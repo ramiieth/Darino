@@ -1,0 +1,37 @@
+/**
+ * فالبک آفلاین لوگوی ۳۲ رمزارز (گرفته‌شده از پاسخ واقعی CoinGecko)
+ * — فقط لوگو؛ قیمت‌ها از API زنده می‌آیند. برای حالت‌های Rate Limit/آفلاین.
+ */
+export const COIN_LOGO_FALLBACK: Record<string, string> = {
+  'AAVE': 'https://coin-images.coingecko.com/coins/images/12645/large/aave-token-round.png?1720472354',
+  'ADA': 'https://coin-images.coingecko.com/coins/images/975/large/cardano.png?1696502090',
+  'APT': 'https://coin-images.coingecko.com/coins/images/26455/large/Aptos-Network-Symbol-Black-RGB-1x.png?1761789140',
+  'ARB': 'https://coin-images.coingecko.com/coins/images/16547/large/arb.jpg?1721358242',
+  'AVAX': 'https://coin-images.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png?1696512369',
+  'BNB': 'https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970',
+  'BTC': 'https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400',
+  'DOGE': 'https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501409',
+  'ENA': 'https://coin-images.coingecko.com/coins/images/36530/large/ethena.png?1711701436',
+  'ETH': 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628',
+  'ETHFI': 'https://coin-images.coingecko.com/coins/images/35958/large/etherfi.jpeg?1710254562',
+  'HYPE': 'https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300',
+  'LINK': 'https://coin-images.coingecko.com/coins/images/877/large/Chainlink_Logo_500.png?1760023405',
+  'LIT': 'https://coin-images.coingecko.com/coins/images/71121/large/lighter.png?1765888098',
+  'LTC': 'https://coin-images.coingecko.com/coins/images/2/large/litecoin.png?1696501400',
+  'MNT': 'https://coin-images.coingecko.com/coins/images/30980/large/MNT_Token_Logo.png?1765516974',
+  'MORPHO': 'https://coin-images.coingecko.com/coins/images/29837/large/Morpho-token-icon.png?1726771230',
+  'NEAR': 'https://coin-images.coingecko.com/coins/images/10365/large/near.jpg?1696510367',
+  'ONDO': 'https://coin-images.coingecko.com/coins/images/26580/large/ONDO.png?1696525656',
+  'PAXG': 'https://coin-images.coingecko.com/coins/images/9519/large/asset-paxg.png?1785284785',
+  'PENDLE': 'https://coin-images.coingecko.com/coins/images/15069/large/Pendle_Logo_Normal-03.png?1696514728',
+  'PEPE': 'https://coin-images.coingecko.com/coins/images/29850/large/pepe-token.jpeg?1696528776',
+  'SHIB': 'https://coin-images.coingecko.com/coins/images/11939/large/shiba.png?1696511800',
+  'SOL': 'https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1718769756',
+  'SUI': 'https://coin-images.coingecko.com/coins/images/26375/large/sui-ocean-square.png?1727791290',
+  'TON': 'https://coin-images.coingecko.com/coins/images/17980/large/Gram_Circular_Badge.png',
+  'UNI': 'https://coin-images.coingecko.com/coins/images/12504/large/uniswap-logo.png?1720676669',
+  'XAUT': 'https://coin-images.coingecko.com/coins/images/10481/large/logo.png?1774627372',
+  'XLM': 'https://coin-images.coingecko.com/coins/images/100/large/fmpFRHHQ_400x400.jpg?1735231350',
+  'XRP': 'https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501442',
+  'ZEC': 'https://coin-images.coingecko.com/coins/images/486/large/Brandmark-Yellow_%281%29.png?1785810558',
+};

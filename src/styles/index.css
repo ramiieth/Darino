@@ -1,0 +1,244 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   دارینو — سیستم طراحی (بازطراحی UI/UX)
+   اصل: آرام، ممتاز، حرفه‌ای — سطح‌های کنترل‌شده به‌جای شیشه
+   ============================================================ */
+
+/* ---------- Design tokens (Light) ---------- */
+:root {
+  --c-surface: 246 247 250;      /* پس‌زمینه — خاکستری سرد ملایم */
+  --c-surface-2: 239 241 246;    /* سطح ثانویه (حوزه ورودی/جدول) */
+  --c-card: 255 255 255;         /* سطح اصلی */
+  --c-line: 15 23 42;            /* خط/حاشیه (با آلفای کم مصرف می‌شود) */
+  --c-ink: 17 24 39;             /* متن اصلی */
+  --c-muted: 100 116 139;        /* متن ثانویه */
+  --c-accent: 13 110 101;        /* برند — سبزآبی عمیق (teal-750): 5.3:1 روی سفید */
+  --c-accent-soft: 214 245 238;
+  --c-positive: 4 120 87;        /* emerald-700: 4.6:1 */
+  --c-negative: 190 18 60;       /* rose-700: 5.6:1 */
+  --c-warn: 180 83 9;            /* amber-700: 4.8:1 */
+  --c-info: 29 78 216;           /* indigo-700: 6.3:1 */
+  color-scheme: light;
+}
+
+/* ---------- Design tokens (Dark) ---------- */
+.dark {
+  --c-surface: 9 13 23;          /* پس‌زمینه — سرمه‌ای عمیق آرام */
+  --c-surface-2: 15 21 36;
+  --c-card: 18 25 42;            /* سطح اصلی */
+  --c-line: 226 232 240;
+  --c-ink: 232 237 247;
+  --c-muted: 148 163 184;
+  --c-accent: 45 212 191;        /* teal-300 — روی سطح تیره */
+  --c-accent-soft: 20 44 46;
+  --c-positive: 52 211 153;
+  --c-negative: 251 113 133;
+  --c-warn: 251 191 36;
+  --c-info: 129 140 248;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface text-ink font-sans antialiased;
+    /* پس‌زمینه آرام — بدون گرادیان‌های رنگی/بلاک‌ها */
+    background-image:
+      linear-gradient(180deg, rgb(var(--c-surface-2) / 0.55), transparent 320px);
+    background-attachment: fixed;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+    font-size: 15px;
+  }
+
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  * {
+    -webkit-font-feature-settings: 'ss01';
+    font-feature-settings: 'ss01';
+  }
+
+  ::selection {
+    background: rgb(var(--c-accent) / 0.25);
+  }
+
+  /* ---------- دسترس‌پذیری: حلقه فوکوس سراسری ---------- */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-accent));
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--c-muted) / 0.3);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* ============================================================
+     سطوح — جایگزین Glassmorphism
+     سه سطح با هماهنگی کامل: default (برجسته) / strong (بیشتر) / soft (کمتر)
+     ============================================================ */
+  .glass {
+    @apply border border-line/10 bg-card shadow-card;
+  }
+  .glass-strong {
+    @apply border border-line/10 bg-card shadow-card-hover;
+  }
+  .glass-soft {
+    @apply border border-line/8 bg-surface-2/60;
+  }
+  .glass-inset {
+    @apply border border-line/10 bg-surface-2/80;
+  }
+
+  /* ---------- ایزوله‌سازی LTR داده‌های مالی ---------- */
+  .num-ltr {
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- Safe-area ---------- */
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+  .pb-safe-nav {
+    padding-bottom: calc(max(env(safe-area-inset-bottom), 0px) + 92px);
+  }
+  .h-safe-nav {
+    height: calc(72px + max(env(safe-area-inset-bottom), 0px));
+  }
+
+  /* ---------- Skeleton (ظریف و آرام) ---------- */
+  .skeleton {
+    @apply rounded-lg;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--c-muted) / 0.07) 25%,
+      rgb(var(--c-muted) / 0.14) 50%,
+      rgb(var(--c-muted) / 0.07) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---------- جدول استاندارد (سطوح داده مات) ---------- */
+  .sim-table {
+    @apply w-full border-separate;
+    border-spacing: 0;
+  }
+  .sim-table thead th {
+    @apply sticky top-0 z-20 whitespace-nowrap px-3 py-2.5 text-[10px] font-bold text-muted;
+    background: rgb(var(--c-card) / 0.98);
+    border-bottom: 1px solid rgb(var(--c-line) / 0.12);
+    letter-spacing: 0.02em;
+  }
+  .sim-table tbody td {
+    @apply whitespace-nowrap border-b border-line/6 px-3 py-2.5 text-[13px];
+  }
+  .sim-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .sim-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .sim-table tbody tr:hover {
+    background: rgb(var(--c-muted) / 0.04);
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold leading-4;
+  }
+
+  /* ---------- لینک پرش به محتوا (دسترس‌پذیری) ---------- */
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus {
+    @apply not-sr-only fixed right-4 top-4 z-[100] rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-accent;
+  }
+
+  /* ---------- تایپوگرافی کمکی ---------- */
+  .num-label {
+    @apply text-[10px] font-bold text-muted;
+    letter-spacing: 0.02em;
+  }
+  .value-main {
+    @apply num-ltr font-extrabold text-ink;
+  }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- حالت چاپ (گزارش PDF) ---------- */
+@media print {
+  body.print-report * {
+    visibility: hidden;
+  }
+  body.print-report .report-print-area,
+  body.print-report .report-print-area * {
+    visibility: visible;
+  }
+  body.print-report .report-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: white;
+    color: black;
+  }
+  body.print-report .report-print-area .num-ltr {
+    direction: ltr;
+  }
+}
+
+/* ---------- انیمیشن‌های سبک (جایگزین framer-motion در shared) ---------- */
+@keyframes darino-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes darino-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes darino-slide-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes darino-pop { from { opacity: 0; transform: translateY(-14px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes darino-toast-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+.anim-fade-in { animation: darino-fade-in 0.25s ease both; }
+.anim-fade-up { animation: darino-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-slide-up { animation: darino-slide-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-pop { animation: darino-pop 0.18s ease both; }
+.anim-toast-in { animation: darino-toast-in 0.22s ease both; }
