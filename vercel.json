@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/health.ts": { "includeFiles": "db/schema.sql" },
+    "api/accounting.ts": { "includeFiles": "db/schema.sql" },
+    "api/portfolio.ts": { "includeFiles": "db/schema.sql" },
+    "api/dashboard.ts": { "includeFiles": "db/schema.sql" }
+  }
+}
