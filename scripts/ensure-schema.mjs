@@ -72,8 +72,24 @@ try {
   const schema = readFileSync(resolve(here, '../db/schema.sql'), 'utf8');
   const statements = splitSqlStatements(schema);
   assertSchemaIsSafe(statements.join(' '));
+  // ⚠️ حتماً sql.query(...) — نه sql.unsafe(...)!
+  // در @neondatabase/serverless، unsafe() فقط یک نشانگر برای درون‌ریزی در
+  // template است و هیچ کوئری‌ای اجرا نمی‌کند (await روی آن بی‌صدا موفق می‌شود).
   for (const st of statements) {
-    await sql.unsafe(st);
+    await sql.query(st);
+  }
+
+  // تأیید نهایی — DDL واقعاً اثر کرد؟ (جلوگیری از موفقیت دروغین)
+  const after = (await sql`SELECT
+    to_regclass('public."accAccounts"') IS NOT NULL AS a,
+    to_regclass('public."accEntries"') IS NOT NULL AS e,
+    to_regclass('public."accLots"') IS NOT NULL AS l,
+    to_regclass('public."accEvents"') IS NOT NULL AS ev,
+    to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
+    to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d`)[0] ?? {};
+  if (!(after.a && after.e && after.l && after.ev && after.p && after.d)) {
+    console.warn('⚠️  DDL اجرا شد اما جداول هنوز موجود نیستند — گارد runtime دوباره تلاش می‌کند.');
+    process.exit(0);
   }
   console.log(`✅ Schema روی Neon اعمال شد (${statements.length} statement — idempotent).`);
 } catch (e) {
