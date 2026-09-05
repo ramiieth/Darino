@@ -34,6 +34,24 @@ export async function cacheGetUniverse(u: MarketUniverse): Promise<MarketAsset[]
   return null;
 }
 
+/**
+ * خواندن هر داده قبلی حتی اگر کهنه باشد (بخش ۲۹: داده قبلی هرگز پاک نمی‌شود).
+ * وقتی شبکه/سهمیه در دسترس نیست، به‌جای «داده ناکافی» آخرین داده واقعی نمایش داده می‌شود.
+ */
+export async function cacheGetUniverseStale(u: MarketUniverse): Promise<MarketAsset[] | null> {
+  try {
+    const rec = await cacheBulkGetPrice([cacheKey(u)]);
+    const r = rec.get(cacheKey(u));
+    const assets = r?.price as unknown as MarketAsset[] | undefined;
+    if (r && Array.isArray(assets) && assets.length > 0) {
+      return assets;
+    }
+  } catch {
+    /* ادامه */
+  }
+  return null;
+}
+
 /** نوشتن کش */
 export async function cachePutUniverse(u: MarketUniverse, assets: MarketAsset[]): Promise<void> {
   try {

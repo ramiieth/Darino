@@ -29,9 +29,9 @@ vi.mock('@/shared/lib/coingeckoGate', () => ({
 
 import { normalizeRow, isValidTokenized } from './normalize';
 import { assetId, type MarketAsset, type MarketSource } from './types';
-import { cacheGetUniverse, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
+import { cacheGetUniverse, cacheGetUniverseStale, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
 import { syncUniverse, useMarketsStore, refreshAllMarkets } from './store';
-import { cacheClearPrices } from '@/shared/lib/db';
+import { cacheClearPrices, cachePutPrice } from '@/shared/lib/db';
 
 // پاک‌سازی کامل بین تست‌ها (استور + کش مرکزی)
 beforeEach(async () => {
@@ -141,6 +141,27 @@ describe('Cache مرکزی (بخش ۱۸)', () => {
     expect(UNIVERSE_TTL_MS.crypto_top_200).toBeLessThanOrEqual(120_000);
     expect(UNIVERSE_TTL_MS.ondo_tokenized).toBeGreaterThanOrEqual(10 * 60_000);
   });
+
+  it('TTL منقضی → کش تازه null ولی داده قبلی همچنان در دسترس (بخش ۲۹)', async () => {
+    const assets: MarketAsset[] = [normalizeRow({ id: 'x', symbol: 'T', current_price: 1, market_cap: 1000 }, 'ondo', 1)];
+    // شبیه‌سازی کش قدیمی: fetchedAt = 0 (خیلی کهنه‌تر از TTL)
+    await cachePutPrice('markets:v2:ondo_tokenized', { price: assets as unknown as number, source: 'live', fetchedAt: 0 });
+
+    expect(await cacheGetUniverse('ondo_tokenized')).toBeNull();
+    const stale = await cacheGetUniverseStale('ondo_tokenized');
+    expect(stale).not.toBeNull();
+    expect(stale![0].symbol).toBe('T');
+  });
+
+  it('استور هرگز از داده قبلی خالی نمی‌شود (setCached، بدون جعل زمان همگام‌سازی)', async () => {
+    const assets: MarketAsset[] = [normalizeRow({ id: 'x', symbol: 'T', current_price: 1, market_cap: 1000 }, 'xstocks', 1)];
+    await cachePutPrice('markets:v2:xstocks', { price: assets as unknown as number, source: 'live', fetchedAt: 0 });
+    const st0 = useMarketsStore.getState();
+    st0.setCached('xstocks', assets, null);
+    const st1 = useMarketsStore.getState();
+    expect(st1.data.xstocks).toHaveLength(1);
+    expect(st1.lastSyncAt.xstocks).toBeNull(); // lastSyncAt دست‌نخورده می‌ماند
+  });
 });
 
 describe('Sync — dedup و شکست‌ایمن (بخش ۱۹/۲۹)', () => {
@@ -185,6 +206,19 @@ describe('Sync — dedup و شکست‌ایمن (بخش ۱۹/۲۹)', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it('با کش کهنه + شکست شبکه → داده قبلی نمایش داده می‌شود (نه «داده ناکافی»)', async () => {
+    const assets: MarketAsset[] = [normalizeRow({ id: 'x', symbol: 'T', current_price: 1, market_cap: 1000 }, 'crypto', 1)];
+    await cachePutPrice('markets:v2:crypto_top_200', { price: assets as unknown as number, source: 'live', fetchedAt: 0 });
+
+    const spy = vi.spyOn(await import('./fetch'), 'fetchUniverseAssets').mockRejectedValueOnce(new Error('offline/429'));
+    await syncUniverse('crypto_top_200');
+    spy.mockRestore();
+
+    const st = useMarketsStore.getState();
+    expect(st.data.crypto_top_200).toHaveLength(1); // حفظ داده واقعی قبلی
+    expect(st.error.crypto_top_200).toContain('offline/429');
   });
 });
 

@@ -12,6 +12,7 @@ import { Search } from 'lucide-react';
 import { GlassCard } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { hydrateUniverse, syncUniverse, useMarketsStore } from '../pipeline/store';
+import { useMarkets } from '../pipeline/useMarkets';
 import type { MarketAsset, MarketSource, MarketUniverse } from '../pipeline/types';
 
 const PAGE = 50;
@@ -34,13 +35,23 @@ export function MarketsTable({
   const [limit, setLimit] = useState(PAGE);
   const [tab, setTab] = useState<'all' | MarketSource>('all');
 
+  // تنظیم موتور Refresh مرکزی: هر Universe همیشه یک تایمر/retry خودکار دارد
+  // (حتی وقتی فعلاً در تب فعال نیست — بدون درخواست تکراری به لطف dedup)
+  useMarkets('crypto_top_200');
+  useMarkets('ondo_tokenized');
+  useMarkets('xstocks');
+
   // شروع همگام‌سازی: کش تازه ← fetch (dedup مرکزی) — فقط همین Universeها
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       for (const u of universes) {
-        const cached = await hydrateUniverse(u);
-        if (!cancelled && cached.length === 0) void syncUniverse(u);
+        // ۱) نمایش سریع داده قبلی (حتی کهنه) — بدون انتظار شبکه
+        await hydrateUniverse(u);
+        if (cancelled) return;
+        // ۲) همیشه همگام‌سازی: کش تازه → بازگشت فوری و بدون شبکه؛
+        //    کش کهنه → رفرش پس‌زمینه؛ بدون کش → fetch (هرگز داده قبلی پاک نمی‌شود)
+        void syncUniverse(u);
       }
     })();
     return () => {
@@ -52,6 +63,11 @@ export function MarketsTable({
   // selectors جزئی — فقط داده همین جدول
   const data = useMarketsStore((s) => s.data);
   const loading = useMarketsStore((s) => s.loading);
+  const error = useMarketsStore((s) => s.error);
+
+  const retry = () => {
+    for (const u of universes) void syncUniverse(u);
+  };
 
   const assets = useMemo(() => {
     const list = universes.flatMap((u) => data[u]);
@@ -68,6 +84,7 @@ export function MarketsTable({
   }, [assets, query, tab]);
 
   const anyLoading = universes.some((u) => loading[u]);
+  const anyError = universes.some((u) => error[u]);
   const isSingle = universes.length === 1;
 
   return (
@@ -115,8 +132,20 @@ export function MarketsTable({
         <div className="p-6 text-center">
           <p className="text-[11px] font-black text-warn">داده ناکافی</p>
           <p className="mt-1 text-[10px] font-bold text-muted">
-            {query ? 'موردی با این جستجو پیدا نشد.' : 'در همگام‌سازی بعدی تلاش دوباره می‌شود — داده قبلی هرگز پاک نمی‌شود.'}
+            {query
+              ? 'موردی با این جستجو پیدا نشد.'
+              : anyError
+                ? 'اتصال به Provider برقرار نشد؛ تلاش خودکار ادامه دارد — داده قبلی هرگز پاک نمی‌شود.'
+                : 'در همگام‌سازی بعدی تلاش دوباره می‌شود — داده قبلی هرگز پاک نمی‌شود.'}
           </p>
+          {!query && anyError && (
+            <button
+              onClick={retry}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full glass-inset px-3 py-1.5 text-[10px] font-black text-ink transition-all hover:text-accent"
+            >
+              همگام‌سازی دوباره
+            </button>
+          )}
         </div>
       ) : (
         <>
