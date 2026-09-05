@@ -138,9 +138,9 @@ export function PriceFormSheet({ open, onClose }: { open: boolean; onClose: () =
         <div className="rounded-xl border border-line/10 bg-surface-2/40 p-2">
           <p className="mb-1.5 text-[9px] font-black text-ink">تاریخ ارزش‌گذاری (شمسی)</p>
           <div className="grid grid-cols-3 gap-2">
-            <Input dir="ltr" value={jy} onChange={(e) => setJy(e.target.value)} className="h-8 text-[10px] text-start" placeholder="سال" />
-            <Input dir="ltr" value={jm} onChange={(e) => setJm(e.target.value)} className="h-8 text-[10px] text-start" placeholder="ماه" />
-            <Input dir="ltr" value={jd} onChange={(e) => setJd(e.target.value)} className="h-8 text-[10px] text-start" placeholder="روز" />
+            <Input dir="ltr" value={jy} onChange={(e) => setJy(e.target.value)} className="h-9 text-[10px] text-start" placeholder="سال" />
+            <Input dir="ltr" value={jm} onChange={(e) => setJm(e.target.value)} className="h-9 text-[10px] text-start" placeholder="ماه" />
+            <Input dir="ltr" value={jd} onChange={(e) => setJd(e.target.value)} className="h-9 text-[10px] text-start" placeholder="روز" />
           </div>
           {dateLabel && (
             <p className="mt-1 text-[8px] font-medium text-muted">
@@ -153,11 +153,11 @@ export function PriceFormSheet({ open, onClose }: { open: boolean; onClose: () =
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">قیمت هر مترمربع (تومان) *</label>
-            <Input dir="ltr" value={pricePerSqm} onChange={(e) => setPricePerSqm(e.target.value)} placeholder="مثلاً 50000000" className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={pricePerSqm} onChange={(e) => setPricePerSqm(e.target.value)} placeholder="مثلاً 50000000" className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">نرخ دلار همان روز</label>
-            <Input dir="ltr" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
         </div>
         <div className="rounded-lg bg-line/5 p-2 text-[9px] font-bold">

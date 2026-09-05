@@ -143,10 +143,10 @@ export function StablecoinsCG() {
                 <span className={cn('num-ltr text-[10px] font-bold', c.price_change_percentage_24h !== null && c.price_change_percentage_24h !== undefined && c.price_change_percentage_24h !== 0 ? pnlClass(c.price_change_percentage_24h) : 'text-muted')}>
                   {c.price_change_percentage_24h !== null && c.price_change_percentage_24h !== undefined ? fmtPct(c.price_change_percentage_24h) : '—'}
                 </span>
-              </div>
-              <div className="hidden w-24 shrink-0 text-end sm:block">
-                <p className="text-[8px] font-bold text-muted">مارکت‌کپ</p>
-                <p className="num-ltr text-[10px] font-black text-ink">{c.market_cap ? fmtUSD(c.market_cap, true) : '—'}</p>
+                {/* مارکت‌کپ در همه عرض‌ها (Reflow — بدون Hide در Mobile) */}
+                <span className="num-ltr text-[8px] font-bold text-muted/70">
+                  MCap: {c.market_cap ? fmtUSD(c.market_cap, true) : '—'}
+                </span>
               </div>
             </motion.div>
           );

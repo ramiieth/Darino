@@ -135,7 +135,7 @@ export function CompareCalculator() {
   return (
     <div className="space-y-4">
       <GlassCard className="space-y-3 p-4">
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <div className="col-span-1">
             <label className="mb-1 block text-[11px] font-bold text-muted">سرمایه اولیه ($)</label>
             <Input dir="ltr" inputMode="decimal" value={invest} onChange={(e) => setInvest(e.target.value)} className="h-10 text-xs text-start" />

@@ -70,21 +70,21 @@ export function OrderPreviewPanel({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div>
           <label className="mb-1 block text-[9px] font-bold text-muted">حجم (YU)</label>
-          <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} className="h-8 text-[10px] text-start" />
+          <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} className="h-9 text-[10px] text-start" />
         </div>
         <div>
           <label className="mb-1 block text-[9px] font-bold text-muted">Collateral موجود (ETH)</label>
-          <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} className="h-8 text-[10px] text-start" />
+          <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} className="h-9 text-[10px] text-start" />
         </div>
         <div>
           <label className="mb-1 block text-[9px] font-bold text-muted">جهت</label>
-          <p className={cn('h-8 rounded-lg px-2 py-1.5 text-[10px] font-black', direction === 'long' ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative')}>
+          <p className={cn('h-9 rounded-lg px-2 py-1.5 text-[10px] font-black', direction === 'long' ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative')}>
             {direction === 'long' ? 'لانگ' : 'شورت'}
           </p>
         </div>
         <div>
           <label className="mb-1 block text-[9px] font-bold text-muted">Fixed APR</label>
-          <p className="num-ltr h-8 rounded-lg bg-surface-2 px-2 py-1.5 text-[10px] font-black text-ink">
+          <p className="num-ltr h-9 rounded-lg bg-surface-2 px-2 py-1.5 text-[10px] font-black text-ink">
             {fmtPct((fixedRate ?? market.markApr) * 100)}
           </p>
         </div>

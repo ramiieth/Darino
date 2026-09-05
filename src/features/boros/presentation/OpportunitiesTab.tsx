@@ -409,7 +409,7 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
                 <tr key={a.marketId} className="border-t border-line/5">
                   <td className="px-1.5 py-1.5">
                     <p className="font-extrabold text-ink">{a.asset} · {a.venue}</p>
-                    <p className="num-ltr text-[7px] text-muted">{a.daysToMaturity} روز · {new Date(a.maturity * 1000).toLocaleDateString('fa-IR')}</p>
+                    <p className="num-ltr text-[8px] text-muted">{a.daysToMaturity} روز · {new Date(a.maturity * 1000).toLocaleDateString('fa-IR')}</p>
                   </td>
                   <td className="num-ltr px-1.5 py-1.5 text-end text-ink">{fmtPct(a.impliedApr * 100)}</td>
                   <td className="num-ltr px-1.5 py-1.5 text-end text-ink">{fmtPct(a.underlyingApr * 100)}</td>

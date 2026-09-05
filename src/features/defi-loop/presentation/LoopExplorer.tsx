@@ -213,13 +213,13 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <select value={chain} onChange={(e) => setChain(e.target.value)} className="glass-inset h-8 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
+          <select value={chain} onChange={(e) => setChain(e.target.value)} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
             {chains.map((c) => <option key={c}>{c}</option>)}
           </select>
-          <select value={project} onChange={(e) => setProject(e.target.value)} className="glass-inset h-8 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
+          <select value={project} onChange={(e) => setProject(e.target.value)} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
             {projects.map((c) => <option key={c}>{c}</option>)}
           </select>
-          <select value={minTvl} onChange={(e) => setMinTvl(Number(e.target.value))} className="glass-inset h-8 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
+          <select value={minTvl} onChange={(e) => setMinTvl(Number(e.target.value))} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
             <option value={0}>TVL: همه</option>
             <option value={100000}>TVL &gt; $100K</option>
             <option value={500000}>TVL &gt; $500K</option>
@@ -228,7 +228,7 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
             <option value={5000000}>TVL &gt; $5M</option>
             <option value={10000000}>TVL &gt; $10M</option>
           </select>
-          <select value={minApy} onChange={(e) => setMinApy(Number(e.target.value))} className="glass-inset h-8 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
+          <select value={minApy} onChange={(e) => setMinApy(Number(e.target.value))} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
             <option value={0}>APY: همه</option>
             <option value={5}>APY &gt; 5%</option>
             <option value={10}>APY &gt; 10%</option>

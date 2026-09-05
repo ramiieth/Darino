@@ -139,27 +139,27 @@ export function LoopCalculator({ pool, onClose }: { pool: YieldPool; onClose: ()
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">LTV (مثلاً 0.75 یا 75)</label>
-              <Input dir="ltr" value={ltv} onChange={(e) => setLtv(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={ltv} onChange={(e) => setLtv(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">Liquidation Threshold</label>
-              <Input dir="ltr" value={lt} onChange={(e) => setLt(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={lt} onChange={(e) => setLt(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">Borrow APY (درصد یا اعشار)</label>
-              <Input dir="ltr" value={borrowApy} onChange={(e) => setBorrowApy(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={borrowApy} onChange={(e) => setBorrowApy(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">Borrow Incentive (پاداش)</label>
-              <Input dir="ltr" value={borrowReward} onChange={(e) => setBorrowReward(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={borrowReward} onChange={(e) => setBorrowReward(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">Gas/Loop ($)</label>
-              <Input dir="ltr" value={gasPerLoop} onChange={(e) => setGasPerLoop(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={gasPerLoop} onChange={(e) => setGasPerLoop(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
             <div>
               <label className="mb-1 block text-[9px] font-bold text-muted">Slippage ($)</label>
-              <Input dir="ltr" value={slippage} onChange={(e) => setSlippage(e.target.value)} className="h-8 text-[10px] text-start" />
+              <Input dir="ltr" value={slippage} onChange={(e) => setSlippage(e.target.value)} className="h-9 text-[10px] text-start" />
             </div>
           </div>
         </div>
@@ -261,7 +261,7 @@ export function LoopCalculator({ pool, onClose }: { pool: YieldPool; onClose: ()
                   <p className={cn('num-ltr text-[10px] font-black', s.risk === 'ok' ? 'text-positive' : s.risk === 'warning' ? 'text-warn' : 'text-negative')}>
                     {s.hf !== null ? s.hf.toFixed(2) : 'N/A'}
                   </p>
-                  <p className={cn('text-[7px] font-bold', s.risk === 'ok' ? 'text-positive' : s.risk === 'warning' ? 'text-warn' : 'text-negative')}>
+                  <p className={cn('text-[8px] font-bold', s.risk === 'ok' ? 'text-positive' : s.risk === 'warning' ? 'text-warn' : 'text-negative')}>
                     {s.risk === 'ok' ? 'OK' : s.risk === 'warning' ? 'هشدار' : 'لیکوییدیشن'}
                   </p>
                 </div>

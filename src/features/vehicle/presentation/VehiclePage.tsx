@@ -490,7 +490,7 @@ function VehicleDetail({
               <div key={b.asset} className="flex items-center justify-between gap-2 rounded-lg bg-card px-2 py-1.5 shadow-card">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black text-ink">{BENCHMARK_FA[b.asset]}</p>
-                  <p className="num-ltr text-[7px] font-medium text-muted">
+                  <p className="num-ltr text-[8px] font-medium text-muted">
                     {b.startPriceUsd !== null ? fmtUsdAmount(b.startPriceUsd) : 'N/A'} ← {b.endPriceUsd !== null ? fmtUsdAmount(b.endPriceUsd) : 'N/A'}
                   </p>
                 </div>
@@ -500,7 +500,7 @@ function VehicleDetail({
                 </div>
               </div>
             ))}
-            <p className="pt-1 text-[7px] font-medium leading-3.5 text-muted/70">
+            <p className="pt-1 text-[9px] font-medium leading-4 text-muted/70">
               بازدهی دلاری = تغییر قیمت دارایی به دلار · بازدهی تومانی = ترکیب تغییر قیمت دارایی و تغییر نرخ دلار
               (نرخ دلار پایان از Snapshot خودرو). داده تاریخی ممکن است تا ۴ روز با تاریخ Snapshot فاصله داشته باشد.
             </p>

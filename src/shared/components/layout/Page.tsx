@@ -31,8 +31,14 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn('anim-fade-up mb-5 flex items-start justify-between gap-3', className)}>
-      <div className="min-w-0">
+    <header
+      className={cn(
+        // در عرض‌های باریک: Actions به خط دوم می‌روند (بدون فشار بر عنوان)
+        'anim-fade-up mb-5 flex flex-wrap items-start justify-between gap-x-3 gap-y-2',
+        className
+      )}
+    >
+      <div className="min-w-0 flex-1 basis-48">
         <h1 className="text-lg font-extrabold leading-snug tracking-tight text-ink md:text-2xl md:font-black">
           {title}
         </h1>

@@ -19,6 +19,7 @@ export function Sparkline({
   if (!points || points.length < 2) {
     return <div style={{ width, height }} className="text-center text-[8px] text-muted">—</div>;
   }
+
   const vals = points.map((p) => p.tvl);
   const min = Math.min(...vals);
   const max = Math.max(...vals);
@@ -37,7 +38,8 @@ export function Sparkline({
   const up = last.tvl >= first.tvl;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="shrink-0">
+    // Responsive: SVG به عرض کانتینر مقصد مقیاس می‌شود (بدون تغییر داده/منطق)
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block h-7 w-full">
       <defs>
         <linearGradient id={`sg-${gid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={color} stopOpacity="0.28" />

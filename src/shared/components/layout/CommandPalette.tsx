@@ -149,8 +149,9 @@ export function CommandPalette({
         onClick={onClose}
         aria-hidden
       />
+      {/* پالت فرمان — زیر TopBar، با در نظر گرفتن Safe Area (نوتچ در standalone) */}
       <div
-        className="anim-pop fixed inset-x-4 top-20 z-[80] mx-auto max-w-md overflow-hidden rounded-2xl border border-line/10 bg-card shadow-pop"
+        className="anim-pop fixed inset-x-4 top-[calc(4.5rem+env(safe-area-inset-top,0px))] z-[80] mx-auto max-w-md overflow-hidden rounded-2xl border border-line/10 bg-card shadow-pop"
         role="dialog"
         aria-label={t('paletteTitle')}
       >

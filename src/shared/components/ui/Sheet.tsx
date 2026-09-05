@@ -80,7 +80,7 @@ export function Sheet({
         aria-label={title ?? 'dialog'}
         className={cn(
           'anim-slide-up fixed inset-x-0 bottom-0 z-50 mx-auto max-w-lg rounded-t-2xl border-t border-line/10 bg-card p-5 shadow-pop outline-none',
-          'pb-safe max-h-[85dvh] overflow-y-auto',
+          'pb-safe max-h-[85dvh] overflow-y-auto overscroll-contain',
           className
         )}
         onPointerDown={(e) => {
@@ -116,7 +116,7 @@ export function Sheet({
           <h2 className="text-base font-extrabold text-ink">{title ?? ''}</h2>
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-muted transition-colors hover:bg-line/5"
+            className="rounded-xl p-2.5 text-muted transition-colors hover:bg-line/5"
             aria-label={t('close')}
           >
             <X className="h-4 w-4" />

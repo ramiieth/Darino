@@ -197,7 +197,7 @@ export function TradePanel() {
                 )}
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <Field label="کارمزد ($)">
                 <Input
                   dir="ltr"
@@ -288,7 +288,7 @@ export function TradePanel() {
                 )}
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <Field label="کارمزد ($)">
                 <Input
                   dir="ltr"

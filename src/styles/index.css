@@ -56,6 +56,9 @@
     min-height: 100dvh;
     text-rendering: optimizeLegibility;
     font-size: 15px;
+    /* تضمین سراسری: هیچ عنصری نباید اسکرول افقی Body ایجاد کند
+       (clip = بدون ساخت Scroll Container — Stickyها دست‌نخورده می‌مانند) */
+    overflow-x: clip;
   }
 
   html,
@@ -151,6 +154,15 @@
   .tnum {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
+  }
+
+  /* ---------- ریل‌های اسکرولی موبایل (تب/چیپ) بدون نوار اسکرول ---------- */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 
   /* ---------- جدول استاندارد (سطوح داده مات) ---------- */

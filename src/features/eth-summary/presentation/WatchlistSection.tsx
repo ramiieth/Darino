@@ -95,7 +95,7 @@ export function WatchlistSection() {
                 void remove(r.symbol);
                 toast('info', t('removedFromWatch'));
               }}
-              className="rounded-lg p-1.5 text-muted hover:bg-negative/10 hover:text-negative"
+              className="rounded-lg p-2 text-muted hover:bg-negative/10 hover:text-negative"
               aria-label={t('removeFromWatch')}
             >
               <X className="h-3.5 w-3.5" />

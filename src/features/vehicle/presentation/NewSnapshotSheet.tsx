@@ -228,22 +228,22 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
         </div>
 
         {/* تاریخ + نرخ دلار (مشترک) */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">سال</label>
-            <Input dir="ltr" value={jy} onChange={(e) => setJy(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={jy} onChange={(e) => setJy(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">ماه</label>
-            <Input dir="ltr" value={jm} onChange={(e) => setJm(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={jm} onChange={(e) => setJm(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">روز</label>
-            <Input dir="ltr" value={jd} onChange={(e) => setJd(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={jd} onChange={(e) => setJd(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">نرخ دلار روز</label>
-            <Input dir="ltr" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
         </div>
         {dateLabel && <p className="text-[9px] font-bold text-ink">تاریخ: {dateLabel}</p>}
@@ -293,17 +293,17 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
                       {v.modelYear && <span className="num-ltr text-[8px] text-muted"> ({v.modelYear})</span>}
                     </p>
                     {prices[v.id] && (
-                      <p className="num-ltr text-[7px] font-medium text-muted">
+                      <p className="num-ltr text-[8px] font-medium text-muted">
                         قبلی: {fmtTomanAmount(Number(prices[v.id]))}
                       </p>
                     )}
                   </div>
                   <div className="w-28">
-                    <label className="block text-[7px] font-bold text-muted">بازار (تومان)</label>
+                    <label className="block text-[9px] font-bold text-muted">بازار (تومان)</label>
                     <Input dir="ltr" value={prices[v.id] ?? ''} onChange={(e) => setPrices((p) => ({ ...p, [v.id]: e.target.value }))} className="h-7 text-[9px] text-start" />
                   </div>
                   <div className="w-28">
-                    <label className="block text-[7px] font-bold text-muted">نمایندگی (تومان)</label>
+                    <label className="block text-[9px] font-bold text-muted">نمایندگی (تومان)</label>
                     <Input dir="ltr" value={dealerPrices[v.id] ?? ''} onChange={(e) => setDealerPrices((p) => ({ ...p, [v.id]: e.target.value }))} className="h-7 text-[9px] text-start" />
                   </div>
                 </div>
@@ -325,22 +325,22 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">برند *</label>
-                <Input dir="rtl" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="مثلاً: چری" className="h-8 text-[10px]" />
+                <Input dir="rtl" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="مثلاً: چری" className="h-9 text-[10px]" />
               </div>
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">نام مدل *</label>
-                <Input dir="rtl" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثلاً: تیگو ۹" className="h-8 text-[10px]" />
+                <Input dir="rtl" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثلاً: تیگو ۹" className="h-9 text-[10px]" />
               </div>
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">سال/مدل (اختیاری)</label>
-                <Input dir="ltr" value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="1405 یا 2025" className="h-8 text-[10px] text-start" />
+                <Input dir="ltr" value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="1405 یا 2025" className="h-9 text-[10px] text-start" />
               </div>
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">دسته</label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as 'imported' | 'domestic')}
-                  className="h-8 w-full rounded-xl border border-line/15 bg-card px-2 text-[10px] font-bold text-ink shadow-card outline-none"
+                  className="h-9 w-full rounded-xl border border-line/15 bg-card px-2 text-[10px] font-bold text-ink shadow-card outline-none"
                 >
                   <option value="domestic">داخلی</option>
                   <option value="imported">وارداتی</option>
@@ -348,11 +348,11 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
               </div>
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">قیمت بازار (تومان) *</label>
-                <Input dir="ltr" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} placeholder="مثلاً 2500000000" className="h-8 text-[10px] text-start" />
+                <Input dir="ltr" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} placeholder="مثلاً 2500000000" className="h-9 text-[10px] text-start" />
               </div>
               <div>
                 <label className="mb-1 block text-[9px] font-bold text-muted">قیمت نمایندگی (اختیاری)</label>
-                <Input dir="ltr" value={newDealer} onChange={(e) => setNewDealer(e.target.value)} className="h-8 text-[10px] text-start" />
+                <Input dir="ltr" value={newDealer} onChange={(e) => setNewDealer(e.target.value)} className="h-9 text-[10px] text-start" />
               </div>
             </div>
 

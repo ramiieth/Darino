@@ -97,7 +97,7 @@ export function JournalPanel() {
         <div className="space-y-2.5">
           {quick === 'manual' ? (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-bold text-muted">حساب بدهکار</label>
                   <select
@@ -182,8 +182,9 @@ export function JournalPanel() {
                 >
                   {/* سربرگ سند — شماره + منبع + تاریخ */}
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-[11px] font-extrabold text-ink">
-                      <span className="num-ltr inline-flex min-w-[34px] items-center rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-black text-muted">
+                    {/* Memo کاربر داده مهم است — wrap می‌شود، truncate نمی‌شود */}
+                    <p className="min-w-0 text-[11px] font-extrabold leading-5 text-ink">
+                      <span className="num-ltr inline-flex min-w-[34px] items-center rounded-md bg-surface-2 px-1.5 py-0.5 align-middle text-[10px] font-black text-muted">
                         #{e.id}
                       </span>{' '}
                       {e.memo}
@@ -220,7 +221,7 @@ export function JournalPanel() {
                     {e.source !== 'reversal' && (
                       <button
                         onClick={() => void reverse(e)}
-                        className="flex items-center gap-1 rounded-lg border border-negative/20 px-2 py-1 text-[9px] font-bold text-negative transition-colors hover:bg-negative/8"
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-negative/20 px-2.5 py-1.5 text-[10px] font-bold text-negative transition-colors hover:bg-negative/8"
                       >
                         <Undo2 className="h-3 w-3" /> ثبت معکوس
                       </button>
