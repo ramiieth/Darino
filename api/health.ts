@@ -8,8 +8,8 @@
  * هرگز Secret/Password/DATABASE_URL را نمایش نمی‌دهد.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { db, isDbConfigured, json } from './_neon';
-import { ensureSchema } from './_schema';
+import { db, isDbConfigured, json } from './_neon.js';
+import { ensureSchema } from './_schema.js';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'GET') {
