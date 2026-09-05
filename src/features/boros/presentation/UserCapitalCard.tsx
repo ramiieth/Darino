@@ -73,7 +73,7 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
       </div>
 
       {/* Economics */}
-      <div className="mt-1.5 grid grid-cols-4 gap-1.5 text-[9px] font-bold">
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[9px] font-bold sm:grid-cols-4">
         <div className="rounded-lg bg-line/5 px-2 py-1">
           <p className="flex items-center gap-1 text-muted">Settlement <ProvenanceBadge kind="calculated" /></p>
           <p className={cn('num-ltr', o.settlementPnl >= 0 ? 'text-positive' : 'text-negative')}>
@@ -130,7 +130,7 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
           {liqAvail ? `${o.liquidationApr.value!.toFixed(2)}٪` : 'N/A'}
         </span>
       </div>
-      <p className="mt-1 text-[7px] font-medium leading-3.5 text-muted/70">
+      <p className="mt-1 text-[9px] font-medium leading-4 text-muted/70">
         Liquidation APR فقط با Position واقعی Boros (Collateral واقعی + وضعیت Position) قابل محاسبه است — این ارزیابی بر اساس Collateral شبیهسازی است.
       </p>
     </GlassCard>

@@ -263,19 +263,19 @@ export function OpportunitiesExplorer() {
           </select>
           <ArrowUpDown className="h-3.5 w-3.5 text-muted" />
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           <FilterInput label="حداقل APY ٪" value={minApy} onChange={setMinApy} />
           <FilterInput label="حداقل TVL (M$)" value={minTvl} onChange={setMinTvl} />
           <div>
             <label className="mb-0.5 block text-[8px] font-bold text-muted">زنجیره</label>
-            <select value={chain} onChange={(e) => setChain(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="glass-inset h-8 w-full rounded-lg px-1 text-[9px] font-bold text-ink outline-none">
+            <select value={chain} onChange={(e) => setChain(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="glass-inset h-9 w-full rounded-lg px-1 text-[9px] font-bold text-ink outline-none">
               <option value="all">همه</option>
               {chains.map((c) => <option key={c} value={c}>{chainName(c)}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-0.5 block text-[8px] font-bold text-muted">نوع</label>
-            <select value={type} onChange={(e) => setType(e.target.value as PendleMarketType | 'all')} className="glass-inset h-8 w-full rounded-lg px-1 text-[9px] font-bold text-ink outline-none">
+            <select value={type} onChange={(e) => setType(e.target.value as PendleMarketType | 'all')} className="glass-inset h-9 w-full rounded-lg px-1 text-[9px] font-bold text-ink outline-none">
               <option value="all">همه</option>
               {(['LP', 'PT', 'YT', 'SY'] as PendleMarketType[]).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -315,8 +315,8 @@ export function OpportunitiesExplorer() {
 function FilterInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-0.5 block text-[8px] font-bold text-muted">{label}</label>
-      <input dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" className="glass-inset h-8 w-full rounded-lg px-1.5 text-center text-[9px] font-bold text-ink outline-none" />
+      <label className="mb-0.5 block text-[9px] font-bold text-muted">{label}</label>
+      <input dir="ltr" value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" className="glass-inset h-9 w-full rounded-lg px-1.5 text-center text-[10px] font-bold text-ink outline-none" />
     </div>
   );
 }

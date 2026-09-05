@@ -303,13 +303,15 @@ export function TvlFlowDashboard() {
                       </p>
                     </div>
                     {c.history ? (
-                      <Sparkline points={downsample(c.history, 40)} positive={positive} />
+                      <span className="w-20 shrink-0 sm:w-24">
+                        <Sparkline points={downsample(c.history, 40)} positive={positive} />
+                      </span>
                     ) : (
-                      <span className="w-24 text-center text-[9px] text-muted/60">
+                      <span className="w-20 text-center text-[9px] text-muted/60 sm:w-24">
                         {c.loadingHist ? '…' : 'تاریخچه'}
                       </span>
                     )}
-                    <div className="w-28 shrink-0 text-end">
+                    <div className="w-[92px] shrink-0 text-end sm:w-28">
                       <ChangeBadge c={ch} />
                     </div>
                   </button>

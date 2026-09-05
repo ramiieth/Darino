@@ -7,7 +7,13 @@ export interface SegmentOption<T extends string> {
   badge?: number;
 }
 
-/** کنترل بخش‌بندی — ریل ظریف با شاخص حرکت (بدون پیل شیشه‌ای) */
+/**
+ * کنترل بخش‌بندی — ریل ظریف با شاخص حرکت (بدون پیل شیشه‌ای)
+ *
+ * Responsive: در Mobile (کمتر از md) ریل افقی Scroll می‌شود و هر تب
+ * عرض محتوای خودش را نگه می‌دارد (بدون فشردن/بریده‌شدن Labelها)؛
+ * از md به بالا تب‌ها عرض را به‌طور مساوی پر می‌کنند (رفتار قبلی).
+ */
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -22,7 +28,7 @@ export function SegmentedControl<T extends string>({
   return (
     <div
       className={cn(
-        'flex w-full items-center gap-1 border-b border-line/10',
+        'no-scrollbar flex w-full items-center gap-1 overflow-x-auto border-b border-line/10',
         className
       )}
       role="tablist"
@@ -36,7 +42,7 @@ export function SegmentedControl<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'relative flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-bold transition-colors',
+              'relative flex h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 text-xs font-bold transition-colors md:flex-1 md:shrink md:px-0',
               active ? 'text-accent' : 'text-muted hover:text-ink'
             )}
           >

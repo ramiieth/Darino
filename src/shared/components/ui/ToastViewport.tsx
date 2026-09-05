@@ -19,8 +19,9 @@ export function ToastViewport() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
 
+  // بالای BottomNav — با در نظر گرفتن Safe Area پایین (حالت standalone)
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[90] flex flex-col items-center gap-2 px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-6">
         {toasts.map((toast) => {
           const Icon = ICONS[toast.type];
           return (

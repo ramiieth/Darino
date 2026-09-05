@@ -173,9 +173,9 @@ export function AssetFormSheet({ open, onClose }: { open: boolean; onClose: () =
         <div className="rounded-xl border border-line/10 bg-surface-2/40 p-2">
           <p className="mb-1.5 text-[9px] font-black text-ink">تاریخ تملک (شمسی)</p>
           <div className="grid grid-cols-3 gap-2">
-            <Input dir="ltr" value={ownY} onChange={(e) => setOwnY(e.target.value)} className="h-8 text-[10px] text-start" placeholder="سال" />
-            <Input dir="ltr" value={ownM} onChange={(e) => setOwnM(e.target.value)} className="h-8 text-[10px] text-start" placeholder="ماه" />
-            <Input dir="ltr" value={ownD} onChange={(e) => setOwnD(e.target.value)} className="h-8 text-[10px] text-start" placeholder="روز" />
+            <Input dir="ltr" value={ownY} onChange={(e) => setOwnY(e.target.value)} className="h-9 text-[10px] text-start" placeholder="سال" />
+            <Input dir="ltr" value={ownM} onChange={(e) => setOwnM(e.target.value)} className="h-9 text-[10px] text-start" placeholder="ماه" />
+            <Input dir="ltr" value={ownD} onChange={(e) => setOwnD(e.target.value)} className="h-9 text-[10px] text-start" placeholder="روز" />
           </div>
           {ownDateJalali && (
             <p className="mt-1 text-[8px] font-medium text-muted">
@@ -188,9 +188,9 @@ export function AssetFormSheet({ open, onClose }: { open: boolean; onClose: () =
         <div className="rounded-xl border border-line/10 bg-surface-2/40 p-2">
           <p className="mb-1.5 text-[9px] font-black text-ink">تاریخ ارزش‌گذاری (شمسی)</p>
           <div className="grid grid-cols-3 gap-2">
-            <Input dir="ltr" value={valY} onChange={(e) => setValY(e.target.value)} className="h-8 text-[10px] text-start" placeholder="سال" />
-            <Input dir="ltr" value={valM} onChange={(e) => setValM(e.target.value)} className="h-8 text-[10px] text-start" placeholder="ماه" />
-            <Input dir="ltr" value={valD} onChange={(e) => setValD(e.target.value)} className="h-8 text-[10px] text-start" placeholder="روز" />
+            <Input dir="ltr" value={valY} onChange={(e) => setValY(e.target.value)} className="h-9 text-[10px] text-start" placeholder="سال" />
+            <Input dir="ltr" value={valM} onChange={(e) => setValM(e.target.value)} className="h-9 text-[10px] text-start" placeholder="ماه" />
+            <Input dir="ltr" value={valD} onChange={(e) => setValD(e.target.value)} className="h-9 text-[10px] text-start" placeholder="روز" />
           </div>
           {valDateJalali && (
             <p className="mt-1 text-[8px] font-medium text-muted">
@@ -203,19 +203,19 @@ export function AssetFormSheet({ open, onClose }: { open: boolean; onClose: () =
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">قیمت خرید (تومان) *</label>
-            <Input dir="ltr" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="مثلاً 10000000000" className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} placeholder="مثلاً 10000000000" className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">نرخ دلار تاریخ تملک</label>
-            <Input dir="ltr" value={ownRate} onChange={(e) => setOwnRate(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={ownRate} onChange={(e) => setOwnRate(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">ارزش فعلی (تومان) *</label>
-            <Input dir="ltr" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="مثلاً 13000000000" className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} placeholder="مثلاً 13000000000" className="h-9 text-[10px] text-start" />
           </div>
           <div>
             <label className="mb-1 block text-[9px] font-bold text-muted">نرخ دلار تاریخ ارزش‌گذاری</label>
-            <Input dir="ltr" value={valRate} onChange={(e) => setValRate(e.target.value)} className="h-8 text-[10px] text-start" />
+            <Input dir="ltr" value={valRate} onChange={(e) => setValRate(e.target.value)} className="h-9 text-[10px] text-start" />
           </div>
         </div>
 

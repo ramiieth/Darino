@@ -88,7 +88,7 @@ export function NetWorthHero() {
           key={netUsd ?? 'na'}
           initial={{ opacity: 0.5 }}
           animate={{ opacity: 1 }}
-          className="num-ltr text-[34px] font-black leading-none tracking-tight text-ink md:text-[40px]"
+          className="num-ltr text-[26px] font-black leading-none tracking-tight text-ink sm:text-[34px] md:text-[40px]"
         >
           {fmtUSD(netUsd)}
         </motion.span>

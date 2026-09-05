@@ -110,7 +110,7 @@ export function MarketsTable({
             value={query}
             onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
             placeholder="جستجوی نماد…"
-            className="glass-inset h-8 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
+            className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
           />
         </div>
         {!isSingle && (
@@ -267,29 +267,36 @@ const MarketRow = memo(function MarketRow({ asset, index }: { asset: MarketAsset
 });
 
 const MarketCard = memo(function MarketCard({ asset, index }: { asset: MarketAsset; index: number }) {
+  // کارت موبایل: همه داده‌های Row (قیمت/24H/7D/30D/MCap) با Reflow نمایش
+  // داده می‌شوند — هیچ متریکی در Mobile مخفی نمی‌شود
   return (
-    <div className="flex items-center gap-2.5 p-3">
-      <span className="num-ltr w-5 text-[9px] font-black text-muted">{index + 1}</span>
-      <Logo src={asset.image} symbol={asset.symbol} />
-      <div className="min-w-0 flex-1">
-        <p dir="ltr" className="text-[12px] font-extrabold text-ink">{asset.symbol}</p>
-        <p className="text-[8px] font-bold text-muted/70">{SOURCE_FA[asset.source]}</p>
+    <div className="p-3">
+      <div className="flex items-center gap-2.5">
+        <span className="num-ltr w-5 shrink-0 text-[9px] font-black text-muted">{index + 1}</span>
+        <Logo src={asset.image} symbol={asset.symbol} />
+        <div className="min-w-0 flex-1">
+          <p dir="ltr" className="text-[12px] font-extrabold text-ink">{asset.symbol}</p>
+          <p className="text-[8px] font-bold text-muted/70">{SOURCE_FA[asset.source]}</p>
+        </div>
+        <div className="shrink-0 text-end">
+          <p className="num-ltr text-[12px] font-black text-ink"><Usd v={asset.price} /></p>
+          <p className="text-[8px] font-bold text-muted/70">MCap: <Usd v={asset.marketCap} /></p>
+        </div>
       </div>
-      <div className="text-end">
-        <p className="num-ltr text-[12px] font-black text-ink"><Usd v={asset.price} /></p>
-        <p className="text-[8px] font-bold text-muted/70">MCap: <Usd v={asset.marketCap} /></p>
-      </div>
-      <div className="flex flex-col items-end gap-0.5">
-        <Pct v={asset.change24h} />
-        <span className="text-[8px] font-bold text-muted/50">24H</span>
-      </div>
-      <div className="hidden flex-col items-end gap-0.5 sm:flex">
-        <Pct v={asset.change7d} />
-        <span className="text-[8px] font-bold text-muted/50">7D</span>
-      </div>
-      <div className="hidden flex-col items-end gap-0.5 sm:flex">
-        <Pct v={asset.change30d} />
-        <span className="text-[8px] font-bold text-muted/50">30D</span>
+      {/* تغییرات — ۳ بازه همیشه قابل مشاهده (Reflow به‌جای Hide) */}
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
+          <p className="text-[8px] font-bold text-muted/60">24H</p>
+          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change24h} /></p>
+        </div>
+        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
+          <p className="text-[8px] font-bold text-muted/60">7D</p>
+          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change7d} /></p>
+        </div>
+        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
+          <p className="text-[8px] font-bold text-muted/60">30D</p>
+          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change30d} /></p>
+        </div>
       </div>
     </div>
   );

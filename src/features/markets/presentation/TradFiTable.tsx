@@ -42,7 +42,7 @@ export function TradFiTable() {
           value={query}
           onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
           placeholder="جستجوی نماد…"
-          className="glass-inset h-8 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
+          className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
         />
       </div>
 
