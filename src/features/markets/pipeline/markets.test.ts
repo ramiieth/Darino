@@ -293,3 +293,53 @@ describe('Accounting کاملاً جدا (بخش ۳۰/۳۱)', () => {
     expect(keys).not.toMatch(/cost|entry|lot|posting|tx/i);
   });
 });
+
+describe('کش مسموم — رگرسیون «بازار همیشه اسنپ‌شات»', () => {
+  /**
+   * سناریوی واقعی باگ:
+   *  rewrite ورسل زیرمسیر را حذف می‌کرد → پروکسی پاسخ ریشه CoinGecko
+   *  (`{"gecko_says":...}`) را با HTTP 200 برمی‌گرداند → این شیء در کش
+   *  نوشته می‌شد → تا ۷ روز سرو می‌شد → بازار روی اسنپ‌شات قفل می‌ماند.
+   */
+  it('کش حاوی شیء (نه آرایه بازار) نباید به‌عنوان داده معتبر سرو شود', async () => {
+    await cachePutPrice('markets:v2:crypto_top_200', {
+      price: { gecko_says: '(V3) To the Moon!' } as unknown as number,
+      source: 'live',
+      fetchedAt: Date.now()
+    });
+    expect(await cacheGetUniverse('crypto_top_200')).toBeNull();
+    expect(await cacheGetUniverseStale('crypto_top_200')).toBeNull();
+  });
+
+  it('کش حاوی آرایه‌ای از ردیف‌های بی‌شکل نباید معتبر شمرده شود', async () => {
+    await cachePutPrice('markets:v2:crypto_top_200', {
+      price: [{ foo: 1 }, { bar: 2 }] as unknown as number,
+      source: 'live',
+      fetchedAt: Date.now()
+    });
+    expect(await cacheGetUniverse('crypto_top_200')).toBeNull();
+    expect(await cacheGetUniverseStale('crypto_top_200')).toBeNull();
+  });
+
+  it('کش سالم همچنان درست سرو می‌شود', async () => {
+    const good: MarketAsset[] = [
+      {
+        id: 'crypto:BTC',
+        symbol: 'BTC',
+        image: null,
+        price: 110420,
+        marketCap: 2.1e12,
+        change24h: 1.2,
+        change7d: null,
+        change30d: null,
+        source: 'crypto' as MarketSource,
+        rank: 1
+      }
+    ];
+    await cachePutUniverse('crypto_top_200', good);
+    const got = await cacheGetUniverse('crypto_top_200');
+    expect(got).not.toBeNull();
+    expect(got?.[0].symbol).toBe('BTC');
+    expect(got?.[0].price).toBe(110420);
+  });
+});

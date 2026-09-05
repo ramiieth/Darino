@@ -87,6 +87,64 @@ describe('fetchTopMarketsOnce — فالبک بازار', () => {
     await expect(fetchTopMarketsOnce()).rejects.toThrow('no market data available');
   });
 
+  it('پاسخ ۲۰۰ ولی نامعتبر (ریشه API) → خطا و هرگز کش نمی‌شود', async () => {
+    // دقیقاً همان چیزی که پروکسی خرابِ /api/cg برمی‌گرداند
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ gecko_says: '(V3) To the Moon!' })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchTopMarketsOnce()).rejects.toThrow('no market data available');
+
+    // مهم: کش نباید با پاسخ خراب مسموم شده باشد
+    const { cacheBulkGetPrice } = await import('@/shared/lib/db');
+    const rec = await cacheBulkGetPrice([FRESH_KEY, SNAPSHOT_KEY]);
+    expect(rec.get(FRESH_KEY)).toBeUndefined();
+    expect(rec.get(SNAPSHOT_KEY)).toBeUndefined();
+  });
+
+  it('کش تازهٔ مسموم نادیده گرفته می‌شود و دوباره شبکه تلاش می‌شود', async () => {
+    await cachePutPrice(FRESH_KEY, {
+      price: { gecko_says: 'bad' } as unknown as number,
+      source: 'live',
+      fetchedAt: Date.now()
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => SAMPLE
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchTopMarketsOnce();
+    expect(fetchMock).toHaveBeenCalled();   // کش خراب سرو نشد
+    expect(res.stale).toBe(false);
+    expect(res.data[0].symbol).toBe('btc');
+  });
+
+  it('اسنپ‌شات مسموم به‌عنوان فالبک استفاده نمی‌شود', async () => {
+    await cachePutPrice(SNAPSHOT_KEY, {
+      price: { gecko_says: 'bad' } as unknown as number,
+      source: 'live',
+      fetchedAt: Date.now()
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(fetchTopMarketsOnce()).rejects.toThrow('no market data available');
+  });
+
+  it('پاسخ آرایه خالی → خطا (نه «موفقیت» جعلی)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => []
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(fetchTopMarketsOnce()).rejects.toThrow('no market data available');
+  });
+
   it('موفقیت شبکه → هم کش تازه و هم اسنپ‌شات ذخیره میشود', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(SAMPLE), { status: 200 })
