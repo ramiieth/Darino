@@ -68,12 +68,33 @@ export interface TopMarketsResult {
   fetchedAt: number;
 }
 
+/**
+ * اعتبارسنجی شکل پاسخ Provider.
+ *
+ * ⚠️ حیاتی: اگر پروکسی/CDN به‌جای آرایه بازار چیز دیگری برگرداند
+ * (مثلاً پاسخ ریشه `{"gecko_says":...}` یا صفحه خطای HTML با کد ۲۰۰)،
+ * نباید آن را «موفق» بدانیم و در کش بنویسیم — وگرنه کش برای ۷ روز
+ * مسموم می‌شود و بازار برای همیشه روی «اسنپ‌شات» می‌ماند.
+ */
+function isCgMarketArray(v: unknown): v is CgMarket[] {
+  return (
+    Array.isArray(v) &&
+    v.length > 0 &&
+    v.every((r) => r !== null && typeof r === 'object' && typeof (r as CgMarket).symbol === 'string')
+  );
+}
+
 /** گرفتن ۱۵۰ توکن برتر از CoinGecko (یک درخواست — از دروازه نرخ سراسری) */
 async function fetchTop150Live(): Promise<CgMarket[]> {
   const url = `${COINGECKO_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&price_change_percentage=24h,7d,30d`;
   const res = await cgFetch(url);
   if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
-  return (await res.json()) as CgMarket[];
+  const json: unknown = await res.json();
+  if (!isCgMarketArray(json)) {
+    // پاسخ ۲۰۰ ولی بی‌معنا → خطای صریح (نه کش‌کردن داده خراب)
+    throw new Error('CoinGecko invalid payload (not a market array)');
+  }
+  return json;
 }
 
 let inFlight: Promise<TopMarketsResult> | null = null;
@@ -94,8 +115,10 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
     try {
       const rec = await cacheBulkGetPrice([FRESH_KEY]);
       const r = rec.get(FRESH_KEY);
-      if (r && Date.now() - r.fetchedAt < CACHE_MS) {
-        return { data: r.price as unknown as CgMarket[], stale: false, fetchedAt: r.fetchedAt };
+      const fresh = r?.price as unknown;
+      // کش فقط وقتی معتبر است که واقعاً آرایه بازار باشد (ضد کش مسموم)
+      if (r && Date.now() - r.fetchedAt < CACHE_MS && isCgMarketArray(fresh)) {
+        return { data: fresh, stale: false, fetchedAt: r.fetchedAt };
       }
     } catch {
       /* ادامه */
@@ -117,13 +140,8 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
       try {
         const rec = await cacheBulkGetPrice([SNAPSHOT_KEY]);
         const r = rec.get(SNAPSHOT_KEY);
-        const snapshot = r?.price as unknown as CgMarket[] | undefined;
-        if (
-          r &&
-          Array.isArray(snapshot) &&
-          snapshot.length > 0 &&
-          Date.now() - r.fetchedAt < SNAPSHOT_TTL_MS
-        ) {
+        const snapshot = r?.price as unknown;
+        if (r && isCgMarketArray(snapshot) && Date.now() - r.fetchedAt < SNAPSHOT_TTL_MS) {
           return { data: snapshot, stale: true, fetchedAt: r.fetchedAt };
         }
       } catch {

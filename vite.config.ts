@@ -153,12 +153,17 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           // پروکسی کوین‌گکو (same-origin) — NetworkFirst با کش آفلاین
+          // ⚠️ در PROD کلاینت به /api/cg می‌زند (نه /coingecko-api)؛ هر دو
+          // مسیر باید پوشش داده شوند وگرنه در PWA نصب‌شده کش آفلاین بازار کار نمی‌کند.
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/coingecko-api/'),
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/coingecko-api/') || url.pathname.startsWith('/api/cg'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'market-coingecko',
               networkTimeoutSeconds: 8,
+              // فقط پاسخ موفق کش شود — خطای ۴۲۹/۵xx نباید آفلاین سرو شود
+              cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 }
             }
           }

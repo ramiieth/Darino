@@ -8,6 +8,7 @@
  * ⚠️ کلید هرگز به Client نمی‌رسد.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
+import { resolveProxyTarget } from './_proxyPath.js';
 
 const UPSTREAM = 'https://api.coingecko.com';
 const PREFIX = '/api/cg';
@@ -17,14 +18,12 @@ const FALLBACK_KEY = process.env.COINGECKO_API_KEY ?? 'CG-1fJVsdhGGY6Jrb5DTZazvS
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     // ۱) مسیر بعد از prefix → upstream (مثلاً /coins/markets)
-    const url = new URL(req.url ?? '/', 'http://internal');
-    let path = url.pathname;
-    if (path.startsWith(PREFIX)) path = path.slice(PREFIX.length) || '/';
-    if (!path.startsWith('/')) path = '/' + path;
+    //    روی Vercel زیرمسیر از طریق `__p` می‌رسد (rewrite با destination ثابت)
+    const { path, search } = resolveProxyTarget(req.url, PREFIX);
 
     const upstream = new URL(`${UPSTREAM}/api/v3${path}`);
     // کپی query + تزریق کلید (سرور-سمت)
-    url.searchParams.forEach((v, k) => upstream.searchParams.set(k, v));
+    search.forEach((v: string, k: string) => upstream.searchParams.set(k, v));
     if (!upstream.searchParams.has('x_cg_demo_api_key')) {
       upstream.searchParams.set('x_cg_demo_api_key', FALLBACK_KEY);
     }
