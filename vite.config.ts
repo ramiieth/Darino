@@ -83,6 +83,15 @@ function marketProxies(): Record<string, ProxyOptions> {
       rewrite: (p: string) => p.replace(/^\/coingecko-api/, '/api/v3'),
       configure: cgKeyInjector
     },
+    // مسیر Production-like: پیش‌نمایش بیلد (vite preview) که کلاینت در PROD
+    // به /api/cg صدا می‌زند؛ اینجا همان مسیر به upstream نگاشت می‌شود
+    // (روی Vercel این مسیر توسط Serverless Function /api/cg.ts پاسخ داده می‌شود).
+    '/api/cg': {
+      target: 'https://api.coingecko.com',
+      changeOrigin: true,
+      rewrite: (p: string) => p.replace(/^\/api\/cg/, '/api/v3'),
+      configure: cgKeyInjector
+    },
     // Alpha Vantage — کلید فقط در سرور تزریق می‌شود
     '/alphavantage-api': {
       target: AV_BASE,
@@ -172,15 +181,28 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/boros-api/, '/apis/v1')
       },
+      // Production-like path — روی Vercel توسط Serverless Function پاسخ داده می‌شود
+      '/api/boros': {
+        target: 'https://api-boros.pendle.finance',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/boros/, '/apis/v1')
+      },
       ...marketProxies()
     }
   },
   preview: {
     proxy: {
+      // پروکسی Boros — دور زدن محدودیت CORS (درخواست same-origin)
       '/boros-api': {
         target: 'https://api-boros.pendle.finance',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/boros-api/, '/apis/v1')
+      },
+      // Production-like path — کلاینت بیلدشده به /api/boros می‌زند
+      '/api/boros': {
+        target: 'https://api-boros.pendle.finance',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/boros/, '/apis/v1')
       },
       ...marketProxies()
     }

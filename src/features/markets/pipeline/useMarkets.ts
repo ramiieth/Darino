@@ -28,8 +28,11 @@ export function useMarkets(u: MarketUniverse) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const cached = await hydrateUniverse(u);
-      if (!cancelled && cached.length === 0) void syncUniverse(u);
+      // نمایش سریع داده قبلی (حتی کهنه) — بدون انتظار شبکه
+      await hydrateUniverse(u);
+      if (cancelled) return;
+      // همیشه تلاش همگام‌سازی: کش تازه → بازگشت فوری؛ کهنه/بدون کش → رفرش پس‌زمینه
+      void syncUniverse(u);
     })();
     return () => {
       cancelled = true;

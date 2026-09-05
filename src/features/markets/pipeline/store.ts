@@ -7,7 +7,7 @@
  *  - داده قدیمی معتبر تا دریافت جدید حفظ می‌شود (هرگز خالی نمی‌شود)
  * ============================================================ */
 import { create } from 'zustand';
-import { cacheGetUniverse, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
+import { cacheGetUniverse, cacheGetUniverseStale, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
 import { fetchUniverseAssets } from './fetch';
 import { isValidTokenized } from './normalize';
 import type { MarketAsset, MarketUniverse } from './types';
@@ -19,6 +19,8 @@ interface MarketsState {
   lastSyncAt: Record<MarketUniverse, number | null>;
   error: Record<MarketUniverse, string | null>;
   set: (u: MarketUniverse, assets: MarketAsset[], error: string | null) => void;
+  /** نشستن داده قبلی/کش (بدون تغییر lastSyncAt — صداقت داده) */
+  setCached: (u: MarketUniverse, assets: MarketAsset[], error: string | null) => void;
   setLoading: (u: MarketUniverse, v: boolean) => void;
 }
 
@@ -31,6 +33,12 @@ export const useMarketsStore = create<MarketsState>((set) => ({
     set((s) => ({
       data: { ...s.data, [u]: assets },
       lastSyncAt: { ...s.lastSyncAt, [u]: Date.now() },
+      loading: { ...s.loading, [u]: false },
+      error: { ...s.error, [u]: error }
+    })),
+  setCached: (u, assets, error) =>
+    set((s) => ({
+      data: { ...s.data, [u]: assets },
       loading: { ...s.loading, [u]: false },
       error: { ...s.error, [u]: error }
     })),
@@ -53,6 +61,12 @@ export async function syncUniverse(u: MarketUniverse): Promise<void> {
   if (cached && cached.length > 0) {
     st.set(u, cached, null);
     return;
+  }
+
+  // ۱.۵) داده قبلی کهنه؟ نمایش فوری + تلاش برای تازه‌سازی در پس‌زمینه
+  const stale = await cacheGetUniverseStale(u);
+  if (stale && stale.length > 0) {
+    st.setCached(u, stale, null);
   }
 
   // ۲) Dedup: فقط یک fetch برای مصرف‌کننده‌های هم‌زمان
@@ -94,11 +108,17 @@ export function refreshAllMarkets(): void {
 export async function hydrateUniverse(u: MarketUniverse): Promise<MarketAsset[]> {
   const st = useMarketsStore.getState();
   if (st.data[u].length > 0) return st.data[u];
-  // کش کهنه → حفظ (برچسب «کش» در UI)
+  // کش تازه → نمایش
   const cached = await cacheGetUniverse(u);
   if (cached && cached.length > 0) {
     st.set(u, cached, null);
     return cached;
+  }
+  // کش کهنه → حفظ (بخش ۲۹) — نه «داده ناکافی» وقتی داده واقعی قبلی موجود است
+  const stale = await cacheGetUniverseStale(u);
+  if (stale && stale.length > 0) {
+    st.setCached(u, stale, null);
+    return stale;
   }
   return [];
 }
