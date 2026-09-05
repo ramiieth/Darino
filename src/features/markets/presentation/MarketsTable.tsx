@@ -11,6 +11,8 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { GlassCard } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { AssetName } from '@/shared/components/ui/AssetName';
+import { assetSearchText } from '@/shared/i18n/assetDisplayName';
 import { hydrateUniverse, syncUniverse, useMarketsStore } from '../pipeline/store';
 import { useMarkets } from '../pipeline/useMarkets';
 import type { MarketAsset, MarketSource, MarketUniverse } from '../pipeline/types';
@@ -79,7 +81,8 @@ export function MarketsTable({
     const q = query.trim().toLowerCase();
     let out = assets;
     if (tab !== 'all') out = out.filter((a) => a.source === tab);
-    if (q) out = out.filter((a) => a.symbol.toLowerCase().includes(q));
+    // جستجو: نماد + نام نمایشی فارسی (فقط Client-side — بدون تغییر Business Logic)
+    if (q) out = out.filter((a) => assetSearchText(a.symbol).includes(q));
     return out;
   }, [assets, query, tab]);
 
@@ -109,7 +112,7 @@ export function MarketsTable({
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
-            placeholder="جستجوی نماد…"
+            placeholder="جستجوی نماد یا نام…"
             className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
           />
         </div>
@@ -251,10 +254,11 @@ const MarketRow = memo(function MarketRow({ asset, index }: { asset: MarketAsset
       <td>
         <div className="flex items-center gap-2">
           <Logo src={asset.image} symbol={asset.symbol} />
-          <div className="min-w-0">
-            <p dir="ltr" className="text-[12px] font-extrabold text-ink">{asset.symbol}</p>
-            <p className="text-[8px] font-bold text-muted/70">{SOURCE_FA[asset.source]}</p>
-          </div>
+          <AssetName
+            symbol={asset.symbol}
+            meta={SOURCE_FA[asset.source]}
+            className="max-w-[180px] flex-1"
+          />
         </div>
       </td>
       <td><Usd v={asset.price} /></td>
@@ -274,11 +278,12 @@ const MarketCard = memo(function MarketCard({ asset, index }: { asset: MarketAss
       <div className="flex items-center gap-2.5">
         <span className="num-ltr w-5 shrink-0 text-[9px] font-black text-muted">{index + 1}</span>
         <Logo src={asset.image} symbol={asset.symbol} />
-        <div className="min-w-0 flex-1">
-          <p dir="ltr" className="text-[12px] font-extrabold text-ink">{asset.symbol}</p>
-          <p className="text-[8px] font-bold text-muted/70">{SOURCE_FA[asset.source]}</p>
-        </div>
-        <div className="shrink-0 text-end">
+        <AssetName
+          symbol={asset.symbol}
+          meta={SOURCE_FA[asset.source]}
+          className="min-w-0 flex-1"
+        />
+        <div className="min-w-0 shrink-0 text-end">
           <p className="num-ltr text-[12px] font-black text-ink"><Usd v={asset.price} /></p>
           <p className="text-[8px] font-bold text-muted/70">MCap: <Usd v={asset.marketCap} /></p>
         </div>

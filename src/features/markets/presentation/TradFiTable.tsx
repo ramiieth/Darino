@@ -11,6 +11,8 @@ import { TRADFI_ASSETS, TRADFI_NAMES, TRADFI_JUL_2026 } from '@/features/simulat
 import { referenceMarketCap, hasReferenceMarketCap } from '@/features/market/data/marketCapReference';
 import { fmtUSD } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
+import { AssetName } from '@/shared/components/ui/AssetName';
+import { assetSearchText } from '@/shared/i18n/assetDisplayName';
 
 const PAGE = 30;
 
@@ -22,10 +24,7 @@ export function TradFiTable() {
     const q = query.trim().toLowerCase();
     return TRADFI_ASSETS.filter((a) => {
       if (!q) return true;
-      return (
-        a.symbol.toLowerCase().includes(q) ||
-        (TRADFI_NAMES[a.symbol] ?? a.nameFa).toLowerCase().includes(q)
-      );
+      return assetSearchText(a.symbol, TRADFI_NAMES[a.symbol] ?? a.nameFa).includes(q);
     }).slice(0, limit);
   }, [query, limit]);
 
@@ -58,13 +57,12 @@ export function TradFiTable() {
             const mcap = hasReferenceMarketCap(a.symbol) ? referenceMarketCap(a.symbol) : null;
             return (
               <div key={a.symbol} className="flex items-center gap-2.5 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12px] font-extrabold text-ink">
-                    {TRADFI_NAMES[a.symbol] ?? a.nameFa}
-                  </p>
-                  <p dir="ltr" className="text-[9px] font-black text-muted">{a.symbol}</p>
-                </div>
-                <div className="text-end">
+                <AssetName
+                  symbol={a.symbol}
+                  fallbackName={TRADFI_NAMES[a.symbol] ?? a.nameFa}
+                  className="min-w-0 flex-1"
+                />
+                <div className="min-w-0 shrink-0 text-end">
                   <p className="num-ltr text-[12px] font-black text-ink">{price ? fmtUSD(price) : 'N/A'}</p>
                   <p className="text-[8px] font-bold text-muted/70">
                     MCap: {mcap ? fmtUSD(mcap, true) : 'N/A'}
