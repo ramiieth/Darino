@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import { cacheGetUniverse, cacheGetUniverseStale, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
 import { fetchUniverseAssets } from './fetch';
 import { isValidTokenized } from './normalize';
+import { buildFallbackAssets } from './fallback';
 import type { MarketAsset, MarketUniverse } from './types';
 
 interface MarketsState {
@@ -67,6 +68,12 @@ export async function syncUniverse(u: MarketUniverse): Promise<void> {
   const stale = await cacheGetUniverseStale(u);
   if (stale && stale.length > 0) {
     st.setCached(u, stale, null);
+  } else if (st.data[u].length === 0) {
+    // بدون کش قبلی → اسنپ‌شات واقعی آفلاین نمایش داده می‌شود (نه «داده ناکافی»)
+    const fallback = buildFallbackAssets(u);
+    if (fallback.length > 0) {
+      st.setCached(u, fallback, null);
+    }
   }
 
   // ۲) Dedup: فقط یک fetch برای مصرف‌کننده‌های هم‌زمان
@@ -83,11 +90,18 @@ export async function syncUniverse(u: MarketUniverse): Promise<void> {
       // فیلتر اعتبار: Tokenized فقط MCap معتبر (بخش ۸/۹) — Crypto همه
       const filtered =
         u === 'crypto_top_200' ? assets : assets.filter(isValidTokenized);
+      // پاسخ خالی از Provider یک «موفقیت» نیست — نباید داده قبلی را پاک کند
+      if (filtered.length === 0) {
+        throw new Error('provider returned empty market data');
+      }
       await cachePutUniverse(u, filtered);
       useMarketsStore.getState().set(u, filtered, null);
     } catch (e) {
-      // شکست → داده قبلی حفظ می‌شود (هرگز خالی/جعلی — بخش ۲۹)
-      useMarketsStore.getState().set(u, useMarketsStore.getState().data[u], e instanceof Error ? e.message : String(e));
+      // شکست → داده قبلی/اسنپ‌شات حفظ می‌شود (هرگز خالی/جعلی — بخش ۲۹)
+      const errMsg = e instanceof Error ? e.message : String(e);
+      const current = useMarketsStore.getState().data[u];
+      const payload = current.length > 0 ? current : buildFallbackAssets(u);
+      useMarketsStore.getState().setCached(u, payload, errMsg);
     } finally {
       useMarketsStore.getState().setLoading(u, false);
       inFlight.delete(u);
@@ -119,6 +133,12 @@ export async function hydrateUniverse(u: MarketUniverse): Promise<MarketAsset[]>
   if (stale && stale.length > 0) {
     st.setCached(u, stale, null);
     return stale;
+  }
+  // بدون هیچ داده قبلی → اسنپ‌شات واقعی آفلاین (نه «داده ناکافی»)
+  const fallback = buildFallbackAssets(u);
+  if (fallback.length > 0) {
+    st.setCached(u, fallback, null);
+    return fallback;
   }
   return [];
 }

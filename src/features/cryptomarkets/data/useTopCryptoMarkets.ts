@@ -117,8 +117,14 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
       try {
         const rec = await cacheBulkGetPrice([SNAPSHOT_KEY]);
         const r = rec.get(SNAPSHOT_KEY);
-        if (r && Date.now() - r.fetchedAt < SNAPSHOT_TTL_MS) {
-          return { data: r.price as unknown as CgMarket[], stale: true, fetchedAt: r.fetchedAt };
+        const snapshot = r?.price as unknown as CgMarket[] | undefined;
+        if (
+          r &&
+          Array.isArray(snapshot) &&
+          snapshot.length > 0 &&
+          Date.now() - r.fetchedAt < SNAPSHOT_TTL_MS
+        ) {
+          return { data: snapshot, stale: true, fetchedAt: r.fetchedAt };
         }
       } catch {
         /* ادامه */

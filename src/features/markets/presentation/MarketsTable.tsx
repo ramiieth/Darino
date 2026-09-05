@@ -85,12 +85,20 @@ export function MarketsTable({
 
   const anyLoading = universes.some((u) => loading[u]);
   const anyError = universes.some((u) => error[u]);
+  const anySnapshot = assets.some((a) => a.snapshot === true);
   const isSingle = universes.length === 1;
+  const firstErrorText =
+    (error[universes.find((u) => error[u]) ?? universes[0]] ?? 'خطا').slice(0, 120);
 
   return (
     <GlassCard className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/10 px-3 py-2">
-        <p className="text-[11px] font-black text-ink">{title}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-black text-ink">{title}</p>
+          {anySnapshot && (
+            <span className="badge shrink-0 bg-warn/10 text-warn">اسنپ‌شات / آفلاین</span>
+          )}
+        </div>
         <p className="num-ltr text-[9px] font-bold text-muted">{filtered.length} دارایی</p>
       </div>
 
@@ -130,15 +138,15 @@ export function MarketsTable({
         </div>
       ) : filtered.length === 0 ? (
         <div className="p-6 text-center">
-          <p className="text-[11px] font-black text-warn">داده ناکافی</p>
+          <p className="text-[11px] font-black text-warn">{query ? 'نتیجه‌ای یافت نشد' : 'داده ناکافی'}</p>
           <p className="mt-1 text-[10px] font-bold text-muted">
             {query
               ? 'موردی با این جستجو پیدا نشد.'
               : anyError
-                ? 'اتصال به Provider برقرار نشد؛ تلاش خودکار ادامه دارد — داده قبلی هرگز پاک نمی‌شود.'
-                : 'در همگام‌سازی بعدی تلاش دوباره می‌شود — داده قبلی هرگز پاک نمی‌شود.'}
+                ? `اتصال به Provider برقرار نشد (${firstErrorText}). تلاش خودکار ادامه دارد — داده قبلی هرگز پاک نمی‌شود.`
+                : 'اطلاعات بازار هنوز دریافت نشده است. اسنپ‌شات آفلاین هم در دسترس نیست — لطفاً همگام‌سازی را دوباره امتحان کنید.'}
           </p>
-          {!query && anyError && (
+          {!query && (
             <button
               onClick={retry}
               className="mt-3 inline-flex items-center gap-1.5 rounded-full glass-inset px-3 py-1.5 text-[10px] font-black text-ink transition-all hover:text-accent"

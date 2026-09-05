@@ -26,6 +26,8 @@ export interface MarketAsset {
   source: MarketSource;
   /** ترتیب CoinGecko (rank) — فقط برای مرتب‌سازی */
   rank: number;
+  /** داده از اسنپ‌شات/مرجع است (نه زنده) — برای برچسب UI و فیلتر اعتبار */
+  snapshot?: boolean;
 }
 
 /** برچسب فارسی Universe (متن UI — نه داده بازار) */

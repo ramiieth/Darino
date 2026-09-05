@@ -48,7 +48,7 @@ export function TradFiTable() {
 
       {rows.length === 0 ? (
         <div className="p-6 text-center">
-          <p className="text-[11px] font-black text-warn">داده ناکافی</p>
+          <p className="text-[11px] font-black text-warn">نتیجه‌ای یافت نشد</p>
           <p className="mt-1 text-[10px] font-bold text-muted">موردی با این جستجو پیدا نشد.</p>
         </div>
       ) : (
