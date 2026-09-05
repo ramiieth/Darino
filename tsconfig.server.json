@@ -1,17 +1,26 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["api"]
+  "include": [
+    "api"
+  ],
+  "exclude": [
+    "api/**/*.test.ts"
+  ]
 }

@@ -5,19 +5,17 @@
  * Dev (Vite):    /boros-api/...  (پروکسی vite.config.ts)
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
+import { resolveProxyTarget } from './_proxyPath.js';
 
 const UPSTREAM = 'https://api-boros.pendle.finance';
 const PREFIX = '/api/boros';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    const url = new URL(req.url ?? '/', 'http://internal');
-    let path = url.pathname;
-    if (path.startsWith(PREFIX)) path = path.slice(PREFIX.length) || '/';
-    if (!path.startsWith('/')) path = '/' + path;
+    const { path, search } = resolveProxyTarget(req.url, PREFIX);
 
     const upstream = new URL(`${UPSTREAM}/apis/v1${path}`);
-    url.searchParams.forEach((v, k) => upstream.searchParams.set(k, v));
+    search.forEach((v: string, k: string) => upstream.searchParams.set(k, v));
 
     const upstreamRes = await fetch(upstream.toString(), {
       headers: { accept: 'application/json' }

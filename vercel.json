@@ -4,13 +4,27 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
   "functions": {
-    "api/health.ts": { "includeFiles": "db/schema.sql" },
-    "api/accounting.ts": { "includeFiles": "db/schema.sql" },
-    "api/portfolio.ts": { "includeFiles": "db/schema.sql" },
-    "api/dashboard.ts": { "includeFiles": "db/schema.sql" }
+    "api/health.ts": {
+      "includeFiles": "db/schema.sql"
+    },
+    "api/accounting.ts": {
+      "includeFiles": "db/schema.sql"
+    },
+    "api/portfolio.ts": {
+      "includeFiles": "db/schema.sql"
+    },
+    "api/dashboard.ts": {
+      "includeFiles": "db/schema.sql"
+    }
   },
   "rewrites": [
-    { "source": "/api/cg/(.*)", "destination": "/api/cg" },
-    { "source": "/api/boros/(.*)", "destination": "/api/boros" }
+    {
+      "source": "/api/cg/:path*",
+      "destination": "/api/cg?__p=/:path*"
+    },
+    {
+      "source": "/api/boros/:path*",
+      "destination": "/api/boros?__p=/:path*"
+    }
   ]
 }
