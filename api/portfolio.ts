@@ -9,8 +9,8 @@
  * Current Value همیشه از Market Data (زنده) محاسبه می‌شود (جدایی Market/Accounting).
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { db, isDbConfigured, json, readBody, userIdOf } from './_neon';
-import { ensureSchema } from './_schema';
+import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
+import { ensureSchema } from './_schema.js';
 
 export interface PortfolioRow {
   id?: number;

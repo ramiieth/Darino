@@ -8,5 +8,9 @@
     "api/accounting.ts": { "includeFiles": "db/schema.sql" },
     "api/portfolio.ts": { "includeFiles": "db/schema.sql" },
     "api/dashboard.ts": { "includeFiles": "db/schema.sql" }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/cg/(.*)", "destination": "/api/cg" },
+    { "source": "/api/boros/(.*)", "destination": "/api/boros" }
+  ]
 }

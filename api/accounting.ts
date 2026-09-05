@@ -11,8 +11,8 @@
  * ساختار payloadها با Types فعلی اپ (domain/types) هماهنگ است.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { db, isDbConfigured, json, readBody, userIdOf } from './_neon';
-import { ensureSchema } from './_schema';
+import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
+import { ensureSchema } from './_schema.js';
 
 interface SyncPayload {
   accounts?: { key: string; nameFa: string; type: string; createdAt: number }[];
