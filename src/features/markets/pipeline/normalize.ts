@@ -42,8 +42,10 @@ export function normalizeRow(row: RawCgRow, source: MarketSource, rank: number):
 /**
  * فیلتر اعتبار (بخش ۸/۹/۲۹):
  *  - Tokenized (Ondo/xStocks): فقط Market Cap معتبر (>0) نمایش داده می‌شود
+ *      مگر اینکه ردیف از اسنپ‌شات آفلاین باشد (قیمت واقعی + MCap نامشخص → «—»)
  *  - Crypto: همه (MCap خالی → null، نه حذف)
  */
 export function isValidTokenized(a: MarketAsset): boolean {
+  if (a.snapshot === true) return a.price !== null && a.price > 0;
   return a.marketCap !== null && a.marketCap > 0;
 }

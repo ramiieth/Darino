@@ -30,6 +30,7 @@ vi.mock('@/shared/lib/coingeckoGate', () => ({
 import { normalizeRow, isValidTokenized } from './normalize';
 import { assetId, type MarketAsset, type MarketSource } from './types';
 import { cacheGetUniverse, cacheGetUniverseStale, cachePutUniverse, UNIVERSE_TTL_MS } from './cache';
+import { buildFallbackAssets } from './fallback';
 import { syncUniverse, useMarketsStore, refreshAllMarkets } from './store';
 import { cacheClearPrices, cachePutPrice } from '@/shared/lib/db';
 
@@ -219,6 +220,60 @@ describe('Sync — dedup و شکست‌ایمن (بخش ۱۹/۲۹)', () => {
     const st = useMarketsStore.getState();
     expect(st.data.crypto_top_200).toHaveLength(1); // حفظ داده واقعی قبلی
     expect(st.error.crypto_top_200).toContain('offline/429');
+  });
+});
+
+describe('اسنپ‌شات آفلاین — نه «داده ناکافی»', () => {
+  it('crypto: اسنپ‌شات واقعی دارد و همه ردیف‌ها snapshot هستند', () => {
+    const fb = buildFallbackAssets('crypto_top_200');
+    expect(fb.length).toBeGreaterThan(0);
+    expect(fb.every((a) => a.snapshot === true)).toBe(true);
+    expect(fb.every((a) => typeof a.price === 'number')).toBe(true);
+    expect(fb[0].source).toBe('crypto');
+  });
+
+  it('tokenized: فقط Ondo و xStocks در اسنپ‌شات هستند', () => {
+    const ondo = buildFallbackAssets('ondo_tokenized');
+    const x = buildFallbackAssets('xstocks');
+    expect(ondo.length).toBeGreaterThan(0);
+    expect(x.length).toBeGreaterThan(0);
+    expect(ondo.every((a) => a.source === 'ondo')).toBe(true);
+    expect(x.every((a) => a.source === 'xstocks')).toBe(true);
+    // ردیف‌های آفلاین MCap ندارند ولی قیمت واقعی دارند → نباید فیلتر شوند
+    const au = normalizeRow({ id: 'x', symbol: 'x', current_price: 10 }, 'ondo', 1);
+    au.snapshot = true;
+    expect(isValidTokenized(au)).toBe(true);
+  });
+
+  it('شکست کامل شبکه بدون کش → اسنپ‌شات نمایش داده می‌شود + خطا ثبت می‌شود (نه خالی)', async () => {
+    const spy = vi.spyOn(await import('./fetch'), 'fetchUniverseAssets').mockRejectedValueOnce(new Error('offline'));
+    await syncUniverse('crypto_top_200');
+    spy.mockRestore();
+
+    const st = useMarketsStore.getState();
+    expect(st.data.crypto_top_200.length).toBeGreaterThan(0);
+    expect(st.data.crypto_top_200[0].snapshot).toBe(true);
+    expect(st.error.crypto_top_200).toContain('offline');
+    expect(st.lastSyncAt.crypto_top_200).toBeNull(); // اسنپ‌شات هرگز «زنده» ثبت نمی‌شود
+  });
+
+  it('پاسخ خالی Provider → داده قبلی حفظ می‌شود و خطا ثبت می‌شود', async () => {
+    // داده قبلی واقعی
+    const spy = vi.spyOn(await import('./fetch'), 'fetchUniverseAssets').mockResolvedValueOnce([
+      normalizeRow({ id: 'x', symbol: 'T', current_price: 1, market_cap: 1000 }, 'xstocks', 1)
+    ]);
+    await syncUniverse('xstocks');
+    spy.mockRestore();
+
+    // پاسخ خالی
+    await cacheClearPrices();
+    const spy2 = vi.spyOn(await import('./fetch'), 'fetchUniverseAssets').mockResolvedValueOnce([]);
+    await syncUniverse('xstocks');
+    spy2.mockRestore();
+
+    const st = useMarketsStore.getState();
+    expect(st.data.xstocks).toHaveLength(1);
+    expect(st.error.xstocks).toContain('empty');
   });
 });
 
