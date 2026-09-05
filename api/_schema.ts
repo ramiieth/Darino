@@ -68,6 +68,19 @@ let schemaReady: boolean | null = null;
  * اطمینان از وجود جداول — قبل از queryهای اصلی صدا زده می‌شود.
  * برگشت false = دیتابیس در دسترس نیست (کالر ۵۰۳ می‌دهد؛ کلاینت local-fallback دارد).
  */
+/** بررسی سبک وجود جداول (Quoted → دقیقاً camelCase) */
+async function tablesExist(sql: NeonQueryFunction<false, false>): Promise<boolean> {
+  const rows = await sql`SELECT
+    to_regclass('public."accAccounts"') IS NOT NULL AS a,
+    to_regclass('public."accEntries"') IS NOT NULL AS e,
+    to_regclass('public."accLots"') IS NOT NULL AS l,
+    to_regclass('public."accEvents"') IS NOT NULL AS ev,
+    to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
+    to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d`;
+  const r = rows[0] as { a: boolean; e: boolean; l: boolean; ev: boolean; p: boolean; d: boolean };
+  return Boolean(r.a && r.e && r.l && r.ev && r.p && r.d);
+}
+
 export async function ensureSchema(sql: NeonQueryFunction<false, false>): Promise<boolean> {
   if (schemaReady === true) return true;
   try {
@@ -77,30 +90,32 @@ export async function ensureSchema(sql: NeonQueryFunction<false, false>): Promis
     // خراب (lowercase) را «موجود» گزارش می‌دهد (false-green) در حالی که
     // کوئری‌های Quoted روی آن‌ها خطا می‌دهند. با کوتیشن، روی دیتابیس قدیمی
     // هم DDL دوباره اجرا و جدول‌های درست ساخته می‌شوند (self-heal).
-    const rows = await sql`SELECT
-      to_regclass('public."accAccounts"') IS NOT NULL AS a,
-      to_regclass('public."accEntries"') IS NOT NULL AS e,
-      to_regclass('public."accLots"') IS NOT NULL AS l,
-      to_regclass('public."accEvents"') IS NOT NULL AS ev,
-      to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
-      to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d`;
-    const r = rows[0] as { a: boolean; e: boolean; l: boolean; ev: boolean; p: boolean; d: boolean };
-    if (r.a && r.e && r.l && r.ev && r.p && r.d) {
+    if (await tablesExist(sql)) {
       schemaReady = true;
       return true;
     }
     // ۲) اجرای DDL (idempotent — فقط IF NOT EXISTS؛ امنیت بررسی شد)
+    // ⚠️ حتماً sql.query(...) — نه sql.unsafe(...)!
+    // در @neondatabase/serverless، unsafe() فقط یک نشانگر برای درون‌ریزی در
+    // template است و هیچ کوئری‌ای اجرا نمی‌کند (await روی آن بی‌صدا موفق می‌شود).
     const source = loadSchemaSql();
     const statements = splitSqlStatements(source);
     // بررسی امنیت روی statementهای پاک‌شده از کامنت (بدون false-positive)
     assertSchemaIsSafe(statements.join(' '));
     for (const st of statements) {
-      await sql.unsafe(st);
+      await sql.query(st);
+    }
+    // ۳) تأیید نهایی — DDL واقعاً اثر کرد؟ (جلوگیری از false-green بی‌صدا)
+    if (!(await tablesExist(sql))) {
+      console.error('[schema] DDL executed but tables are still missing');
+      schemaReady = null;
+      return false;
     }
     schemaReady = true;
     return true;
-  } catch {
+  } catch (e) {
     // خطای موقت → اجازه تلاش مجدد در درخواست بعد (هرگز 500 «relation does not exist»)
+    console.error('[schema] ensureSchema failed:', e instanceof Error ? e.message : e);
     schemaReady = null;
     return false;
   }
