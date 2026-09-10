@@ -16,25 +16,52 @@ export function isRemoteAllowed(): boolean {
   return true;
 }
 
-/** وضعیت سرور (کش‌شده — یک بار در نشست) */
-let serverStatus: 'unknown' | 'ready' | 'local' = 'unknown';
+/** نتیجه probe سلامت سرور (کش‌شده — یک بار در نشست) */
+interface HealthProbe {
+  /** فانکشن سرورلس پاسخ ok:true داد (فارغ از وضعیت دیتابیس) */
+  serverUp: boolean;
+  /** دیتابیس (Neon) هم متصل است */
+  dbConnected: boolean;
+}
+
+let health: HealthProbe | null = null;
+
+/** probe سلامت با کش (با force دوباره صدا می‌خورد) */
+async function probeHealth(force: boolean): Promise<HealthProbe> {
+  if (!force && health) return health;
+  try {
+    const res = await fetchJson<{ ok: boolean; database?: string }>('/api/health', {
+      timeoutMs: 3000
+    });
+    health = { serverUp: res?.ok === true, dbConnected: res?.database === 'connected' };
+  } catch {
+    health = { serverUp: false, dbConnected: false };
+  }
+  return health;
+}
 
 /** آیا سرور و دیتابیس (Neon) در دسترس‌اند؟ */
 export async function isRemoteReady(force = false): Promise<boolean> {
   if (!isRemoteAllowed()) return false;
-  if (!force && serverStatus !== 'unknown') return serverStatus === 'ready';
-  try {
-    const res = await fetchJson<{ ok: boolean; database: string }>('/api/health', { timeoutMs: 3000 });
-    serverStatus = res?.database === 'connected' ? 'ready' : 'local';
-  } catch {
-    serverStatus = 'local';
-  }
-  return serverStatus === 'ready';
+  const h = await probeHealth(force);
+  return h.serverUp && h.dbConnected;
+}
+
+/**
+ * آیا خودِ سرور (فانکشن سرورلس) در دسترس است — فارغ از دیتابیس؟
+ * جریان‌هایی مثل کلکشن دیوار از مسیر `/api/propertyMarket` انجام می‌شوند و
+ * برای اصلِ کلکشن نیازی به Neon ندارند؛ پس اتصال دیتابیس نباید آن‌ها را
+ * مسدود کند (نتیجه سمت کلاینت در IndexedDB ذخیره می‌شود).
+ */
+export async function isServerReachable(force = false): Promise<boolean> {
+  if (!isRemoteAllowed()) return false;
+  const h = await probeHealth(force);
+  return h.serverUp;
 }
 
 /** ریست (برای تست‌ها) */
 export function resetRemoteStatus(): void {
-  serverStatus = 'unknown';
+  health = null;
 }
 
 /** درخواست JSON به API سرور (با Timeout و هدر userId) */
