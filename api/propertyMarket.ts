@@ -10,6 +10,14 @@
  * ⚠️ مرورگر مستقیم به دیوار نمی‌زند (CORS) — فقط این فانکشن.
  * ⚠️ کلکشنر: بازنویسی تایپ‌اسکریپت مرجع `mobin-torabi/divar-house-scraper`
  *    مطابق معماری دارینو (کپی مستقیم نشده است).
+ *
+ * حالت بدون دیتابیس (DATABASE_URL تنظیم نشده یا خطا):
+ *   کلکشن دیوار ذاتاً به Neon نیاز ندارد — فقط واکشی سرور-سمت از دیوار است.
+ *   در این حالت آگهی‌ها در بافر درون‌حافظهٔ همین instance نگه‌داری می‌شوند،
+ *   آگهی‌های جدید هر تکه در پاسخ به کلاینت برمی‌گردند (`persisted: false`)
+ *   و کلاینت آن‌ها را در finalize پس می‌فرستد تا حتی با سردشدن/چرخش
+ *   instanceها (Vercel) Snapshot کامل ساخته شود. ذخیره نهایی سمت کلاینت
+ *   در IndexedDB انجام می‌شود.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
 import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
@@ -39,16 +47,22 @@ function fromJsonb<T>(p: T | string): T {
   return typeof p === 'string' ? (JSON.parse(p) as T) : p;
 }
 
-async function loadListings(userId: string): Promise<PropertyMarketListing[]> {
-  const sql = db();
-  const rows = (await sql`
+/* ---------------- بافر درون‌حافظه (حالت بدون دیتابیس) ----------------
+ * روی یک instance گرم بین درخواست‌های متوالی کلکشن زنده می‌ماند؛
+ * برای ایمنی در برابر چرخش/سردشدن instance، کلاینت آگهی‌های دریافتی
+ * را در finalize پس می‌فرستد و بافر از آن‌ها بازسازی می‌شود. */
+const memListings = new Map<string, PropertyMarketListing[]>();
+const memSnapshots = new Map<string, PropertyMarketSnapshot[]>();
+
+async function loadListingsDb(userId: string): Promise<PropertyMarketListing[]> {
+  const rows = (await db()`
     SELECT token, payload FROM "pmListings"
     WHERE "userId" = ${userId}
   `) as unknown as StoredRow[];
   return rows.map((r) => fromJsonb<PropertyMarketListing>(r.payload));
 }
 
-async function upsertListings(userId: string, listings: PropertyMarketListing[]): Promise<number> {
+async function upsertListingsDb(userId: string, listings: PropertyMarketListing[]): Promise<number> {
   let added = 0;
   for (const l of listings) {
     const res = await db()`
@@ -65,22 +79,52 @@ async function upsertListings(userId: string, listings: PropertyMarketListing[])
   return added;
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!isDbConfigured()) {
-    json(res, 200, { configured: false, listings: [], snapshots: [] });
-    return;
+/** ادغام آگهی‌ها بر اساس توکن (بدون رونویسی — اولین نسخه هر توکن می‌ماند) */
+function mergeByToken(
+  base: PropertyMarketListing[],
+  incoming: unknown[]
+): { merged: PropertyMarketListing[]; fresh: PropertyMarketListing[] } {
+  const known = new Set(base.map((l) => l.token));
+  const merged = [...base];
+  const fresh: PropertyMarketListing[] = [];
+  for (const item of incoming) {
+    if (!item || typeof item !== 'object') continue;
+    const l = item as PropertyMarketListing;
+    if (typeof l.token !== 'string' || l.token.length === 0 || known.has(l.token)) continue;
+    known.add(l.token);
+    merged.push(l);
+    fresh.push(l);
   }
+  return { merged, fresh };
+}
+
+/** آیا دیتابیس قابل استفاده است؟ (تنظیم‌شده + اتصال/schema سالم) */
+async function isDbUsable(): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  try {
+    return await ensureSchema(db());
+  } catch {
+    return false;
+  }
+}
+
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const userId = userIdOf(req);
+  const useDb = await isDbUsable();
 
   try {
-    if (!(await ensureSchema(db()))) {
-      json(res, 503, { ok: false, error: 'database_unavailable' });
-      return;
-    }
-
     /* ---------- GET: آگهی‌ها + Snapshotها ---------- */
     if (req.method === 'GET') {
-      const listings = await loadListings(userId);
+      if (!useDb) {
+        // حالت بدون دیتابیس — داده‌های همین جلسه کلکشن (ممکن است خالی باشد)
+        json(res, 200, {
+          configured: false,
+          listings: memListings.get(userId) ?? [],
+          snapshots: memSnapshots.get(userId) ?? []
+        });
+        return;
+      }
+      const listings = await loadListingsDb(userId);
       const snapRows = (await db()`
         SELECT payload FROM "pmSnapshots" WHERE "userId" = ${userId} ORDER BY "dateTs" ASC LIMIT 200
       `) as unknown as { payload: PropertyMarketSnapshot | string }[];
@@ -107,15 +151,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       try {
         result = await collectChunk({ city, cursor });
       } catch (e) {
-        json(res, 200, {
-          ok: false,
-          error: e instanceof Error ? e.message.slice(0, 160) : 'divar unreachable'
-        });
+        const raw = e instanceof Error ? e.message.slice(0, 160) : '';
+        // پیام‌های مبهم شبکه (مثل fetch failed نود) → پیام صریح درباره دیوار
+        const error = !raw || raw === 'fetch failed' ? 'divar unreachable' : raw;
+        json(res, 200, { ok: false, error });
         return;
       }
 
       // پاک‌سازی تکه + ادغام با موجودی (حذف تکراری)
-      const existing = await loadListings(userId);
+      const existing = useDb
+        ? await loadListingsDb(userId)
+        : (memListings.get(userId) ?? []);
       const report = newCleaningReport();
       const valid: PropertyMarketListing[] = [];
       const scrapedAt = Date.now();
@@ -127,23 +173,53 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       // فقط آگهی‌های جدید ذخیره شوند
       const known = new Set(existing.map((l) => l.token));
       const fresh = merged.filter((l) => !known.has(l.token));
-      const added = fresh.length > 0 ? await upsertListings(userId, fresh) : 0;
 
+      if (useDb) {
+        const added = fresh.length > 0 ? await upsertListingsDb(userId, fresh) : 0;
+        json(res, 200, {
+          ok: true,
+          done: result.done,
+          cursor: result.cursor,
+          added,
+          fetchedDetails: result.fetchedDetails,
+          failedDetails: result.failedDetails,
+          report,
+          persisted: true
+        });
+        return;
+      }
+
+      // حالت بدون دیتابیس → بافر محلی + بازگشت آگهی‌های جدید به کلاینت
+      memListings.set(userId, [...existing, ...fresh]);
       json(res, 200, {
         ok: true,
         done: result.done,
         cursor: result.cursor,
-        added,
+        added: fresh.length,
         fetchedDetails: result.fetchedDetails,
         failedDetails: result.failedDetails,
-        report
+        report,
+        persisted: false,
+        listings: fresh
       });
       return;
     }
 
     /* ---------- POST finalize → Snapshot جدید (الحاق، نه رونویسی) ---------- */
     if (action === 'finalize') {
-      const all = await loadListings(userId);
+      let all = useDb
+        ? await loadListingsDb(userId)
+        : (memListings.get(userId) ?? []);
+
+      // آگهی‌های پس‌فرستاده‌شده از کلاینت (حالت بدون دیتابیس — تضمین کامل
+      // بودن داده حتی اگر بافر این instance به‌دلیل چرخش از دست رفته باشد)
+      if (Array.isArray(body.listings) && body.listings.length > 0) {
+        const { merged, fresh } = mergeByToken(all, body.listings as unknown[]);
+        all = merged;
+        if (useDb && fresh.length > 0) await upsertListingsDb(userId, fresh);
+        if (!useDb) memListings.set(userId, merged);
+      }
+
       if (all.length === 0) {
         json(res, 200, { ok: false, error: 'no listings collected yet' });
         return;
@@ -176,12 +252,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         createdAt: dateTs
       };
 
-      await db()`
-        INSERT INTO "pmSnapshots" (id, "userId", "dateTs", payload, "createdAt")
-        VALUES (${snapshot.id}, ${userId}, ${dateTs}, ${JSON.stringify(snapshot)}::jsonb, ${dateTs})
-        ON CONFLICT ("userId", id) DO NOTHING
-      `;
-      json(res, 200, { ok: true, snapshot });
+      if (useDb) {
+        await db()`
+          INSERT INTO "pmSnapshots" (id, "userId", "dateTs", payload, "createdAt")
+          VALUES (${snapshot.id}, ${userId}, ${dateTs}, ${JSON.stringify(snapshot)}::jsonb, ${dateTs})
+          ON CONFLICT ("userId", id) DO NOTHING
+        `;
+      } else {
+        const snaps = memSnapshots.get(userId) ?? [];
+        if (!snaps.some((s) => s.id === snapshot.id)) snaps.push(snapshot);
+        memSnapshots.set(userId, snaps);
+      }
+      json(res, 200, { ok: true, snapshot, persisted: useDb });
       return;
     }
 

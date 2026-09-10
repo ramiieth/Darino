@@ -6,11 +6,14 @@
  *  - مهاجرت یک‌باره داده تاریخی ماژول قبلی (حذف داده ممنوع)
  *  - کلکشن دیوار فقط از مسیر سرور (/api/propertyMarket) — مرورگر
  *    نمی‌تواند مستقیم به دیوار بزند (CORS).
+ *  - کلکشن به اتصال دیتابیس وابسته نیست: اگر Neon در دسترس نباشد،
+ *    سرور آگهی‌ها را در پاسخ برمی‌گرداند و کلاینت آن‌ها را در
+ *    IndexedDB ذخیره می‌کند (پیش‌نیاز فقط خودِ سرور است).
  * ============================================================ */
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { getDb, settingGet, settingSet } from '@/shared/lib/db';
-import { fetchJson, isRemoteAllowed, isRemoteReady } from '@/repositories/remoteClient';
+import { fetchJson, isRemoteAllowed, isRemoteReady, isServerReachable } from '@/repositories/remoteClient';
 import type {
   PropertyMarketListing,
   PropertyMarketScenario,
@@ -76,7 +79,7 @@ export interface CollectState {
   listingsAdded: number;
   detailsFetched: number;
   cursor: CollectCursor | null;
-  /** آیا سرور/دیتابیس در دسترس نیست؟ */
+  /** آیا سرور (مسیر کلکشن) در دسترس نیست؟ */
   serverUnavailable: boolean;
 }
 
@@ -91,6 +94,10 @@ interface CollectChunkResponse {
   fetchedDetails?: number;
   failedDetails?: number;
   error?: string;
+  /** آیا سرور آگهی‌ها را در دیتابیس ذخیره کرد؟ */
+  persisted?: boolean;
+  /** آگهی‌های جدید این تکه — فقط وقتی دیتابیس سرور در دسترس نیست */
+  listings?: PropertyMarketListing[];
 }
 
 interface PropertyMarketState {
@@ -261,11 +268,15 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
     const st = get();
     if (st.collect.status === 'running' || st.collect.status === 'finalizing') return;
 
-    if (!isRemoteAllowed() || !(await isRemoteReady(true))) {
+    // پیش‌نیاز کلکشن فقط «خودِ سرور» است — نه دیتابیس. کلکشن دیوار از مسیر
+    // فانکشن سرورلس انجام می‌شود و اگر Neon در دسترس نباشد، نتیجه سمت
+    // کلاینت (IndexedDB) ذخیره می‌شود. پس سلامت دیتابیس مانع کلکشن نیست.
+    if (!isRemoteAllowed() || !(await isServerReachable(true))) {
       set({
         collect: {
           status: 'unavailable',
-          message: 'سرور/دیتابیس در دسترس نیست — کلکشن دیوار فقط از مسیر سرور انجام می‌شود.',
+          message:
+            'سرور در دسترس نیست — کلکشن دیوار فقط از مسیر سرور انجام می‌شود (مرورگر مستقیم به دیوار نمی‌زند). اتصال اینترنت را بررسی و دوباره تلاش کنید.',
           chunks: 0,
           listingsAdded: 0,
           detailsFetched: 0,
@@ -289,6 +300,10 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
     });
 
     let cursor: CollectCursor | null = null;
+    // وقتی سرور دیتابیس ندارد، آگهی‌های هر تکه اینجا جمع می‌شوند و در
+    // finalize به سرور پس فرستاده می‌شوند (ساخت Snapshot بدون اتکا به حافظه سرور)
+    let pendingListings: PropertyMarketListing[] = [];
+    const seenTokens = new Set<string>();
     try {
       let done = false;
       let guard = 0;
@@ -304,6 +319,14 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
         );
         if (!res.ok) throw new Error(res.error ?? 'collect failed');
         cursor = res.cursor ?? cursor;
+        if (res.persisted === false && Array.isArray(res.listings)) {
+          for (const l of res.listings) {
+            if (!seenTokens.has(l.token)) {
+              seenTokens.add(l.token);
+              pendingListings.push(l);
+            }
+          }
+        }
         const c = get().collect;
         set({
           collect: {
@@ -320,12 +343,22 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
 
       // ثبت Snapshot جدید (هرگز overwrite نمی‌شود)
       set({ collect: { ...get().collect, status: 'finalizing', message: 'ساخت Snapshot بازار…' } });
-      const fin = await fetchJson<{ ok: boolean; snapshot?: PropertyMarketSnapshot; error?: string }>(
-        '/api/propertyMarket',
-        { method: 'POST', body: { action: 'finalize' }, timeoutMs: 60_000 }
-      );
+      const fin = await fetchJson<{
+        ok: boolean;
+        snapshot?: PropertyMarketSnapshot;
+        error?: string;
+      }>('/api/propertyMarket', {
+        method: 'POST',
+        body:
+          pendingListings.length > 0
+            ? { action: 'finalize', listings: pendingListings }
+            : { action: 'finalize' },
+        timeoutMs: 60_000
+      });
       if (!fin.ok || !fin.snapshot) throw new Error(fin.error ?? 'finalize failed');
       await localPutSnapshot(fin.snapshot);
+      // آگهی‌های جمع‌شده (حالت بدون دیتابیس) مستقیم در محل ذخیره می‌شوند
+      if (pendingListings.length > 0) await localPutListings(pendingListings);
       // دریافت فهرست آگهی‌های به‌روز برای ویوی محلی
       let listings = get().listings;
       try {
@@ -338,6 +371,13 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
         }
       } catch {
         /* محلی ادامه می‌دهد */
+      }
+      // اگر فهرست سرور خالی بود (مثلاً پاسخ‌ها فقط شامل آگهی‌های تکه‌ها بود)
+      // آگهی‌های محلیِ همین کلکشن را به ویو اضافه کن (بدون تکراری)
+      if (pendingListings.length > 0) {
+        const known = new Set(listings.map((l) => l.token));
+        const missing = pendingListings.filter((l) => !known.has(l.token));
+        if (missing.length > 0) listings = [...listings, ...missing];
       }
       const snapshots = [...get().snapshots.filter((s) => s.id !== fin.snapshot!.id), fin.snapshot!].sort(
         (a, b) => a.dateTs - b.dateTs
@@ -352,11 +392,15 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
         }
       });
     } catch (e) {
+      const raw = e instanceof Error ? e.message.slice(0, 160) : 'خطای کلکشن';
+      const message = raw.includes('divar unreachable')
+        ? 'دیوار از سمت سرور در دسترس نبود (اختلال شبکه/محدودیت دیوار) — چند دقیقه دیگر دوباره تلاش کنید.'
+        : raw;
       set({
         collect: {
           ...get().collect,
           status: 'error',
-          message: e instanceof Error ? e.message.slice(0, 160) : 'خطای کلکشن'
+          message
         }
       });
     }

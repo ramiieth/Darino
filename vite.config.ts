@@ -2,6 +2,9 @@ import { defineConfig, type Plugin, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /**
  * پروکسی سرور-سمت برای Providerهای بازار:
@@ -45,6 +48,88 @@ function alphaVantageServer(): Plugin {
         const keys = avKeys();
         res.end(JSON.stringify({ configured: keys.length > 0, keys: keys.length }));
       });
+    }
+  };
+}
+
+/**
+ * پلاگین اجرای محلی Vercel Functions (api/*.ts) در dev و preview:
+ *  - /api/health ، /api/propertyMarket و … دقیقاً مثل Production توسط همان
+ *    هندلرهای تایپ‌اسکریپت پاسخ داده می‌شوند (باندل درون‌فرآیندی با esbuild —
+ *    همان روش `scripts/collect-property-market.mjs`).
+ *  - بدون DATABASE_URL هندلرها در «حالت بدون دیتابیس» کار می‌کنند؛ بنابراین
+ *    کلکشن دیوار در توسعه/پیش‌نمایش هم از مسیر سرور قابل اجراست.
+ *  - /api/cg و /api/boros مستثنی‌اند (پروکسی مستقیم به بازارهای بالادست).
+ */
+function localServerlessApi(): Plugin {
+  // این مسیرها توسط پروکسی‌های بازار پاسخ داده می‌شوند، نه هندلرهای محلی
+  const EXCLUDED = ['/api/cg', '/api/boros'];
+  const cache = new Map<string, { mtime: number; mod: Promise<{ default: unknown }> }>();
+
+  async function loadHandler(file: string): Promise<(req: unknown, res: unknown) => Promise<void>> {
+    const mtime = statSync(file).mtimeMs;
+    const hit = cache.get(file);
+    if (!hit || hit.mtime !== mtime) {
+      const mod = (async () => {
+        const { build } = await import('esbuild');
+        const outFile = path.join(tmpdir(), `darino-api-${path.basename(file, '.ts')}-${mtime}.mjs`);
+        await build({
+          entryPoints: [file],
+          bundle: true,
+          platform: 'node',
+          format: 'esm',
+          target: 'node18',
+          outfile: outFile,
+          logLevel: 'silent'
+        });
+        return import(pathToFileURL(outFile).href) as Promise<{ default: unknown }>;
+      })();
+      cache.set(file, { mtime, mod });
+      mod.catch(() => cache.delete(file));
+    }
+    const { mod } = cache.get(file)!;
+    const handler = (await mod).default;
+    if (typeof handler !== 'function') throw new Error(`no default handler in ${file}`);
+    return handler as (req: unknown, res: unknown) => Promise<void>;
+  }
+
+  function middleware(req: { url?: string }, res: { statusCode?: number; setHeader(k: string, v: string): void; end(b: string): void }, next: (e?: unknown) => void): void {
+    const url = req.url ?? '/';
+    const pathname = url.split('?')[0];
+    if (!pathname.startsWith('/api/') || EXCLUDED.some((p) => pathname.startsWith(p))) {
+      next();
+      return;
+    }
+    const name = pathname.slice('/api/'.length).replace(/\.ts$/, '');
+    if (!/^[\w-]+$/.test(name)) {
+      next();
+      return;
+    }
+    const file = path.resolve(__dirname, 'api', `${name}.ts`);
+    if (!existsSync(file)) {
+      next();
+      return;
+    }
+    loadHandler(file)
+      .then((handler) => handler(req, res))
+      .catch((e) => {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message.slice(0, 160) : 'local api error' }));
+      });
+  }
+
+  return {
+    name: 'local-serverless-api',
+    configureServer(server) {
+      // قبل از میدلورهای داخلی نصب می‌شود تا مسیرهای /api/health و … به
+      // هندلر واقعی برسند (وگرنه Vite آن‌ها را به‌عنوان ماژول TS سرو می‌کند).
+      // مسیرهای بازار (/api/cg ، /api/boros) صریحاً رد می‌شوند تا پروکسی
+      // داخلی آن‌ها را به بالادست ببرد.
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware);
     }
   };
 }
@@ -121,6 +206,7 @@ export default defineConfig({
   plugins: [
     react(),
     alphaVantageServer(),
+    localServerlessApi(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon.png', 'icons/apple-touch-icon.png'],
