@@ -83,9 +83,11 @@ export async function ensureSchema(sql: NeonQueryFunction<false, false>): Promis
       to_regclass('public."accLots"') IS NOT NULL AS l,
       to_regclass('public."accEvents"') IS NOT NULL AS ev,
       to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
-      to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d`;
-    const r = rows[0] as { a: boolean; e: boolean; l: boolean; ev: boolean; p: boolean; d: boolean };
-    if (r.a && r.e && r.l && r.ev && r.p && r.d) {
+      to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d,
+      to_regclass('public."pmListings"') IS NOT NULL AS pm1,
+      to_regclass('public."pmSnapshots"') IS NOT NULL AS pm2`;
+    const r = rows[0] as { a: boolean; e: boolean; l: boolean; ev: boolean; p: boolean; d: boolean; pm1: boolean; pm2: boolean };
+    if (r.a && r.e && r.l && r.ev && r.p && r.d && r.pm1 && r.pm2) {
       schemaReady = true;
       return true;
     }

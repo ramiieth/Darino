@@ -91,7 +91,7 @@ describe('Schema — ایمن، idempotent، غیرمخرب (A/B)', () => {
 
 describe('Schema/Case — هم‌خوانی camelCase Quoted بین api و schema.sql', () => {
   const schema = readFileSync(resolve(process.cwd(), 'db/schema.sql'), 'utf8');
-  const apiFiles = ['api/accounting.ts', 'api/portfolio.ts', 'api/dashboard.ts', 'api/_schema.ts'].map(
+  const apiFiles = ['api/accounting.ts', 'api/portfolio.ts', 'api/dashboard.ts', 'api/propertyMarket.ts', 'api/_schema.ts'].map(
     (f) => readFileSync(resolve(process.cwd(), f), 'utf8')
   );
 

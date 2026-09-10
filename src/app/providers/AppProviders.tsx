@@ -64,7 +64,7 @@ export function AppShell({
           : window.location.hash.includes('vehicle')
             ? 'سرمایه‌گذاری خودرو'
             : window.location.hash.includes('realestate')
-            ? 'سرمایه‌گذاری ملک'
+            ? 'بازار املاک اهواز'
             : window.location.hash.includes('calculators')
             ? 'ماشین‌حساب سرمایه‌گذاری'
             : window.location.hash.includes('providers')

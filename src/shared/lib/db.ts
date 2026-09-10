@@ -6,8 +6,6 @@ import Dexie, { type Table } from 'dexie';
 import type { PriceQuote } from '@/shared/types';
 import type { Vehicle } from '@/features/vehicle/domain/types';
 import type { VehicleSnapshot } from '@/features/vehicle/domain/types';
-import type { RealAsset } from '@/features/realestate/domain/types';
-import type { RealEstateSnapshot } from '@/features/realestate/domain/types';
 
 /** رکورد کش قیمت در IndexedDB */
 export interface PriceCacheRecord extends PriceQuote {
@@ -54,6 +52,9 @@ class AppDatabase extends Dexie {
   settings!: Table<SettingRecord, string>;
   fxRates!: Table<FxRateRecord, string>;
   watchlist!: Table<WatchItemRecord, string>;
+  // بازار املاک (Divar) — v10
+  pmListings!: Table<Record<string, unknown>, string>;
+  pmSnapshots!: Table<Record<string, unknown>, string>;
 
   constructor() {
     super('portfolio-simulator-db');
@@ -165,6 +166,30 @@ class AppDatabase extends Dexie {
       tokenizedAssetSyncRuns: '++id, provider, sourceCategory, startedAt',
       portfolioAssets: '++id, assetType, assetId, updatedAt',
       dashboardSnapshots: '++id, timestamp, createdAt'
+    });
+    // v10: بازار املاک (Divar) — pmListings/pmSnapshots (سناریو در settings)
+    // ⚠️ جدول‌های ماژول قدیمی (realAssets/realEstateSnapshots) حذف نمی‌شوند:
+    //    داده‌های تاریخی ارزشمندند و به‌صورت خواندنی/مهاجرت‌یافته باقی می‌مانند.
+    this.version(10).stores({
+      priceCache: 'key, fetchedAt',
+      assetMeta: 'key, updatedAt',
+      settings: 'key',
+      fxRates: 'id, updatedAt',
+      watchlist: 'symbol, addedAt',
+      accAccounts: 'key',
+      accEntries: '++id, date, createdAt',
+      accLots: '++id, asset, openedAt',
+      accEvents: '++id, at',
+      vehicles: 'id',
+      vehicleSnapshots: 'id, dateTs',
+      realAssets: 'id, neighborhoodId',
+      realEstateSnapshots: 'id, dateTs',
+      tokenizedAssetRegistry: 'key, provider, status, underlyingSymbol, assetType, sourceRank, updatedAt',
+      tokenizedAssetSyncRuns: '++id, provider, sourceCategory, startedAt',
+      portfolioAssets: '++id, assetType, assetId, updatedAt',
+      dashboardSnapshots: '++id, timestamp, createdAt',
+      pmListings: 'token, city, scrapedAt',
+      pmSnapshots: 'id, dateTs, source'
     });
   }
 }

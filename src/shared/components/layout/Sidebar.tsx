@@ -49,7 +49,7 @@ const GROUPS: {
       { to: '/simulation', label: t('navSimulation'), icon: LineChart },
       { to: '/calculators', label: 'ماشین‌حساب', icon: Calculator },
       { to: '/vehicle', label: 'خودرو', icon: Car },
-      { to: '/realestate', label: 'ملک', icon: Home }
+      { to: '/realestate', label: 'بازار املاک', icon: Home }
     ]
   },
   {

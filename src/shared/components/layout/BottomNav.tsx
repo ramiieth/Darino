@@ -35,7 +35,7 @@ const MORE = [
   { to: '/boros', label: 'Boros', icon: Radar },
   { to: '/defi-loop', label: 'Yield Loop', icon: Repeat },
   { to: '/vehicle', label: 'خودرو', icon: Car },
-  { to: '/realestate', label: 'ملک', icon: Home }
+  { to: '/realestate', label: 'بازار املاک', icon: Home }
 ] as const;
 
 /** نوار ناوبری پایین — موبایل (در دسکتاپ سایدبار جایگزین آن است) */

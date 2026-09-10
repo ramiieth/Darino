@@ -15,6 +15,10 @@
     },
     "api/dashboard.ts": {
       "includeFiles": "db/schema.sql"
+    },
+    "api/propertyMarket.ts": {
+      "includeFiles": "db/schema.sql",
+      "maxDuration": 60
     }
   },
   "rewrites": [
