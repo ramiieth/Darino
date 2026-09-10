@@ -102,6 +102,37 @@ CREATE TABLE IF NOT EXISTS "dashboardSnapshots" (
   UNIQUE ("userId", timestamp)
 );
 
+-- ------------------------------------------------------------
+-- بازار املاک (Property Market) — کلکشنر Divar + Snapshotهای بازار
+-- قوانین:
+--   * آگهی‌ها (pmListings): کلید (کاربر، توکن دیوار) — حذف تکراری با توکن
+--   * Snapshotها (pmSnapshots): تاریخچه بازار — الحاقی/Immutable (هرگز
+--     رونویسی نمی‌شود؛ §۲۰ مأموریت). آمار فقط «تومانی» ذخیره می‌شود؛
+--     تبدیل دلاری با نرخ زنده در لایه سرویس اپ انجام می‌شود.
+--   * نرخ دلار منبع جداگانه ندارد — از جدول/سرویس موجود (fx) اپ خوانده می‌شود.
+-- ------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS "pmListings" (
+  "userId"    TEXT NOT NULL DEFAULT 'local-user',
+  token       TEXT NOT NULL,              -- شناسه آگهی دیوار
+  city        TEXT NOT NULL DEFAULT 'ahvaz',
+  payload     JSONB NOT NULL,             -- PropertyMarketListing کامل
+  "listedAt"  BIGINT,
+  "scrapedAt" BIGINT NOT NULL,
+  PRIMARY KEY ("userId", token)
+);
+CREATE INDEX IF NOT EXISTS idx_pmListings_city ON "pmListings" ("userId", city, "scrapedAt");
+
+CREATE TABLE IF NOT EXISTS "pmSnapshots" (
+  "userId"    TEXT NOT NULL DEFAULT 'local-user',
+  id          TEXT NOT NULL,              -- pmsnap-{ts} / legacy-{id}
+  "dateTs"    BIGINT NOT NULL,
+  payload     JSONB NOT NULL,             -- PropertyMarketSnapshot (آمار + گزارش پاک‌سازی)
+  "createdAt" BIGINT NOT NULL,
+  PRIMARY KEY ("userId", id)
+);
+CREATE INDEX IF NOT EXISTS idx_pmSnapshots_date ON "pmSnapshots" ("userId", "dateTs");
+
 -- ============================================================
 -- Migration راهنمای اجرا:
 --   1) روی Vercel: متغیر DATABASE_URL را تنظیم کنید

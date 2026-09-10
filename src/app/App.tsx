@@ -10,7 +10,7 @@ const DashboardPage = lazy(() => import('@/features/eth-summary/presentation/Das
 const SimulationPage = lazy(() => import('@/features/simulation/presentation/SimulationPage').then((m) => ({ default: m.SimulationPage })));
 const DeFiPage = lazy(() => import('@/features/defi/presentation/DeFiPage').then((m) => ({ default: m.DeFiPage })));
 const VehiclePage = lazy(() => import('@/features/vehicle/presentation/VehiclePage').then((m) => ({ default: m.VehiclePage })));
-const RealEstatePage = lazy(() => import('@/features/realestate/presentation/RealEstatePage').then((m) => ({ default: m.RealEstatePage })));
+const PropertyMarketPage = lazy(() => import('@/features/propertyMarket/presentation/PropertyMarketPage').then((m) => ({ default: m.PropertyMarketPage })));
 const PendlePage = lazy(() => import('@/features/pendle/presentation/PendlePage').then((m) => ({ default: m.PendlePage })));
 const PendleMarketDetailPage = lazy(() => import('@/features/pendle/presentation/PendleMarketDetailPage').then((m) => ({ default: m.PendleMarketDetailPage })));
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
@@ -111,8 +111,16 @@ export function App() {
           <Route
             path="/realestate"
             element={
-              <Lazy label="ملک">
-                <RealEstatePage />
+              <Lazy label="بازار املاک">
+                <PropertyMarketPage />
+              </Lazy>
+            }
+          />
+          <Route
+            path="/property-market"
+            element={
+              <Lazy label="بازار املاک">
+                <PropertyMarketPage />
               </Lazy>
             }
           />

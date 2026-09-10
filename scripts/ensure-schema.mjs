@@ -62,9 +62,11 @@ try {
     to_regclass('public."accLots"') IS NOT NULL AS l,
     to_regclass('public."accEvents"') IS NOT NULL AS ev,
     to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
-    to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d`;
+    to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d,
+    to_regclass('public."pmListings"') IS NOT NULL AS pm1,
+    to_regclass('public."pmSnapshots"') IS NOT NULL AS pm2`;
   const r = rows[0] ?? {};
-  if (r.a && r.e && r.l && r.ev && r.p && r.d) {
+  if (r.a && r.e && r.l && r.ev && r.p && r.d && r.pm1 && r.pm2) {
     console.log('✅ Schema از قبل آماده است — بدون DDL.');
     process.exit(0);
   }
