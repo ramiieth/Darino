@@ -5,16 +5,16 @@
  *  - بهترین فرصت‌ها بر اساس Opportunity Score (نه فقط APY)
  *  - کلیک روی هر پول → Calculator
  */
-import { useMemo, useState } from 'react';
-import { Search, Filter, Sparkles, Wallet } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { Skeleton } from '@/shared/components/ui/Skeleton';
-import { ErrorState } from '@/shared/components/ui/StateViews';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Field, SearchField, Select } from '@/shared/components/ui/Input';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { EmptyState, ErrorState, ListSkeleton } from '@/shared/components/ui/StateViews';
 import { useYieldPools, loadYieldPools, ensurePoolChart } from '@/features/defi-loop/data/useYieldLoops';
 import type { YieldPool } from '@/features/defi-loop/data/yieldsService';
 import { computeApyStats, computeTvlStats, opportunityScore, riskIndicators, type RiskIndicator } from '@/features/defi-loop/domain/yieldAnalytics';
-import { fmtPct, fmtUSD, fmtInt } from '@/shared/utils/formatters';
-import { cn } from '@/shared/lib/cn';
+import { fmtUSD, fmtInt } from '@/shared/utils/formatters';
 
 export interface LoopRow {
   pool: YieldPool;
@@ -60,82 +60,21 @@ export async function buildLoopRow(pool: YieldPool): Promise<LoopRow> {
   return { pool, score, apyStats, tvlStats, risks, rewardDependency: rewardDep };
 }
 
-function PoolCard({ row, onOpen }: { row: LoopRow; onOpen: () => void }) {
-  const p = row.pool;
-  const total = p.apy ?? 0;
+function RiskBadges({ risks }: { risks: RiskIndicator[] }) {
+  if (risks.length === 0) return null;
   return (
-    <button onClick={onOpen} className="w-full text-start">
-      <GlassCard variant="soft" className="p-3 transition-all hover:bg-line/5">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-extrabold text-ink">
-              {p.project} · {p.symbol}
-            </p>
-            <p className="truncate text-[9px] font-medium text-muted">
-              {p.chain} · TVL {fmtUSD(p.tvlUsd, true)}
-              {p.poolMeta ? ` · ${p.poolMeta}` : ''}
-            </p>
-          </div>
-          <div className="shrink-0 text-end">
-            <p className="num-ltr text-[15px] font-black text-accent">{Math.round(row.score)}</p>
-            <p className="text-[8px] font-bold text-muted">امتیاز</p>
-          </div>
-        </div>
-
-        {/* اجزای APY */}
-        <div className="mt-2 grid grid-cols-3 gap-1.5 text-[9px] font-bold">
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">کل APY</p>
-            <p className={cn('num-ltr', total >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(total)}</p>
-          </div>
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">پایه (Intrinsic)</p>
-            <p className="num-ltr text-ink">{p.apyBase !== null ? fmtPct(p.apyBase) : 'N/A'}</p>
-          </div>
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">Reward</p>
-            <p className="num-ltr text-ink">{p.apyReward !== null ? fmtPct(p.apyReward) : 'N/A'}</p>
-          </div>
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">میانگین ۳۰d</p>
-            <p className="num-ltr text-ink">{row.apyStats.avg30d !== null ? fmtPct(row.apyStats.avg30d) : 'N/A'}</p>
-          </div>
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">تغییر TVL ۳۰d</p>
-            <p className={cn('num-ltr', (row.tvlStats.change30d ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-              {row.tvlStats.change30d !== null ? `${row.tvlStats.change30d >= 0 ? '+' : ''}${fmtPct(row.tvlStats.change30d)}` : 'N/A'}
-            </p>
-          </div>
-          <div className="rounded-lg bg-line/5 px-2 py-1">
-            <p className="text-muted">نوسان APY</p>
-            <p className="num-ltr text-ink">{row.apyStats.volatility !== null ? fmtPct(row.apyStats.volatility) : 'N/A'}</p>
-          </div>
-        </div>
-
-        {/* هشدارها */}
-        {row.risks.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {row.risks.slice(0, 3).map((r, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'badge ring-1',
-                  r.severity === 'critical'
-                    ? 'bg-negative/10 text-negative ring-negative/20'
-                    : r.severity === 'warning'
-                      ? 'bg-warn/10 text-warn ring-warn/20'
-                      : 'bg-line/5 text-muted ring-line/10'
-                )}
-              >
-                {r.label}
-              </span>
-            ))}
-          </div>
-        )}
-      </GlassCard>
-    </button>
+    <span className="flex flex-wrap gap-1">
+      {risks.slice(0, 3).map((r, i) => (
+        <Badge key={i} tone={r.severity === 'critical' ? 'loss' : r.severity === 'warning' ? 'warn' : 'neutral'}>
+          {r.label}
+        </Badge>
+      ))}
+    </span>
   );
 }
+
+const TVL_OPTS = [0, 100_000, 500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000];
+const APY_OPTS = [0, 5, 10, 20, 50];
 
 export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => void }) {
   const { pools, loading, error } = useYieldPools();
@@ -146,8 +85,9 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
   const [minTvl, setMinTvl] = useState(0);
   const [minApy, setMinApy] = useState(0);
   const [rows, setRows] = useState<Record<string, LoopRow>>({});
+  const [building, setBuilding] = useState(false);
+  const builtIds = useRef<Set<string>>(new Set());
 
-  // بارگذاری lazy تاریخچه برای پول‌های بالای لیست
   const topPools = useMemo(() => {
     const filtered = pools.filter((p) => {
       if (chain !== 'همه' && p.chain !== chain) return false;
@@ -161,22 +101,27 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
     return filtered.sort((a, b) => (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0)).slice(0, 60);
   }, [pools, q, chain, project, stableOnly, minTvl, minApy]);
 
-  // build rows (async lazy)
-  const [building, setBuilding] = useState(false);
-  const [builtIds, setBuiltIds] = useState<Set<string>>(new Set());
-  useMemo(() => {
+  // lazy history → rows for the visible pools (side effect: useEffect, not useMemo)
+  const poolKey = topPools.map((p) => p.pool).join(',');
+  useEffect(() => {
+    let cancelled = false;
     void (async () => {
+      const toBuild = topPools.filter((p) => !builtIds.current.has(p.pool)).slice(0, 15);
+      if (toBuild.length === 0) return;
       setBuilding(true);
-      const toBuild = topPools.filter((p) => !builtIds.has(p.pool));
-      for (const p of toBuild.slice(0, 15)) {
+      for (const p of toBuild) {
         const row = await buildLoopRow(p);
+        if (cancelled) break;
+        builtIds.current.add(p.pool);
         setRows((prev) => ({ ...prev, [p.pool]: row }));
-        setBuiltIds((prev) => new Set(prev).add(p.pool));
       }
-      setBuilding(false);
+      if (!cancelled) setBuilding(false);
     })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topPools.map((p) => p.pool).join(',')]);
+  }, [poolKey]);
 
   const chains = useMemo(() => ['همه', ...new Set(pools.map((p) => p.chain))].slice(0, 15), [pools]);
   const projects = useMemo(() => ['همه', ...new Set(pools.map((p) => p.project))].slice(0, 15), [pools]);
@@ -186,96 +131,165 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
     [topPools, rows]
   );
 
-  if (loading && pools.length === 0) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-        ))}
-      </div>
-    );
-  }
+  if (loading && pools.length === 0) return <ListSkeleton rows={6} />;
   if (error && pools.length === 0) {
     return <ErrorState message="ارتباط با DeFiLlama Yields برقرار نشد" onRetry={() => void loadYieldPools()} />;
   }
 
   return (
-    <div className="space-y-3">
-      {/* فیلترها */}
-      <GlassCard className="space-y-2 p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="جستجوی نماد/پروتکل/زنجیره…"
-            className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-accent/40"
-          />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <select value={chain} onChange={(e) => setChain(e.target.value)} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
-            {chains.map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <select value={project} onChange={(e) => setProject(e.target.value)} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
-            {projects.map((c) => <option key={c}>{c}</option>)}
-          </select>
-          <select value={minTvl} onChange={(e) => setMinTvl(Number(e.target.value))} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
-            <option value={0}>TVL: همه</option>
-            <option value={100000}>TVL &gt; $100K</option>
-            <option value={500000}>TVL &gt; $500K</option>
-            <option value={1000000}>TVL &gt; $1M</option>
-            <option value={2000000}>TVL &gt; $2M</option>
-            <option value={5000000}>TVL &gt; $5M</option>
-            <option value={10000000}>TVL &gt; $10M</option>
-          </select>
-          <select value={minApy} onChange={(e) => setMinApy(Number(e.target.value))} className="glass-inset h-9 rounded-xl px-2 text-[9px] font-bold text-ink outline-none">
-            <option value={0}>APY: همه</option>
-            <option value={5}>APY &gt; 5%</option>
-            <option value={10}>APY &gt; 10%</option>
-            <option value={20}>APY &gt; 20%</option>
-            <option value={50}>APY &gt; 50%</option>
-          </select>
-          <button
-            onClick={() => setStableOnly((s) => !s)}
-            className={cn('flex items-center gap-1 rounded-xl px-2 py-1.5 text-[9px] font-black transition-all', stableOnly ? 'bg-emerald-400/15 text-emerald-400' : 'glass-inset text-muted')}
-          >
-            <Wallet className="h-3 w-3" /> استیبل‌کوین
-          </button>
-        </div>
-      </GlassCard>
-
-      {/* بهترین فرصت‌ها */}
-      {list.length > 0 && (
-        <GlassCard variant="soft" className="p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-[12px] font-black text-ink">
-            <Sparkles className="h-4 w-4 text-accent" /> بهترین فرصت‌ها (بر اساس امتیاز — نه فقط APY)
-          </p>
-          <div className="space-y-1.5">
-            {list.slice(0, 3).map((r) => (
-              <PoolCard key={r.pool.pool} row={r} onOpen={() => onOpenPool(r.pool)} />
-            ))}
+    <div className="space-y-5">
+      <Surface className="p-4 md:p-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="sm:col-span-2 lg:col-span-2">
+            <p className="mb-1.5 text-xs font-semibold text-muted">جستجو</p>
+            <SearchField value={q} onChange={setQ} placeholder="نماد، پروتکل یا زنجیره…" />
           </div>
-        </GlassCard>
+          <Field label="زنجیره">
+            <Select value={chain} onChange={(e) => setChain(e.target.value)}>
+              {chains.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="پروتکل">
+            <Select value={project} onChange={(e) => setProject(e.target.value)}>
+              {projects.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </Select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1 lg:grid-cols-1">
+            <Field label="حداقل TVL">
+              <Select value={minTvl} onChange={(e) => setMinTvl(Number(e.target.value))}>
+                {TVL_OPTS.map((v) => (
+                  <option key={v} value={v}>
+                    {v === 0 ? 'همه' : `> ${fmtUSD(v, true)}`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="حداقل APY">
+              <Select value={minApy} onChange={(e) => setMinApy(Number(e.target.value))}>
+                {APY_OPTS.map((v) => (
+                  <option key={v} value={v}>
+                    {v === 0 ? 'همه' : `> ${v}%`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </div>
+        <label className="mt-4 inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+          <input
+            type="checkbox"
+            checked={stableOnly}
+            onChange={(e) => setStableOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-divider-strong accent-[rgb(var(--c-brand-500))]"
+          />
+          فقط استیبل‌کوین
+        </label>
+      </Surface>
+
+      {list.length === 0 ? (
+        building ? <ListSkeleton rows={5} /> : <EmptyState message="پولی با این فیلترها یافت نشد" />
+      ) : (
+        <Surface className="overflow-hidden">
+          {/* desktop */}
+          <div className="hidden lg:block">
+            <table className="data-table">
+              <caption className="sr-only">پول‌های بازدهی</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="!ps-5">پول</th>
+                  <th scope="col" className="col-num">APY کل</th>
+                  <th scope="col" className="col-num">پایه</th>
+                  <th scope="col" className="col-num">پاداش</th>
+                  <th scope="col" className="col-num">میانگین ۳۰ روز</th>
+                  <th scope="col" className="col-num">TVL</th>
+                  <th scope="col" className="col-num">تغییر TVL ۳۰ روز</th>
+                  <th scope="col" className="col-num !pe-5">امتیاز</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r, i) => {
+                  const p = r.pool;
+                  return (
+                    <tr key={p.pool} className="cursor-pointer" onClick={() => onOpenPool(p)}>
+                      <td className="!ps-5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPool(p);
+                          }}
+                          className="text-start"
+                        >
+                          <span className="flex items-center gap-2 font-semibold text-ink hover:text-accent">
+                            <bdi dir="ltr">{p.project} · {p.symbol}</bdi>
+                            {i < 3 && <Badge tone="brand">برتر</Badge>}
+                          </span>
+                          <span className="block text-xs text-muted">
+                            {p.chain}
+                            {p.poolMeta ? ` · ${p.poolMeta}` : ''}
+                          </span>
+                        </button>
+                        <div className="mt-1"><RiskBadges risks={r.risks} /></div>
+                      </td>
+                      <td className="col-num font-semibold text-ink"><PercentValue value={p.apy} signed={false} tone="none" /></td>
+                      <td className="col-num"><PercentValue value={p.apyBase} signed={false} tone="none" /></td>
+                      <td className="col-num"><PercentValue value={p.apyReward} signed={false} tone="none" /></td>
+                      <td className="col-num text-muted"><PercentValue value={r.apyStats.avg30d} signed={false} tone="none" /></td>
+                      <td className="col-num"><MoneyValue value={p.tvlUsd} compact /></td>
+                      <td className="col-num"><PercentValue value={r.tvlStats.change30d} /></td>
+                      <td className="col-num num-ltr !pe-5 font-bold text-ink">{Math.round(r.score)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* phones & tablets */}
+          <ul className="divide-y divide-divider px-4 lg:hidden">
+            {list.map((r, i) => {
+              const p = r.pool;
+              return (
+                <li key={p.pool}>
+                  <button type="button" onClick={() => onOpenPool(p)} className="w-full py-3 text-start">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-2 truncate text-sm font-semibold text-ink">
+                          <bdi dir="ltr" className="truncate">{p.project} · {p.symbol}</bdi>
+                          {i < 3 && <Badge tone="brand">برتر</Badge>}
+                        </p>
+                        <p className="truncate text-xs text-muted">
+                          {p.chain} · TVL <MoneyValue value={p.tvlUsd} compact />
+                        </p>
+                        <p className="mt-1 flex flex-wrap gap-x-3 text-2xs text-muted">
+                          <span>پایه <PercentValue value={p.apyBase} signed={false} tone="none" /></span>
+                          <span>پاداش <PercentValue value={p.apyReward} signed={false} tone="none" /></span>
+                          <span>TVL ۳۰ر <PercentValue value={r.tvlStats.change30d} /></span>
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-end">
+                        <p className="text-base font-bold text-ink"><PercentValue value={p.apy} signed={false} tone="none" /></p>
+                        <p className="text-2xs text-muted">امتیاز <span className="num-ltr">{Math.round(r.score)}</span></p>
+                      </div>
+                    </div>
+                    {r.risks.length > 0 && <div className="mt-2"><RiskBadges risks={r.risks} /></div>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Surface>
       )}
 
-      {/* همه */}
-      <div className="space-y-2">
-        {list.map((r) => (
-          <PoolCard key={r.pool.pool} row={r} onOpen={() => onOpenPool(r.pool)} />
-        ))}
-        {list.length === 0 && (
-          <GlassCard variant="soft" className="p-6 text-center text-[11px] font-bold text-muted">
-            {building ? 'در حال بارگذاری…' : 'پولی با این فیلترها یافت نشد'}
-          </GlassCard>
-        )}
-        {!building && pools.length > 0 && (
-          <p className="text-center text-[9px] font-medium text-muted/70">
-            {fmtInt(pools.length)} پول از DeFiLlama Yields · امتیاز = ترکیب Net APY + پایداری + TVL + نقدینگی + کیفیت — نه احتمال موفقیت
-          </p>
-        )}
-      </div>
+      {pools.length > 0 && (
+        <p className="text-xs text-muted">
+          {fmtInt(pools.length)} پول از DeFiLlama Yields · امتیاز = ترکیب APY خالص، پایداری، TVL، نقدینگی و کیفیت — نه احتمال موفقیت
+          {building && ' · در حال بارگذاری تاریخچه…'}
+        </p>
+      )}
     </div>
   );
 }
-
-export { Filter };

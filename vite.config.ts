@@ -209,7 +209,7 @@ export default defineConfig({
     localServerlessApi(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/favicon.png', 'icons/apple-touch-icon.png'],
+      includeAssets: ['icons/favicon.svg', 'icons/favicon.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'دارینو — مدیریت هوشمند دارایی شخصی',
         short_name: 'دارینو',
@@ -218,11 +218,12 @@ export default defineConfig({
         lang: 'fa',
         dir: 'rtl',
         display: 'standalone',
-        orientation: 'portrait',
+        // tablets/iPad and desktop installs must rotate freely
+        orientation: 'any',
         start_url: '/',
         scope: '/',
-        background_color: '#0a0f1e',
-        theme_color: '#0a0f1e',
+        background_color: '#F6F8FC',
+        theme_color: '#F6F8FC',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -235,7 +236,10 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,woff,png,svg}'],
+        // woff2 only (every supported browser) — the .woff duplicates doubled the font precache
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+        // design-source artwork, never requested by the app
+        globIgnores: ['**/icons/icon-master.png'],
         navigateFallback: '/index.html',
         runtimeCaching: [
           // پروکسی کوین‌گکو (same-origin) — NetworkFirst با کش آفلاین

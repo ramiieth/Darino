@@ -7,7 +7,6 @@
  * - خروجی همیشه timestamp (میلی‌ثانیه، ساعت ۱۲ محلی)
  */
 import { useEffect, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
 import { Input } from '@/shared/components/ui/Input';
 import {
   formatJalali,
@@ -90,7 +89,7 @@ export function SmartDateField({
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      {label && <span className="block text-[11px] font-bold text-muted">{label}</span>}
+      {label && <span className="block text-xs font-semibold text-muted">{label}</span>}
       <div className="grid grid-cols-2 gap-2">
         {/* شمسی */}
         <div>
@@ -101,35 +100,31 @@ export function SmartDateField({
             onChange={(e) => onJChange(e.target.value)}
             placeholder="1404/05/17"
             aria-label="تاریخ شمسی"
-            className={cn(
-              'h-10 text-xs text-start',
-              invalid && 'ring-2 ring-negative/50 focus:ring-negative/50'
-            )}
+            invalid={invalid}
           />
         </div>
         {/* میلادی */}
         <div className="relative">
-          <CalendarDays className="pointer-events-none absolute start-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <Input
             type="date"
             dir="ltr"
             value={gIso}
             onChange={(e) => onGChange(e.target.value)}
             aria-label="تاریخ میلادی"
-            className="h-10 px-2 ps-8 text-xs text-start"
+            className="px-3"
           />
         </div>
       </div>
       {!compact && value !== null && !invalid && (
-        <p className="text-[9px] font-medium text-muted/80">
+        <p className="text-2xs font-normal text-muted">
           {formatJalali(value)} شمسی · {formatGregorianIso(value)} میلادی
         </p>
       )}
       {!compact && invalid && (
-        <p className="text-[9px] font-bold text-negative">تاریخ شمسی نامعتبر است — مثال: 1404/05/17</p>
+        <p className="text-2xs font-semibold text-negative">تاریخ شمسی نامعتبر است — مثال: 1404/05/17</p>
       )}
       {!compact && (
-        <p className="text-[9px] font-medium text-muted/60">
+        <p className="text-2xs font-normal text-subtle">
           ورودی شمسی یا میلادی — دیگری خودکار محاسبه می‌شود
         </p>
       )}

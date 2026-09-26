@@ -10,22 +10,24 @@
  *    جمع‌آوری شده و لزوماً به معنای قیمت معامله‌شده نیست.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Car, History, Plus, TrendingUp, TrendingDown, Info, Search } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { History, Plus } from 'lucide-react';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { Sheet } from '@/shared/components/ui/Sheet';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { ProvenanceBadge } from '@/shared/components/ui/ProvenanceBadge';
-import { fmtTomanAmount, fmtUsdAmount, fmtPct, toFaDigits, fmtInt } from '@/shared/utils/formatters';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Button } from '@/shared/components/ui/Button';
+import { Field, Select } from '@/shared/components/ui/Input';
+import { PageSkeleton } from '@/shared/components/ui/Skeleton';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { KeyValueList, Metric, MetricGrid, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { fmtTomanAmount, fmtUsdAmount, toFaDigits } from '@/shared/utils/formatters';
 import { useVehicleStore, useVehicles } from '../data/useVehicles';
 import { useFxStore } from '@/shared/store/fxStore';
 import {
   vehicleReturn,
-  vehicleReturnRange,
   rankVehicles,
   dealerMarketGap,
   vehicleStats,
   type VehicleSortKey,
-  type PriceKind,
   type RankedVehicle
 } from '../domain/engine';
 import { BENCHMARK_FA } from '../domain/engine';
@@ -33,7 +35,6 @@ import type { Vehicle, VehicleSnapshot } from '../domain/types';
 import { compareWithBenchmarks } from '../data/benchmarks';
 import { VehicleChart, type ChartPoint } from './VehicleChart';
 import { NewSnapshotSheet } from './NewSnapshotSheet';
-import { cn } from '@/shared/lib/cn';
 
 const SORT_LABEL: Record<VehicleSortKey, string> = {
   'toman-pct': 'بیشترین رشد تومانی (٪)',
@@ -43,13 +44,8 @@ const SORT_LABEL: Record<VehicleSortKey, string> = {
   worst: 'بیشترین کاهش'
 };
 
-function ReturnBadge({ pct, prefix = '' }: { pct: number | null; prefix?: string }) {
-  if (pct === null) return <span className="num-ltr text-muted">—</span>;
-  return (
-    <span className={cn('num-ltr font-black', pct >= 0 ? 'text-positive' : 'text-negative')}>
-      {pct >= 0 ? '▲' : '▼'} {prefix}{pct >= 0 ? '+' : ''}{pct.toFixed(1)}٪
-    </span>
-  );
+function ReturnBadge({ pct }: { pct: number | null }) {
+  return <PercentValue value={pct} digits={1} className="font-semibold" />;
 }
 
 export function VehiclePage() {
@@ -59,7 +55,6 @@ export function VehiclePage() {
   const [startIdx, setStartIdx] = useState(0);
   const [endIdx, setEndIdx] = useState(0);
   const [sortKey, setSortKey] = useState<VehicleSortKey>('toman-pct');
-  const [priceKind, setPriceKind] = useState<PriceKind>('market');
   const [selected, setSelected] = useState<Vehicle | null>(null);
   const [showNewSnapshot, setShowNewSnapshot] = useState(false);
 
@@ -67,18 +62,15 @@ export function VehiclePage() {
     void useFxStore.getState().hydrate();
   }, []);
 
-  // پیش‌فرض: بازه = ابتدایی‌ترین تا آخرین Snapshot (All Time)
+  // default range: first → latest snapshot (all time)
   useEffect(() => {
-    if (snapshots.length > 0) {
-      setEndIdx(snapshots.length - 1);
-    }
+    if (snapshots.length > 0) setEndIdx(snapshots.length - 1);
   }, [snapshots.length]);
 
   const startSnap = snapshots[startIdx];
   const endSnap = snapshots[endIdx];
-  const rangeValid = startSnap && endSnap && startSnap.dateTs < endSnap.dateTs;
+  const rangeValid = !!startSnap && !!endSnap && startSnap.dateTs < endSnap.dateTs;
 
-  /** خودروها گروه‌بندی‌شده بر اساس برند (برای dropdown انتخاب) */
   const groupedByBrand = useMemo(() => {
     const map = new Map<string, Vehicle[]>();
     for (const v of vehicles) {
@@ -88,250 +80,233 @@ export function VehiclePage() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fa'));
   }, [vehicles]);
 
-  const ranked = useMemo<RankedVehicle[]>(() => {
-    if (!startSnap || !endSnap || startSnap.dateTs >= endSnap.dateTs) return [];
-    return rankVehicles(vehicles, startSnap, endSnap, sortKey);
-  }, [vehicles, startSnap, endSnap, sortKey]);
+  const ranked = useMemo<RankedVehicle[]>(
+    () => (rangeValid ? rankVehicles(vehicles, startSnap, endSnap, sortKey) : []),
+    [vehicles, startSnap, endSnap, sortKey, rangeValid]
+  );
+  const stats = useMemo(() => (rangeValid ? vehicleStats(vehicles, startSnap, endSnap) : null), [vehicles, startSnap, endSnap, rangeValid]);
 
-  const stats = useMemo(() => {
-    if (!startSnap || !endSnap || startSnap.dateTs >= endSnap.dateTs) return null;
-    return vehicleStats(vehicles, startSnap, endSnap);
-  }, [vehicles, startSnap, endSnap]);
+  const header = (
+    <PageHeader
+      title="سرمایه‌گذاری خودرو"
+      subtitle="خودرو به‌عنوان یک دارایی — قیمت تاریخی، بازدهی تومانی و دلاری و مقایسه با سایر دارایی‌ها"
+      actions={
+        <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
+          ثبت قیمت جدید
+        </Button>
+      }
+    />
+  );
 
-  // سید — اگر داده خالی است (اولین بار)، صبر کن
   if (loading && snapshots.length === 0) {
     return (
-      <div className="space-y-3">
-        <PageHeader title="سرمایه‌گذاری خودرو" subtitle="خودرو به‌عنوان یک Asset Class" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="skeleton h-16 w-full rounded-2xl" />
-        ))}
-      </div>
+      <Page>
+        {header}
+        <PageSkeleton />
+      </Page>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="سرمایه‌گذاری خودرو"
-        subtitle="ثبت قیمت تاریخی، بازدهی تومانی/دلاری و مقایسه با سایر دارایی‌ها"
-        actions={
-          <button
-            onClick={() => setShowNewSnapshot(true)}
-            className="flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3 text-[11px] font-bold text-white shadow-accent transition-colors hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" /> ثبت قیمت جدید
-          </button>
-        }
-      />
+    <Page>
+      {header}
 
-      {/* توضیح منبع */}
-      <GlassCard variant="soft" className="flex items-start gap-2 p-3">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
-        <p className="text-[9px] font-medium leading-4 text-muted">
-          این قیمت‌ها بر اساس میانگین قیمت پیشنهادی فروشندگان و نمایشگاه‌داران جمع‌آوری شده و لزوماً به معنای
-          قیمت معامله‌شده نیست. هر Snapshot (تاریخ + نرخ دلار همان روز + قیمت‌ها) به‌صورت غیرقابل‌تغییر ذخیره
-          می‌شود؛ تغییر نرخ دلار در روزهای بعد هرگز Snapshotهای گذشته را تغییر نمی‌دهد.
-        </p>
-      </GlassCard>
+      <Notice tone="neutral">
+        قیمت‌ها میانگین قیمت پیشنهادی فروشندگان و نمایشگاه‌داران است، نه لزوماً قیمت معامله‌شده. هر Snapshot (تاریخ، نرخ دلار همان
+        روز و قیمت‌ها) غیرقابل‌تغییر ذخیره می‌شود و تغییر نرخ دلار بعدی آن را عوض نمی‌کند.
+      </Notice>
 
-      {/* انتخاب خودرو — میانبر سریع (بدون تایپ دستی) */}
-      <GlassCard className="p-3">
-        <label className="mb-1 flex items-center gap-1 text-[9px] font-bold text-muted">
-          <Search className="h-3 w-3" /> انتخاب خودرو (مشاهده مستقیم جزئیات)
-        </label>
-        <select
-          value=""
-          onChange={(e) => {
-            const v = vehicles.find((x) => x.id === e.target.value);
-            if (v) setSelected(v);
-            e.target.value = '';
-          }}
-          className="h-10 w-full rounded-xl border border-line/15 bg-card px-2 text-[10px] font-bold text-ink shadow-card outline-none hover:border-line/25"
-        >
-          <option value="" disabled>— انتخاب از بین {toFaDigits(vehicles.length)} خودرو —</option>
-          {groupedByBrand.map(([brand, list]) => (
-            <optgroup key={brand} label={brand}>
-              {list.map((v) => (
-                <option key={v.id} value={v.id}>{v.name}{v.modelYear ? ` (${v.modelYear})` : ''}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        <p className="mt-1 text-[8px] font-medium text-muted">
-          با انتخاب، جزئیات (تاریخچه + نمودار + مقایسه با سایر دارایی‌ها) باز می‌شود.
-        </p>
-      </GlassCard>
-
-      {/* انتخاب بازه */}
-      <GlassCard className="p-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">از تاریخ (Snapshot شروع)</label>
-            <select
-              value={startIdx}
-              onChange={(e) => setStartIdx(Number(e.target.value))}
-              className="glass-inset h-9 rounded-xl px-2 text-[10px] font-bold text-ink outline-none"
-            >
+      <Surface className="p-4 md:p-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="از تاریخ">
+            <Select value={startIdx} onChange={(e) => setStartIdx(Number(e.target.value))}>
               {snapshots.map((s, i) => (
-                <option key={s.id} value={i}>{s.dateLabel}</option>
+                <option key={s.id} value={i}>
+                  {s.dateLabel}
+                </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">تا تاریخ (Snapshot پایان)</label>
-            <select
-              value={endIdx}
-              onChange={(e) => setEndIdx(Number(e.target.value))}
-              className="glass-inset h-9 rounded-xl px-2 text-[10px] font-bold text-ink outline-none"
-            >
+            </Select>
+          </Field>
+          <Field label="تا تاریخ">
+            <Select value={endIdx} onChange={(e) => setEndIdx(Number(e.target.value))}>
               {snapshots.map((s, i) => (
-                <option key={s.id} value={i}>{s.dateLabel}</option>
+                <option key={s.id} value={i}>
+                  {s.dateLabel}
+                </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">مرتب‌سازی</label>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as VehicleSortKey)}
-              className="glass-inset h-9 rounded-xl px-2 text-[10px] font-bold text-ink outline-none"
-            >
+            </Select>
+          </Field>
+          <Field label="مرتب‌سازی">
+            <Select value={sortKey} onChange={(e) => setSortKey(e.target.value as VehicleSortKey)}>
               {(Object.keys(SORT_LABEL) as VehicleSortKey[]).map((k) => (
-                <option key={k} value={k}>{SORT_LABEL[k]}</option>
+                <option key={k} value={k}>
+                  {SORT_LABEL[k]}
+                </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">نوع قیمت</label>
-            <div className="flex gap-1 rounded-xl bg-surface-2/70 p-0.5">
-              {(['market', 'dealer'] as const).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setPriceKind(k)}
-                  className={cn(
-                    'rounded-lg px-2.5 py-1.5 text-[9px] font-black transition-colors',
-                    priceKind === k ? 'bg-card text-accent shadow-card' : 'text-muted hover:text-ink'
-                  )}
-                >
-                  {k === 'market' ? 'بازار' : 'نمایندگی'}
-                </button>
+            </Select>
+          </Field>
+          <Field label="مشاهده مستقیم یک خودرو">
+            <Select
+              value=""
+              onChange={(e) => {
+                const v = vehicles.find((x) => x.id === e.target.value);
+                if (v) setSelected(v);
+              }}
+            >
+              <option value="" disabled>
+                انتخاب از {toFaDigits(vehicles.length)} خودرو…
+              </option>
+              {groupedByBrand.map(([brand, list]) => (
+                <optgroup key={brand} label={brand}>
+                  {list.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                      {v.modelYear ? ` (${v.modelYear})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </div>
-          </div>
+            </Select>
+          </Field>
         </div>
         {startSnap && endSnap && (
-          <p className="mt-2 text-[9px] font-medium text-muted">
-            بازه: <span className="font-bold text-ink">{startSnap.dateLabel}</span> ←{' '}
-            <span className="font-bold text-ink">{endSnap.dateLabel}</span> · نرخ دلار شروع:{' '}
-            <span className="num-ltr font-bold text-ink">{toFaDigits(startSnap.usdRate.toLocaleString('en-US'))}</span> تومان ·
-            نرخ دلار پایان: <span className="num-ltr font-bold text-ink">{toFaDigits(endSnap.usdRate.toLocaleString('en-US'))}</span> تومان
+          <p className="mt-4 border-t border-divider pt-3 text-xs text-muted">
+            نرخ دلار: <span className="num-ltr font-semibold text-ink">{toFaDigits(startSnap.usdRate.toLocaleString('en-US'))}</span> ←{' '}
+            <span className="num-ltr font-semibold text-ink">{toFaDigits(endSnap.usdRate.toLocaleString('en-US'))}</span> تومان
+            {!rangeValid && <span className="text-warn"> · تاریخ پایان باید بعد از تاریخ شروع باشد</span>}
           </p>
         )}
-      </GlassCard>
+      </Surface>
 
-      {/* آمار بازه */}
       {stats && rangeValid && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <GlassCard variant="soft" className="p-2.5">
-            <p className="text-[9px] font-bold text-muted">خودروهای قابل مقایسه</p>
-            <p className="num-ltr mt-0.5 text-[15px] font-black text-ink">{fmtInt(stats.comparableCount)}</p>
-          </GlassCard>
-          <GlassCard variant="soft" className="p-2.5">
-            <p className="text-[9px] font-bold text-muted">میانگین بازدهی تومانی</p>
-            <ReturnBadge pct={stats.avgTomanPct} />
-          </GlassCard>
-          <GlassCard variant="soft" className="p-2.5">
-            <p className="text-[9px] font-bold text-muted">میانگین بازدهی دلاری</p>
-            <ReturnBadge pct={stats.avgUsdPct} />
-          </GlassCard>
-          <GlassCard variant="soft" className="p-2.5">
-            <p className="text-[9px] font-bold text-muted">رشد / افت (تومانی)</p>
-            <p className="mt-0.5 text-[12px] font-black">
-              <span className="text-positive">{fmtInt(stats.gainersToman)}</span>
-              <span className="text-muted"> / </span>
-              <span className="text-negative">{fmtInt(stats.losersToman)}</span>
-            </p>
-          </GlassCard>
-        </div>
+        <Surface className="p-4 md:p-5">
+          <MetricGrid cols={4}>
+            <Metric size="lg" label="میانگین بازدهی تومانی" value={<ReturnBadge pct={stats.avgTomanPct} />} />
+            <Metric size="lg" label="میانگین بازدهی دلاری" value={<ReturnBadge pct={stats.avgUsdPct} />} />
+            <Metric label="خودروهای قابل مقایسه" value={<span>{toFaDigits(stats.comparableCount)}</span>} />
+            <Metric
+              label="رشد / افت (تومانی)"
+              value={
+                <span>
+                  <span className="text-positive">{toFaDigits(stats.gainersToman)}</span>
+                  <span className="text-subtle"> / </span>
+                  <span className="text-negative">{toFaDigits(stats.losersToman)}</span>
+                </span>
+              }
+            />
+          </MetricGrid>
+        </Surface>
       )}
 
-      {/* رتبه‌بندی */}
-      <GlassCard className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-line/10 px-3.5 py-2.5">
-          <p className="flex items-center gap-1.5 text-[12px] font-black text-ink">
-            <Car className="h-4 w-4 text-accent" /> رتبه‌بندی خودروها ({ranked.length})
-          </p>
-          <span className="text-[8px] font-medium text-muted">
-            {priceKind === 'market' ? 'قیمت بازار' : 'قیمت نمایندگی'}
-          </span>
-        </div>
+      <Section id="ranking" title="رتبه‌بندی خودروها" description={`${toFaDigits(ranked.length)} خودرو · بر اساس قیمت بازار`}>
         {ranked.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[10px] font-bold text-muted">
-            {snapshots.length < 2
-              ? 'برای مقایسه بازدهی، حداقل دو Snapshot لازم است — «ثبت قیمت جدید» را بزنید.'
-              : 'در این بازه خودروی قابل مقایسه‌ای نیست.'}
-          </p>
+          <EmptyState
+            message={snapshots.length < 2 ? 'برای مقایسه بازدهی حداقل دو Snapshot لازم است' : 'در این بازه خودروی قابل مقایسه‌ای نیست'}
+            action={
+              snapshots.length < 2 ? (
+                <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
+                  ثبت قیمت جدید
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
-          <div>
-            {ranked.map((r) => (
-              <button
-                key={r.vehicle.id}
-                onClick={() => setSelected(r.vehicle)}
-                className={cn(
-                  'block w-full px-3.5 py-2.5 text-start transition-colors hover:bg-surface-2/60',
-                  r.rank > 1 && 'border-t border-line/8'
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="tnum w-5 shrink-0 text-center text-[12px] font-black text-muted/60">
-                    {r.rank}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-extrabold text-ink">
-                      {r.vehicle.brand} <span className="text-muted">· {r.vehicle.name}</span>
-                      {r.vehicle.modelYear && <span className="num-ltr text-[9px] text-muted/70"> ({r.vehicle.modelYear})</span>}
-                    </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[8px] font-medium text-muted">
-                      <span className="num-ltr">{fmtTomanAmount(r.ret.startToman)}</span>
-                      <span className="text-muted/60">←</span>
-                      <span className="num-ltr">{fmtTomanAmount(r.ret.endToman)}</span>
-                      {r.gap?.gapPct !== null && r.gap !== null && (
-                        <span className="text-muted/70">
-                          · اختلاف بازار/نمایندگی: <span className={cn('num-ltr font-bold', r.gap.gapPct! >= 0 ? 'text-warn' : 'text-positive')}>{r.gap.gapPct! >= 0 ? '+' : ''}{r.gap.gapPct!.toFixed(0)}٪</span>
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-end">
-                    <ReturnBadge pct={r.ret.tomanPct} />
-                    <p className="mt-0.5 text-[8px] font-bold text-muted">
-                      دلاری: <ReturnBadge pct={r.ret.usdPct} />
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+          <Surface className="overflow-hidden">
+            <div className="hidden md:block">
+              <table className="data-table">
+                <caption className="sr-only">رتبه‌بندی خودروها</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="w-10 !ps-5">#</th>
+                    <th scope="col">خودرو</th>
+                    <th scope="col" className="col-num">قیمت شروع</th>
+                    <th scope="col" className="col-num">قیمت پایان</th>
+                    <th scope="col" className="col-num">بازدهی تومانی</th>
+                    <th scope="col" className="col-num">بازدهی دلاری</th>
+                    <th scope="col" className="col-num !pe-5">اختلاف نمایندگی</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranked.map((r) => (
+                    <tr key={r.vehicle.id} className="cursor-pointer" onClick={() => setSelected(r.vehicle)}>
+                      <td className="num-ltr !ps-5 text-xs text-subtle">{r.rank}</td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(r.vehicle);
+                          }}
+                          className="text-start font-semibold text-ink hover:text-accent"
+                        >
+                          {r.vehicle.brand} · {r.vehicle.name}
+                          {r.vehicle.modelYear && <span className="num-ltr text-xs font-normal text-muted"> ({r.vehicle.modelYear})</span>}
+                        </button>
+                      </td>
+                      <td className="col-num text-muted"><Toman v={r.ret.startToman} /></td>
+                      <td className="col-num"><Toman v={r.ret.endToman} /></td>
+                      <td className="col-num"><ReturnBadge pct={r.ret.tomanPct} /></td>
+                      <td className="col-num"><ReturnBadge pct={r.ret.usdPct} /></td>
+                      <td className="col-num !pe-5 text-muted">
+                        {r.gap?.gapPct !== null && r.gap ? <PercentValue value={r.gap.gapPct} digits={0} tone="none" /> : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ul className="divide-y divide-divider px-4 md:hidden">
+              {ranked.map((r) => (
+                <li key={r.vehicle.id}>
+                  <button type="button" onClick={() => setSelected(r.vehicle)} className="flex w-full items-center gap-3 py-3 text-start">
+                    <span className="num-ltr w-6 shrink-0 text-center text-xs text-subtle">{r.rank}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-ink">
+                        {r.vehicle.brand} · {r.vehicle.name}
+                      </span>
+                      <span className="block text-xs text-muted">
+                        <Toman v={r.ret.endToman} />
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-end text-sm">
+                      <ReturnBadge pct={r.ret.tomanPct} />
+                      <span className="block text-2xs text-muted">
+                        دلاری <ReturnBadge pct={r.ret.usdPct} />
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Surface>
         )}
-      </GlassCard>
+      </Section>
 
-      {/* جزئیات خودرو */}
-      <Sheet open={selected !== null} onClose={() => setSelected(null)} title={selected ? `${selected.brand} · ${selected.name}` : ''}>
+      <Sheet
+        open={selected !== null}
+        onClose={() => setSelected(null)}
+        title={selected ? `${selected.brand} · ${selected.name}` : ''}
+        variant="panel"
+        size="lg"
+      >
         {selected && startSnap && endSnap && (
           <VehicleDetail vehicle={selected} snapshots={snapshots} fxRate={fxRate} fxHydrated={fxHydrated} />
         )}
       </Sheet>
 
-      {/* ثبت Snapshot جدید */}
       <NewSnapshotSheet open={showNewSnapshot} onClose={() => setShowNewSnapshot(false)} />
 
-      <p className="text-center text-[8px] font-medium text-muted/70">
-        {toFaDigits(vehicles.length)} خودرو · {toFaDigits(snapshots.length)} Snapshot تاریخی ·
-        قیمت دلاری هر Snapshot در لحظه ثبت ذخیره شده و با تغییر نرخ دلار تغییر نمی‌کند.
+      <p className="text-xs text-muted">
+        {toFaDigits(vehicles.length)} خودرو · {toFaDigits(snapshots.length)} Snapshot تاریخی · قیمت دلاری هر Snapshot در لحظه ثبت
+        ذخیره شده است.
       </p>
-    </div>
+    </Page>
   );
+}
+
+/** Toman amount: Persian digits (Toman policy) with separators */
+function Toman({ v }: { v: number | null | undefined }) {
+  return <span>{fmtTomanAmount(v ?? null)}</span>;
 }
 
 /* ================= جزئیات خودرو ================= */
@@ -394,74 +369,68 @@ function VehicleDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id, start?.dateTs, end?.dateTs]);
 
+  const endRec = end?.records.find((x) => x.vehicleId === vehicle.id);
   return (
-    <div className="space-y-3">
-      {/* خلاصه */}
-      <div className="grid grid-cols-2 gap-1.5 text-[10px] font-bold sm:grid-cols-3">
-        <div className="rounded-lg bg-line/5 p-2">
-          <p className="text-muted">قیمت بازار (پایان بازه)</p>
-          <p className="num-ltr text-ink">{fmtTomanAmount(end?.records.find((x) => x.vehicleId === vehicle.id)?.marketPriceToman ?? null)}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 p-2">
-          <p className="text-muted">قیمت نمایندگی</p>
-          <p className="num-ltr text-ink">{gap ? fmtTomanAmount(gap.dealerToman) : '—'}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 p-2">
-          <p className="text-muted">معادل دلاری (ثبت‌شده)</p>
-          <p className="num-ltr text-ink">{fmtUsdAmount(end?.records.find((x) => x.vehicleId === vehicle.id)?.marketPriceUsd ?? null)}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 p-2">
-          <p className="text-muted">نرخ دلار زمان ثبت</p>
-          <p className="num-ltr text-ink">{end ? toFaDigits(end.usdRate.toLocaleString('en-US')) : '—'} تومان</p>
-        </div>
-        <div className="rounded-lg bg-positive/8 p-2">
-          <p className="text-muted">بازدهی تومانی</p>
-          <ReturnBadge pct={ret?.tomanPct ?? null} />
-        </div>
-        <div className="rounded-lg bg-line/5 p-2">
-          <p className="text-muted">بازدهی دلاری</p>
-          <ReturnBadge pct={ret?.usdPct ?? null} />
-        </div>
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm text-muted">قیمت بازار (آخرین Snapshot)</p>
+        <p className="mt-1 text-3xl font-extrabold tracking-tight text-ink">{fmtTomanAmount(endRec?.marketPriceToman ?? null)}</p>
+        <p className="mt-1 text-sm text-muted">
+          بازدهی تومانی <ReturnBadge pct={ret?.tomanPct ?? null} /> · دلاری <ReturnBadge pct={ret?.usdPct ?? null} />
+        </p>
       </div>
 
-      {/* اختلاف نمایندگی/بازار */}
-      {gap && gap.dealerToman !== null && gap.marketToman !== null && (
-        <div className="rounded-lg border border-warn/20 bg-warn/5 px-2.5 py-2 text-[9px] font-bold">
-          <p className="flex items-center justify-between">
-            <span className="text-muted">اختلاف نمایندگی و بازار (پایان بازه)</span>
-            <span className={cn('num-ltr', gap.gapPct! >= 0 ? 'text-warn' : 'text-positive')}>
-              {fmtTomanAmount(gap.gapToman)} ({gap.gapPct! >= 0 ? '+' : ''}{gap.gapPct!.toFixed(1)}٪)
-            </span>
-          </p>
-        </div>
-      )}
+      <KeyValueList
+        rows={[
+          { label: 'قیمت نمایندگی', value: gap ? fmtTomanAmount(gap.dealerToman) : '—' },
+          ...(gap && gap.dealerToman !== null && gap.marketToman !== null
+            ? [
+                {
+                  label: 'اختلاف بازار و نمایندگی',
+                  value: (
+                    <span>
+                      {fmtTomanAmount(gap.gapToman)} <PercentValue value={gap.gapPct} digits={1} tone="none" className="text-muted" />
+                    </span>
+                  )
+                }
+              ]
+            : []),
+          { label: 'معادل دلاری (ثبت‌شده)', value: <span className="num-ltr">{fmtUsdAmount(endRec?.marketPriceUsd ?? null)}</span> },
+          { label: 'نرخ دلار زمان ثبت', value: end ? <span><span className="num-ltr">{toFaDigits(end.usdRate.toLocaleString('en-US'))}</span> تومان</span> : '—' }
+        ]}
+      />
 
-      {/* تاریخچه Snapshot‌ها */}
-      <div className="rounded-xl border border-line/10 bg-surface-2/40 p-2.5">
-        <p className="mb-1.5 flex items-center gap-1 text-[10px] font-black text-ink">
-          <History className="h-3 w-3 text-accent" /> تاریخچه Snapshot‌ها
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-[9px]">
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-ink">روند قیمت</h3>
+        <VehicleChart points={points} />
+      </div>
+
+      <div>
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink">
+          <History aria-hidden className="h-4 w-4 text-muted" /> تاریخچه Snapshotها
+        </h3>
+        <div className="overflow-x-auto rounded-field border border-divider">
+          <table className="data-table is-compact min-w-[480px]">
+            <caption className="sr-only">تاریخچه قیمت</caption>
             <thead>
-              <tr className="text-muted">
-                <th className="px-1.5 py-1 text-start font-black">تاریخ</th>
-                <th className="px-1.5 py-1 text-end font-black">بازار (تومان)</th>
-                <th className="px-1.5 py-1 text-end font-black">نمایندگی (تومان)</th>
-                <th className="px-1.5 py-1 text-end font-black">دلار همان روز</th>
-                <th className="px-1.5 py-1 text-end font-black">بازار (دلار)</th>
+              <tr>
+                <th scope="col" className="!ps-4">تاریخ</th>
+                <th scope="col" className="col-num">بازار (تومان)</th>
+                <th scope="col" className="col-num">نمایندگی (تومان)</th>
+                <th scope="col" className="col-num">دلار همان روز</th>
+                <th scope="col" className="col-num !pe-4">بازار (دلار)</th>
               </tr>
             </thead>
             <tbody>
               {snapshots.map((s) => {
                 const r = s.records.find((x) => x.vehicleId === vehicle.id);
                 return (
-                  <tr key={s.id} className="border-t border-line/5">
-                    <td className="px-1.5 py-1.5 font-bold text-ink">{s.dateLabel}</td>
-                    <td className="num-ltr px-1.5 py-1.5 text-end">{r?.marketPriceToman !== null ? toFaDigits(r!.marketPriceToman.toLocaleString('en-US')) : '—'}</td>
-                    <td className="num-ltr px-1.5 py-1.5 text-end">{r?.dealerPriceToman !== null ? toFaDigits(r!.dealerPriceToman.toLocaleString('en-US')) : '—'}</td>
-                    <td className="num-ltr px-1.5 py-1.5 text-end text-muted">{toFaDigits(s.usdRate.toLocaleString('en-US'))}</td>
-                    <td className="num-ltr px-1.5 py-1.5 text-end">{r?.marketPriceUsd !== null ? fmtUsdAmount(r!.marketPriceUsd) : '—'}</td>
+                  <tr key={s.id}>
+                    <td className="!ps-4 font-semibold text-ink">{s.dateLabel}</td>
+                    <td className="col-num num-ltr">{r?.marketPriceToman != null ? toFaDigits(r.marketPriceToman.toLocaleString('en-US')) : '—'}</td>
+                    <td className="col-num num-ltr">{r?.dealerPriceToman != null ? toFaDigits(r.dealerPriceToman.toLocaleString('en-US')) : '—'}</td>
+                    <td className="col-num num-ltr text-muted">{toFaDigits(s.usdRate.toLocaleString('en-US'))}</td>
+                    <td className="col-num num-ltr !pe-4">{r?.marketPriceUsd != null ? fmtUsdAmount(r.marketPriceUsd) : '—'}</td>
                   </tr>
                 );
               })}
@@ -470,49 +439,55 @@ function VehicleDetail({
         </div>
       </div>
 
-      {/* نمودار */}
-      <VehicleChart points={points} />
-
-      {/* مقایسه با سایر دارایی‌ها */}
-      <div className="rounded-xl border border-line/10 bg-surface-2/40 p-2.5">
-        <p className="mb-1.5 text-[10px] font-black text-ink">
-          مقایسه با سایر دارایی‌ها — «اگر به‌جای این خودرو…»
-        </p>
-        <p className="mb-2 text-[8px] font-medium leading-4 text-muted">
-          سرمایه اولیه = قیمت بازار خودرو در {start?.dateLabel} ({ret?.startToman ? fmtTomanAmount(ret.startToman) : '—'})
-          · قیمت‌های تاریخی از coins.llama.fi (نزدیک‌ترین روز به تاریخ) — در دسترس نبود → N/A.
+      <div>
+        <h3 className="text-sm font-bold text-ink">اگر به‌جای این خودرو…</h3>
+        <p className="mb-2 text-xs leading-5 text-muted">
+          سرمایه اولیه = قیمت بازار در {start?.dateLabel} ({ret?.startToman ? fmtTomanAmount(ret.startToman) : '—'}). قیمت‌های تاریخی از
+          coins.llama.fi (نزدیک‌ترین روز)؛ در صورت نبود، N/A.
         </p>
         {benchLoading && !benchmarks ? (
-          <p className="py-3 text-center text-[9px] font-bold text-muted">در حال دریافت قیمت‌های تاریخی…</p>
+          <p className="rounded-field bg-surface-2 py-4 text-center text-sm text-muted">در حال دریافت قیمت‌های تاریخی…</p>
         ) : benchmarks ? (
-          <div className="space-y-1">
-            {benchmarks.map((b) => (
-              <div key={b.asset} className="flex items-center justify-between gap-2 rounded-lg bg-card px-2 py-1.5 shadow-card">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black text-ink">{BENCHMARK_FA[b.asset]}</p>
-                  <p className="num-ltr text-[8px] font-medium text-muted">
-                    {b.startPriceUsd !== null ? fmtUsdAmount(b.startPriceUsd) : 'N/A'} ← {b.endPriceUsd !== null ? fmtUsdAmount(b.endPriceUsd) : 'N/A'}
-                  </p>
-                </div>
-                <div className="shrink-0 text-end">
-                  <p className="text-[9px] font-bold text-muted">دلاری: <ReturnBadge pct={b.usdPct} /></p>
-                  <p className="text-[9px] font-bold text-muted">تومانی: <ReturnBadge pct={b.tomanPct} /></p>
-                </div>
-              </div>
-            ))}
-            <p className="pt-1 text-[9px] font-medium leading-4 text-muted/70">
-              بازدهی دلاری = تغییر قیمت دارایی به دلار · بازدهی تومانی = ترکیب تغییر قیمت دارایی و تغییر نرخ دلار
-              (نرخ دلار پایان از Snapshot خودرو). داده تاریخی ممکن است تا ۴ روز با تاریخ Snapshot فاصله داشته باشد.
-            </p>
+          <div className="overflow-x-auto rounded-field border border-divider">
+            <table className="data-table is-compact">
+              <caption className="sr-only">مقایسه با سایر دارایی‌ها</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="!ps-4">دارایی</th>
+                  <th scope="col" className="col-num">قیمت دلاری</th>
+                  <th scope="col" className="col-num">دلاری</th>
+                  <th scope="col" className="col-num !pe-4">تومانی</th>
+                </tr>
+              </thead>
+              <tbody>
+                {benchmarks.map((b) => (
+                  <tr key={b.asset}>
+                    <td className="!ps-4 font-semibold text-ink">{BENCHMARK_FA[b.asset]}</td>
+                    <td className="col-num num-ltr text-xs text-muted">
+                      {b.startPriceUsd !== null ? fmtUsdAmount(b.startPriceUsd) : 'N/A'} → {b.endPriceUsd !== null ? fmtUsdAmount(b.endPriceUsd) : 'N/A'}
+                    </td>
+                    <td className="col-num"><ReturnBadge pct={b.usdPct} /></td>
+                    <td className="col-num !pe-4"><ReturnBadge pct={b.tomanPct} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <p className="py-2 text-center text-[8px] font-bold text-muted">قیمت تاریخی در دسترس نیست (N/A)</p>
+          <p className="rounded-field bg-surface-2 py-4 text-center text-sm text-muted">قیمت تاریخی در دسترس نیست (N/A)</p>
         )}
+        <p className="mt-2 text-xs leading-5 text-muted">
+          بازدهی تومانی ترکیب تغییر قیمت دارایی و تغییر نرخ دلار است (نرخ پایان از Snapshot خودرو). داده تاریخی ممکن است تا ۴ روز با
+          تاریخ Snapshot فاصله داشته باشد.
+        </p>
       </div>
 
-      <p className="text-[8px] font-medium leading-4 text-muted/70">
-        {fxHydrated ? `نرخ دلار فعلی اپ: ${toFaDigits(fxRate.toLocaleString('en-US'))} تومان — صرفاً برای اطلاع؛ Snapshotها با نرخ ثبت‌شده خودشان محاسبه می‌شوند.` : ''}
-      </p>
+      {fxHydrated && (
+        <p className="text-xs text-subtle">
+          نرخ دلار فعلی اپ: <span className="num-ltr">{toFaDigits(fxRate.toLocaleString('en-US'))}</span> — صرفاً برای اطلاع؛ Snapshotها با نرخ خودشان
+          محاسبه می‌شوند.
+        </p>
+      )}
     </div>
   );
 }

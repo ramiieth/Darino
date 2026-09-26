@@ -1,21 +1,23 @@
 /**
- * ۱) ماشین‌حساب سود و زیان — UI فقط نمایش نتایج (محاسبات در domain)
+ * ① Profit & loss — what is my position worth now vs what I paid?
+ * INPUT (asset · qty · buy price · fees) → RESULT (P/L) → SECONDARY → CHARTS → EXPORT
+ * All calculations in domain (calcPnl, cumulativeProfitSeries).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { Button } from '@/shared/components/ui/Button';
-import { Input } from '@/shared/components/ui/Input';
+import { Field, Input } from '@/shared/components/ui/Input';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { MetricGrid, Metric, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { AssetPicker } from './AssetPicker';
-import { StatCard } from './StatCard';
-import { LineChartCard } from './CalcCharts';
+import { CalcShell, ResultHero, ResultPlaceholder } from './StatCard';
+import { LineChartCard, fmtFaDate } from './CalcCharts';
 import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { getHistoricalSeries, TIMEFRAME_LABELS, TIMEFRAME_MS } from '@/features/calculators/data/historical';
 import { calcPnl, cumulativeProfitSeries, type PnlResult } from '@/features/calculators/domain';
 import type { CalculatorAsset } from '@/features/calculators/data/catalogs';
-import { fmtUSD, fmtPct, pnlClass } from '@/shared/utils/formatters';
-import { cn } from '@/shared/lib/cn';
-import { fmtFaDate } from './CalcCharts';
+import { fmtUSD, fmtPct } from '@/shared/utils/formatters';
 
 export function PnlCalculator() {
   const { prices } = useCalculatorPrices();
@@ -31,14 +33,12 @@ export function PnlCalculator() {
 
   const currentPrice = asset ? (prices[asset.symbol] ?? null) : null;
 
-  // قیمت فعلی → پیش‌فرض قیمت خرید (فقط اولین بار)
+  // current price → default buy price (first time only)
   useEffect(() => {
-    if (asset && currentPrice !== null && buyPrice === '') {
-      setBuyPrice(String(currentPrice));
-    }
+    if (asset && currentPrice !== null && buyPrice === '') setBuyPrice(String(currentPrice));
   }, [asset, currentPrice, buyPrice]);
 
-  // داده تاریخی برای نمودار
+  // history for the charts
   useEffect(() => {
     if (!asset) return;
     let cancelled = false;
@@ -51,8 +51,8 @@ export function PnlCalculator() {
       if (!s || s.length < 2) {
         setHistMsg(
           asset.kind === 'tokenized'
-            ? 'داده تاریخی برای دارایی توکن‌ایز در دسترس نیست'
-            : 'داده تاریخی فعلاً در دسترس نیست (محدودیت API)'
+            ? 'داده تاریخی برای دارایی توکن‌ایز در دسترس نیست.'
+            : 'داده تاریخی فعلاً در دسترس نیست (محدودیت API).'
         );
       }
       setHistLoading(false);
@@ -78,82 +78,81 @@ export function PnlCalculator() {
     return cumulativeProfitSeries(Number(buyPrice) || 0, Number(qty) || 0, Number(buyFee) || 0, series);
   }, [result, series, buyPrice, qty, buyFee]);
 
-  const ready = asset && result !== null;
+  const inputs = (
+    <>
+      <AssetPicker value={asset} onChange={setAsset} />
+      {asset && (
+        <p className="text-sm text-muted">
+          قیمت فعلی: <MoneyValue value={currentPrice} className="font-semibold text-ink" />
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="تعداد واحد">
+          <Input dir="ltr" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} suffix={asset?.symbol} />
+        </Field>
+        <Field label="قیمت خرید">
+          <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} suffix="$" />
+        </Field>
+        <Field label="کارمزد خرید">
+          <Input dir="ltr" inputMode="decimal" value={buyFee} onChange={(e) => setBuyFee(e.target.value)} suffix="$" />
+        </Field>
+        <Field label="کارمزد فروش">
+          <Input dir="ltr" inputMode="decimal" value={sellFee} onChange={(e) => setSellFee(e.target.value)} suffix="$" />
+        </Field>
+      </div>
+    </>
+  );
 
   return (
-    <div className="space-y-4">
-      <GlassCard className="space-y-3 p-4">
-        <AssetPicker value={asset} onChange={setAsset} />
-        {asset && currentPrice === null && (
-          <p className="text-[11px] font-bold text-warn">
-            قیمت فعلی برای این دارایی در دسترس نیست — نتیجه N/A نمایش داده می‌شود
-          </p>
-        )}
-        {asset && currentPrice !== null && (
-          <div className="flex items-center justify-between rounded-2xl bg-line/[0.03] px-3.5 py-2.5">
-            <span className="text-[11px] font-bold text-muted">قیمت فعلی (از API)</span>
-            <span className="num-ltr text-[14px] font-black text-ink">{fmtUSD(currentPrice)}</span>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label="تعداد واحد" value={qty} onChange={setQty} />
-          <Field label="قیمت خرید ($)" value={buyPrice} onChange={setBuyPrice} />
-          <Field label="کارمزد خرید ($)" value={buyFee} onChange={setBuyFee} />
-          <Field label="کارمزد فروش ($)" value={sellFee} onChange={setSellFee} />
-        </div>
-        {/* بازه زمانی */}
-        <div>
-          <label className="mb-1.5 block text-[11px] font-bold text-muted">بازه زمانی نمودار</label>
-          <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {TIMEFRAME_LABELS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTf(t.key)}
-                className={cn(
-                  'shrink-0 rounded-full px-3 py-1 text-[10px] font-bold transition-all',
-                  tf === t.key ? 'bg-accent text-white' : 'glass-inset text-muted'
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </GlassCard>
-
-      {ready && (
+    <CalcShell inputs={inputs}>
+      {!asset || !result ? (
+        <ResultPlaceholder>برای محاسبه سود و زیان، یک دارایی انتخاب کنید.</ResultPlaceholder>
+      ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5">
-            <StatCard label="ارزش فعلی" value={fmtUSD(result.currentValue)} tone="accent" />
-            <StatCard label="کل سرمایه پرداخت‌شده" value={fmtUSD(result.totalCost)} sub={`سرمایه اولیه: ${fmtUSD(result.initialInvestment)}`} />
-            <StatCard
-              label="سود / زیان"
-              value={fmtUSD(result.profit)}
-              tone={result.profit === null ? 'neutral' : result.profit >= 0 ? 'positive' : 'negative'}
-              sub={`ارزش خالص فروش: ${fmtUSD(result.netValue)}`}
-            />
-            <StatCard
-              label="درصد بازده"
-              value={fmtPct(result.returnPct)}
-              tone={result.returnPct === null ? 'neutral' : result.returnPct >= 0 ? 'positive' : 'negative'}
+          {currentPrice === null && (
+            <Notice tone="warn">قیمت فعلی این دارایی در دسترس نیست؛ ارزش و سود «—» نمایش داده می‌شود.</Notice>
+          )}
+          <ResultHero
+            label="سود / زیان"
+            value={<MoneyValue value={result.profit} signed tone="auto" />}
+            sub={
+              <>
+                بازده <PercentValue value={result.returnPct} className="font-semibold" /> · ارزش خالص فروش{' '}
+                <MoneyValue value={result.netValue} className="font-semibold text-ink" />
+              </>
+            }
+          >
+            <MetricGrid cols={3}>
+              <Metric label="ارزش فعلی" value={<MoneyValue value={result.currentValue} />} />
+              <Metric label="کل هزینه پرداخت‌شده" value={<MoneyValue value={result.totalCost} />} />
+              <Metric label="سرمایه اولیه" value={<MoneyValue value={result.initialInvestment} />} />
+            </MetricGrid>
+          </ResultHero>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-bold text-ink">نمودار</h3>
+            <SegmentedControl
+              label="بازه نمودار"
+              size="sm"
+              value={tf}
+              onChange={setTf}
+              options={TIMEFRAME_LABELS.map((t) => ({ value: t.key, label: t.label }))}
             />
           </div>
-
-          {histLoading && <div className="skeleton h-44 rounded-2xl" />}
-          {!histLoading && histMsg && !series && (
-            <p className="glass-soft rounded-2xl px-4 py-3 text-center text-[11px] font-bold text-muted">{histMsg}</p>
-          )}
+          {histLoading && <Skeleton className="h-60 w-full" />}
+          {!histLoading && histMsg && !series && <Notice tone="neutral">{histMsg}</Notice>}
           {!histLoading && series && (
             <>
               <LineChartCard
-                title={`رشد قیمت ${asset.symbol}`}
+                title={`قیمت ${asset.symbol}`}
                 labels={series.map((p) => fmtFaDate(p.t))}
-                datasets={[{ label: 'قیمت', data: series.map((p) => p.price), color: '#0d9488', fill: true }]}
+                datasets={[{ label: 'قیمت', data: series.map((p) => p.price), color: 'chart-1', fill: true }]}
               />
               <LineChartCard
                 title="سود تجمعی"
+                description="اگر در هر نقطه از بازه فروخته می‌شد"
                 labels={profitSeries.map((p) => fmtFaDate(p.t))}
-                datasets={[{ label: 'سود', data: profitSeries.map((p) => p.value), color: '#059669' }]}
+                datasets={[{ label: 'سود', data: profitSeries.map((p) => p.value), color: 'chart-2' }]}
               />
             </>
           )}
@@ -169,7 +168,7 @@ export function PnlCalculator() {
                 table: {
                   headers: ['موارد', 'مقدار'],
                   rows: [
-                    ['قیمت خرید', fmtUSD(result.initialInvestment)],
+                    ['قیمت خرید', fmtUSD(Number(buyPrice) || 0)],
                     ['قیمت فعلی', fmtUSD(currentPrice)],
                     ['تعداد واحد', qty],
                     ['ارزش فعلی', fmtUSD(result.currentValue)],
@@ -178,27 +177,12 @@ export function PnlCalculator() {
                     ['درصد بازده', fmtPct(result.returnPct)]
                   ]
                 },
-                note: 'محاسبات توسط موتور مالی (decimal.js) با دقت ۱۲ رقم اعشار انجام شده است.'
+                note: 'محاسبات با موتور مالی (decimal.js) و دقت ۱۲ رقم اعشار انجام شده است.'
               }
             ]}
           />
         </>
       )}
-    </div>
-  );
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-bold text-muted">{label}</label>
-      <Input
-        dir="ltr"
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 text-xs text-start"
-      />
-    </div>
+    </CalcShell>
   );
 }

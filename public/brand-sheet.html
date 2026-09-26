@@ -4,196 +4,129 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>دارینو — هویت بصری برند</title>
+<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
 <style>
   :root {
-    --navy: #0B2545; --navy-deep: #081A36; --navy-ink: #0a0f1e;
-    --emerald: #10B981; --emerald-light: #34D399;
-    --ink: #0f172a; --muted: #64748b; --line: #e2e8f0;
+    --brand-50: #EEF3FF; --brand-500: #2E5BFF; --brand-700: #1837B0; --brand-900: #0B1B5C;
+    --ink: #0E1530; --muted: #5B6480; --line: #E6E9F2; --canvas: #F6F8FC;
+    --gain: #0F9D6B; --gold: #B7861F;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: #f4f6fb; color: var(--ink); padding: 40px 20px; }
-  .wrap { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
-  .sub { color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 30px; }
+  body { font-family: 'Vazirmatn', Tahoma, sans-serif; background: var(--canvas); color: var(--ink); padding: 40px 20px; line-height: 1.75; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 30px; font-weight: 800; line-height: 1.3; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 18px; font-weight: 700; margin: 36px 0 12px; }
+  p.note { color: var(--muted); font-size: 14px; max-width: 42rem; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 26px; box-shadow: 0 6px 24px rgba(11,37,69,.06); }
-  .card h3 { font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 18px; letter-spacing: .02em; }
-  .center { display: flex; align-items: center; justify-content: center; }
-  .dark { background: var(--navy-deep); }
-  .mono { background: #fff; }
-  .row { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
-  .chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: #fff; }
-  .swatch { width: 44px; height: 44px; border-radius: 14px; border: 1px solid rgba(0,0,0,.08); }
-  .foot { margin-top: 26px; text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
-  .latin { font-weight: 800; letter-spacing: .3em; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .card h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 16px; }
+  .stage { display: flex; align-items: center; justify-content: center; gap: 16px; min-height: 120px; flex-wrap: wrap; }
+  .dark { background: #090D1B; border-color: #181F36; }
+  .dark h3 { color: #A0A8C0; }
+  .brandbg { background: var(--brand-500); border-color: var(--brand-500); }
+  .brandbg h3 { color: #DCE6FF; }
+  .lockup { display: inline-flex; align-items: center; gap: 12px; }
+  .word { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+  .tag { font-size: 12px; color: var(--muted); display: block; margin-top: 2px; }
+  .latin { font-weight: 800; letter-spacing: .24em; font-size: 16px; }
+  .swatches { display: flex; gap: 12px; flex-wrap: wrap; }
+  .sw { width: 120px; }
+  .sw i { display: block; height: 56px; border-radius: 12px; border: 1px solid rgba(14,21,48,.08); margin-bottom: 6px; }
+  .sw b { font-size: 13px; display: block; }
+  .sw code { font-size: 12px; color: var(--muted); }
+  ul.rules { font-size: 14px; color: var(--muted); padding-inline-start: 20px; }
+  .foot { margin-top: 32px; text-align: center; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3D6BFF"/><stop offset="1" stop-color="#1837B0"/></linearGradient>
+    <symbol id="glyph" viewBox="0 0 64 64">
+      <rect x="14" y="37" width="7" height="12" rx="2.5" fill="currentColor" opacity=".55"/>
+      <rect x="24" y="27" width="7" height="22" rx="2.5" fill="currentColor" opacity=".8"/>
+      <path d="M34 15 A17 17 0 0 1 34 49 Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="mark" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="16" fill="url(#t)"/>
+      <use href="#glyph" width="64" height="64" color="#fff"/>
+    </symbol>
+  </defs>
+</svg>
+
 <div class="wrap">
   <h1>دارینو</h1>
-  <p class="sub">DARINO · مدیریت هوشمند دارایی شخصی — هویت بصری برند</p>
+  <p class="sub">DARINO · مدیریت هوشمند دارایی شخصی · هویت بصری برند</p>
 
+  <p class="note">
+    نماد «ستون‌های رشد»: دو ستون صعودی و یک کاسهٔ نیم‌دایره که با هم حرف D را می‌سازند؛
+    هم‌زمان هم نام دارینو است و هم نمودار رشد دارایی. رنگ کاشی همان آبی برند اپ (brand-500 → brand-700) است.
+  </p>
+
+  <h2>لوگو</h2>
   <div class="grid">
-    <!-- لوگوی اصلی -->
+    <div class="card">
+      <h3>روشن</h3>
+      <div class="stage">
+        <span class="lockup"><svg width="56" height="56"><use href="#mark"/></svg>
+          <span><span class="word">دارینو</span><span class="tag">مدیریت هوشمند دارایی شخصی</span></span></span>
+      </div>
+    </div>
     <div class="card dark">
-      <h3>لوگوی اصلی (Dark)</h3>
-      <div class="center" style="height:130px">
-        <svg viewBox="0 0 64 64" width="84" height="84" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="g1" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-            </linearGradient>
-            <linearGradient id="s1" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#2E6BB5"/><stop offset="1" stop-color="#34D399"/>
-            </linearGradient>
-          </defs>
-          <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#s1)" stroke-width="3.6" stroke-linejoin="round"/>
-          <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g1)" stroke-linejoin="round"/>
-        </svg>
+      <h3>تیره</h3>
+      <div class="stage">
+        <span class="lockup"><svg width="56" height="56"><use href="#mark"/></svg>
+          <span><span class="word" style="color:#E7EBF5">دارینو</span><span class="tag" style="color:#A0A8C0">مدیریت هوشمند دارایی شخصی</span></span></span>
       </div>
     </div>
-
-    <!-- لوگوی روشن -->
+    <div class="card brandbg">
+      <h3>تک‌رنگ روی رنگ برند</h3>
+      <div class="stage" style="color:#fff">
+        <span class="lockup"><svg width="56" height="56"><use href="#glyph" color="#fff"/></svg>
+          <span class="word">دارینو</span></span>
+      </div>
+    </div>
     <div class="card">
-      <h3>لوگوی اصلی (Light)</h3>
-      <div class="center" style="height:130px">
-        <svg viewBox="0 0 64 64" width="84" height="84" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="g2" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-            </linearGradient>
-          </defs>
-          <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#g2)" stroke-width="3.6" stroke-linejoin="round"/>
-          <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g2)" stroke-linejoin="round"/>
-        </svg>
-      </div>
-    </div>
-
-    <!-- تک‌رنگ -->
-    <div class="card mono">
-      <h3>Monochrome</h3>
-      <div class="center" style="height:130px;color:#0f172a">
-        <svg viewBox="0 0 64 64" width="84" height="84" xmlns="http://www.w3.org/2000/svg">
-          <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linejoin="round"/>
-          <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="currentColor" stroke-linejoin="round"/>
-        </svg>
-      </div>
-    </div>
-
-    <!-- وردمارک فارسی -->
-    <div class="card">
-      <h3>Wordmark فارسی</h3>
-      <div class="center" style="height:130px">
-        <div style="text-align:center">
-          <div style="font-size:44px;font-weight:900;line-height:1.15">دارینو</div>
-          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:6px">مدیریت هوشمند دارایی شخصی</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- وردمارک لاتین -->
-    <div class="card">
-      <h3>Wordmark لاتین (ثانویه)</h3>
-      <div class="center" style="height:130px">
-        <div style="text-align:center">
-          <div class="latin" style="font-size:36px">DARINO</div>
-          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:6px">Smart Personal Asset Management</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- آیکون اپ -->
-    <div class="card dark">
-      <h3>App Icon</h3>
-      <div class="center" style="height:130px">
-        <div style="width:96px;height:96px;border-radius:24px;background:var(--navy-deep);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(0,0,0,.35)">
-          <svg viewBox="0 0 64 64" width="62" height="62" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g3" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#123C74"/><stop offset=".55" stop-color="#0E6E8C"/><stop offset="1" stop-color="#34D399"/>
-              </linearGradient>
-              <linearGradient id="s3" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#2E6BB5"/><stop offset="1" stop-color="#34D399"/>
-              </linearGradient>
-            </defs>
-            <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#s3)" stroke-width="3.8" stroke-linejoin="round"/>
-            <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g3)" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
-    </div>
-
-    <!-- رنگ‌ها -->
-    <div class="card">
-      <h3>پالت رنگی</h3>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="row" style="justify-content:flex-start">
-          <span class="swatch" style="background:#081A36"></span>
-          <span style="font-size:12px;font-weight:700">Deep Navy <span style="color:var(--muted);font-weight:600">#081A36</span></span>
-        </div>
-        <div class="row" style="justify-content:flex-start">
-          <span class="swatch" style="background:#0B2545"></span>
-          <span style="font-size:12px;font-weight:700">Navy Blue <span style="color:var(--muted);font-weight:600">#0B2545</span></span>
-        </div>
-        <div class="row" style="justify-content:flex-start">
-          <span class="swatch" style="background:#10B981"></span>
-          <span style="font-size:12px;font-weight:700">Emerald <span style="color:var(--muted);font-weight:600">#10B981</span></span>
-        </div>
-        <div class="row" style="justify-content:flex-start">
-          <span class="swatch" style="background:linear-gradient(180deg,#10B981,#0B2545)"></span>
-          <span style="font-size:12px;font-weight:700">Gradient <span style="color:var(--muted);font-weight:600">Navy → Emerald</span></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- نماد در اندازه‌های کوچک -->
-    <div class="card">
-      <h3>مقیاس‌پذیری (اندازه‌های کوچک)</h3>
-      <div class="center" style="height:130px">
-        <div class="row">
-          <svg viewBox="0 0 64 64" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g4" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-              </linearGradient>
-            </defs>
-            <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#g4)" stroke-width="3.6" stroke-linejoin="round"/>
-            <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g4)" stroke-linejoin="round"/>
-          </svg>
-          <svg viewBox="0 0 64 64" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g5" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-              </linearGradient>
-            </defs>
-            <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#g5)" stroke-width="3.6" stroke-linejoin="round"/>
-            <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g5)" stroke-linejoin="round"/>
-          </svg>
-          <svg viewBox="0 0 64 64" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g6" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-              </linearGradient>
-            </defs>
-            <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#g6)" stroke-width="3.6" stroke-linejoin="round"/>
-            <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g6)" stroke-linejoin="round"/>
-          </svg>
-          <svg viewBox="0 0 64 64" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="g7" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stop-color="#081A36"/><stop offset=".55" stop-color="#0B2545"/><stop offset="1" stop-color="#10B981"/>
-              </linearGradient>
-            </defs>
-            <path d="M32 5 L55.5 20 V44 L32 59 L8.5 44 V20 Z" fill="none" stroke="url(#g7)" stroke-width="3.6" stroke-linejoin="round"/>
-            <path d="M32 12 L40 22 V24 H38 V44 H16 V38 H21 V31 H26 V24 H24 V22 Z" fill="url(#g7)" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div style="font-size:10px;color:var(--muted);font-weight:600;margin-top:10px">48px · 32px · 20px · 14px</div>
+      <h3>تک‌رنگ (چاپ)</h3>
+      <div class="stage">
+        <span class="lockup"><svg width="56" height="56"><use href="#glyph" color="#0E1530"/></svg>
+          <span class="latin" dir="ltr">DARINO</span></span>
       </div>
     </div>
   </div>
 
-  <p class="foot">دارینو DARINO · نماد «گوهر صعود» — شش‌ضلعی (امنیت/فناوری) + فلش پله‌ای (رشد/مدیریت) · گرادیان سرمه‌ای به زمردی</p>
+  <h2>آیکون اپ و اندازه‌های کوچک</h2>
+  <div class="card">
+    <div class="stage">
+      <img src="/icons/icon-512.png" width="120" height="120" alt="آیکون ۵۱۲" />
+      <img src="/icons/icon-maskable-512.png" width="96" height="96" style="border-radius:50%" alt="آیکون ماسک‌پذیر اندروید" />
+      <img src="/icons/apple-touch-icon.png" width="80" height="80" style="border-radius:18px" alt="آیکون iOS" />
+      <svg width="48" height="48"><use href="#mark"/></svg>
+      <svg width="32" height="32"><use href="#mark"/></svg>
+      <svg width="16" height="16"><use href="#mark"/></svg>
+    </div>
+  </div>
+
+  <h2>رنگ‌ها</h2>
+  <div class="swatches">
+    <div class="sw"><i style="background:#2E5BFF"></i><b>brand-500</b><code dir="ltr">#2E5BFF</code></div>
+    <div class="sw"><i style="background:#1837B0"></i><b>brand-700</b><code dir="ltr">#1837B0</code></div>
+    <div class="sw"><i style="background:#0B1B5C"></i><b>brand-900</b><code dir="ltr">#0B1B5C</code></div>
+    <div class="sw"><i style="background:#EEF3FF"></i><b>brand-50</b><code dir="ltr">#EEF3FF</code></div>
+    <div class="sw"><i style="background:#0E1530"></i><b>ink</b><code dir="ltr">#0E1530</code></div>
+    <div class="sw"><i style="background:#0F9D6B"></i><b>gain</b><code dir="ltr">#0F9D6B</code></div>
+  </div>
+
+  <h2>قواعد استفاده</h2>
+  <ul class="rules">
+    <li>حاشیهٔ امن دور نماد حداقل ¼ عرض آن باشد.</li>
+    <li>کوچک‌ترین اندازه: ۱۶px برای نماد، ۹۶px عرض برای لوگوی کامل با شعار.</li>
+    <li>کاشی را نچرخانید، کشیده نکنید و گرادیان یا سایهٔ دیگری به آن اضافه نکنید.</li>
+    <li>روی پس‌زمینه‌های رنگی یا عکس، از نسخهٔ تک‌رنگ سفید استفاده کنید.</li>
+  </ul>
+
+  <p class="foot">منبع هندسه: src/shared/components/brand/DarinoLogo.tsx · آیکون‌ها: scripts/generate-brand-icons.mjs</p>
 </div>
 </body>
 </html>

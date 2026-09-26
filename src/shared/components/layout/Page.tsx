@@ -1,50 +1,93 @@
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
+import { useShellStore } from '@/shared/store/shellStore';
 
-export function AmbientBackground() {
-  return (
-    <div
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-100"
-      aria-hidden
-    >
-      {/* هاله‌های بسیار ملایم — بدون بلاک‌های رنگی برجسته */}
-      <div
-        className="absolute -top-40 start-1/4 h-80 w-80 rounded-full blur-3xl"
-        style={{ background: 'rgb(var(--c-accent) / 0.05)' }}
-      />
-      <div
-        className="absolute bottom-0 end-0 h-72 w-72 rounded-full blur-3xl"
-        style={{ background: 'rgb(var(--c-info) / 0.04)' }}
-      />
-    </div>
-  );
-}
-
+/**
+ * PageHeader — the single <h1> of a screen.
+ *
+ *   [‹ back]                                   (detail screens, standalone PWA)
+ *   eyebrow
+ *   Title                                        [actions]
+ *   description
+ *   meta (freshness / status line)
+ *
+ * When the title scrolls out of view the mobile top bar shows it (compact title).
+ */
 export function PageHeader({
   title,
   subtitle,
   actions,
-  className
+  className,
+  eyebrow,
+  meta,
+  back
 }: {
-  title: string;
-  subtitle?: string;
-  actions?: React.ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
   className?: string;
+  eyebrow?: ReactNode;
+  /** Status line under the description (e.g. FreshnessBar) */
+  meta?: ReactNode;
+  /** Back affordance: a label (navigates -1), {label, to} or {label, onClick} (in-page drill-in) */
+  back?: Back;
 }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  const setCompact = useShellStore((s) => s.setCompactTitle);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), {
+      rootMargin: '-64px 0px 0px 0px'
+    });
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      setCompact(false);
+    };
+  }, [setCompact]);
+
   return (
-    <header
-      className={cn(
-        // در عرض‌های باریک: Actions به خط دوم می‌روند (بدون فشار بر عنوان)
-        'anim-fade-up mb-5 flex flex-wrap items-start justify-between gap-x-3 gap-y-2',
-        className
-      )}
-    >
-      <div className="min-w-0 flex-1 basis-48">
-        <h1 className="text-lg font-extrabold leading-snug tracking-tight text-ink md:text-2xl md:font-black">
-          {title}
-        </h1>
-        {subtitle && <p className="mt-1 text-[12px] font-medium leading-5 text-muted">{subtitle}</p>}
+    <header className={cn('mb-6 md:mb-8', className)}>
+      {back && <BackButton back={back} />}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-64">
+          {eyebrow && <p className="mb-1 text-xs font-semibold text-muted">{eyebrow}</p>}
+          <h1 ref={ref} className="text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
+            {title}
+          </h1>
+          {subtitle && <p className="mt-1.5 max-w-prose text-sm text-muted">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {meta && <div className="mt-3">{meta}</div>}
     </header>
   );
+}
+
+type Back = string | { label: string; to?: string; onClick?: () => void };
+
+/** Back affordance — separate component so pages without it need no router context */
+function BackButton({ back }: { back: Back }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        typeof back === 'string' ? navigate(-1) : back.onClick ? back.onClick() : back.to ? navigate(back.to) : navigate(-1)
+      }
+      className="-ms-1.5 mb-3 inline-flex h-8 items-center gap-1 rounded-control pe-2 ps-1 text-sm font-semibold text-muted hover:bg-surface-2 hover:text-ink"
+    >
+      <ChevronRight aria-hidden className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />
+      {typeof back === 'string' ? back : back.label}
+    </button>
+  );
+}
+
+/** Page — standard vertical rhythm between sections (24 mobile / 32 desktop) */
+export function Page({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('space-y-6 md:space-y-8', className)}>{children}</div>;
 }

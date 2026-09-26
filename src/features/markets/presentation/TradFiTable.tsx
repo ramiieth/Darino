@@ -1,18 +1,22 @@
 /** ============================================================
- * TradFiTable — بازار سنتی (سبک — داده مرجع، بدون درخواست سنگین)
+ * TradFiTable — traditional markets (reference data, no heavy requests)
  *
- * ⚠️ فقط قیمت/MCAP مرجع با برچسب «≈ مرجع»؛ داده ناشناخته N/A.
- * این بخش داده زنده Provider ندارد (کلید سرور اختیاری) — هرگز حدس نمی‌زند.
+ * ⚠️ Reference prices / market caps only, clearly labelled; unknown = N/A.
+ * No live provider here (server key optional) — never guesses.
  * ============================================================ */
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { SearchField } from '@/shared/components/ui/Input';
+import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
+import { MoneyValue } from '@/shared/components/ui/FinancialValue';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { AssetName } from '@/shared/components/ui/AssetName';
+import { AssetLogo } from '@/shared/components/ui/AssetLogo';
 import { TRADFI_ASSETS, TRADFI_NAMES, TRADFI_JUL_2026 } from '@/features/simulation/domain/constants';
 import { referenceMarketCap, hasReferenceMarketCap } from '@/features/market/data/marketCapReference';
-import { fmtUSD } from '@/shared/utils/formatters';
-import { cn } from '@/shared/lib/cn';
-import { AssetName } from '@/shared/components/ui/AssetName';
 import { assetSearchText } from '@/shared/i18n/assetDisplayName';
+import { toFaDigits } from '@/shared/utils/formatters';
 
 const PAGE = 30;
 
@@ -20,75 +24,88 @@ export function TradFiTable() {
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(PAGE);
 
-  const rows = useMemo(() => {
+  const all = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return TRADFI_ASSETS.filter((a) => {
-      if (!q) return true;
-      return assetSearchText(a.symbol, TRADFI_NAMES[a.symbol] ?? a.nameFa).includes(q);
-    }).slice(0, limit);
-  }, [query, limit]);
+    return TRADFI_ASSETS.filter((a) => !q || assetSearchText(a.symbol, TRADFI_NAMES[a.symbol] ?? a.nameFa).includes(q));
+  }, [query]);
+  const rows = all.slice(0, limit);
 
   return (
-    <GlassCard className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/10 px-3 py-2">
-        <p className="text-[11px] font-black text-ink">سهام / ETF / شاخص / کامودیتی / اوراق</p>
-        <p className="num-ltr text-[9px] font-bold text-muted">{TRADFI_ASSETS.length} دارایی</p>
-      </div>
+    <section aria-label="بازار سنتی" className="space-y-4">
+      <Notice tone="neutral" title="قیمت مرجع — نه زنده">
+        سهام، ETF، شاخص، کالا و اوراق با قیمت مرجع ژوئیه ۲۰۲۶ نمایش داده می‌شوند. داده زنده برای این بخش در دسترس نیست و
+        موارد بدون مرجع «N/A» هستند.
+      </Notice>
 
-      <div className="relative px-3 py-2">
-        <Search className="pointer-events-none absolute start-6 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-        <input
+      <div className="flex items-center gap-2">
+        <SearchField
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
+          onChange={(v) => {
+            setQuery(v);
+            setLimit(PAGE);
+          }}
           placeholder="جستجوی نماد…"
-          className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
+          className="flex-1 md:max-w-sm"
         />
+        <p className="ms-auto hidden text-xs text-muted md:block">{toFaDigits(TRADFI_ASSETS.length)} دارایی</p>
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-6 text-center">
-          <p className="text-[11px] font-black text-warn">نتیجه‌ای یافت نشد</p>
-          <p className="mt-1 text-[10px] font-bold text-muted">موردی با این جستجو پیدا نشد.</p>
-        </div>
+        <EmptyState message="نتیجه‌ای یافت نشد" hint="موردی با این جستجو پیدا نشد." />
       ) : (
-        <div className="divide-y divide-line/5">
-          {rows.map((a) => {
-            const price = TRADFI_JUL_2026[a.symbol] ?? null;
-            const mcap = hasReferenceMarketCap(a.symbol) ? referenceMarketCap(a.symbol) : null;
-            return (
-              <div key={a.symbol} className="flex items-center gap-2.5 px-3 py-2.5">
-                <AssetName
-                  symbol={a.symbol}
-                  fallbackName={TRADFI_NAMES[a.symbol] ?? a.nameFa}
-                  className="min-w-0 flex-1"
-                />
-                <div className="min-w-0 shrink-0 text-end">
-                  <p className="num-ltr text-[12px] font-black text-ink">{price ? fmtUSD(price) : 'N/A'}</p>
-                  <p className="text-[8px] font-bold text-muted/70">
-                    MCap: {mcap ? fmtUSD(mcap, true) : 'N/A'}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    'badge shrink-0',
-                    price ? 'bg-warn/10 text-warn' : 'bg-line/5 text-muted'
-                  )}
-                >
-                  {price ? '≈ مرجع' : 'N/A'}
-                </span>
-              </div>
-            );
-          })}
-          {TRADFI_ASSETS.length > limit && (
-            <button
-              onClick={() => setLimit((l) => l + PAGE)}
-              className="w-full py-2.5 text-center text-[10px] font-black text-accent"
-            >
-              نمایش بیشتر
-            </button>
+        <Surface className="overflow-hidden">
+          <table className="data-table">
+            <caption className="sr-only">دارایی‌های بازار سنتی — قیمت مرجع</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="!ps-4 md:!ps-5">دارایی</th>
+                <th scope="col" className="col-num">قیمت مرجع</th>
+                <th scope="col" className="col-num hidden sm:table-cell">ارزش بازار</th>
+                <th scope="col" className="!pe-4 md:!pe-5"><span className="sr-only">وضعیت</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => {
+                const price = TRADFI_JUL_2026[a.symbol] ?? null;
+                const mcap = hasReferenceMarketCap(a.symbol) ? referenceMarketCap(a.symbol) : null;
+                return (
+                  <tr key={a.symbol}>
+                    <td className="!ps-4 md:!ps-5">
+                      <div className="flex items-center gap-3">
+                        <AssetLogo symbol={a.symbol} kind="tradfi" size={28} />
+                        <AssetName
+                          symbol={a.symbol}
+                          fallbackName={TRADFI_NAMES[a.symbol] ?? a.nameFa}
+                          className="max-w-[10rem] sm:max-w-[16rem]"
+                        />
+                      </div>
+                    </td>
+                    <td className="col-num font-semibold text-ink">
+                      {price ? <MoneyValue value={price} /> : <span className="text-subtle">N/A</span>}
+                      <span className="block text-2xs font-normal text-muted sm:hidden">
+                        {mcap ? <MoneyValue value={mcap} compact /> : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="col-num hidden text-muted sm:table-cell">
+                      {mcap ? <MoneyValue value={mcap} compact /> : <span className="text-subtle">N/A</span>}
+                    </td>
+                    <td className="!pe-4 text-end md:!pe-5">
+                      <Badge tone={price ? 'warn' : 'neutral'}>{price ? '≈ مرجع' : 'N/A'}</Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {all.length > limit && (
+            <div className="border-t border-divider p-2">
+              <Button variant="ghost" size="sm" className="w-full text-accent" onClick={() => setLimit((l) => l + PAGE)}>
+                نمایش بیشتر ({toFaDigits(all.length - limit)} باقی‌مانده)
+              </Button>
+            </div>
           )}
-        </div>
+        </Surface>
       )}
-    </GlassCard>
+    </section>
   );
 }

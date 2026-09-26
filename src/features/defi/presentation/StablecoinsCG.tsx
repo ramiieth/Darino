@@ -3,16 +3,17 @@
  * نماد + لوگو + نام فارسی + قیمت + تغییر ۲۴h + مارکت‌کپ
  */
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Coins, RefreshCw } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { ErrorState, DeFiListSkeleton } from '@/shared/components/ui/StateViews';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
+import { Button } from '@/shared/components/ui/Button';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { AssetLogo } from '@/shared/components/ui/AssetLogo';
 import { fetchWithRetry } from '@/shared/lib/fetchWithRetry';
 import { cacheBulkGetPrice, cachePutPrice } from '@/shared/lib/db';
 import { COINGECKO_BASE } from '@/app/config/apiConfig';
 import { useLogoStore } from '@/shared/store/logoStore';
-import { fmtUSD, fmtPct, fmtInt, pnlClass } from '@/shared/utils/formatters';
+import { fmtInt } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 
 const CACHE_MS = 60_000;
@@ -65,6 +66,7 @@ export function StablecoinsCG() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [tick, setTick] = useState(0);
+  const [fallback, setFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +86,10 @@ export function StablecoinsCG() {
         const res = await fetchWithRetry(url, { retries: 0, timeoutMs: 10_000 });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const list = (await res.json()) as CgStable[];
-        if (!cancelled) setCoins(list);
+        if (!cancelled) {
+          setCoins(list);
+          setFallback(false);
+        }
         try { await cachePutPrice(ck, { price: list as unknown as number, source: 'live', fetchedAt: Date.now() }); } catch { /* خاموش */ }
       } catch {
         // فالبک: کش CoinGecko (۲۵۰ سکه برتر) — فقط استیبل‌کوین‌های شناخته‌شده
@@ -97,7 +102,10 @@ export function StablecoinsCG() {
           market_cap: top250[sym]?.marketCap ?? null,
           price_change_percentage_24h: null
         }));
-        if (!cancelled) setCoins(fallback);
+        if (!cancelled) {
+          setCoins(fallback);
+          setFallback(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -107,51 +115,85 @@ export function StablecoinsCG() {
     };
   }, [tick]);
 
-  if (loading && !coins) return <DeFiListSkeleton rows={8} />;
+  if (loading && !coins) return <ListSkeleton rows={8} />;
   if (error && !coins) return <ErrorState message="ارتباط با CoinGecko برقرار نشد" onRetry={() => setTick((t) => t + 1)} />;
 
-  return (
-    <div className="space-y-3">
-      <GlassCard variant="soft" className="flex items-center justify-between px-4 py-2.5">
-        <p className="text-[10px] font-bold text-muted">
-          {coins ? `${fmtInt(coins.length)} استیبل‌کوین برتر` : ''} · منبع: CoinGecko (دسته Stablecoins)
-        </p>
-        <button onClick={() => setTick((t) => t + 1)} className="flex items-center gap-1 text-[10px] font-bold text-accent">
-          <RefreshCw className="h-3 w-3" /> همگام‌سازی
-        </button>
-      </GlassCard>
+  const pegDev = (p: number | null | undefined) =>
+    typeof p === 'number' && Number.isFinite(p) ? Math.abs(p - 1) * 100 : null;
 
-      <div className="space-y-2">
-        {coins?.map((c, i) => {
-          const sym = c.symbol.toUpperCase();
-          return (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i < 15 ? i * 0.01 : 0, duration: 0.2 }}
-              className="glass flex items-center gap-3 rounded-2xl p-3"
-            >
-              <span className="num-ltr w-6 shrink-0 text-center text-[10px] font-black text-muted">{i + 1}</span>
-              <AssetLogo symbol={sym} kind="crypto" size={32} />
-              <div className="min-w-0 flex-1">
-                <p className="tnum text-[13px] font-extrabold text-ink">{sym}</p>
-                <p className="truncate text-[10px] font-medium text-muted">{faName(sym, c.name)}</p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className="num-ltr text-[13px] font-black text-ink">{fmtUSD(c.current_price)}</span>
-                <span className={cn('num-ltr text-[10px] font-bold', c.price_change_percentage_24h !== null && c.price_change_percentage_24h !== undefined && c.price_change_percentage_24h !== 0 ? pnlClass(c.price_change_percentage_24h) : 'text-muted')}>
-                  {c.price_change_percentage_24h !== null && c.price_change_percentage_24h !== undefined ? fmtPct(c.price_change_percentage_24h) : '—'}
-                </span>
-                {/* مارکت‌کپ در همه عرض‌ها (Reflow — بدون Hide در Mobile) */}
-                <span className="num-ltr text-[8px] font-bold text-muted/70">
-                  MCap: {c.market_cap ? fmtUSD(c.market_cap, true) : '—'}
-                </span>
-              </div>
-            </motion.div>
-          );
-        })}
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">
+          {coins ? `${fmtInt(coins.length)} استیبل‌کوین برتر بر اساس ارزش بازار` : ''} · منبع: CoinGecko
+        </p>
+        <Button variant="ghost" size="sm" icon={<RefreshCw />} onClick={() => setTick((t) => t + 1)} className="text-accent">
+          همگام‌سازی
+        </Button>
       </div>
+      {fallback && (
+        <Notice tone="stale" title="داده زنده در دسترس نیست">
+          فهرست از کش محلی ساخته شده است؛ قیمت و تغییر ۲۴ ساعته تا اتصال دوباره «—» نمایش داده می‌شوند.
+        </Notice>
+      )}
+
+      <Surface className="overflow-hidden">
+        <table className="data-table">
+          <caption className="sr-only">استیبل‌کوین‌ها</caption>
+          <thead>
+            <tr>
+              <th scope="col" className="w-10 !ps-4 md:!ps-5">#</th>
+              <th scope="col">استیبل‌کوین</th>
+              <th scope="col" className="col-num">قیمت</th>
+              <th scope="col" className="col-num hidden sm:table-cell">انحراف از ۱ دلار</th>
+              <th scope="col" className="col-num hidden sm:table-cell">۲۴ ساعت</th>
+              <th scope="col" className="col-num !pe-4 md:!pe-5">ارزش بازار</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coins?.map((c, i) => {
+              const sym = c.symbol.toUpperCase();
+              const dev = pegDev(c.current_price);
+              return (
+                <tr key={c.id}>
+                  <td className="num-ltr !ps-4 text-xs text-subtle md:!ps-5">{i + 1}</td>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <AssetLogo symbol={sym} kind="crypto" size={28} />
+                      <div className="min-w-0">
+                        <p className="max-w-[9rem] truncate font-semibold text-ink sm:max-w-none">{faName(sym, c.name)}</p>
+                        <p className="text-2xs font-semibold text-muted"><bdi dir="ltr">{sym}</bdi></p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="col-num font-semibold text-ink">
+                    <MoneyValue value={c.current_price ?? null} />
+                    <span className="block text-2xs font-normal sm:hidden">
+                      <PercentValue value={c.price_change_percentage_24h ?? null} />
+                    </span>
+                  </td>
+                  <td className="col-num hidden sm:table-cell">
+                    {dev === null ? (
+                      <span className="text-subtle">—</span>
+                    ) : (
+                      <span className={cn('num-ltr', dev > 0.5 ? 'font-semibold text-warn' : 'text-muted')}>
+                        {dev.toFixed(2)}%
+                      </span>
+                    )}
+                  </td>
+                  <td className="col-num hidden sm:table-cell">
+                    <PercentValue value={c.price_change_percentage_24h ?? null} />
+                  </td>
+                  <td className="col-num !pe-4 text-muted md:!pe-5">
+                    <MoneyValue value={c.market_cap ?? null} compact />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Surface>
+      <p className="text-xs text-muted">انحراف بیش از ۰٫۵٪ از ۱ دلار برجسته می‌شود. این فهرست توصیه سرمایه‌گذاری نیست.</p>
     </div>
   );
 }

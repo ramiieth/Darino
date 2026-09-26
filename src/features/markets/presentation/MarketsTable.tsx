@@ -1,58 +1,89 @@
 /** ============================================================
- * MarketsTable — جدول واحد برای همه Universeها (بخش ۱۰)
+ * MarketsTable — one table for every universe
  *
- *  هر Symbol یک Row مستقل: Logo | Symbol | Price | 24H | 7D | 30D | Market Cap
- *  - بدون Asset / Underlying / Company / Grouping در UI (بخش ۱۲/۱۳)
- *  - Row با React.memo — re-render فقط برای ردیف‌های تغییرکرده
- *  - برش + «نمایش بیشتر» — همه Assetها همزمان Render نمی‌شوند
- *  - Metric ناقص → «—» (نه حذف کل Token — بخش ۲۹)
+ *  desktop: sortable financial table (sticky header, tabular numerals)
+ *           # · asset · price · 24H · 7D · 30D · market cap · watch
+ *  phones:  list rows — price + 24H prominent, 7D / 30D / MCap reflowed
+ *           into a quiet second line (nothing hidden), tap → detail sheet
+ *
+ *  - Rows are memoized; list is sliced with «show more» (no full render)
+ *  - Missing metric → "—" (never 0); snapshot data is labelled
+ *  - Data comes only from the central pipeline (no fetch in render)
  * ============================================================ */
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Star } from 'lucide-react';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { AssetName } from '@/shared/components/ui/AssetName';
-import { assetSearchText } from '@/shared/i18n/assetDisplayName';
+import { SearchField, Select } from '@/shared/components/ui/Input';
+import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
+import { Button } from '@/shared/components/ui/Button';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Sheet } from '@/shared/components/ui/Sheet';
+import { KeyValueList, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { EmptyState, ErrorState } from '@/shared/components/ui/StateViews';
+import { assetDisplayName, assetSearchText } from '@/shared/i18n/assetDisplayName';
+import { useWatchlistStore } from '@/shared/store/watchlistStore';
+import { toFaDigits } from '@/shared/utils/formatters';
+import { cn } from '@/shared/lib/cn';
 import { hydrateUniverse, syncUniverse, useMarketsStore } from '../pipeline/store';
 import { useMarkets } from '../pipeline/useMarkets';
 import type { MarketAsset, MarketSource, MarketUniverse } from '../pipeline/types';
 
 const PAGE = 50;
 
-/* ---------- منبع → برچسب (فقط برای badge کوچک — نه Grouping) ---------- */
 const SOURCE_FA: Record<MarketSource, string> = {
   crypto: 'کریپتو',
   ondo: 'Ondo',
   xstocks: 'xStocks'
 };
 
+type SortKey = 'rank' | 'price' | 'change24h' | 'change7d' | 'change30d' | 'marketCap';
+type SortDir = 'asc' | 'desc';
+
+const SORT_LABEL: Record<SortKey, string> = {
+  rank: 'رتبه',
+  price: 'قیمت',
+  change24h: 'تغییر ۲۴ ساعت',
+  change7d: 'تغییر ۷ روز',
+  change30d: 'تغییر ۳۰ روز',
+  marketCap: 'ارزش بازار'
+};
+
 export function MarketsTable({
   universes,
-  title
+  title,
+  initialQuery = '',
+  sourceFilter = false
 }: {
   universes: MarketUniverse[];
   title: string;
+  initialQuery?: string;
+  /** show Ondo / xStocks chips (tokenized view) */
+  sourceFilter?: boolean;
 }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [limit, setLimit] = useState(PAGE);
-  const [tab, setTab] = useState<'all' | MarketSource>('all');
+  const [source, setSource] = useState<'all' | MarketSource>('all');
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'rank', dir: 'asc' });
+  const [detail, setDetail] = useState<MarketAsset | null>(null);
+  const watch = useWatchlistStore((s) => s.items);
+  const toggleWatch = useWatchlistStore((s) => s.toggle);
 
-  // تنظیم موتور Refresh مرکزی: هر Universe همیشه یک تایمر/retry خودکار دارد
-  // (حتی وقتی فعلاً در تب فعال نیست — بدون درخواست تکراری به لطف dedup)
+  useEffect(() => setQuery(initialQuery), [initialQuery]);
+
+  // central refresh engine: every universe keeps its own timer/retry (deduped)
   useMarkets('crypto_top_200');
   useMarkets('ondo_tokenized');
   useMarkets('xstocks');
 
-  // شروع همگام‌سازی: کش تازه ← fetch (dedup مرکزی) — فقط همین Universeها
+  // cached data first (even stale) → background sync; never clears previous data
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       for (const u of universes) {
-        // ۱) نمایش سریع داده قبلی (حتی کهنه) — بدون انتظار شبکه
         await hydrateUniverse(u);
         if (cancelled) return;
-        // ۲) همیشه همگام‌سازی: کش تازه → بازگشت فوری و بدون شبکه؛
-        //    کش کهنه → رفرش پس‌زمینه؛ بدون کش → fetch (هرگز داده قبلی پاک نمی‌شود)
         void syncUniverse(u);
       }
     })();
@@ -62,7 +93,6 @@ export function MarketsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [universes.join(',')]);
 
-  // selectors جزئی — فقط داده همین جدول
   const data = useMarketsStore((s) => s.data);
   const loading = useMarketsStore((s) => s.loading);
   const error = useMarketsStore((s) => s.error);
@@ -80,229 +110,379 @@ export function MarketsTable({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = assets;
-    if (tab !== 'all') out = out.filter((a) => a.source === tab);
-    // جستجو: نماد + نام نمایشی فارسی (فقط Client-side — بدون تغییر Business Logic)
+    if (source !== 'all') out = out.filter((a) => a.source === source);
     if (q) out = out.filter((a) => assetSearchText(a.symbol).includes(q));
+    if (sort.key !== 'rank' || sort.dir !== 'asc') {
+      const k = sort.key;
+      const sign = sort.dir === 'asc' ? 1 : -1;
+      out = [...out].sort((a, b) => {
+        if (k === 'rank') return sign * (a.rank - b.rank);
+        const av = a[k];
+        const bv = b[k];
+        // unavailable values always last
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        return sign * (av - bv);
+      });
+    }
     return out;
-  }, [assets, query, tab]);
+  }, [assets, query, source, sort]);
 
   const anyLoading = universes.some((u) => loading[u]);
   const anyError = universes.some((u) => error[u]);
-  const anySnapshot = assets.some((a) => a.snapshot === true);
-  const isSingle = universes.length === 1;
-  const firstErrorText =
-    (error[universes.find((u) => error[u]) ?? universes[0]] ?? 'خطا').slice(0, 120);
+  const visible = filtered.slice(0, limit);
+
+  const onSort = (key: SortKey) =>
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'rank' ? 'asc' : 'desc' }
+    );
 
   return (
-    <GlassCard className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/10 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <p className="text-[11px] font-black text-ink">{title}</p>
-          {anySnapshot && (
-            <span className="badge shrink-0 bg-warn/10 text-warn">اسنپ‌شات / آفلاین</span>
-          )}
+    <section aria-label={title} className="space-y-4">
+      {/* toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchField
+          value={query}
+          onChange={(v) => {
+            setQuery(v);
+            setLimit(PAGE);
+          }}
+          placeholder="جستجوی نماد یا نام…"
+          className="min-w-0 flex-1 md:max-w-sm"
+        />
+        <div className="w-32 shrink-0 md:hidden">
+          <Select
+            aria-label="مرتب‌سازی"
+            value={`${sort.key}:${sort.dir}`}
+            onChange={(e) => {
+              const [key, dir] = e.target.value.split(':') as [SortKey, SortDir];
+              setSort({ key, dir });
+            }}
+          >
+            <option value="rank:asc">رتبه</option>
+            <option value="marketCap:desc">بیشترین ارزش بازار</option>
+            <option value="change24h:desc">بیشترین رشد ۲۴ ساعت</option>
+            <option value="change24h:asc">بیشترین افت ۲۴ ساعت</option>
+            <option value="change7d:desc">بیشترین رشد ۷ روز</option>
+            <option value="change30d:desc">بیشترین رشد ۳۰ روز</option>
+            <option value="price:desc">بیشترین قیمت</option>
+          </Select>
         </div>
-        <p className="num-ltr text-[9px] font-bold text-muted">{filtered.length} دارایی</p>
+        <p className="ms-auto hidden text-xs text-muted md:block">
+          {toFaDigits(filtered.length)} دارایی
+          {sort.key !== 'rank' && ` · مرتب بر اساس ${SORT_LABEL[sort.key]}`}
+        </p>
       </div>
 
-      {/* جستجو + فیلتر منبع (بدون Grouping — فقط فیلتر) */}
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-        <div className="relative min-w-[160px] flex-1">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setLimit(PAGE); }}
-            placeholder="جستجوی نماد یا نام…"
-            className="glass-inset h-9 w-full rounded-xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
-          />
-        </div>
-        {!isSingle && (
-          <div className="flex gap-1">
-            {(['all', 'crypto', 'ondo', 'xstocks'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => { setTab(s); setLimit(PAGE); }}
-                className={`rounded-full px-2.5 py-1 text-[9px] font-black transition-all ${
-                  tab === s ? 'bg-accent text-white shadow-glow' : 'glass-inset text-muted hover:text-ink'
-                }`}
-              >
-                {s === 'all' ? 'همه' : SOURCE_FA[s]}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {sourceFilter && (
+        <ChipGroup
+          bleed
+          label="منبع"
+          value={source}
+          onChange={(v) => {
+            setSource(v);
+            setLimit(PAGE);
+          }}
+          options={[
+            { value: 'all', label: 'همه' },
+            { value: 'ondo', label: 'Ondo' },
+            { value: 'xstocks', label: 'xStocks' }
+          ]}
+        />
+      )}
 
       {anyLoading && assets.length === 0 ? (
-        <div className="space-y-2 p-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full rounded-xl" />
-          ))}
-        </div>
+        <Surface className="p-4">
+          <div className="space-y-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            ))}
+          </div>
+        </Surface>
       ) : filtered.length === 0 ? (
-        <div className="p-6 text-center">
-          <p className="text-[11px] font-black text-warn">{query ? 'نتیجه‌ای یافت نشد' : 'داده ناکافی'}</p>
-          <p className="mt-1 text-[10px] font-bold text-muted">
-            {query
-              ? 'موردی با این جستجو پیدا نشد.'
-              : anyError
-                ? `اتصال به Provider برقرار نشد (${firstErrorText}). تلاش خودکار ادامه دارد — داده قبلی هرگز پاک نمی‌شود.`
-                : 'اطلاعات بازار هنوز دریافت نشده است. اسنپ‌شات آفلاین هم در دسترس نیست — لطفاً همگام‌سازی را دوباره امتحان کنید.'}
-          </p>
-          {!query && (
-            <button
-              onClick={retry}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-full glass-inset px-3 py-1.5 text-[10px] font-black text-ink transition-all hover:text-accent"
-            >
-              همگام‌سازی دوباره
-            </button>
-          )}
-        </div>
+        query ? (
+          <EmptyState message="نتیجه‌ای یافت نشد" hint={`موردی با «${query}» پیدا نشد.`} />
+        ) : anyError ? (
+          <ErrorState
+            message="اتصال به منبع داده بازار برقرار نشد"
+            hint="تلاش خودکار ادامه دارد؛ داده قبلی هرگز پاک نمی‌شود."
+            onRetry={retry}
+          />
+        ) : (
+          <EmptyState
+            message="داده بازار هنوز دریافت نشده"
+            hint="اسنپ‌شات آفلاین هم در دسترس نیست. همگام‌سازی را دوباره امتحان کنید."
+            action={
+              <Button variant="outline" size="sm" icon={<RefreshCw />} onClick={retry}>
+                همگام‌سازی دوباره
+              </Button>
+            }
+          />
+        )
       ) : (
-        <>
-          {/* دسکتاپ — جدول */}
+        <Surface className="overflow-hidden">
+          {/* desktop — table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="sim-table w-full text-start">
+            <table className="data-table">
+              <caption className="sr-only">{title}</caption>
               <thead>
                 <tr>
-                  <th className="!text-start">#</th>
-                  <th className="!text-start">Symbol</th>
-                  <th className="!text-start">Price</th>
-                  <th className="!text-start">24H</th>
-                  <th className="!text-start">7D</th>
-                  <th className="!text-start">30D</th>
-                  <th className="!text-start">Market Cap</th>
+                  <SortTh k="rank" sort={sort} onSort={onSort} className="w-12 !ps-5">#</SortTh>
+                  <th scope="col">دارایی</th>
+                  <SortTh k="price" sort={sort} onSort={onSort} num>قیمت</SortTh>
+                  <SortTh k="change24h" sort={sort} onSort={onSort} num>۲۴ ساعت</SortTh>
+                  <SortTh k="change7d" sort={sort} onSort={onSort} num>۷ روز</SortTh>
+                  <SortTh k="change30d" sort={sort} onSort={onSort} num>۳۰ روز</SortTh>
+                  <SortTh k="marketCap" sort={sort} onSort={onSort} num>ارزش بازار</SortTh>
+                  <th scope="col" className="w-12 !pe-4"><span className="sr-only">پیگیری</span></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, limit).map((a, i) => (
-                  <MarketRow key={a.id} asset={a} index={i} />
+                {visible.map((a, i) => (
+                  <MarketRow
+                    key={a.id}
+                    asset={a}
+                    index={i}
+                    watched={watch[a.symbol] !== undefined}
+                    onWatch={() => void toggleWatch(a.symbol)}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* موبایل — کارت (همان Row) */}
-          <div className="divide-y divide-line/5 md:hidden">
-            {filtered.slice(0, limit).map((a, i) => (
-              <MarketCard key={a.id} asset={a} index={i} />
+          {/* phones — list */}
+          <ul className="divide-y divide-divider px-4 md:hidden">
+            {visible.map((a) => (
+              <MarketCard key={a.id} asset={a} onOpen={() => setDetail(a)} />
             ))}
-          </div>
+          </ul>
 
           {filtered.length > limit && (
-            <button
-              onClick={() => setLimit((l) => l + PAGE)}
-              className="w-full py-2.5 text-center text-[10px] font-black text-accent transition-colors hover:bg-accent/[0.04]"
-            >
-              نمایش بیشتر ({filtered.length - limit} باقی‌مانده)
-            </button>
+            <div className="border-t border-divider p-2">
+              <Button variant="ghost" size="sm" className="w-full text-accent" onClick={() => setLimit((l) => l + PAGE)}>
+                نمایش بیشتر ({toFaDigits(filtered.length - limit)} باقی‌مانده)
+              </Button>
+            </div>
           )}
-        </>
+        </Surface>
       )}
-    </GlassCard>
+
+      <MarketDetailSheet
+        asset={detail}
+        onClose={() => setDetail(null)}
+        watched={detail ? watch[detail.symbol] !== undefined : false}
+        onWatch={() => detail && void toggleWatch(detail.symbol)}
+      />
+    </section>
   );
 }
 
-/* ---------- Row مستقل (memoized — بخش ۲۷) ---------- */
-
-function Pct({ v }: { v: number | null }) {
-  if (v === null || !Number.isFinite(v)) return <span className="num-ltr text-muted/50">—</span>;
-  const cls = v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : 'text-ink';
-  const sign = v > 0 ? '+' : '';
+/* ---------- sortable header ---------- */
+function SortTh({
+  k,
+  sort,
+  onSort,
+  children,
+  num,
+  className
+}: {
+  k: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (k: SortKey) => void;
+  children: React.ReactNode;
+  num?: boolean;
+  className?: string;
+}) {
+  const active = sort.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
   return (
-    <span className={`num-ltr font-bold tabular-nums ${cls}`}>
-      {sign}
-      {v.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%
-    </span>
+    <th
+      scope="col"
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className={cn(num && 'col-num', className)}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={cn('inline-flex items-center gap-1 rounded-control hover:text-ink', active && 'text-ink')}
+      >
+        {children}
+        <Icon aria-hidden className={cn('h-3 w-3', !active && 'opacity-40')} />
+      </button>
+    </th>
   );
 }
 
-function Usd({ v }: { v: number | null }) {
-  if (v === null || !Number.isFinite(v) || v <= 0) return <span className="num-ltr text-muted/50">—</span>;
-  const text = v >= 1e9
-    ? `$${(v / 1e9).toLocaleString('en-US', { maximumFractionDigits: 2 })}B`
-    : v >= 1e6
-      ? `$${(v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2 })}M`
-      : v >= 1e3
-        ? `$${(v / 1e3).toLocaleString('en-US', { maximumFractionDigits: 2 })}K`
-        : v < 1
-          ? `$${v.toLocaleString('en-US', { maximumFractionDigits: 6 })}`
-          : `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
-  return <span className="num-ltr tabular-nums">{text}</span>;
-}
-
-function Logo({ src, symbol }: { src: string | null; symbol: string }) {
-  const small = src?.includes('coin-images.coingecko.com') && src.includes('/large/')
-    ? src.replace('/large/', '/small/')
-    : src;
+/* ---------- logo (CoinGecko small variant) ---------- */
+function Logo({ src, symbol, size = 28 }: { src: string | null; symbol: string; size?: number }) {
+  const small =
+    src?.includes('coin-images.coingecko.com') && src.includes('/large/') ? src.replace('/large/', '/small/') : src;
   if (!small) {
     return (
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent/60 to-info/60 text-[9px] font-black text-white">
-        {symbol.slice(0, 1)}
+      <span
+        className="flex shrink-0 items-center justify-center rounded-full bg-surface-2 text-2xs font-bold text-muted ring-1 ring-divider"
+        style={{ width: size, height: size }}
+      >
+        {symbol.slice(0, 2)}
       </span>
     );
   }
   return (
-    <img src={small} alt={symbol} loading="lazy" width={24} height={24} className="h-6 w-6 shrink-0 rounded-full object-contain" />
+    <img
+      src={small}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      width={size}
+      height={size}
+      className="shrink-0 rounded-full bg-card object-contain ring-1 ring-divider"
+      style={{ width: size, height: size }}
+    />
   );
 }
 
-const MarketRow = memo(function MarketRow({ asset, index }: { asset: MarketAsset; index: number }) {
+function WatchButton({ watched, onClick, symbol }: { watched: boolean; onClick: () => void; symbol: string }) {
   return (
-    <tr className="cursor-default">
-      <td className="num-ltr text-muted">{index + 1}</td>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={watched}
+      aria-label={watched ? `حذف ${symbol} از لیست پیگیری` : `افزودن ${symbol} به لیست پیگیری`}
+      className={cn(
+        'flex h-8 w-8 items-center justify-center rounded-control transition-colors hover:bg-surface-2',
+        watched ? 'text-gold' : 'text-subtle hover:text-ink'
+      )}
+    >
+      <Star className={cn('h-4 w-4', watched && 'fill-current')} />
+    </button>
+  );
+}
+
+/* ---------- desktop row (memoized) ---------- */
+const MarketRow = memo(function MarketRow({
+  asset,
+  index,
+  watched,
+  onWatch
+}: {
+  asset: MarketAsset;
+  index: number;
+  watched: boolean;
+  onWatch: () => void;
+}) {
+  return (
+    <tr>
+      <td className="num-ltr !ps-5 text-xs text-subtle">{index + 1}</td>
       <td>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Logo src={asset.image} symbol={asset.symbol} />
-          <AssetName
-            symbol={asset.symbol}
-            meta={SOURCE_FA[asset.source]}
-            className="max-w-[180px] flex-1"
-          />
+          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[16rem]" />
         </div>
       </td>
-      <td><Usd v={asset.price} /></td>
-      <td><Pct v={asset.change24h} /></td>
-      <td><Pct v={asset.change7d} /></td>
-      <td><Pct v={asset.change30d} /></td>
-      <td><Usd v={asset.marketCap} /></td>
+      <td className="col-num font-semibold text-ink">
+        <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
+      </td>
+      <td className="col-num"><PercentValue value={asset.change24h} /></td>
+      <td className="col-num"><PercentValue value={asset.change7d} /></td>
+      <td className="col-num"><PercentValue value={asset.change30d} /></td>
+      <td className="col-num text-muted">
+        <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
+      </td>
+      <td className="!pe-4">
+        <WatchButton watched={watched} onClick={onWatch} symbol={asset.symbol} />
+      </td>
     </tr>
   );
 });
 
-const MarketCard = memo(function MarketCard({ asset, index }: { asset: MarketAsset; index: number }) {
-  // کارت موبایل: همه داده‌های Row (قیمت/24H/7D/30D/MCap) با Reflow نمایش
-  // داده می‌شوند — هیچ متریکی در Mobile مخفی نمی‌شود
+/* ---------- detail sheet (phones) ---------- */
+function MarketDetailSheet({
+  asset,
+  onClose,
+  watched,
+  onWatch
+}: {
+  asset: MarketAsset | null;
+  onClose: () => void;
+  watched: boolean;
+  onWatch: () => void;
+}) {
+  if (!asset) return null;
+  const d = assetDisplayName(asset.symbol);
   return (
-    <div className="p-3">
-      <div className="flex items-center gap-2.5">
-        <span className="num-ltr w-5 shrink-0 text-[9px] font-black text-muted">{index + 1}</span>
-        <Logo src={asset.image} symbol={asset.symbol} />
-        <AssetName
-          symbol={asset.symbol}
-          meta={SOURCE_FA[asset.source]}
-          className="min-w-0 flex-1"
-        />
-        <div className="min-w-0 shrink-0 text-end">
-          <p className="num-ltr text-[12px] font-black text-ink"><Usd v={asset.price} /></p>
-          <p className="text-[8px] font-bold text-muted/70">MCap: <Usd v={asset.marketCap} /></p>
+    <Sheet
+      open
+      onClose={onClose}
+      title={d.name}
+      description={`${asset.symbol} · ${SOURCE_FA[asset.source]}`}
+      size="sm"
+      footer={
+        <Button variant={watched ? 'outline' : 'secondary'} className="w-full" icon={<Star className={cn(watched && 'fill-current')} />} onClick={onWatch}>
+          {watched ? 'حذف از لیست پیگیری' : 'افزودن به لیست پیگیری'}
+        </Button>
+      }
+    >
+      <div className="flex items-center gap-3">
+        <Logo src={asset.image} symbol={asset.symbol} size={44} />
+        <div>
+          <p className="text-3xl font-extrabold tracking-tight text-ink">
+            <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} state={asset.snapshot ? 'stale' : 'ready'} />
+          </p>
+          <PercentValue value={asset.change24h} className="text-sm font-semibold" />
+          <span className="ms-1 text-xs text-muted">۲۴ ساعت</span>
         </div>
       </div>
-      {/* تغییرات — ۳ بازه همیشه قابل مشاهده (Reflow به‌جای Hide) */}
-      <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
-          <p className="text-[8px] font-bold text-muted/60">24H</p>
-          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change24h} /></p>
+      {asset.snapshot && (
+        <div className="mt-3">
+          <Badge tone="warn">داده ذخیره‌شده — زنده نیست</Badge>
         </div>
-        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
-          <p className="text-[8px] font-bold text-muted/60">7D</p>
-          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change7d} /></p>
+      )}
+      <KeyValueList
+        className="mt-4"
+        rows={[
+          { label: 'تغییر ۷ روز', value: <PercentValue value={asset.change7d} /> },
+          { label: 'تغییر ۳۰ روز', value: <PercentValue value={asset.change30d} /> },
+          { label: 'ارزش بازار', value: <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact /> },
+          { label: 'رتبه', value: <span className="num-ltr">#{asset.rank}</span> }
+        ]}
+      />
+    </Sheet>
+  );
+}
+
+/* ---------- phone row: every metric stays visible (reflow, not hide) ---------- */
+const MarketCard = memo(function MarketCard({ asset, onOpen }: { asset: MarketAsset; onOpen: () => void }) {
+  return (
+    <li>
+      <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 py-3 text-start">
+        <Logo src={asset.image} symbol={asset.symbol} size={36} />
+        <div className="min-w-0 flex-1">
+          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} />
+          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 text-2xs text-muted">
+            <span>
+              ۷ روز <PercentValue value={asset.change7d} />
+            </span>
+            <span>
+              ۳۰ روز <PercentValue value={asset.change30d} />
+            </span>
+            <span>
+              ارزش <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
+            </span>
+          </p>
         </div>
-        <div className="min-w-0 rounded-lg bg-surface-2/60 px-2 py-1.5">
-          <p className="text-[8px] font-bold text-muted/60">30D</p>
-          <p className="mt-0.5 truncate text-[11px]"><Pct v={asset.change30d} /></p>
+        <div className="shrink-0 text-end">
+          <p className="text-sm font-semibold text-ink">
+            <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
+          </p>
+          <PercentValue value={asset.change24h} className="text-xs font-semibold" />
         </div>
-      </div>
-    </div>
+      </button>
+    </li>
   );
 });

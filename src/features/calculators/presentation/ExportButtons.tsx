@@ -1,8 +1,8 @@
 /**
- * خروجی CSV (دانلود مستقیم) + PDF (گزارش چاپی RTL — ذخیره به‌صورت PDF)
+ * Export — CSV (direct download) + PDF (RTL print report → "Save as PDF")
  */
-import { useState } from 'react';
-import { Download, FileText, Printer, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, FileText, Printer } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Sheet } from '@/shared/components/ui/Sheet';
 import { downloadCsv } from '@/shared/utils/csv';
@@ -14,12 +14,14 @@ export function exportCsvFile(filename: string, headers: string[], rows: (string
     const s = String(v);
     return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const content = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+  const content = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
   downloadCsv(filename, content);
   toast('success', 'فایل CSV دانلود شد');
 }
 
-/** گزارش PDF — پنجره چاپ (RTL کامل) */
+type Section = { heading?: string; table?: { headers: string[]; rows: (string | number | null)[][] }; note?: string };
+
+/** PDF report — print preview (full RTL); only `.report-print-area` is printed */
 export function PdfReportModal({
   open,
   onClose,
@@ -29,22 +31,56 @@ export function PdfReportModal({
   open: boolean;
   onClose: () => void;
   title: string;
-  sections: { heading?: string; table?: { headers: string[]; rows: (string | number | null)[][] }; note?: string }[];
+  sections: Section[];
 }) {
+  const reportRef = useRef<HTMLDivElement>(null);
+  /** print a detached copy at the top of <body> so no dialog/scroll ancestor clips it */
+  const print = () => {
+    const src = reportRef.current;
+    if (!src) return;
+    const clone = src.cloneNode(true) as HTMLElement;
+    clone.classList.add('report-print-clone');
+    document.body.appendChild(clone);
+    document.body.classList.add('print-report');
+    const cleanup = () => {
+      document.body.classList.remove('print-report');
+      clone.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    // browsers without afterprint support
+    setTimeout(cleanup, 1000);
+  };
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
-      <div className="glass-inset rounded-2xl p-4 text-[11px] leading-6">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="lg"
+      description="پیش‌نمایش گزارش — در پنجره چاپ «Save as PDF» را انتخاب کنید."
+      footer={
+        <Button
+          size="lg"
+          className="w-full"
+          icon={<Printer />}
+          onClick={print}
+        >
+          چاپ / ذخیره PDF
+        </Button>
+      }
+    >
+      <div ref={reportRef} className="report-print-area space-y-6 rounded-field border border-divider p-4 text-sm" dir="rtl">
+        <h3 className="text-base font-bold text-ink">{title}</h3>
         {sections.map((sec, i) => (
-          <div key={i} className="mb-4">
-            {sec.heading && (
-              <h4 className="mb-1.5 font-extrabold text-ink">{sec.heading}</h4>
-            )}
+          <section key={i}>
+            {sec.heading && <h4 className="mb-2 font-semibold text-ink">{sec.heading}</h4>}
             {sec.table && (
-              <table className="w-full border-collapse text-[10px]">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
                     {sec.table.headers.map((h) => (
-                      <th key={h} className="border-b border-line/20 pb-1 text-start font-extrabold text-ink">
+                      <th key={h} className="border-b border-divider-strong pb-1.5 text-start text-xs font-semibold text-muted">
                         {h}
                       </th>
                     ))}
@@ -54,7 +90,7 @@ export function PdfReportModal({
                   {sec.table.rows.map((r, ri) => (
                     <tr key={ri}>
                       {r.map((c, ci) => (
-                        <td key={ci} className="num-ltr border-b border-line/5 py-1 text-muted">
+                        <td key={ci} className={ci === 0 ? 'border-b border-divider py-1.5 text-ink' : 'num-ltr border-b border-divider py-1.5 text-right text-ink'}>
                           {c ?? '—'}
                         </td>
                       ))}
@@ -63,28 +99,10 @@ export function PdfReportModal({
                 </tbody>
               </table>
             )}
-            {sec.note && <p className="text-muted">{sec.note}</p>}
-          </div>
+            {sec.note && <p className="mt-2 text-xs text-muted">{sec.note}</p>}
+          </section>
         ))}
       </div>
-      <Button
-        size="lg"
-        className="mt-4 w-full"
-        onClick={() => {
-          // حالت چاپ: فقط گزارش نمایش داده می‌شود
-          document.body.classList.add('print-report');
-          const printTarget = document.querySelector('.report-print-area');
-          if (printTarget) printTarget.id = 'print-root';
-          window.print();
-          document.body.classList.remove('print-report');
-        }}
-      >
-        <Printer className="h-4 w-4" />
-        چاپ / ذخیره PDF
-      </Button>
-      <p className="mt-2 text-center text-[10px] font-medium text-muted">
-        در پنجره چاپ، «Save as PDF» را انتخاب کنید
-      </p>
     </Sheet>
   );
 }
@@ -100,27 +118,19 @@ export function ExportButtons({
   headers: string[];
   rows: (string | number | null)[][];
   pdfTitle: string;
-  pdfSections: { heading?: string; table?: { headers: string[]; rows: (string | number | null)[][] }; note?: string }[];
+  pdfSections: Section[];
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   return (
-    <div className="flex gap-2">
-      <Button variant="outline" size="sm" className="flex-1" onClick={() => exportCsvFile(filename, headers, rows)}>
-        <Download className="h-3.5 w-3.5" />
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-muted">خروجی:</span>
+      <Button variant="outline" size="sm" icon={<Download />} onClick={() => exportCsvFile(filename, headers, rows)}>
         CSV
       </Button>
-      <Button variant="outline" size="sm" className="flex-1" onClick={() => setPdfOpen(true)}>
-        <FileText className="h-3.5 w-3.5" />
+      <Button variant="outline" size="sm" icon={<FileText />} onClick={() => setPdfOpen(true)}>
         PDF
       </Button>
-      <PdfReportModal
-        open={pdfOpen}
-        onClose={() => setPdfOpen(false)}
-        title={pdfTitle}
-        sections={pdfSections}
-      />
+      <PdfReportModal open={pdfOpen} onClose={() => setPdfOpen(false)} title={pdfTitle} sections={pdfSections} />
     </div>
   );
 }
-
-export { X as _X };

@@ -35,8 +35,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 export function applyTheme(t: ThemeMode): void {
   const root = document.documentElement;
   root.classList.toggle('dark', t === 'dark');
-  const meta = document.querySelector('meta[name="theme-color"]');
-  meta?.setAttribute('content', t === 'dark' ? '#0a0f1e' : '#f4f6fa');
+  // explicit choice overrides the media-query defaults in index.html
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    m.setAttribute('content', t === 'dark' ? '#090D1B' : '#F6F8FC');
+  });
 }
 
 /** صدا زدن قبل از render — جلوگیری از فلش */

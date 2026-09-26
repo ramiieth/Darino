@@ -1,20 +1,18 @@
 /**
- * Boros Intelligence Dashboard
- *  - Best Opportunities (فرصت‌های برتر)
- *  - Market Comparison (مقایسه بازارها)
- *  - Simulator (شبیه‌ساز با موتور محاسباتی)
- *  - Risk Monitor (مانیتور ریسک)
- * فقط Read Only + Simulation — بدون معامله/کیف پول
+ * Boros intelligence — funding-rate (yield) markets, analysis only
+ *   فرصت‌ها · مقایسه · شبیه‌ساز · مانیتور ریسک · ممیزی
+ * Read only + simulation — no trading, no wallet.
  */
-import { useMemo, useState } from 'react';
-import { Sparkles, GitCompare, Calculator, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Skeleton } from '@/shared/components/ui/Skeleton';
-import { ErrorState } from '@/shared/components/ui/StateViews';
-import { useBoros, loadBoros, resetBorosLoad, retryBorosSoon } from '@/features/boros/data/useBoros';
+import { useEffect, useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { Button } from '@/shared/components/ui/Button';
+import { PageSkeleton } from '@/shared/components/ui/Skeleton';
+import { ErrorState, Notice } from '@/shared/components/ui/StateViews';
 import { FreshnessBar } from '@/shared/components/ui/FreshnessBar';
-import { useEffect } from 'react';
+import { useBoros, loadBoros, resetBorosLoad, retryBorosSoon } from '@/features/boros/data/useBoros';
+import { toFaDigits } from '@/shared/utils/formatters';
 import { OpportunitiesTab } from './OpportunitiesTab';
 import { ComparisonTab } from './ComparisonTab';
 import { SimulatorTab } from './SimulatorTab';
@@ -23,103 +21,106 @@ import { AuditTab } from './AuditTab';
 
 type Tab = 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
 
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'opp', label: 'فرصت‌ها' },
+  { value: 'compare', label: 'مقایسه' },
+  { value: 'sim', label: 'شبیه‌ساز' },
+  { value: 'risk', label: 'مانیتور ریسک' },
+  { value: 'audit', label: 'ممیزی' }
+];
+
 export default function BorosDashboard() {
   const { markets, loading, error, stale, syncProgress, loadedAt } = useBoros();
   const [tab, setTab] = useState<Tab>('opp');
 
-  // تلاش مجدد خودکار پس از خطا (Rate Limit موقت — بدون دخالت کاربر)
+  // automatic retry after an error (temporary rate limit — no user action needed)
   useEffect(() => {
     if (error) retryBorosSoon(15_000);
   }, [error]);
 
   const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now()), [markets]);
+  const reload = () => {
+    resetBorosLoad();
+    void loadBoros();
+  };
+
+  const header = (
+    <PageHeader
+      title="تحلیل Boros"
+      subtitle="بازارهای نرخ تأمین مالی و بازدهی — فقط تحلیل و شبیه‌سازی؛ هیچ معامله‌ای انجام نمی‌شود."
+      meta={
+        markets.length > 0 ? (
+          <FreshnessBar
+            loadedAt={loadedAt}
+            stale={stale}
+            error={error}
+            syncing={syncProgress !== null}
+            sourceLabel="Pendle Boros API"
+            autoMs={2 * 60_000}
+            onRefresh={reload}
+          />
+        ) : undefined
+      }
+    />
+  );
 
   if (loading && markets.length === 0) {
     return (
-      <div className="space-y-4">
-        <PageHeader title="تحلیل Boros" subtitle="موتور هوش بازدهی — بازارهای نرخ تأمین‌مالی" />
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-2xl" />
-          ))}
-        </div>
-      </div>
+      <Page>
+        {header}
+        <PageSkeleton />
+      </Page>
     );
   }
   if (error && markets.length === 0) {
-    return <ErrorState message="ارتباط با API بوروس برقرار نشد" onRetry={() => void loadBoros()} />;
+    return (
+      <Page>
+        {header}
+        <ErrorState message="ارتباط با API بوروس برقرار نشد" onRetry={() => void loadBoros()} />
+      </Page>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="تحلیل Boros"
-        subtitle="موتور هوش بازدهی — بازارهای Yield و Funding Rate (فقط تحلیل)"
-      />
+    <Page>
+      {header}
 
-      <FreshnessBar
-        loadedAt={loadedAt}
-        stale={stale}
-        error={error}
-        syncing={syncProgress !== null}
-        sourceLabel="Pendle Boros API"
-        autoMs={2 * 60_000}
-        onRefresh={() => {
-          resetBorosLoad();
-          void loadBoros();
-        }}
-      />
-
-      {!error && stale && markets.length > 0 && (
-        <div className="glass-soft flex items-center gap-2 rounded-2xl px-3.5 py-2">
-          <span className="badge bg-warn/10 text-warn ring-1 ring-warn/20">داده کش‌شده</span>
-          <p className="flex-1 text-[10px] font-bold text-muted">
-            ارتباط زنده با API بوروس برقرار نیست — آخرین داده ذخیره‌شده نمایش داده می‌شود (تلاش مجدد خودکار)
-          </p>
-          <button
-            onClick={() => {
-              resetBorosLoad();
-              void loadBoros();
-            }}
-            className="text-[10px] font-black text-accent"
-          >
-            تلاش مجدد
-          </button>
-        </div>
+      {!error && stale && (
+        <Notice
+          tone="stale"
+          title="داده ذخیره‌شده"
+          action={
+            <Button variant="outline" size="sm" icon={<RefreshCw />} onClick={reload}>
+              تلاش دوباره
+            </Button>
+          }
+        >
+          ارتباط زنده با API بوروس برقرار نیست؛ آخرین داده ذخیره‌شده نمایش داده می‌شود و تلاش مجدد خودکار ادامه دارد.
+        </Notice>
       )}
 
       {syncProgress && (
-        <div className="glass-soft flex items-center gap-2 rounded-2xl px-3.5 py-2">
-          <ShieldAlert className="h-3.5 w-3.5 animate-pulse text-accent" />
-          <p className="flex-1 text-[10px] font-bold text-muted">
-            همگام‌سازی تاریخچه APR: {syncProgress.done}/{syncProgress.total}
-          </p>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line/10">
+        <div className="flex items-center gap-3 text-xs text-muted" role="status">
+          <span className="shrink-0">
+            تاریخچه APR {toFaDigits(syncProgress.done)}/{toFaDigits(syncProgress.total)}
+          </span>
+          <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div
-              className="h-full rounded-full bg-accent transition-all"
+              className="h-full rounded-full bg-accent transition-[width] duration-slow"
               style={{ width: `${(syncProgress.done / Math.max(1, syncProgress.total)) * 100}%` }}
             />
           </div>
         </div>
       )}
 
-      <SegmentedControl
-        options={[
-          { value: 'opp' as const, label: 'فرصت‌ها', icon: <Sparkles className="h-3.5 w-3.5" /> },
-          { value: 'compare' as const, label: 'مقایسه', icon: <GitCompare className="h-3.5 w-3.5" /> },
-          { value: 'sim' as const, label: 'شبیه‌ساز', icon: <Calculator className="h-3.5 w-3.5" /> },
-          { value: 'risk' as const, label: 'مانیتور ریسک', icon: <ShieldAlert className="h-3.5 w-3.5" /> },
-          { value: 'audit' as const, label: 'ممیزی', icon: <ShieldCheck className="h-3.5 w-3.5" /> }
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-
-      {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
-      {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
-      {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}
-      {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
-      {tab === 'audit' && <AuditTab markets={activeMarkets} />}
-    </div>
+      <div className="space-y-6">
+        <Tabs<Tab> label="بخش‌های Boros" options={TABS} value={tab} onChange={setTab} />
+        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
+        {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
+        {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}
+        {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
+        {tab === 'audit' && <AuditTab markets={activeMarkets} />}
+      </div>
+    </Page>
   );
 }

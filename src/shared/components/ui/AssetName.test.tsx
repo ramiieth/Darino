@@ -21,10 +21,12 @@ describe('AssetName — نمایش نام دارایی', () => {
   it('نام فارسی از Ticker وزن بصری بیشتری دارد', () => {
     const { container } = render(<AssetName symbol="ETH" />);
     const [nameEl, tickerEl] = Array.from(container.querySelectorAll('p'));
-    expect(nameEl.className).toContain('text-[12px]');
-    expect(nameEl.className).toContain('font-extrabold');
-    expect(tickerEl.className).toContain('text-[9px]');
-    expect(tickerEl.className).toContain('text-muted/70');
+    // توکن‌های سیستم طراحی: نام = label (14/semibold/ink) · Ticker = micro (11/muted)
+    expect(nameEl.className).toContain('text-sm');
+    expect(nameEl.className).toContain('font-semibold');
+    expect(nameEl.className).toContain('text-ink');
+    expect(tickerEl.className).toContain('text-2xs');
+    expect(tickerEl.className).toContain('text-muted');
   });
 
   it('نام‌های طولانی truncate می‌شوند (ارتفاع ردیف ثابت)', () => {

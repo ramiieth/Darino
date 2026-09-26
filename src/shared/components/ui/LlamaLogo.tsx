@@ -16,11 +16,11 @@ export function protocolLogoUrl(slug: string): string {
 }
 
 const GRADIENTS = [
-  'from-teal-400 to-emerald-600',
-  'from-indigo-400 to-violet-600',
-  'from-sky-400 to-blue-600',
-  'from-amber-400 to-orange-600',
-  'from-rose-400 to-pink-600'
+  'from-accent to-positive',
+  'from-accent to-accent',
+  'from-accent to-accent',
+  'from-warn to-warn',
+  'from-negative to-pink-600'
 ];
 
 export function LlamaLogo({
@@ -42,7 +42,7 @@ export function LlamaLogo({
     return (
       <span
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-black text-white',
+          'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-extrabold text-white',
           g,
           className
         )}
@@ -62,7 +62,7 @@ export function LlamaLogo({
       loading="lazy"
       onError={() => setFailed(true)}
       className={cn(
-        'shrink-0 rounded-full bg-card object-contain ring-1 ring-line/10',
+        'shrink-0 rounded-full bg-card object-contain ring-1 ring-divider',
         className
       )}
       style={{ width: size, height: size }}

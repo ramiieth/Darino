@@ -8,11 +8,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Trash2, KeyRound, Check, Save, RotateCcw } from 'lucide-react';
-import { Chart as ChartJS, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, type ChartOptions } from 'chart.js';
+import { Chart as ChartJS, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { Sheet } from '@/shared/components/ui/Sheet';
-import { Button } from '@/shared/components/ui/Button';
-import { Input } from '@/shared/components/ui/Input';
+import { Button, IconButton } from '@/shared/components/ui/Button';
+import { Field, Input } from '@/shared/components/ui/Input';
+import { KeyValueList } from '@/shared/components/ui/FinancialValue';
+import { baseChartOptions, cssColor } from '@/shared/design/chartTheme';
 import { useSettingsStore, effectiveApiKeys } from '@/shared/store/settingsStore';
 import { useMarketStore } from '@/shared/store/marketStore';
 import { useFxStore } from '@/shared/store/fxStore';
@@ -26,7 +28,7 @@ import { storage } from '@/shared/lib/storage';
 import { cn } from '@/shared/lib/cn';
 import { fmtIntLatin, fmtTime, DEFAULT_IRR_RATE } from '@/shared/utils/formatters';
 
-ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip);
+ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler);
 
 const scenarioSchema = z.object({
   ethAmount: z.coerce.number().min(0.000001, '≥ 0'),
@@ -91,8 +93,8 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
       baseCapital2026: values.baseCapital2026,
       ethRefJuly2026: values.ethRefJuly2026
     });
-    // کلیدها با کاما جدا می‌شوند
-    const keys = (values.apiKey ?? '')
+    // کلیدها با کاما جدا می‌شوند — از فیلد کنترل‌شده (فیلد فرم ثبت نشده بود و ویرایش ذخیره نمی‌شد)
+    const keys = (keysInput ?? '')
       .split(/[,،]/)
       .map((k) => k.trim())
       .filter(Boolean);
@@ -120,84 +122,41 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     toast('success', t('cacheCleared'));
   };
 
-  const field = (label: string, key: keyof ScenarioForm, placeholder = '0.00') => (
-    <div>
-      <label className="mb-1 block text-[11px] font-bold text-muted">{label}</label>
-      <Input
-        type="number"
-        step="any"
-        inputMode="decimal"
-        dir="ltr"
-        placeholder={placeholder}
-        className="h-10 text-xs text-start"
-        {...register(key)}
-      />
-      {errors[key] && (
-        <p className="mt-1 text-[11px] font-bold text-negative">{errors[key]?.message}</p>
-      )}
-    </div>
+  const field = (label: string, key: keyof ScenarioForm, suffix?: string) => (
+    <Field label={label} error={errors[key]?.message as string | undefined}>
+      <Input type="number" step="any" inputMode="decimal" dir="ltr" placeholder="0.00" suffix={suffix} {...register(key)} />
+    </Field>
   );
 
-  // نمودار تاریخچه نرخ
-  const fxChartData = {
-    labels: fx.history.map((h) => fmtTime(h.t)),
-    datasets: [
-      {
-        label: 'نرخ',
-        data: fx.history.map((h) => h.rate),
-        borderColor: 'rgb(15 118 110)',
-        backgroundColor: 'rgba(15,118,110,0.08)',
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.3,
-        fill: true
-      }
-    ]
-  };
-  const fxOptions: ChartOptions<'line'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        rtl: true,
-        textDirection: 'rtl',
-        callbacks: {
-          label: (ctx) => ` نرخ: ${fmtIntLatin(ctx.parsed.y)}`
-        }
-      }
-    },
-    scales: {
-      x: { grid: { display: false }, ticks: { maxTicksLimit: 6, font: { size: 9 } } },
-      y: { grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { font: { size: 9 } } }
-    }
-  };
+  const fxOptions = baseChartOptions({ formatTooltip: (v) => `${fmtIntLatin(v)} ریال`, formatY: (v) => fmtIntLatin(v) });
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('settingsTitle')}>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        {/* نرخ ارز (fx_rates) */}
-        <section className="space-y-2.5">
-          <h3 className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
-            <Save className="h-3.5 w-3.5 text-accent" />
-            {t('fxRateTitle')}
-          </h3>
-          <p className="text-[11px] font-medium text-muted">{t('fxRateHint')}</p>
-          <div className="flex items-center gap-2">
-            <Input
-              dir="ltr"
-              inputMode="numeric"
-              value={fxInput}
-              onChange={(e) => setFxInput(e.target.value)}
-              className="h-10 flex-1 text-start text-xs"
-              aria-label={t('fxRateInput')}
-            />
-            <Button size="sm" onClick={saveFx} type="button">
-              <Save className="h-3.5 w-3.5" />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={t('settingsTitle')}
+      variant="panel"
+      footer={
+        <Button size="lg" className="w-full" type="submit" form="settings-form" loading={isSubmitting} icon={saved ? <Check /> : undefined}>
+          {saved ? t('savedToast') : t('save')}
+        </Button>
+      }
+    >
+      <form id="settings-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8 pb-2">
+        {/* FX rate */}
+        <section className="space-y-3" aria-labelledby="fx-title">
+          <div>
+            <h3 id="fx-title" className="text-sm font-bold text-ink">{t('fxRateTitle')}</h3>
+            <p className="text-xs text-muted">{t('fxRateHint')}</p>
+          </div>
+          <div className="flex items-end gap-2">
+            <Field label={t('fxRateInput')} className="flex-1">
+              <Input dir="ltr" inputMode="numeric" value={fxInput} onChange={(e) => setFxInput(e.target.value)} />
+            </Field>
+            <Button onClick={saveFx} type="button" variant="secondary" icon={<Save />}>
               {t('fxRateSave')}
             </Button>
-            <Button
-              size="sm"
+            <IconButton
               variant="outline"
               type="button"
               onClick={() => {
@@ -207,120 +166,122 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
               }}
               aria-label={t('fxRateReset')}
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
+              <RotateCcw />
+            </IconButton>
           </div>
           {fx.updatedAt && (
-            <p className="text-[11px] font-bold text-muted">
+            <p className="text-xs text-muted">
               {t('fxLastUpdate')}: {fmtTime(fx.updatedAt)}
             </p>
           )}
           {fx.history.length > 1 && (
-            <div className="glass-inset rounded-xl p-3">
-              <p className="mb-2 text-[11px] font-bold text-muted">{t('fxHistoryTitle')}</p>
-              <div className="h-28">
-                <Line data={fxChartData} options={fxOptions} />
+            <div className="rounded-field border border-divider p-3">
+              <p className="mb-2 text-xs font-semibold text-muted">{t('fxHistoryTitle')}</p>
+              <div className="h-28" dir="ltr">
+                <Line
+                  data={{
+                    labels: fx.history.map((h) => fmtTime(h.t)),
+                    datasets: [
+                      {
+                        label: 'نرخ',
+                        data: fx.history.map((h) => h.rate),
+                        borderColor: cssColor('chart-1'),
+                        backgroundColor: cssColor('chart-1', 0.08),
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.25,
+                        fill: true
+                      }
+                    ]
+                  }}
+                  options={fxOptions as never}
+                />
               </div>
             </div>
           )}
         </section>
 
-        {/* موقعیت اتریوم */}
-        <section className="space-y-2.5">
-          <h3 className="text-xs font-extrabold text-ink">{t('scenarioEthTitle')}</h3>
-          <div className="grid grid-cols-2 gap-2.5">
-            {field(t('ethAmountLabel'), 'ethAmount')}
-            {field(t('ethBuyPriceLabel'), 'ethBuyPrice')}
-            {field(t('ethInitialLabel'), 'ethInitialInvestment')}
-            {field(t('usdcLabel'), 'usdcAllocation2026')}
+        {/* ETH position */}
+        <section className="space-y-3" aria-labelledby="eth-title">
+          <h3 id="eth-title" className="text-sm font-bold text-ink">{t('scenarioEthTitle')}</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {field(t('ethAmountLabel'), 'ethAmount', 'ETH')}
+            {field(t('ethBuyPriceLabel'), 'ethBuyPrice', '$')}
+            {field(t('ethInitialLabel'), 'ethInitialInvestment', '$')}
+            {field(t('usdcLabel'), 'usdcAllocation2026', '$')}
           </div>
         </section>
 
-        {/* سرمایه پایه */}
-        <section className="space-y-2.5">
-          <h3 className="text-xs font-extrabold text-ink">{t('scenarioBaseTitle')}</h3>
-          <div className="grid grid-cols-2 gap-2.5">
-            {field(t('base2025Label'), 'baseCapital2025')}
-            {field(t('base2026Label'), 'baseCapital2026')}
-            <p className="text-[9px] font-medium leading-4 text-muted/70">
-              با فعال بودن حسابداری، موجودی نقد واقعی (Cash Balance) مبنای شبیه‌سازی‌هاست —
-              این مقادیر فقط فالبک هستند.
+        {/* base capital */}
+        <section className="space-y-3" aria-labelledby="base-title">
+          <div>
+            <h3 id="base-title" className="text-sm font-bold text-ink">{t('scenarioBaseTitle')}</h3>
+            <p className="text-xs text-muted">
+              با فعال بودن حسابداری، موجودی نقد واقعی مبنای شبیه‌سازی‌هاست — این مقادیر فقط جایگزین هستند.
             </p>
-            {field(t('ethRef2026Label'), 'ethRefJuly2026')}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {field(t('base2025Label'), 'baseCapital2025', '$')}
+            {field(t('base2026Label'), 'baseCapital2026', '$')}
+            {field(t('ethRef2026Label'), 'ethRefJuly2026', '$')}
           </div>
         </section>
 
-        {/* کلیدهای API — چند کلید برای افزایش سهمیه روزانه */}
-        <section className="space-y-2">
-          <h3 className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
-            <KeyRound className="h-3.5 w-3.5 text-accent" />
+        {/* API keys */}
+        <section className="space-y-3" aria-labelledby="keys-title">
+          <h3 id="keys-title" className="flex items-center gap-1.5 text-sm font-bold text-ink">
+            <KeyRound aria-hidden className="h-4 w-4 text-muted" />
             {t('apiKeysLabel')}
           </h3>
-          <Input
-            dir="ltr"
-            placeholder="WZK7..., KEY2, KEY3"
-            value={keysInput}
-            onChange={(e) => setKeysInput(e.target.value)}
-            className="h-10 text-start text-xs"
-            aria-label={t('apiKeysLabel')}
-          />
-          <p className="text-[11px] font-medium text-muted">{t('avBudgetHint')}</p>
-
-          {/* مصرف امروز هر کلید */}
-          <div className="glass-inset space-y-1.5 rounded-2xl p-3">
-            {effectiveApiKeys(useSettingsStore.getState().apiKeys).map((k) => {
-              const used = avBudget.usedToday(k);
-              const left = Math.max(0, 22 - used);
-              return (
-                <div key={k} className="flex items-center justify-between text-[11px] font-bold">
-                  <span dir="ltr" className="truncate text-muted">
-                    {k.slice(0, 10)}…
-                  </span>
-                  <span
-                    className={cn(
-                      'num-ltr',
-                      left <= 0 ? 'text-negative' : left < 10 ? 'text-warn' : 'text-ink'
-                    )}
-                  >
-                    {used}/22
-                  </span>
-                </div>
-              );
-            })}
-            <p className="num-ltr border-t border-line/10 pt-1.5 text-[11px] font-extrabold text-ink">
-              {t('avBudgetLabel')}: {avBudgetInfo().used} / {avBudgetInfo().budget}
-            </p>
+          <Field label="کلیدها (با کاما جدا کنید)" hint={t('avBudgetHint')}>
+            <Input dir="ltr" placeholder="WZK7..., KEY2, KEY3" value={keysInput} onChange={(e) => setKeysInput(e.target.value)} />
+          </Field>
+          <div className="rounded-field border border-divider px-3">
+            <KeyValueList
+              dense
+              rows={[
+                ...effectiveApiKeys(useSettingsStore.getState().apiKeys).map((k) => {
+                  const used = avBudget.usedToday(k);
+                  const left = Math.max(0, 22 - used);
+                  return {
+                    label: <bdi dir="ltr" className="font-mono">{k.slice(0, 10)}…</bdi>,
+                    value: (
+                      <span className={cn('num-ltr', left <= 0 ? 'text-negative' : left < 10 ? 'text-warn' : 'text-ink')}>
+                        {used}/22
+                      </span>
+                    )
+                  };
+                }),
+                {
+                  label: t('avBudgetLabel'),
+                  emphasis: true,
+                  value: (
+                    <span className="num-ltr">
+                      {avBudgetInfo().used} / {avBudgetInfo().budget}
+                    </span>
+                  )
+                }
+              ]}
+            />
           </div>
         </section>
 
-        {/* کش */}
-        <section className="flex items-center justify-between rounded-2xl glass-inset p-3">
+        {/* cache */}
+        <section className="flex items-center justify-between gap-3 rounded-field border border-divider p-3" aria-label={t('settingsCacheTitle')}>
           <div>
-            <p className="text-[11px] font-bold text-ink">{t('settingsCacheTitle')}</p>
-            <p className="text-[11px] text-muted">
-              {storage.persistent ? 'IndexedDB / LocalStorage' : 'In-memory (پیش‌نمایش)'}
-            </p>
+            <p className="text-sm font-semibold text-ink">{t('settingsCacheTitle')}</p>
+            <p className="text-xs text-muted">{storage.persistent ? 'IndexedDB / LocalStorage' : 'حافظه موقت (پیش‌نمایش)'}</p>
           </div>
           <Button
-            variant="danger"
+            variant="destructive"
             size="sm"
+            icon={<Trash2 />}
             onClick={() => (confirmClear ? void clearCache() : setConfirmClear(true))}
             type="button"
           >
-            <Trash2 className="h-3.5 w-3.5" />
             {confirmClear ? t('clearCacheConfirm') : t('clearCache')}
           </Button>
         </section>
-
-        <Button size="lg" className="w-full" type="submit" disabled={isSubmitting}>
-          {saved ? (
-            <>
-              <Check className="h-4 w-4" /> {t('savedToast')}
-            </>
-          ) : (
-            t('save')
-          )}
-        </Button>
       </form>
     </Sheet>
   );

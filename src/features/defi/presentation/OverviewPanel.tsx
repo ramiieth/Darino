@@ -4,12 +4,13 @@
  */
 import { useEffect, useState } from 'react';
 import { Globe2 } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { ErrorState } from '@/shared/components/ui/StateViews';
+import { Metric, MetricGrid, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { fetchWithRetry } from '@/shared/lib/fetchWithRetry';
 import { COINGECKO_BASE } from '@/app/config/apiConfig';
 import { cacheBulkGetPrice, cachePutPrice } from '@/shared/lib/db';
-import { fmtUSD, fmtInt } from '@/shared/utils/formatters';
 import { t } from '@/shared/i18n/fa';
 
 export function OverviewPanel() {
@@ -47,27 +48,27 @@ export function OverviewPanel() {
   }, []);
 
   if (!data && !error) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-24 w-full rounded-2xl" />
-      </div>
-    );
+    return <Skeleton className="h-40 w-full" />;
   }
 
   return (
-    <div className="space-y-3">
-      <GlassCard animated className="p-5">
-        <p className="flex items-center gap-1.5 text-[11px] font-bold text-muted">
-          <Globe2 className="h-3.5 w-3.5 text-accent" />
-          {t('defiTvlTotal')}
-        </p>
-        <p className="num-ltr mt-2 text-3xl font-black text-ink">{fmtUSD(data?.mcap, true)}</p>
-        <p className="num-ltr mt-1 text-[10px] font-bold text-muted">
-          حجم ۲۴h: {fmtUSD(data?.vol, true)} · سهم BTC: {data?.dominance ? fmtInt(data.dominance) : '—'}٪ · منبع: CoinGecko
-        </p>
-      </GlassCard>
-      {error && <p className="glass-soft rounded-2xl px-4 py-3 text-center text-[10px] font-bold text-warn">ارتباط با CoinGecko برقرار نشد</p>}
-      <p className="text-center text-[9px] font-medium text-muted">{t('defiUpdated')}</p>
+    <div className="space-y-4">
+      {error && !data ? (
+        <ErrorState message="ارتباط با CoinGecko برقرار نشد" />
+      ) : (
+        <Surface className="p-4 md:p-6">
+          <MetricGrid cols={3}>
+            <Metric size="hero" label="ارزش کل بازار رمزارزها" value={<MoneyValue value={data?.mcap ?? null} compact />} icon={<Globe2 />} />
+            <Metric size="lg" label="حجم معاملات ۲۴ ساعت" value={<MoneyValue value={data?.vol ?? null} compact />} />
+            <Metric
+              size="lg"
+              label="سهم بیت‌کوین از بازار"
+              value={<PercentValue value={data?.dominance ?? null} signed={false} tone="none" digits={1} />}
+            />
+          </MetricGrid>
+        </Surface>
+      )}
+      <p className="text-xs text-muted">منبع: CoinGecko Global · {t('defiUpdated')}</p>
     </div>
   );
 }

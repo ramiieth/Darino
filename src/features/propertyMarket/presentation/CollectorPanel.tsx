@@ -4,22 +4,13 @@
  *  - اجرای کلکشن از مسیر سرور (مرورگر مستقیم به دیوار نمی‌زند)
  *  - نمایش پیشرفت + قیف پاک‌سازی آخرین Snapshot (شفافیت §۱۸)
  * ============================================================ */
-import { Download, Loader2, Radar } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Download } from 'lucide-react';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
+import { Notice } from '@/shared/components/ui/StateViews';
 import { fmtInt, toFaDigits } from '@/shared/utils/formatters';
-import { cn } from '@/shared/lib/cn';
 import type { PropertyMarketSnapshot } from '../domain/types';
 import type { CollectState } from '../data/store';
-
-function FunnelStep({ label, value, dim }: { label: string; value: number; dim?: boolean }) {
-  return (
-    <div className={cn('rounded-lg border border-line/10 px-2 py-1.5 text-center', dim && 'opacity-60')}>
-      <p className="num-ltr text-[12px] font-extrabold text-ink">{fmtInt(value)}</p>
-      <p className="text-[7px] font-bold text-muted">{label}</p>
-    </div>
-  );
-}
 
 export function CollectorPanel({
   collect,
@@ -34,54 +25,46 @@ export function CollectorPanel({
   const c = lastSnapshot?.cleaning;
 
   return (
-    <GlassCard className="p-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-[11px] font-extrabold text-ink">
-          <Radar className="h-3.5 w-3.5 text-accent" />
-          کلکشنر دیوار — آپارتمان‌های فروشی اهواز
-        </h3>
-        <Button onClick={onCollect} disabled={busy} className="h-8 gap-1.5 px-3 text-[9px] font-extrabold">
-          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+    <Surface className="p-4 md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-ink">کلکشنر دیوار</h2>
+          <p className="text-xs text-muted">آپارتمان‌های فروشی اهواز — از مسیر سرور (مرورگر مستقیم به دیوار درخواست نمی‌دهد)</p>
+        </div>
+        <Button onClick={onCollect} loading={busy} icon={<Download />} size="sm">
           {busy ? collect.message ?? 'در حال اجرا…' : 'جمع‌آوری از دیوار'}
         </Button>
       </div>
 
-      {collect.status === 'unavailable' && (
-        <p className="mt-2 rounded-lg border border-warn/20 bg-warn/5 px-2.5 py-1.5 text-[8px] font-bold leading-4 text-muted">
-          {collect.message}
-        </p>
-      )}
-      {collect.status === 'error' && (
-        <p className="mt-2 rounded-lg border border-negative/20 bg-negative/5 px-2.5 py-1.5 text-[8px] font-bold leading-4 text-negative">
-          خطا در کلکشن: {collect.message}
-        </p>
-      )}
+      {collect.status === 'unavailable' && <Notice tone="warn" className="mt-4">{collect.message}</Notice>}
+      {collect.status === 'error' && <Notice tone="error" className="mt-4" title="خطا در کلکشن">{collect.message}</Notice>}
       {busy && (
-        <p className="mt-2 text-[8px] font-bold text-muted">
-          تکه‌های پردازش‌شده: {toFaDigits(collect.chunks)} · آگهی جدید: {fmtInt(collect.listingsAdded)} · جزئیات
-          واکشی‌شده: {fmtInt(collect.detailsFetched)}
+        <p className="mt-3 text-xs text-muted" role="status">
+          تکه‌های پردازش‌شده {toFaDigits(collect.chunks)} · آگهی جدید {fmtInt(collect.listingsAdded)} · جزئیات واکشی‌شده{' '}
+          {fmtInt(collect.detailsFetched)}
         </p>
       )}
-      {collect.status === 'done' && collect.message && (
-        <p className="mt-2 rounded-lg border border-positive/20 bg-positive/5 px-2.5 py-1.5 text-[8px] font-bold text-positive">
-          {collect.message}
-        </p>
-      )}
+      {collect.status === 'done' && collect.message && <Notice tone="success" className="mt-4">{collect.message}</Notice>}
 
       {c && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-[8px] font-extrabold text-muted">
-            قیف پاک‌سازی آخرین داده بازار
-          </p>
-          <div className="grid grid-cols-5 gap-1.5">
-            <FunnelStep label="خام" value={c.raw} />
-            <FunnelStep label="معتبر" value={c.valid} />
-            <FunnelStep label="بدون تکراری" value={c.market + c.outliersRemoved} dim />
-            <FunnelStep label="حذف پرت" value={c.outliersRemoved} />
-            <FunnelStep label="نهایی" value={c.market} />
-          </div>
+        <div className="mt-5 border-t border-divider pt-4">
+          <p className="mb-2 text-xs font-semibold text-muted">قیف پاک‌سازی آخرین داده</p>
+          <ol className="grid grid-cols-5 gap-2 text-center">
+            {[
+              ['خام', c.raw],
+              ['معتبر', c.valid],
+              ['یکتا', c.market + c.outliersRemoved],
+              ['پرت حذف‌شده', c.outliersRemoved],
+              ['نهایی', c.market]
+            ].map(([label, value]) => (
+              <li key={label as string} className="rounded-field bg-surface-2 px-1 py-2">
+                <p className="text-sm font-bold text-ink">{fmtInt(value as number)}</p>
+                <p className="text-2xs text-muted">{label}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
-    </GlassCard>
+    </Surface>
   );
 }

@@ -1,6 +1,7 @@
-import { Search, Layers, Download } from 'lucide-react';
-import { Input } from '@/shared/components/ui/Input';
-import { cn } from '@/shared/lib/cn';
+import { Download, Layers } from 'lucide-react';
+import { SearchField } from '@/shared/components/ui/Input';
+import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
+import { Button } from '@/shared/components/ui/Button';
 import { t } from '@/shared/i18n/fa';
 
 export type CategoryFilter =
@@ -27,6 +28,7 @@ export const CATEGORY_OPTIONS: { value: CategoryFilter; label: string }[] = [
   { value: 'bond', label: 'اوراق' }
 ];
 
+/** Toolbar: search · category chips · group toggle · CSV export */
 export function FiltersBar({
   query,
   onQuery,
@@ -45,55 +47,17 @@ export function FiltersBar({
   onExport: () => void;
 }) {
   return (
-    <div className="space-y-2.5">
-      <Input
-        withSearchIcon
-        placeholder={t('searchPlaceholder')}
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-      />
-
-      <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {CATEGORY_OPTIONS.map((opt) => {
-          const active = category === opt.value;
-          return (
-            <button
-              key={opt.value}
-              onClick={() => onCategory(opt.value)}
-              className={cn(
-                'shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95',
-                active ? 'bg-accent text-white shadow-accent' : 'glass-inset text-muted hover:text-ink'
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-
-        <span className="mx-1 w-px shrink-0 bg-line/10" aria-hidden />
-
-        {/* گروه‌بندی */}
-        <button
-          onClick={onToggleGroup}
-          aria-pressed={grouped}
-          className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95',
-            grouped ? 'bg-info/15 text-info ring-1 ring-info/30' : 'glass-inset text-muted hover:text-ink'
-          )}
-        >
-          <Layers className="h-3.5 w-3.5" />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchField value={query} onChange={onQuery} placeholder={t('searchPlaceholder')} className="min-w-0 flex-1 md:max-w-sm" />
+        <Button variant={grouped ? 'secondary' : 'outline'} size="sm" icon={<Layers />} aria-pressed={grouped} onClick={onToggleGroup}>
           {t('groupBy')}
-        </button>
-
-        {/* خروجی CSV */}
-        <button
-          onClick={onExport}
-          className="flex shrink-0 items-center gap-1.5 rounded-full bg-positive/10 px-3.5 py-1.5 text-[11px] font-bold text-positive ring-1 ring-positive/25 transition-all hover:bg-positive/15 active:scale-95"
-        >
-          <Download className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" icon={<Download />} onClick={onExport}>
           {t('exportCsv')}
-        </button>
+        </Button>
       </div>
+      <ChipGroup bleed label="دسته دارایی" options={CATEGORY_OPTIONS} value={category} onChange={onCategory} />
     </div>
   );
 }

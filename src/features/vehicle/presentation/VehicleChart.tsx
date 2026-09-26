@@ -46,14 +46,14 @@ function Series({
   const gid2 = `${gid}-${color.replace(/[^a-z]/gi, '')}`;
 
   return (
-    <svg viewBox={`0 0 ${w} ${height}`} className="h-full w-full" preserveAspectRatio="none" aria-hidden>
+    <svg viewBox={`0 0 ${w} ${height}`} className="h-full w-full" preserveAspectRatio="none" aria-hidden direction="ltr">
       <defs>
         <linearGradient id={gid2} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.22" />
+          <stop offset="0" stopColor={color} stopOpacity="0.14" />
           <stop offset="1" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
-      <path d={area} fill={`url(#${gid2})`} />
+      <path d={area} fill={`url(#${gid2})`} opacity="0.5" />
       <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
       {line.map((c, i) => (
         <circle key={i} cx={c.x} cy={c.y} r="2.6" fill={color} stroke="rgb(var(--c-card))" strokeWidth="1" />
@@ -65,41 +65,39 @@ function Series({
 export function VehicleChart({ points }: { points: ChartPoint[] }) {
   if (points.length === 0) {
     return (
-      <p className="py-6 text-center text-[10px] font-bold text-muted">
-        داده تاریخی کافی برای نمودار نیست
-      </p>
+      <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">داده تاریخی کافی برای نمودار نیست</p>
     );
   }
   return (
     <div className="space-y-3">
       <div>
-        <div className="mb-1 flex items-center justify-between text-[9px] font-bold">
-          <span className="flex items-center gap-1 text-muted">
-            <span className="h-2 w-2 rounded-full bg-accent" /> قیمت بازار (تومان)
+        <div className="mb-1 flex items-center justify-between text-2xs font-semibold">
+          <span className="flex items-center gap-1.5 text-muted">
+            <span className="h-2 w-2 rounded-sm bg-chart-1" /> قیمت بازار (تومان)
           </span>
           {points[points.length - 1].toman !== null && (
             <span className="num-ltr text-ink">{fmtTomanAmount(points[points.length - 1].toman!)}</span>
           )}
         </div>
-        <div className="h-[110px] w-full rounded-lg border border-line/10 bg-surface-2/40 p-1">
-          <Series points={points} get={(p) => p.toman} color="rgb(var(--c-accent))" />
+        <div className="h-[120px] w-full rounded-field border border-divider p-1" dir="ltr">
+          <Series points={points} get={(p) => p.toman} color="rgb(var(--c-chart-1))" />
         </div>
       </div>
       <div>
-        <div className="mb-1 flex items-center justify-between text-[9px] font-bold">
-          <span className="flex items-center gap-1 text-muted">
-            <span className="h-2 w-2 rounded-full bg-indigo-400" /> معادل دلاری (USD — ثبت‌شده در لحظه)
+        <div className="mb-1 flex items-center justify-between text-2xs font-semibold">
+          <span className="flex items-center gap-1.5 text-muted">
+            <span className="h-2 w-2 rounded-sm bg-chart-2" /> معادل دلاری (ثبت‌شده در لحظه)
           </span>
           {points[points.length - 1].usd !== null && (
             <span className="num-ltr text-ink">{fmtUsdAmount(points[points.length - 1].usd!)}</span>
           )}
         </div>
-        <div className="h-[110px] w-full rounded-lg border border-line/10 bg-surface-2/40 p-1">
-          <Series points={points} get={(p) => p.usd} color="rgb(129 140 248)" />
+        <div className="h-[120px] w-full rounded-field border border-divider p-1" dir="ltr">
+          <Series points={points} get={(p) => p.usd} color="rgb(var(--c-chart-2))" />
         </div>
       </div>
       {/* برچسب تاریخ‌ها */}
-      <div className={cn('flex justify-between text-[8px] font-bold text-muted')}>
+      <div dir="ltr" className={cn('flex justify-between text-2xs text-muted')}>
         {points.map((p, i) => (
           <span key={i} className="truncate px-0.5">
             {p.label}

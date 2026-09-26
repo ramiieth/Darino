@@ -34,6 +34,8 @@ import {
   makeExpenseEntry,
   makeSellEntry,
   makeWithdrawEntry,
+  applyFifoConsumption,
+  repairPartiallyClosedLots,
   validateEntry,
   type BuyInput
 } from '@/features/accounting/domain/engine';
@@ -171,7 +173,8 @@ export function useAccounting(): AccountingState & AccountingActions {
     ]);
     setEntries(es);
     setAccounts(as);
-    setLots(ls);
+    // ترمیم لات‌های بخشی‌مصرف‌شده‌ای که نسخه قبلی به‌اشتباه بسته بود
+    setLots(repairPartiallyClosedLots(ls));
     setEvents(evs);
     setLoading(false);
   }, []);
@@ -359,13 +362,8 @@ export function useAccounting(): AccountingState & AccountingActions {
       }
       const { entry, fifo, realized } = makeSellEntry(input);
       const saved = await entryAppend(entry);
-      // بستن لات‌های مصرف‌شده
-      const consumedIds = new Set(fifo.consumed.map((c) => c.lotId));
-      const nextLots = input.lots.map((l) =>
-        consumedIds.has(l.id) && !l.closedAt
-          ? { ...l, qty: l.qty - (fifo.consumed.find((c) => c.lotId === l.id)?.qty ?? 0), closedAt: Date.now() }
-          : l
-      );
+      // اعمال مصرف FIFO: فقط لات‌های کاملاً مصرف‌شده بسته می‌شوند
+      const nextLots = applyFifoConsumption(input.lots, fifo.consumed, Date.now());
       await lotReplaceAll(nextLots);
       await eventAppend(
         'sell',

@@ -1,91 +1,89 @@
-import { Settings, Sun, Moon, Download, Search } from 'lucide-react';
-import { DarinoMark } from '@/shared/components/brand/DarinoLogo';
-import { useThemeStore } from '@/shared/store/themeStore';
-import { useInstallStore } from '@/shared/store/installStore';
-import { t } from '@/shared/i18n/fa';
-import { cn } from '@/shared/lib/cn';
-
 /**
- * هدر اپ — موبایل: نوار چسبان ساده با حاشیه ظریف (بدون پیل شیشه‌ای)
- * دسکتاپ: هدر محتوا در کنار سایدبار (lg+)
+ * TopBar — contextual header.
+ *
+ *  phones/tablets: sticky, safe-area aware. Shows the brand mark; once the page
+ *                  H1 scrolls away the page title slides in (large-title pattern).
+ *  desktop (lg+):  slim utility bar (status · install) — navigation and search
+ *                  live in the sidebar, the page owns its single H1.
+ *
+ * The title is presentation only (not a heading) — each page renders one <h1>.
  */
-export function TopBar({
-  onOpenSettings,
-  onOpenPalette,
-  title
-}: {
-  onOpenSettings: () => void;
-  onOpenPalette?: () => void;
-  title: string;
-}) {
-  const theme = useThemeStore((s) => s.theme);
-  const toggle = useThemeStore((s) => s.toggle);
-  const { installed, openPrompt } = useInstallStore();
+import { Link, useLocation } from 'react-router-dom';
+import { Download, Search, Settings, WifiOff } from 'lucide-react';
+import { DarinoMark } from '@/shared/components/brand/DarinoLogo';
+import { IconButton } from '@/shared/components/ui/Button';
+import { useInstallStore } from '@/shared/store/installStore';
+import { useShellStore } from '@/shared/store/shellStore';
+import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
+import { cn } from '@/shared/lib/cn';
+import { navItemForPath } from './navigation';
 
-  const showInstall = !installed;
-  const handleInstall = showInstall ? openPrompt : undefined;
-
-  const actionBtn =
-    'flex h-9 w-9 items-center justify-center rounded-xl border border-line/10 bg-card text-ink shadow-card transition-colors hover:bg-surface-2 active:scale-[0.97]';
+export function TopBar({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const { pathname } = useLocation();
+  const item = navItemForPath(pathname);
+  const title = item?.title ?? item?.label ?? 'دارینو';
+  const compact = useShellStore((s) => s.compactTitle);
+  const openPalette = useShellStore((s) => s.setPaletteOpen);
+  const { installed, deferredPrompt, openPrompt } = useInstallStore();
+  const online = useOnlineStatus();
 
   return (
     <header
       className={cn(
-        'pt-safe sticky top-0 z-40 border-b border-line/10 bg-surface/85 backdrop-blur-md',
-        'lg:relative lg:z-30 lg:border-b-0 lg:bg-transparent lg:pt-0 lg:backdrop-blur-none'
+        'pt-safe sticky top-0 z-nav border-b bg-canvas/90 backdrop-blur-md transition-colors duration-base lg:hidden',
+        compact ? 'border-divider' : 'border-transparent'
       )}
     >
-      <div className="flex h-14 items-center justify-between gap-2 px-4 lg:h-16 lg:px-8">
-        {/* برند + عنوان */}
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="shrink-0 lg:hidden">
-            <DarinoMark size={32} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-[15px] font-extrabold text-ink">{title}</h1>
-            <p className="hidden truncate text-[11px] font-medium text-muted sm:block">
-              {t('appTagline')}
-            </p>
-          </div>
-        </div>
-
-        {/* اقدامات */}
-        <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
-          {handleInstall && (
-            <button
-              onClick={handleInstall}
-              className="flex h-9 items-center gap-1.5 rounded-xl bg-accent px-3 text-[11px] font-bold text-white shadow-accent transition-all hover:opacity-90 active:scale-[0.97]"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{t('installButton')}</span>
-            </button>
+      <div className="flex h-topbar items-center gap-2 px-gutter md:px-6">
+        <Link to="/" aria-label="دارینو — صفحه اصلی" className="shrink-0 rounded-field md:hidden">
+          <DarinoMark size={28} />
+        </Link>
+        <p
+          aria-hidden={!compact}
+          className={cn(
+            'min-w-0 flex-1 truncate text-base font-bold text-ink transition-[opacity,transform] duration-base ease-standard',
+            compact ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
           )}
-          <button
-            onClick={onOpenPalette}
-            aria-label={t('paletteOpen')}
-            title={t('paletteOpen')}
-            className={actionBtn}
-          >
-            <Search className="h-4 w-4" />
-          </button>
-          <button
-            onClick={toggle}
-            aria-label="تغییر تم"
-            title="تغییر تم"
-            className={actionBtn}
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <button
-            onClick={onOpenSettings}
-            aria-label={t('settings')}
-            title={t('settings')}
-            className={actionBtn}
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        </div>
+        >
+          {title}
+        </p>
+
+        {!online && (
+          <span className="flex shrink-0 items-center gap-1 rounded-control bg-warn/10 px-2 py-1 text-2xs font-semibold text-warn">
+            <WifiOff aria-hidden className="h-3.5 w-3.5" />
+            آفلاین
+          </span>
+        )}
+        {!installed && deferredPrompt && (
+          <IconButton aria-label="نصب برنامه" onClick={openPrompt} className="text-accent">
+            <Download className="h-5 w-5" />
+          </IconButton>
+        )}
+        <IconButton aria-label="جستجو" onClick={() => openPalette(true)} className="md:hidden">
+          <Search className="h-5 w-5" />
+        </IconButton>
+        <IconButton aria-label="تنظیمات" onClick={onOpenSettings} className="md:hidden">
+          <Settings className="h-5 w-5" />
+        </IconButton>
       </div>
     </header>
+  );
+}
+
+/** Global connectivity notice — sits under the header on every screen */
+export function OfflineBanner() {
+  const online = useOnlineStatus();
+  if (online) return null;
+  return (
+    <div
+      role="status"
+      className="mx-auto mb-4 flex max-w-content items-center gap-2 rounded-field bg-warn/8 px-3.5 py-2.5 text-xs text-ink"
+    >
+      <WifiOff aria-hidden className="h-4 w-4 shrink-0 text-warn" />
+      <span>
+        <span className="font-semibold">آفلاین هستید.</span>{' '}
+        <span className="text-muted">آخرین داده‌های ذخیره‌شده نمایش داده می‌شوند و پس از اتصال به‌روز می‌شوند.</span>
+      </span>
+    </div>
   );
 }

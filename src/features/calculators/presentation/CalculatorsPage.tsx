@@ -1,9 +1,11 @@
 /**
- * صفحه ماشین‌حساب‌های مالی — ۵ ابزار (همه محاسبات در domain؛ UI فقط نمایش)
+ * Investment calculators — five tools, all math in domain; UI presents only.
+ * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState } from 'react';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { cn } from '@/shared/lib/cn';
 import { PnlCalculator } from './PnlCalculator';
 import { DcaCalculator } from './DcaCalculator';
 import { CagrCalculator } from './CagrCalculator';
@@ -12,43 +14,50 @@ import { CompareCalculator } from './CompareCalculator';
 
 type CalcTab = 'pnl' | 'dca' | 'cagr' | 'xirr' | 'compare';
 
+const TABS: { value: CalcTab; label: string; description: string }[] = [
+  { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
+  { value: 'dca', label: 'خرید دوره‌ای (DCA)', description: 'نتیجه سرمایه‌گذاری منظم با مبلغ ثابت در یک بازه' },
+  { value: 'cagr', label: 'رشد سالانه (CAGR)', description: 'نرخ رشد سالانه مرکب بین دو ارزش' },
+  { value: 'xirr', label: 'بازده واقعی (XIRR)', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
+  { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' }
+];
+
 export function CalculatorsPage() {
   const [tab, setTab] = useState<CalcTab>('pnl');
+  const current = TABS.find((t) => t.value === tab);
+  const panel = (id: CalcTab) => ({
+    className: cn(tab !== id && 'hidden'),
+    'aria-hidden': tab !== id,
+    inert: tab !== id ? ('' as const) : undefined
+  });
 
   return (
-    <div className="space-y-4">
+    <Page>
       <PageHeader
         title="ماشین‌حساب سرمایه‌گذاری"
-        subtitle=""
+        subtitle="محاسبه دقیق با موتور مالی decimal.js — نتایج صرفاً محاسباتی‌اند و پیش‌بینی آینده نیستند."
       />
-
-      <SegmentedControl<CalcTab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'pnl', label: 'سود و زیان' },
-          { value: 'dca', label: 'DCA' },
-          { value: 'cagr', label: 'CAGR' },
-          { value: 'xirr', label: 'XIRR' },
-          { value: 'compare', label: 'مقایسه بازارها' }
-        ]}
-      />
-
-      <div className={tab !== 'pnl' ? 'hidden' : ''} aria-hidden={tab !== 'pnl'} inert={tab !== 'pnl' ? '' : undefined}>
-        <PnlCalculator />
+      <div className="space-y-6">
+        <div>
+          <Tabs<CalcTab> label="ماشین‌حساب‌ها" options={TABS} value={tab} onChange={setTab} />
+          {current && <p className="mt-3 text-sm text-muted">{current.description}</p>}
+        </div>
+        <div {...panel('pnl')}>
+          <PnlCalculator />
+        </div>
+        <div {...panel('dca')}>
+          <DcaCalculator />
+        </div>
+        <div {...panel('cagr')}>
+          <CagrCalculator />
+        </div>
+        <div {...panel('xirr')}>
+          <XirrCalculator />
+        </div>
+        <div {...panel('compare')}>
+          <CompareCalculator />
+        </div>
       </div>
-      <div className={tab !== 'dca' ? 'hidden' : ''} aria-hidden={tab !== 'dca'} inert={tab !== 'dca' ? '' : undefined}>
-        <DcaCalculator />
-      </div>
-      <div className={tab !== 'cagr' ? 'hidden' : ''} aria-hidden={tab !== 'cagr'} inert={tab !== 'cagr' ? '' : undefined}>
-        <CagrCalculator />
-      </div>
-      <div className={tab !== 'xirr' ? 'hidden' : ''} aria-hidden={tab !== 'xirr'} inert={tab !== 'xirr' ? '' : undefined}>
-        <XirrCalculator />
-      </div>
-      <div className={tab !== 'compare' ? 'hidden' : ''} aria-hidden={tab !== 'compare'} inert={tab !== 'compare' ? '' : undefined}>
-        <CompareCalculator />
-      </div>
-    </div>
+    </Page>
   );
 }

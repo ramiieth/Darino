@@ -1,13 +1,17 @@
 /**
- * مانیتور ریسک (Risk Monitor) — هشدارها
- *  - Funding Extreme (انحراف APR شدید)
- *  - Low Liquidity (OI/حجم کم)
- *  - High Volatility (نوسان بالا)
+ * Risk monitor — market-level alerts (not position liquidation risk)
+ *  - extreme funding (deviation from the 7-day mean / z-score)
+ *  - low liquidity (OI / volume)
+ *  - high volatility
+ * Position metrics (liquidation APR, health factor) need a real Boros position → N/A.
  */
 import { useMemo } from 'react';
-import { ShieldAlert, AlertTriangle, Droplets, Activity } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { fmtPct, fmtUSD } from '@/shared/utils/formatters';
+import { Activity, AlertTriangle, Droplets, ShieldCheck } from 'lucide-react';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
+import { Badge, type Tone } from '@/shared/components/ui/Badge';
+import { KeyValueList, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { fmtPct, fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { BorosCalculationEngine } from '@/features/boros/domain/calc';
 import type { BorosMarket } from '@/features/boros/domain/types';
 import { cn } from '@/shared/lib/cn';
@@ -17,149 +21,138 @@ interface AlertRow {
   type: 'extreme' | 'liquidity' | 'volatility';
   message: string;
   severity: 'high' | 'medium' | 'low';
+  riskLevel: string;
+  riskScore: number;
 }
+
+const SEVERITY: Record<AlertRow['severity'], { label: string; tone: Tone }> = {
+  high: { label: 'شدید', tone: 'loss' },
+  medium: { label: 'متوسط', tone: 'warn' },
+  low: { label: 'خفیف', tone: 'neutral' }
+};
+
+const TYPE_META = {
+  extreme: { label: 'تأمین مالی افراطی', icon: AlertTriangle },
+  liquidity: { label: 'نقدشوندگی پایین', icon: Droplets },
+  volatility: { label: 'نوسان بالا', icon: Activity }
+};
 
 export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
   const alerts = useMemo<AlertRow[]>(() => {
     const out: AlertRow[] = [];
     for (const m of markets) {
+      // analyse once per market (the old view re-ran it twice per alert on every render)
       const a = BorosCalculationEngine.analyze({ m, size: 1000 });
-      const dev = a.relDev7d; // انحراف نسبی از میانگین ۷ روزه
-      const liq = a.liquidityScore;
-      const vol = a.volatility;
-      // ۱) Funding Extreme — Z-Score یا انحراف نسبی
+      const base = { m, riskLevel: a.riskLevel, riskScore: a.riskScore };
+      const dev = a.relDev7d;
       if (a.extreme === 'high' || a.extreme === 'low') {
         out.push({
-          m,
+          ...base,
           type: 'extreme',
-          message: `Z-Score ${a.zScore?.toFixed(1)} — APR ${a.extreme === 'high' ? 'بسیار بالاتر' : 'بسیار پایین‌تر'} از میانگین تاریخی (تأمین‌مالی افراطی)`,
+          message: `Z-Score ${a.zScore?.toFixed(1)} — APR ${a.extreme === 'high' ? 'بسیار بالاتر' : 'بسیار پایین‌تر'} از میانگین تاریخی`,
           severity: Math.abs(a.zScore ?? 0) > 3 ? 'high' : 'medium'
         });
       } else if (dev !== null && Math.abs(dev) > 25) {
         out.push({
-          m,
+          ...base,
           type: 'extreme',
-          message: `انحراف نسبی ${dev > 0 ? '+' : ''}${fmtPct(dev)} از میانگین ۷ روزه`,
+          message: `انحراف ${fmtPct(dev)} از میانگین ۷ روزه`,
           severity: Math.abs(dev) > 50 ? 'high' : 'medium'
         });
       }
-      // ۲) Low Liquidity
-      if (liq < 0.3) {
+      if (a.liquidityScore < 0.3) {
         out.push({
-          m,
+          ...base,
           type: 'liquidity',
-          message: `نقدشوندگی پایین (OI: ${fmtUSD(m.notionalOI)} · حجم: ${fmtUSD(m.volume24h)})`,
-          severity: liq < 0.15 ? 'high' : 'medium'
+          message: `OI ${fmtUSD(m.notionalOI, true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h, true)}`,
+          severity: a.liquidityScore < 0.15 ? 'high' : 'medium'
         });
       }
-      // ۳) High Volatility
-      if (vol !== null && vol > 0.015) {
+      if (a.volatility !== null && a.volatility > 0.015) {
         out.push({
-          m,
+          ...base,
           type: 'volatility',
-          message: `نوسان روزانه ${fmtPct(vol * 100)} — بالاتر از حد طبیعی`,
-          severity: vol > 0.03 ? 'high' : 'low'
+          message: `نوسان روزانه ${fmtPct(a.volatility * 100)} — بالاتر از حد طبیعی`,
+          severity: a.volatility > 0.03 ? 'high' : 'low'
         });
       }
     }
-    return out.sort((a, b) => (a.severity === 'high' ? -1 : 1) - (b.severity === 'high' ? -1 : 1));
+    const rank = { high: 0, medium: 1, low: 2 };
+    return out.sort((x, y) => rank[x.severity] - rank[y.severity]);
   }, [markets]);
 
-  const severityStyle = (s: AlertRow['severity']) =>
-    s === 'high'
-      ? 'border-negative/30 bg-negative/10'
-      : s === 'medium'
-        ? 'border-warn/30 bg-warn/10'
-        : 'border-line/10 bg-line/5';
+  const counts = {
+    high: alerts.filter((a) => a.severity === 'high').length,
+    medium: alerts.filter((a) => a.severity === 'medium').length,
+    low: alerts.filter((a) => a.severity === 'low').length
+  };
 
   return (
-    <div className="space-y-3">
-      {/* ===== Position Layer (WORLD B) — بدون Position واقعی = N/A ===== */}
-      <GlassCard className="p-3.5">
-        <p className="mb-2 flex items-center gap-1.5 text-[12px] font-black text-ink">
-          <ShieldAlert className="h-4 w-4 text-warn" /> Position Layer — ریسک Position واقعی
-        </p>
-        <div className="grid grid-cols-2 gap-1.5 text-[9px] font-bold sm:grid-cols-3">
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Live Position</p><p className="text-negative">NO</p></div>
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Actual Collateral</p><p className="text-muted">N/A</p></div>
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Actual Notional</p><p className="text-muted">N/A</p></div>
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Liquidation Implied APR</p><p className="text-muted">N/A</p></div>
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Health Factor</p><p className="text-muted">N/A</p></div>
-          <div className="rounded-lg bg-line/5 px-2 py-1.5"><p className="text-muted">Maintenance Margin</p><p className="text-muted">N/A</p></div>
+    <div className="space-y-8">
+      <Section id="market-alerts" title="هشدارهای بازار" description="تشخیص خودکار — فقط تحلیلی، بدون هیچ اقدام خودکار">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Badge tone="loss">{toFaDigits(counts.high)} شدید</Badge>
+          <Badge tone="warn">{toFaDigits(counts.medium)} متوسط</Badge>
+          <Badge tone="neutral">{toFaDigits(counts.low)} خفیف</Badge>
         </div>
-        <p className="mt-1.5 text-[8px] font-medium leading-4 text-muted">
-          ⚠ Liquidation APR و Health Factor فقط با Position واقعی Boros (Collateral واقعی + وضعیت Position) در دسترس‌اند — از داده بازار حدس زده نمی‌شوند.
-          هشدارهای زیر «ریسک بازار» هستند، نه «ریسک لیکوییدیشن Position».
-        </p>
-      </GlassCard>
+        {alerts.length === 0 ? (
+          <Notice tone="success" icon={<ShieldCheck />}>هشدار فعالی وجود ندارد.</Notice>
+        ) : (
+          <Surface className="px-4 md:px-5">
+            <ul className="divide-y divide-divider">
+              {alerts.slice(0, 40).map((a, i) => {
+                const Icon = TYPE_META[a.type].icon;
+                const sev = SEVERITY[a.severity];
+                return (
+                  <li key={i} className="flex items-start gap-3 py-3.5">
+                    <span
+                      className={cn(
+                        'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                        a.severity === 'high' ? 'bg-negative/10 text-negative' : a.severity === 'medium' ? 'bg-warn/10 text-warn' : 'bg-surface-2 text-muted'
+                      )}
+                    >
+                      <Icon aria-hidden className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                        <bdi dir="ltr" className="truncate">{a.m.name}</bdi>
+                        <Badge tone={sev.tone}>{sev.label}</Badge>
+                      </p>
+                      <p className="text-sm text-muted">
+                        {TYPE_META[a.type].label}: <span className="num-ltr">{a.message}</span>
+                      </p>
+                      <p className="mt-0.5 text-xs text-subtle">
+                        ریسک {a.riskLevel} ({toFaDigits(Math.round(a.riskScore))}/۱۰۰) · APR{' '}
+                        <PercentValue value={a.m.markApr * 100} signed={false} tone="none" /> · شناور{' '}
+                        <PercentValue value={a.m.floatingApr * 100} signed={false} tone="none" />
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Surface>
+        )}
+      </Section>
 
-      <GlassCard variant="soft" className="p-3.5">
-        <p className="flex items-center gap-1.5 text-[12px] font-black text-ink">
-          <ShieldAlert className="h-4 w-4 text-warn" /> هشدارهای بازار ({alerts.length})
-        </p>
-        <p className="mt-1 text-[10px] font-medium text-muted">
-          تشخیص خودکار: تأمین‌مالی افراطی (انحراف از میانگین ۷ روزه)، نقدشوندگی پایین، نوسان بالا
-        </p>
-      </GlassCard>
-
-      {alerts.length === 0 && (
-        <GlassCard variant="soft" className="p-6 text-center text-[11px] font-bold text-muted">
-          هشدار فعالی وجود ندارد ✓
-        </GlassCard>
-      )}
-
-      {alerts.slice(0, 40).map((a, i) => (
-        <div key={i} className={cn('rounded-2xl border p-3', severityStyle(a.severity))}>
-          <div className="flex items-center gap-2.5">
-            <span
-              className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-                a.type === 'extreme'
-                  ? 'bg-warn/20 text-warn'
-                  : a.type === 'liquidity'
-                    ? 'bg-rose-500/15 text-rose-400'
-                    : 'bg-info/15 text-info'
-              )}
-            >
-              {a.type === 'extreme' ? (
-                <AlertTriangle className="h-4 w-4" />
-              ) : a.type === 'liquidity' ? (
-                <Droplets className="h-4 w-4" />
-              ) : (
-                <Activity className="h-4 w-4" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-extrabold text-ink">{a.m.name}</p>
-              <p className="text-[9px] font-medium leading-4 text-muted">{a.message}</p>
-            </div>
-            <span
-              className={cn(
-                'badge shrink-0 ring-1',
-                a.severity === 'high'
-                  ? 'bg-negative/10 text-negative ring-negative/20'
-                  : a.severity === 'medium'
-                    ? 'bg-warn/10 text-warn ring-warn/20'
-                    : 'bg-line/5 text-muted ring-line/10'
-              )}
-            >
-              {a.severity === 'high' ? 'شدید' : a.severity === 'medium' ? 'متوسط' : 'خفیف'}
-            </span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[8px] font-bold">
-            <span className="badge bg-line/5 text-muted ring-1 ring-line/10">
-              ریسک: {BorosCalculationEngine.analyze({ m: a.m, size: 1000 }).riskLevel} ({Math.round(BorosCalculationEngine.analyze({ m: a.m, size: 1000 }).riskScore)}/100)
-            </span>
-            <span className="badge bg-line/5 text-muted ring-1 ring-line/10">
-              APR: {fmtPct(a.m.markApr * 100)} · شناور: {fmtPct(a.m.floatingApr * 100)}
-            </span>
-          </div>
-        </div>
-      ))}
-
-      <p className="text-center text-[9px] font-medium text-muted/70">
-        فقط هشدار تحلیلی — هیچ اقدامی خودکار انجام نمی‌شود (Read Only)
-      </p>
+      <Section
+        id="position-layer"
+        title="ریسک Position واقعی"
+        description="بدون Position واقعی در Boros، این شاخص‌ها از داده بازار حدس زده نمی‌شوند"
+      >
+        <Surface className="px-4 md:px-5">
+          <KeyValueList
+            rows={[
+              { label: 'Position فعال', value: <Badge tone="neutral">ندارد</Badge> },
+              { label: 'Collateral واقعی', value: <span className="text-subtle">N/A</span> },
+              { label: 'Notional واقعی', value: <span className="text-subtle">N/A</span> },
+              { label: 'Liquidation Implied APR', value: <span className="text-subtle">N/A</span> },
+              { label: 'Health Factor', value: <span className="text-subtle">N/A</span> },
+              { label: 'Maintenance Margin', value: <span className="text-subtle">N/A</span> }
+            ]}
+          />
+        </Surface>
+      </Section>
     </div>
   );
 }

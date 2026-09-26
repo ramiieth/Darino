@@ -1,12 +1,15 @@
 /**
- * ممیزی (Audit Trail) — تاریخچه رویدادها؛ فقط‌افزودنی و غیرقابل تغییر
+ * Audit trail — append-only event history (immutable)
  */
-import { ShieldCheck, Lock } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { useAccounting } from '@/features/accounting/data/useAccounting';
-import { fmtUSD } from '@/shared/utils/formatters';
+import { useMemo, useState } from 'react';
+import { Lock } from 'lucide-react';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Badge, type Tone } from '@/shared/components/ui/Badge';
+import { Button } from '@/shared/components/ui/Button';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { useAccountingData } from './AccountingContext';
 import { formatDualDate } from '@/shared/utils/jalali';
-import { cn } from '@/shared/lib/cn';
+import { toFaDigits } from '@/shared/utils/formatters';
 
 const KIND_FA: Record<string, string> = {
   opening: 'افتتاحیه',
@@ -19,75 +22,59 @@ const KIND_FA: Record<string, string> = {
   reversal: 'ثبت معکوس'
 };
 
-const KIND_TONE: Record<string, string> = {
-  opening: 'bg-accent/10 text-accent ring-accent/20',
-  deposit: 'bg-positive/10 text-positive ring-positive/20',
-  withdraw: 'bg-warn/10 text-warn ring-warn/20',
-  expense: 'bg-negative/10 text-negative ring-negative/20',
-  buy: 'bg-positive/10 text-positive ring-positive/20',
-  sell: 'bg-info/10 text-info ring-info/20',
-  manual: 'bg-line/5 text-muted ring-line/10',
-  reversal: 'bg-negative/10 text-negative ring-negative/20'
+const KIND_TONE: Record<string, Tone> = {
+  opening: 'brand',
+  deposit: 'gain',
+  withdraw: 'warn',
+  expense: 'loss',
+  buy: 'gain',
+  sell: 'info',
+  manual: 'neutral',
+  reversal: 'loss'
 };
 
 export function AuditPanel() {
-  const { events, entries, cashBalance } = useAccounting();
+  const { events, entries } = useAccountingData();
+  const [limit, setLimit] = useState(60);
+  const sorted = useMemo(() => [...events].sort((a, b) => b.id - a.id), [events]);
 
   return (
-    <div className="space-y-3">
-      <GlassCard variant="soft" className="p-3.5">
-        <div className="flex items-start gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
-            <ShieldCheck className="h-4.5 w-4.5" />
-          </span>
-          <div>
-            <h4 className="text-[12px] font-black text-ink">تاریخچه غیرقابل تغییر</h4>
-            <p className="text-[10px] font-medium leading-5 text-muted">
-              همه سندها و رویدادها فقط‌افزودنی هستند: هیچ ویرایش یا حذفی وجود ندارد. هر اصلاح با
-              «سند معکوس» ثبت می‌شود و ردپای کامل (سند اصلی + معکوس) در ممیزی باقی می‌ماند.
-            </p>
-          </div>
-        </div>
-      </GlassCard>
+    <div className="space-y-4">
+      <Notice tone="neutral" icon={<Lock />} title="تاریخچه غیرقابل تغییر">
+        همه سندها و رویدادها فقط‌افزودنی‌اند؛ ویرایش یا حذفی وجود ندارد. هر اصلاح با «سند معکوس» ثبت می‌شود و ردپای کامل (سند
+        اصلی + معکوس) باقی می‌ماند.
+      </Notice>
 
-      <GlassCard variant="soft" className="p-3.5">
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="flex items-center gap-1.5 text-[12px] font-black text-ink">
-            <Lock className="h-3.5 w-3.5 text-muted" /> رویدادها ({events.length})
-          </h4>
-          <span className="num-ltr text-[10px] font-bold text-muted">نقد: {fmtUSD(cashBalance)}</span>
-        </div>
-        {events.length === 0 ? (
-          <p className="text-[11px] font-medium text-muted">رویدادی ثبت نشده است</p>
-        ) : (
-          <div className="space-y-1.5">
-            {[...events]
-              .sort((a, b) => b.id - a.id)
-              .slice(0, 60)
-              .map((ev) => {
-                const entry = entries.find((e) => e.id === ev.refId);
-                return (
-                  <div key={ev.id} className="flex items-center gap-2.5 rounded-xl bg-line/5 px-3 py-2">
-                    <span
-                      className={cn(
-                        'badge shrink-0 ring-1',
-                        KIND_TONE[ev.kind] ?? 'bg-line/5 text-muted ring-line/10'
-                      )}
-                    >
-                      {KIND_FA[ev.kind] ?? ev.kind}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[10px] font-bold text-ink">{ev.detail}</p>
-                      <p className="text-[9px] font-medium text-muted">
-                        {formatDualDate(ev.at)} {entry ? `· سند #${entry.id}` : ''}
-                      </p>
-                    </div>
+      {sorted.length === 0 ? (
+        <EmptyState message="رویدادی ثبت نشده است" />
+      ) : (
+        <Surface className="px-4 md:px-5">
+          <ol className="divide-y divide-divider" aria-label="رویدادها">
+            {sorted.slice(0, limit).map((ev) => {
+              const entry = entries.find((e) => e.id === ev.refId);
+              return (
+                <li key={ev.id} className="flex items-start gap-3 py-3">
+                  <Badge tone={KIND_TONE[ev.kind] ?? 'neutral'} className="mt-0.5 shrink-0">
+                    {KIND_FA[ev.kind] ?? ev.kind}
+                  </Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm leading-6 text-ink">{ev.detail}</p>
+                    <p className="text-xs text-muted">
+                      {formatDualDate(ev.at)}
+                      {entry ? ` · سند #${entry.id}` : ''}
+                    </p>
                   </div>
-                );
-              })}
-          </div>
-        )}
-      </GlassCard>
+                </li>
+              );
+            })}
+          </ol>
+        </Surface>
+      )}
+      {sorted.length > limit && (
+        <Button variant="ghost" size="sm" className="w-full text-accent" onClick={() => setLimit((l) => l + 60)}>
+          رویدادهای قدیمی‌تر ({toFaDigits(sorted.length - limit)})
+        </Button>
+      )}
     </div>
   );
 }

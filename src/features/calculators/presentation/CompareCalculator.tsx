@@ -1,25 +1,27 @@
 /**
- * ۵) ماشین‌حساب مقایسه بازارها — چند دارایی هم‌زمان
- * ارزش فعلی، سود، درصد، CAGR، رتبه‌بندی، مرتب‌سازی، فیلتر، جستجو، CSV/PDF
+ * ⑤ Market comparison — the same capital in several assets over one period.
+ * Value, profit, return, CAGR, ranking, sort, filter, CSV/PDF.
+ * Calculations in domain (calcCompare).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { X, TrendingUp, TrendingDown, Search } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { Button } from '@/shared/components/ui/Button';
-import { Input } from '@/shared/components/ui/Input';
+import { ArrowDown, ArrowUp, ArrowUpDown, X } from 'lucide-react';
+import { Field, Input, SearchField } from '@/shared/components/ui/Input';
 import { SmartDateField } from '@/shared/components/ui/SmartDateField';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { MetricGrid, Metric, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
 import { parseIsoToTs, formatGregorianIso } from '@/shared/utils/jalali';
 import { AssetPicker } from './AssetPicker';
-import { StatCard } from './StatCard';
-import { LineChartCard, BarChartCard } from './CalcCharts';
+import { CalcShell, ResultHero, ResultPlaceholder } from './StatCard';
+import { LineChartCard, BarChartCard, fmtFaDate } from './CalcCharts';
 import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { getHistoricalSeries } from '@/features/calculators/data/historical';
 import { calcCompare, type CompareResult } from '@/features/calculators/domain';
 import type { CalculatorAsset } from '@/features/calculators/data/catalogs';
-import { fmtUSD, fmtPct, pnlClass } from '@/shared/utils/formatters';
+import { SERIES } from '@/shared/design/chartTheme';
+import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
-import { fmtFaDate } from './CalcCharts';
 
 type SortKey = 'return' | 'value' | 'profit' | 'name';
 type SortDir = 'asc' | 'desc';
@@ -45,9 +47,7 @@ export function CompareCalculator() {
   const years = Math.max((endTs - startTs) / (365.25 * 86_400_000), 0);
 
   const addAsset = (a: CalculatorAsset | null) => {
-    if (a && !selected.some((x) => x.symbol === a.symbol)) {
-      setSelected((s) => [...s, a]);
-    }
+    if (a && !selected.some((x) => x.symbol === a.symbol)) setSelected((s) => [...s, a]);
   };
   const removeAsset = (symbol: string) => {
     setSelected((s) => s.filter((x) => x.symbol !== symbol));
@@ -58,7 +58,7 @@ export function CompareCalculator() {
     });
   };
 
-  // دریافت قیمت تاریخی شروع برای هر دارایی
+  // historical series per asset (start price)
   useEffect(() => {
     for (const a of selected) {
       if (hist[a.symbol] !== undefined || loading[a.symbol]) continue;
@@ -71,227 +71,182 @@ export function CompareCalculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, startTs, endTs]);
 
-  const results: CompareResult[] = useMemo(() => {
-    return selected.map((a) => {
-      const series = hist[a.symbol];
-      // قیمت تاریخی = نزدیک‌ترین نقطه به تاریخ شروع
-      let historical: number | null = null;
-      if (series && series.length > 0) {
-        let best = series[0].price;
-        for (const p of series) {
-          if (p.t <= startTs + 3 * 86_400_000) best = p.price;
-          else break;
+  const results: CompareResult[] = useMemo(
+    () =>
+      selected.map((a) => {
+        const series = hist[a.symbol];
+        let historical: number | null = null;
+        if (series && series.length > 0) {
+          let best = series[0].price;
+          for (const p of series) {
+            if (p.t <= startTs + 3 * 86_400_000) best = p.price;
+            else break;
+          }
+          historical = best;
         }
-        historical = best;
-      }
-      const current = prices[a.symbol] ?? null;
-      return calcCompare(
-        { symbol: a.symbol, nameFa: a.nameFa, investment: Number(invest) || 0, historicalPrice: historical, currentPrice: current },
-        years
-      );
-    });
-  }, [selected, hist, prices, invest, startTs, years]);
+        return calcCompare(
+          { symbol: a.symbol, nameFa: a.nameFa, investment: Number(invest) || 0, historicalPrice: historical, currentPrice: prices[a.symbol] ?? null },
+          years
+        );
+      }),
+    [selected, hist, prices, invest, startTs, years]
+  );
 
   const ranked = useMemo(() => {
-    const filtered = results.filter(
-      (r) =>
-        filterQ === '' ||
-        r.symbol.toLowerCase().includes(filterQ.toLowerCase()) ||
-        r.nameFa.includes(filterQ)
-    );
-    const sorted = [...filtered];
-    const val = (r: CompareResult) =>
-      sort === 'return' ? (r.returnPct ?? -Infinity) : sort === 'value' ? (r.currentValue ?? -Infinity) : sort === 'profit' ? (r.profit ?? -Infinity) : r.nameFa.localeCompare(r.nameFa);
-    sorted.sort((a, b) => {
+    const q = filterQ.trim().toLowerCase();
+    const filtered = results.filter((r) => !q || r.symbol.toLowerCase().includes(q) || r.nameFa.includes(filterQ));
+    const sign = dir === 'desc' ? -1 : 1;
+    return [...filtered].sort((a, b) => {
+      if (sort === 'name') return sign * a.nameFa.localeCompare(b.nameFa, 'fa');
+      const val = (r: CompareResult) =>
+        sort === 'return' ? r.returnPct : sort === 'value' ? r.currentValue : r.profit;
       const av = val(a);
       const bv = val(b);
-      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * (dir === 'desc' ? -1 : 1);
-      return String(av).localeCompare(String(bv));
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1; // unavailable last
+      if (bv === null) return -1;
+      return sign * (av - bv);
     });
-    return sorted;
   }, [results, sort, dir, filterQ]);
 
-  const best = ranked.find((r) => r.returnPct !== null && r.returnPct === Math.max(...ranked.map((x) => x.returnPct ?? -Infinity)));
-  const worst = ranked.find((r) => r.returnPct !== null && r.returnPct === Math.min(...ranked.map((x) => x.returnPct ?? Infinity)));
+  const withReturn = ranked.filter((r) => r.returnPct !== null);
+  const best = withReturn.length ? withReturn.reduce((a, b) => ((b.returnPct as number) > (a.returnPct as number) ? b : a)) : null;
+  const worst = withReturn.length ? withReturn.reduce((a, b) => ((b.returnPct as number) < (a.returnPct as number) ? b : a)) : null;
 
-  // نمودار رشد نرمال‌شده (شروع = ۱۰۰)
   const growthChart = useMemo(() => {
     const labels: string[] = [];
-    const datasets: { label: string; data: number[]; color: string }[] = [];
-    const colors = ['#0d9488', '#8b5cf6', '#0ea5e9', '#f59e0b', '#ec4899', '#10b981', '#6366f1', '#ef4444'];
+    const datasets: { label: string; data: number[]; color: (typeof SERIES)[number] }[] = [];
     selected.forEach((a, i) => {
       const series = hist[a.symbol];
-      if (!series || series.length < 2) return;
+      if (!series || series.length < 2 || !series[0].price) return;
       const base = series[0].price;
-      if (!base) return;
       const pts = series.filter((p) => p.t >= startTs - 86_400_000 && p.t <= endTs + 86_400_000);
-      const data = pts.map((p) => (p.price / base) * 100);
-      datasets.push({ label: a.symbol, data, color: colors[i % colors.length] });
+      datasets.push({ label: a.symbol, data: pts.map((p) => (p.price / base) * 100), color: SERIES[i % SERIES.length] });
       if (labels.length === 0) labels.push(...pts.map((p) => fmtFaDate(p.t)));
     });
     return { labels, datasets };
   }, [selected, hist, startTs, endTs]);
 
+  const onSort = (k: SortKey) => {
+    if (sort === k) setDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    else {
+      setSort(k);
+      setDir(k === 'name' ? 'asc' : 'desc');
+    }
+  };
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    const I = sort !== k ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
+    return <I aria-hidden className={cn('h-3 w-3', sort !== k && 'opacity-40')} />;
+  };
+  const th = (k: SortKey, label: string, num = true) => (
+    <th scope="col" className={cn(num && 'col-num')} aria-sort={sort === k ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" onClick={() => onSort(k)} className={cn('inline-flex items-center gap-1 hover:text-ink', sort === k && 'text-ink')}>
+        {label}
+        <SortIcon k={k} />
+      </button>
+    </th>
+  );
+
+  const inputs = (
+    <>
+      <Field label="سرمایه برای هر دارایی">
+        <Input dir="ltr" inputMode="decimal" value={invest} onChange={(e) => setInvest(e.target.value)} suffix="$" />
+      </Field>
+      <SmartDateField label="تاریخ شروع" value={start ? parseIsoToTs(start) : null} onChange={(ts) => setStart(ts ? formatGregorianIso(ts) : '')} />
+      <SmartDateField label="تاریخ پایان" value={end ? parseIsoToTs(end) : null} onChange={(ts) => setEnd(ts ? formatGregorianIso(ts) : '')} />
+      <AssetPicker value={null} onChange={addAsset} compact label="افزودن دارایی" />
+      {selected.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="دارایی‌های انتخاب‌شده">
+          {selected.map((a) => (
+            <li key={a.symbol} className="inline-flex h-8 items-center gap-1 rounded-control bg-surface-2 pe-1 ps-2.5 text-xs font-semibold text-ink">
+              <bdi dir="ltr">{a.symbol}</bdi>
+              <button
+                type="button"
+                onClick={() => removeAsset(a.symbol)}
+                className="flex h-6 w-6 items-center justify-center rounded-control text-muted hover:bg-card hover:text-ink"
+                aria-label={`حذف ${a.symbol}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
   return (
-    <div className="space-y-4">
-      <GlassCard className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <div className="col-span-1">
-            <label className="mb-1 block text-[11px] font-bold text-muted">سرمایه اولیه ($)</label>
-            <Input dir="ltr" inputMode="decimal" value={invest} onChange={(e) => setInvest(e.target.value)} className="h-10 text-xs text-start" />
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] font-bold text-muted">تاریخ شروع</label>
-            <SmartDateField
-              value={start ? parseIsoToTs(start) : null}
-              onChange={(ts) => setStart(ts ? formatGregorianIso(ts) : '')}
-              className="w-full"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] font-bold text-muted">تاریخ پایان</label>
-            <SmartDateField
-              value={end ? parseIsoToTs(end) : null}
-              onChange={(ts) => setEnd(ts ? formatGregorianIso(ts) : '')}
-              className="w-full"
-            />
-          </div>
-        </div>
-
-        <AssetPicker value={null} onChange={addAsset} compact />
-
-        {/* انتخاب‌شده‌ها */}
-        {selected.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {selected.map((a) => (
-              <span key={a.symbol} className="badge bg-accent/10 py-1 pe-1 ps-2.5 text-[11px] text-accent ring-1 ring-accent/25">
-                {a.symbol}
-                <button onClick={() => removeAsset(a.symbol)} className="ms-1 rounded-full p-0.5 hover:bg-accent/20" aria-label="حذف">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </GlassCard>
-
-      {ranked.length > 0 && (
+    <CalcShell inputs={inputs}>
+      {selected.length === 0 ? (
+        <ResultPlaceholder>چند دارایی از فهرست اضافه کنید تا با سرمایه و بازه یکسان مقایسه شوند.</ResultPlaceholder>
+      ) : (
         <>
-          {/* کارت‌های برترین/بدترین */}
-          <div className="grid grid-cols-2 gap-2.5">
-            {best && (
-              <GlassCard className="border border-positive/25 p-3.5">
-                <p className="flex items-center gap-1 text-[10px] font-bold text-positive">
-                  <TrendingUp className="h-3 w-3" /> بهترین عملکرد
-                </p>
-                <p className="mt-1 text-[13px] font-extrabold text-ink">{best.symbol}</p>
-                <p className="num-ltr text-[15px] font-black text-positive">{fmtPct(best.returnPct)}</p>
-              </GlassCard>
-            )}
-            {worst && (
-              <GlassCard className="border border-negative/25 p-3.5">
-                <p className="flex items-center gap-1 text-[10px] font-bold text-negative">
-                  <TrendingDown className="h-3 w-3" /> بدترین عملکرد
-                </p>
-                <p className="mt-1 text-[13px] font-extrabold text-ink">{worst.symbol}</p>
-                <p className="num-ltr text-[15px] font-black text-negative">{fmtPct(worst.returnPct)}</p>
-              </GlassCard>
-            )}
-          </div>
-
-          {/* کارت‌های آماری هر دارایی */}
-          <div className="grid grid-cols-2 gap-2.5">
-            {ranked.map((r, i) => (
-              <StatCard
-                key={r.symbol}
-                label={`${i + 1}. ${r.nameFa} (${r.symbol})`}
-                value={fmtUSD(r.currentValue)}
-                sub={`${fmtPct(r.returnPct)} · CAGR ${fmtPct(r.cagr === null ? null : r.cagr * 100)}`}
-                tone={r.returnPct === null ? 'neutral' : r.returnPct >= 0 ? 'positive' : 'negative'}
-                delay={Math.min(i * 0.04, 0.4)}
-              />
-            ))}
-          </div>
+          <ResultHero
+            label="بهترین عملکرد"
+            value={best ? <PercentValue value={best.returnPct} tone="auto" /> : <span className="text-subtle">—</span>}
+            sub={best ? `${best.nameFa} (${best.symbol}) · ارزش ${fmtUSD(best.currentValue)}` : 'داده تاریخی هنوز دریافت نشده است'}
+          >
+            <MetricGrid cols={3}>
+              <Metric label="بدترین عملکرد" value={worst ? <PercentValue value={worst.returnPct} /> : '—'} sub={worst ? worst.symbol : undefined} />
+              <Metric label="تعداد دارایی" value={<span>{toFaDigits(selected.length)}</span>} />
+              <Metric label="مدت" value={<span className="num-ltr">{years.toFixed(2)}</span>} sub="سال" />
+            </MetricGrid>
+          </ResultHero>
 
           {growthChart.datasets.length > 0 && (
             <LineChartCard
-              title="نمودار مقایسه رشد (شروع = ۱۰۰)"
+              title="رشد نسبی (شروع = ۱۰۰)"
               labels={growthChart.labels}
               datasets={growthChart.datasets}
               prefix=""
             />
           )}
-          <BarChartCard
-            title="نمودار بازده هر دارایی"
-            labels={ranked.map((r) => r.symbol)}
-            values={ranked.map((r) => r.returnPct ?? 0)}
-          />
+          <BarChartCard title="بازده هر دارایی" labels={ranked.map((r) => r.symbol)} values={ranked.map((r) => r.returnPct ?? 0)} unit="%" />
 
-          {/* جدول رتبه‌بندی + مرتب‌سازی */}
-          <GlassCard className="overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-line/10 px-3 py-2">
-              <Search className="h-3.5 w-3.5 shrink-0 text-muted" />
-              <input
-                value={filterQ}
-                onChange={(e) => setFilterQ(e.target.value)}
-                placeholder="جستجو در جدول…"
-                className="w-full bg-transparent text-[11px] font-bold text-ink outline-none placeholder:text-muted/60"
-              />
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="glass-inset rounded-lg px-2 py-1 text-[10px] font-bold text-ink outline-none"
-              >
-                <option value="return">بازده</option>
-                <option value="value">ارزش</option>
-                <option value="profit">سود</option>
-                <option value="name">نام</option>
-              </select>
-              <button
-                onClick={() => setDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-                className="glass-inset rounded-lg px-2 py-1 text-[10px] font-bold text-ink"
-              >
-                {dir === 'desc' ? '↓' : '↑'}
-              </button>
+          <Surface className="overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-divider p-3 md:px-5">
+              <SearchField value={filterQ} onChange={setFilterQ} placeholder="جستجو در جدول…" className="flex-1 md:max-w-xs" />
             </div>
-            <div className="max-h-72 overflow-auto">
-              <table className="sim-table min-w-[520px] text-start">
+            <div className="max-h-96 overflow-auto">
+              <table className="data-table min-w-[640px]">
+                <caption className="sr-only">رتبه‌بندی دارایی‌ها</caption>
                 <thead>
                   <tr>
-                    <th className="!text-start">#</th>
-                    <th className="!text-start">دارایی</th>
-                    <th className="!text-start">قیمت شروع</th>
-                    <th className="!text-start">قیمت فعلی</th>
-                    <th className="!text-start">ارزش</th>
-                    <th className="!text-start">سود</th>
-                    <th className="!text-start">بازده</th>
-                    <th className="!text-start">CAGR</th>
+                    <th scope="col" className="w-10 !ps-4 md:!ps-5">#</th>
+                    {th('name', 'دارایی', false)}
+                    <th scope="col" className="col-num">قیمت شروع</th>
+                    <th scope="col" className="col-num">قیمت فعلی</th>
+                    {th('value', 'ارزش')}
+                    {th('profit', 'سود')}
+                    {th('return', 'بازده')}
+                    <th scope="col" className="col-num !pe-4 md:!pe-5">CAGR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ranked.map((r, i) => (
                     <tr key={r.symbol}>
-                      <td className="num-ltr text-muted">{i + 1}</td>
+                      <td className="num-ltr !ps-4 text-xs text-subtle md:!ps-5">{i + 1}</td>
                       <td>
-                        <span className="tnum font-extrabold text-ink">{r.symbol}</span>
+                        <p className="font-semibold text-ink">{r.nameFa}</p>
+                        <bdi dir="ltr" className="text-2xs text-muted">{r.symbol}</bdi>
                       </td>
-                      <td className="num-ltr text-muted">{fmtUSD(r.historicalPrice)}</td>
-                      <td className="num-ltr text-ink">{fmtUSD(r.currentPrice)}</td>
-                      <td className="num-ltr font-bold text-ink">{fmtUSD(r.currentValue)}</td>
-                      <td className={cn('num-ltr font-bold', pnlClass(r.profit))}>{fmtUSD(r.profit)}</td>
-                      <td className={cn('num-ltr font-bold', pnlClass(r.returnPct))}>{fmtPct(r.returnPct)}</td>
-                      <td className={cn('num-ltr font-bold', pnlClass(r.cagr === null ? null : r.cagr * 100))}>{fmtPct(r.cagr === null ? null : r.cagr * 100)}</td>
+                      <td className="col-num text-muted"><MoneyValue value={r.historicalPrice} /></td>
+                      <td className="col-num"><MoneyValue value={r.currentPrice} /></td>
+                      <td className="col-num font-semibold text-ink"><MoneyValue value={r.currentValue} /></td>
+                      <td className="col-num"><MoneyValue value={r.profit} signed tone="auto" /></td>
+                      <td className="col-num font-semibold"><PercentValue value={r.returnPct} /></td>
+                      <td className="col-num !pe-4 md:!pe-5"><PercentValue value={r.cagr === null ? null : r.cagr * 100} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             {ranked.some((r) => r.historicalPrice === null) && (
-              <p className="border-t border-line/10 px-4 py-2 text-[10px] font-medium text-muted">
-                دارایی‌هایی که قیمت تاریخی ندارند (داده تاریخی در دسترس نیست) با N/A نمایش داده می‌شوند.
-              </p>
+              <Notice tone="neutral" className="m-3">
+                دارایی‌های بدون داده تاریخی «—» نمایش داده می‌شوند و در انتهای رتبه‌بندی قرار می‌گیرند.
+              </Notice>
             )}
-          </GlassCard>
+          </Surface>
 
           <ExportButtons
             filename="compare-markets.csv"
@@ -310,13 +265,6 @@ export function CompareCalculator() {
           />
         </>
       )}
-
-      {selected.length === 0 && (
-        <p className="glass-soft rounded-2xl px-6 py-10 text-center text-[11px] font-bold text-muted">
-          ابتدا چند دارایی از لیست انتخاب کنید (امکان انتخاب هم‌زمان چند نماد)
-        </p>
-      )}
-      <div className="h-2" />
-    </div>
+    </CalcShell>
   );
 }

@@ -26,9 +26,9 @@ import { COIN_LOGO_FALLBACK } from '@/features/simulation/data/coinLogoFallback'
 import type { AssetKind } from '@/shared/types';
 
 const KIND_GRADIENTS: Record<AssetKind, string> = {
-  crypto: 'from-violet-400 to-indigo-600',
-  tokenized: 'from-sky-400 to-blue-600',
-  tradfi: 'from-emerald-400 to-teal-600'
+  crypto: 'from-accent to-accent',
+  tokenized: 'from-accent to-accent',
+  tradfi: 'from-positive to-accent'
 };
 
 /** لوگوی آیکونی کالاها (کامودیتی) — لوگوی اختصاصی برای همه ۱۶ کالا */
@@ -70,7 +70,7 @@ export function LetterAvatar({
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-black text-white shadow-sm',
+        'flex shrink-0 items-center justify-center rounded-full font-bold ring-1 ring-divider',
         KIND_GRADIENTS[kind]
       )}
       style={{ width: size, height: size, fontSize: Math.max(9, size * 0.32) }}
@@ -140,7 +140,7 @@ export function AssetLogo({
     return (
       <span
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-sm',
+          'flex shrink-0 items-center justify-center rounded-full ring-1 ring-divider',
           KIND_GRADIENTS[kind]
         )}
         style={{ width: size, height: size }}
@@ -165,7 +165,7 @@ export function AssetLogo({
       referrerPolicy="no-referrer"
       onError={() => setFailed((f) => (f.includes(currentIdx) ? f : [...f, currentIdx]))}
       className={cn(
-        'shrink-0 rounded-full bg-card object-contain shadow-sm ring-1 ring-line/10',
+        'shrink-0 rounded-full bg-card object-contain ring-1 ring-divider',
         className
       )}
       style={{ width: size, height: size }}
