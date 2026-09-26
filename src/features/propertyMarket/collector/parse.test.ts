@@ -165,3 +165,49 @@ describe('parseIntoSeed — جزئیات آگهی', () => {
     expect(findFeatureModal({ a: { b: [] } })).toBeNull();
   });
 });
+
+/* ---------------- پاسخ واقعی دیوار (برش‌خورده، سپتامبر ۲۰۲۶) ---------------- */
+import realList from './__fixtures__/divar-list.json';
+import realDetail from './__fixtures__/divar-detail.json';
+import { priceFromText } from './parse';
+
+describe('دیوار — پاسخ واقعی', () => {
+  it('priceFromText فقط با واحد «تومان»', () => {
+    expect(priceFromText('۳,۱۰۰,۰۰۰,۰۰۰ تومان')).toBe(3_100_000_000);
+    expect(priceFromText('توافقی')).toBeNull();
+    expect(priceFromText('۲ روز پیش')).toBeNull();
+    expect(priceFromText(null)).toBeNull();
+  });
+
+  it('فهرست: قیمت کل از middle_description_text + محله از web_info', () => {
+    const { seeds, pagination } = parseListPage(realList);
+    expect(seeds.size).toBe(3);
+    for (const s of seeds.values()) {
+      expect(s.source).toBe('divar');
+      expect(s.totalPriceToman).toBeGreaterThan(100_000_000);
+      expect(s.neighborhood).toBeTruthy();
+    }
+    expect(seeds.get('gagCBuEm')?.totalPriceToman).toBe(3_100_000_000);
+    expect(seeds.get('gagCBuEm')?.neighborhood).toBe('۳۰ متری');
+    expect(pagination.hasNext).toBe(true);
+    expect(pagination.data).toBeTruthy();
+  });
+
+  it('جزئیات: متراژ/ساخت/اتاق/قیمت هر متر/طبقه/آسانسور', () => {
+    const s = parseIntoSeed(emptySeed('gagCBuEm'), realDetail as Record<string, unknown>);
+    expect(s.areaSqm).toBe(90);
+    expect(s.yearBuilt).toBe(1387);
+    expect(s.rooms).toBe(2);
+    expect(s.totalPriceToman).toBe(3_100_000_000);
+    expect(s.pricePerSqmToman).toBe(34_444_000);
+    expect(s.floor).toBe(3);
+    expect(s.elevator).toBe(false); // «آسانسور ندارد»
+    expect(s.propertyKind).toBe('apartment');
+    expect(s.otherCity ?? null).toBeNull();
+  });
+
+  it('توضیحات با نام محله تهران → نشانه شهر دیگر', () => {
+    const d = { sections: [{ widgets: [{ widget_type: 'DESCRIPTION_ROW', data: { text: 'واحد فوری در جنت آباد' } }] }] };
+    expect(parseIntoSeed(emptySeed('x1'), d).otherCity).toBe('جنت آباد');
+  });
+});

@@ -7,7 +7,7 @@
  *    با فیلدهای خالی نگه داشته می‌شود (بسته به مرحله).
  * ============================================================ */
 import type { CleaningReport, PropertyCity, PropertyMarketListing } from '../domain/types.js';
-import { resolveNeighborhood } from '../data/catalog.js';
+import { otherCityMarker, resolveNeighborhood } from '../data/catalog.js';
 import type { ParsedListingSeed } from './parse.js';
 import { derivePricePerSqm } from './parse.js';
 import { percentile } from '../domain/stats.js';
@@ -28,6 +28,8 @@ export const MIN_YEAR = 1330;
 export const MAX_YEAR = 1410;
 /** حداقل تعداد نمونه محله برای فیلتر پرت آماری (کمتر → بدون فیلتر) */
 export const MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR = 6;
+/** ضریب حصار سراسری (محله‌های کم‌نمونه) — پرت شدید */
+export const GLOBAL_IQR_K = 3;
 
 export function newCleaningReport(): CleaningReport {
   return {
@@ -61,7 +63,7 @@ export function normalizeAndValidate(
   report.raw += 1;
 
   const pricePerSqm = derivePricePerSqm(seed);
-  const nb = resolveNeighborhood(seed.neighborhood);
+  const nb = resolveNeighborhood(seed.neighborhood, seed.title);
 
   const listing: PropertyMarketListing = {
     token: seed.token,
@@ -84,9 +86,21 @@ export function normalizeAndValidate(
     title: seed.title,
     listedAt: seed.listedAt,
     scrapedAt,
-    source: 'divar'
+    source: seed.source === 'sheypoor' ? 'sheypoor' : 'divar'
   };
   report.normalized += 1;
+
+  // آگهی ملکِ شهر دیگر که در دسته اهواز ثبت شده (نشانه صریح در متن)
+  if (seed.otherCity || otherCityMarker(seed.title)) {
+    reject(report, 'other-city');
+    return null;
+  }
+
+  // شیپور دسته «خانه و آپارتمان» را با هم دارد — فقط آپارتمان با دیوار قابل مقایسه است
+  if (listing.propertyKind === 'villa-house') {
+    reject(report, 'not-apartment');
+    return null;
+  }
 
   // اعتبارسنجی: برای تحلیل قیمت، حداقل «قیمت هر متر» لازم است.
   if (pricePerSqm === null) {
@@ -183,9 +197,11 @@ export function filterOutliers(
     .filter((v): v is number => v !== null && v > 0);
   const gq1 = percentile(all, 25);
   const gq3 = percentile(all, 75);
+  // حصار سراسری برای محله‌های کم‌نمونه = «پرت شدید» توکی (۳×IQR): فقط خطای
+  // ورود/واحد را می‌گیرد، نه محله گران واقعی (مثل کیانپارس با چند آگهی).
   const globalFence: [number, number] | null =
     gq1 !== null && gq3 !== null
-      ? [gq1 - 1.5 * (gq3 - gq1), gq3 + 1.5 * (gq3 - gq1)]
+      ? [gq1 - GLOBAL_IQR_K * (gq3 - gq1), gq3 + GLOBAL_IQR_K * (gq3 - gq1)]
       : null;
 
   // گروه‌بندی محله‌ها

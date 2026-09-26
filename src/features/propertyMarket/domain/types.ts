@@ -9,6 +9,15 @@
 /** شهر پشتیبانی‌شده (نسخه فعلی: اهواز — قابل توسعه) */
 export type PropertyCity = 'ahvaz';
 
+/** منبع آنلاین آگهی (هر دو از API عمومی وب — بدون لاگین) */
+export type ListingSource = 'divar' | 'sheypoor';
+
+/** برچسب فارسی منابع */
+export const LISTING_SOURCE_FA: Record<ListingSource, string> = {
+  divar: 'دیوار',
+  sheypoor: 'شیپور'
+};
+
 /** نوع ملک در آگهی‌های دیوار */
 export type PropertyKind = 'apartment' | 'villa-house' | 'unknown';
 
@@ -50,7 +59,7 @@ export interface PropertyMarketListing {
   /** تاریخ استخراج توسط کلکشنر */
   scrapedAt: number;
   /** منبع داده */
-  source: 'divar' | 'manual-legacy';
+  source: ListingSource | 'manual-legacy';
 }
 
 /** آمار یک حوزه (محله یا کل شهر) روی قیمت هر مترمربع — شاخص اصلی: میانه */
@@ -62,6 +71,12 @@ export interface AreaPriceStats {
   p75TomanPerM2: number | null;
   /** تعداد آگهی معتبر (بعد از پاک‌سازی) */
   listingCount: number;
+  /** میانه قیمت کل (تومان) — از بازطراحی ۲۰۲۶-۰۹ (Snapshotهای قدیمی ندارند) */
+  medianTotalToman?: number | null;
+  /** میانگین قیمت کل (تومان) */
+  meanTotalToman?: number | null;
+  /** میانه متراژ (متر مربع) */
+  medianAreaSqm?: number | null;
 }
 
 /** آمار یک محله داخل Snapshot */
@@ -96,11 +111,24 @@ export interface PropertyMarketSnapshot {
   dateTs: number;
   dateLabel: string;
   city: PropertyCity;
-  source: 'divar' | 'manual-legacy';
-  /** نرخ دلار→تومان همان لحظه (صرفاً جهت اطلاع/مرجع — مبنای محاسبه نیست) */
+  /** منبع غالب — «mixed» وقتی بیش از یک منبع آنلاین در Snapshot سهم دارد */
+  source: ListingSource | 'mixed' | 'manual-legacy';
+  /** تعداد آگهی نهایی به تفکیک منبع (اختیاری — Snapshotهای قدیمی ندارند) */
+  sourceCounts?: Partial<Record<ListingSource, number>>;
+  /**
+   * نرخ تتر (تومان) در لحظه ثبت Snapshot — مبنای مقایسه دلاری در طول زمان.
+   * نبود → نرخ روزانه تاریخچه تتر همان تاریخ (والکس/بیت‌پین) استفاده می‌شود.
+   */
   fxRateAtSnapshotToman: number | null;
+  /** منبع نرخ ذخیره‌شده */
+  fxSource?: 'wallex' | 'bitpin' | 'manual-legacy';
   cityStats: AreaPriceStats;
   neighborhoodStats: NeighborhoodStatsRecord[];
+  /**
+   * آمار «منطقه»ها (گروه محله‌های هم‌نام: کیانپارس، کیان‌آباد، پادادشهر، زیتون…)
+   * — Snapshotهای قبل از ۲۰۲۶-۰۹-۲۶ ندارند (آن‌ها کلید ادغامی را در neighborhoodStats داشتند).
+   */
+  groupStats?: NeighborhoodStatsRecord[];
   cleaning: CleaningReport;
   createdAt: number;
 }

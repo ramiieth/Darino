@@ -8,7 +8,17 @@
  * ⚠️ نرخ‌ها از منبع موجود دارینو (fx_rates) می‌آیند — اینجا فقط مصرف.
  * ============================================================ */
 import { calculateUsdScenario } from '../domain/scenarioEngine';
-import { buildCityStats, buildNeighborhoodStats } from '../domain/stats';
+import { buildAreaStats, buildCityStats, buildNeighborhoodStats, median } from '../domain/stats';
+import {
+  AGE_BANDS,
+  AREA_BANDS,
+  UNKNOWN_BAND_LABEL,
+  ageBandOf,
+  areaBandOf,
+  buildingAgeYears,
+  type AgeBand,
+  type AreaBand
+} from '../domain/segments';
 import { changePercent, classifyPosition, relativePercent, tomanToUsd } from '../domain/fx';
 import type {
   AreaPriceStats,
@@ -18,7 +28,16 @@ import type {
   PropertyMarketScenario,
   PropertyMarketSnapshot
 } from '../domain/types';
-import { neighborhoodDisplayName } from '../data/catalog';
+import { areaGroupOf, neighborhoodDisplayName } from '../data/catalog';
+
+/** سطح تحلیل: محله رسمی، یا منطقه (گروه محله‌های هم‌نام + محله‌های مستقل) */
+export type AreaLevel = 'neighborhood' | 'area';
+
+/** کلید منطقه یک محله: گروه اگر عضو است، وگرنه خود محله */
+export function areaKeyOf(neighborhoodKey: string | null): string | null {
+  if (!neighborhoodKey) return null;
+  return areaGroupOf(neighborhoodKey) ?? neighborhoodKey;
+}
 
 /** ورودی نرخ‌ها — هر دو از منبع موجود دلار در دارینو تغذیه می‌شوند */
 export interface FxInput {
@@ -94,6 +113,7 @@ export function buildMarketView(opts: {
   fx: FxInput;
   city?: PropertyCity;
   lastPropertyUpdate?: number | null;
+  level?: AreaLevel;
 }): PropertyMarketView {
   const city = opts.city ?? 'ahvaz';
   const listings = opts.listings;
@@ -110,9 +130,18 @@ export function buildMarketView(opts: {
       : null;
 
   // محله‌ها
-  const keys = [...new Set(listings.map((l) => l.neighborhoodKey).filter((k): k is string => !!k))];
+  const keyOf = (l: PropertyMarketListing) => (opts.level === 'area' ? areaKeyOf(l.neighborhoodKey) : l.neighborhoodKey);
+  const keys = [...new Set(listings.map(keyOf).filter((k): k is string => !!k))];
   const rows: NeighborhoodMarketRow[] = keys.map((key) => {
-    const stats = buildNeighborhoodStats(listings, key);
+    const stats =
+      opts.level === 'area'
+        ? buildAreaStats(
+            listings
+              .filter((l) => keyOf(l) === key)
+              .map((l) => l.pricePerSqmToman)
+              .filter((v): v is number => v !== null && Number.isFinite(v) && v > 0)
+          )
+        : buildNeighborhoodStats(listings, key);
     return buildRow(key, stats, currentRate, futureRate, growth, cityMedian);
   });
 
@@ -136,7 +165,21 @@ export function buildMarketView(opts: {
 }
 
 /** ساخت ویوی بازار از Snapshot ذخیره‌شده (آمار تومانی فریزشده) */
-export function buildMarketViewFromSnapshot(snapshot: PropertyMarketSnapshot, fx: FxInput): PropertyMarketView {
+/** ردیف‌های آماری Snapshot در سطح خواسته‌شده */
+export function snapshotAreaRecords(snapshot: PropertyMarketSnapshot, level: AreaLevel = 'neighborhood') {
+  if (level === 'neighborhood') return snapshot.neighborhoodStats;
+  // منطقه = گروه‌ها + محله‌هایی که عضو هیچ گروهی نیستند
+  return [
+    ...(snapshot.groupStats ?? []),
+    ...snapshot.neighborhoodStats.filter((n) => !areaGroupOf(n.neighborhoodKey))
+  ];
+}
+
+export function buildMarketViewFromSnapshot(
+  snapshot: PropertyMarketSnapshot,
+  fx: FxInput,
+  level: AreaLevel = 'neighborhood'
+): PropertyMarketView {
   const currentRate = fx.currentUsdRateToman;
   const futureRate = fx.futureUsdRateToman ?? currentRate;
   const growth = fx.propertyTomanGrowthPct ?? null;
@@ -146,7 +189,7 @@ export function buildMarketViewFromSnapshot(snapshot: PropertyMarketSnapshot, fx
       ? safeScenario(cityMedian, currentRate, futureRate, growth)
       : null;
 
-  const rows = snapshot.neighborhoodStats
+  const rows = snapshotAreaRecords(snapshot, level)
     .map((ns) => buildRow(ns.neighborhoodKey, ns.stats, currentRate, futureRate, growth, cityMedian))
     .sort((a, b) => (b.medianTomanPerM2 ?? -1) - (a.medianTomanPerM2 ?? -1));
 
@@ -270,4 +313,78 @@ export function fxInputFromScenario(scenario: PropertyMarketScenario | null, cur
     futureUsdRateToman: scenario?.futureUsdRateToman ?? currentRate,
     propertyTomanGrowthPct: scenario?.propertyTomanGrowthPct ?? null
   };
+}
+
+/* ---------------- دسته‌بندی سن بنا / متراژ + معادل دلاری هر آگهی ---------------- */
+
+/** آگهی + مقادیر مشتق (سن، دسته‌ها، معادل دلاری) — فقط برای نمایش */
+export interface ListingView extends PropertyMarketListing {
+  ageYears: number | null;
+  ageBand: AgeBand;
+  areaBand: AreaBand;
+  pricePerSqmUsd: number | null;
+  totalPriceUsd: number | null;
+}
+
+export function toListingViews(
+  listings: PropertyMarketListing[],
+  usdRateToman: number | null,
+  currentJalaliYear: number
+): ListingView[] {
+  const rate = usdRateToman ?? 0;
+  return listings.map((l) => {
+    const ageYears = buildingAgeYears(l.yearBuilt, currentJalaliYear);
+    return {
+      ...l,
+      ageYears,
+      ageBand: ageBandOf(ageYears),
+      areaBand: areaBandOf(l.areaSqm),
+      pricePerSqmUsd: tomanToUsd(l.pricePerSqmToman, rate),
+      totalPriceUsd: tomanToUsd(l.totalPriceToman, rate)
+    };
+  });
+}
+
+export type SegmentDim = 'age' | 'area';
+
+export interface SegmentRow {
+  key: string;
+  label: string;
+  count: number;
+  medianPpmToman: number | null;
+  medianPpmUsd: number | null;
+  medianTotalToman: number | null;
+  medianTotalUsd: number | null;
+  medianArea: number | null;
+  /** سهم از کل آگهی‌ها (٪) */
+  sharePct: number;
+}
+
+/** آمار هر دسته (میانه‌ها) — ترتیب دسته‌ها ثابت، «نامشخص» آخر، دسته خالی حذف */
+export function buildSegmentRows(views: ListingView[], dim: SegmentDim, usdRateToman: number | null): SegmentRow[] {
+  const rate = usdRateToman ?? 0;
+  const defs: { key: string; label: string }[] = [
+    ...(dim === 'age' ? AGE_BANDS : AREA_BANDS).map((b) => ({ key: b.key as string, label: b.label })),
+    { key: 'unknown', label: UNKNOWN_BAND_LABEL }
+  ];
+  const total = views.length;
+  const rows: SegmentRow[] = [];
+  for (const d of defs) {
+    const group = views.filter((v) => (dim === 'age' ? v.ageBand : v.areaBand) === d.key);
+    if (group.length === 0) continue;
+    const ppm = median(group.map((v) => v.pricePerSqmToman).filter((x): x is number => x !== null));
+    const tot = median(group.map((v) => v.totalPriceToman).filter((x): x is number => x !== null));
+    rows.push({
+      key: d.key,
+      label: d.label,
+      count: group.length,
+      medianPpmToman: ppm,
+      medianPpmUsd: tomanToUsd(ppm, rate),
+      medianTotalToman: tot,
+      medianTotalUsd: tomanToUsd(tot, rate),
+      medianArea: median(group.map((v) => v.areaSqm).filter((x): x is number => x !== null)),
+      sharePct: total > 0 ? (group.length / total) * 100 : 0
+    });
+  }
+  return rows;
 }
