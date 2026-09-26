@@ -54,8 +54,12 @@ export interface PropertyMarketListing {
   balcony: boolean | null;
   /** عنوان آگهی */
   title: string | null;
-  /** تاریخ ثبت آگهی (اگر دیوار ارائه دهد) */
+  /** تاریخ انتشار اولیه آگهی (دیوار: «انتشار آگهی»؛ شیپور: addedAt) */
   listedAt: number | null;
+  /** آخرین به‌روزرسانی آگهی در منبع — مبنای تشخیص آگهی کهنه (نسخه‌های قبلی ندارند) */
+  sourceUpdatedAt?: number | null;
+  /** «کلید اول» (متن صریح آگهی) */
+  firstKey?: boolean | null;
   /** تاریخ استخراج توسط کلکشنر */
   scrapedAt: number;
   /** منبع داده */
@@ -77,6 +81,20 @@ export interface AreaPriceStats {
   meanTotalToman?: number | null;
   /** میانه متراژ (متر مربع) */
   medianAreaSqm?: number | null;
+  /**
+   * آمار به تفکیک «نوع قیمت» (کلید اول، ۱ تا ۷ سال ساخت) — مبنای تاریخچه
+   * هم‌سن (حذف اثر تغییر ترکیب آگهی‌ها). Snapshotهای قبل از ۲۰۲۶-۰۹-۲۶ ندارند.
+   */
+  byType?: Partial<Record<string, TypeStats>>;
+}
+
+/** آمار یک نوع قیمت در یک ناحیه */
+export interface TypeStats {
+  count: number;
+  medianPpm: number | null;
+  meanPpm: number | null;
+  medianTotal: number | null;
+  meanTotal: number | null;
 }
 
 /** آمار یک محله داخل Snapshot */

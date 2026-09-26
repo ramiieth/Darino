@@ -126,7 +126,7 @@ describe('PropertyMarketPage', () => {
     expect(screen.getByText(/میانه قیمت اهواز/)).toBeTruthy();
     // محله کم‌نمونه پیش‌فرض پنهان
     expect(screen.queryAllByText('زرگان').length).toBe(0);
-    fireEvent.click(screen.getByRole('button', { name: /نمایش همه/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: /نمایش همه/ })[0]);
     expect((await screen.findAllByText('زرگان')).length).toBeGreaterThan(0);
   });
 
@@ -189,7 +189,7 @@ describe('PropertyMarketPage', () => {
     fireEvent.click(await screen.findByRole('tab', { name: /دسته‌بندی/ }));
     expect(await screen.findByText('نوساز تا ۱ سال')).toBeTruthy();
     expect(screen.getByText('۱۱ تا ۲۰ سال')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'متراژ' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'بازه متراژ' }));
     expect(await screen.findByText('۱۰۰ تا ۱۲۰ متر')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'سن بنا' }));
     fireEvent.click(await screen.findByText('نوساز تا ۱ سال'));
@@ -246,5 +246,34 @@ describe('PropertyMarketPage', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'محله' }));
     expect((await screen.findAllByText('کیانپارس شرقی')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('کیانپارس غربی').length).toBeGreaterThan(0);
+  });
+
+  it('جدول انواع قیمت: ستون‌های کلید اول و ۱ تا ۷ سال', async () => {
+    const withTypes = MANY.map((l, i) => ({ ...l, yearBuilt: 1405 - (i % 4), firstKey: i === 0 }));
+    usePropertyMarketStore.setState({ listings: withTypes });
+    render(<PropertyMarketPage />);
+    expect((await screen.findAllByText('قیمت به تفکیک کلید اول و سال ساخت')).length).toBeGreaterThan(0);
+    for (const h of ['کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال']) {
+      expect(screen.getAllByRole('columnheader', { name: h }).length).toBeGreaterThan(0);
+    }
+    fireEvent.click(screen.getByRole('radio', { name: 'قیمت کل' }));
+    expect(screen.getAllByText(/میلیارد/).length).toBeGreaterThan(0);
+  });
+
+  it('متراژ دقیق: هر متراژ جداگانه در بازه‌ها؛ کلیک → فقط آگهی‌های همان متراژ', async () => {
+    const sized = MANY.map((l, i) => ({ ...l, areaSqm: [95, 120, 120, 175, 300, 60, 400][i], totalPriceToman: (l.pricePerSqmToman ?? 0) * [95, 120, 120, 175, 300, 60, 400][i] }));
+    usePropertyMarketStore.setState({ listings: sized });
+    render(<PropertyMarketPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: /دسته‌بندی/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'متراژ دقیق' }));
+    expect(await screen.findByText(/۹۰ تا ۱۷۰ متر · ۲ متراژ متفاوت · ۳ آگهی/)).toBeTruthy();
+    expect(screen.getByText(/۱۷۱ تا ۳۳۰ متر · ۲ متراژ متفاوت/)).toBeTruthy();
+    expect(screen.getByText(/کمتر از ۹۰ متر/)).toBeTruthy();
+    expect(screen.getByText(/بیش از ۳۳۰ متر/)).toBeTruthy();
+    fireEvent.click(screen.getByText('۱۲۰ متر'));
+    expect(await screen.findByRole('button', { name: 'حذف فیلتر متراژ دقیق' })).toBeTruthy();
+    expect(screen.getByText('آگهی k2')).toBeTruthy();
+    expect(screen.getByText('آگهی k3')).toBeTruthy();
+    expect(screen.queryByText('آگهی k1')).toBeNull();
   });
 });

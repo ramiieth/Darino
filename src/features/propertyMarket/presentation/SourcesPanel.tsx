@@ -51,6 +51,7 @@ export const REJECT_REASON_FA: Record<string, string> = {
   'missing-neighborhood': 'بدون محله',
   'not-apartment': 'ویلایی/غیرآپارتمان',
   'other-city': 'ملک شهر دیگر (مثل تهران)',
+  'stale-ad': 'آگهی کهنه (به‌روزنشده بیش از ۴۵ روز)',
   outlier: 'پرت آماری'
 };
 

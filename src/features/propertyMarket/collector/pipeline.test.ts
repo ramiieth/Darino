@@ -202,3 +202,39 @@ describe('runCleaningPipeline (مسیر کامل)', () => {
     expect(again.listings.length).toBe(1);
   });
 });
+
+import { STALE_AD_DAYS } from './pipeline';
+
+describe('آگهی کهنه و کلید اول', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  const base = () => {
+    const s = emptySeed('st1');
+    s.neighborhood = 'گلستان';
+    s.areaSqm = 100;
+    s.totalPriceToman = 9e9;
+    return s;
+  };
+  it('آخرین به‌روزرسانی قدیمی‌تر از ۴۵ روز → رد «stale-ad»', () => {
+    const r = newCleaningReport();
+    const s = base();
+    s.sourceUpdatedAt = now - (STALE_AD_DAYS + 1) * 86_400_000;
+    expect(normalizeAndValidate(s, 'ahvaz', '7', now, r)).toBeNull();
+    expect(r.rejectReasons['stale-ad']).toBe(1);
+  });
+  it('انتشار قدیمی ولی به‌روزرسانی/نردبان اخیر → معتبر', () => {
+    const s = base();
+    s.listedAt = now - 240 * 86_400_000;
+    s.sourceUpdatedAt = now - 2 * 3600_000;
+    const l = normalizeAndValidate(s, 'ahvaz', '7', now, newCleaningReport())!;
+    expect(l.sourceUpdatedAt).toBe(s.sourceUpdatedAt);
+    expect(l.listedAt).toBe(s.listedAt);
+  });
+  it('بدون تاریخ منبع → کهنه حساب نمی‌شود (هرگز حدس)', () => {
+    expect(normalizeAndValidate(base(), 'ahvaz', '7', now, newCleaningReport())).not.toBeNull();
+  });
+  it('کلید اول از عنوان وقتی جزئیات نیامده', () => {
+    const s = base();
+    s.title = 'فروش ۹۰ متری کلید اول';
+    expect(normalizeAndValidate(s, 'ahvaz', '7', now, newCleaningReport())!.firstKey).toBe(true);
+  });
+});

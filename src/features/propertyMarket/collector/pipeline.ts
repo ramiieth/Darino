@@ -8,6 +8,7 @@
  * ============================================================ */
 import type { CleaningReport, PropertyCity, PropertyMarketListing } from '../domain/types.js';
 import { otherCityMarker, resolveNeighborhood } from '../data/catalog.js';
+import { detectFirstKey } from './dates.js';
 import type { ParsedListingSeed } from './parse.js';
 import { derivePricePerSqm } from './parse.js';
 import { percentile } from '../domain/stats.js';
@@ -28,6 +29,14 @@ export const MIN_YEAR = 1330;
 export const MAX_YEAR = 1410;
 /** حداقل تعداد نمونه محله برای فیلتر پرت آماری (کمتر → بدون فیلتر) */
 export const MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR = 6;
+/** آگهی که آخرین به‌روزرسانی‌اش قدیمی‌تر از این باشد «کهنه» است و در تحلیل نمی‌آید */
+export const STALE_AD_DAYS = 45;
+const DAY_MS = 86_400_000;
+
+/** آیا آگهی نسبت به زمان مرجع کهنه است؟ (بدون تاریخ منبع → کهنه حساب نمی‌شود) */
+export function isStaleAd(sourceUpdatedAt: number | null | undefined, ref: number): boolean {
+  return typeof sourceUpdatedAt === 'number' && ref - sourceUpdatedAt > STALE_AD_DAYS * DAY_MS;
+}
 /** ضریب حصار سراسری (محله‌های کم‌نمونه) — پرت شدید */
 export const GLOBAL_IQR_K = 3;
 
@@ -85,10 +94,18 @@ export function normalizeAndValidate(
     balcony: seed.balcony,
     title: seed.title,
     listedAt: seed.listedAt,
+    sourceUpdatedAt: seed.sourceUpdatedAt ?? null,
+    firstKey: seed.firstKey ?? detectFirstKey(seed.title),
     scrapedAt,
     source: seed.source === 'sheypoor' ? 'sheypoor' : 'divar'
   };
   report.normalized += 1;
+
+  // آگهی کهنه: آخرین به‌روزرسانی در منبع قدیمی‌تر از ۴۵ روز
+  if (isStaleAd(listing.sourceUpdatedAt, scrapedAt)) {
+    reject(report, 'stale-ad');
+    return null;
+  }
 
   // آگهی ملکِ شهر دیگر که در دسته اهواز ثبت شده (نشانه صریح در متن)
   if (seed.otherCity || otherCityMarker(seed.title)) {

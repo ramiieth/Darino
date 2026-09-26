@@ -50,7 +50,7 @@ describe('تقویم و حد تحمل', () => {
     expect(new Date(monthsBefore(Date.parse('2026-09-26T00:00:00Z'), 36)).toISOString().slice(0, 10)).toBe('2023-09-26');
   });
   it('دوره‌ها دقیقاً مطابق درخواست', () => {
-    expect([...CHANGE_PERIODS_MONTHS]).toEqual([1, 3, 6, 9, 12, 16, 24, 32, 36]);
+    expect([...CHANGE_PERIODS_MONTHS]).toEqual([1, 3, 6, 9, 12, 16, 24, 32, 36, 48, 60]);
   });
 });
 
@@ -155,10 +155,24 @@ describe('جدول و رتبه‌بندی', () => {
     const ts = monthsBefore(Date.parse('2026-09-26T10:00:00Z'), i);
     series.push(snap(new Date(ts).toISOString(), [50e6 + (36 - i) * 1e6, 5e9], { a: [40e6 + (36 - i) * 2e6, 4e9], b: [60e6, 6e9] }, 100000 + (36 - i) * 3000));
   }
-  it('همه ۹ دوره برای ۳۶ ماه داده → ok', () => {
+  it('۳۶ ماه داده → ۹ دوره اول ok؛ ۴۸ و ۶۰ ماه «در انتظار» با تاریخ', () => {
     const rows = changeTable(series, CITY_KEY, {});
-    expect(rows.map((r) => r.months)).toEqual([1, 3, 6, 9, 12, 16, 24, 32, 36]);
-    expect(rows.every((r) => r.status === 'ok')).toBe(true);
+    expect(rows.map((r) => r.months)).toEqual([1, 3, 6, 9, 12, 16, 24, 32, 36, 48, 60]);
+    expect(rows.slice(0, 9).every((r) => r.status === 'ok')).toBe(true);
+    expect(rows[9].status).toBe('pending');
+    expect(rows[10].status).toBe('pending');
+    expect(rows[9].availableFrom).toBeGreaterThan(rows[8].now!.dateTs);
+  });
+
+  it('۶۰ ماه تاریخچه → دوره ۶۰ ماه ok', () => {
+    const long: PropertyMarketSnapshot[] = [];
+    for (let i = 60; i >= 0; i -= 12) {
+      const ts = monthsBefore(Date.parse('2026-09-26T10:00:00Z'), i);
+      long.push(snap(new Date(ts).toISOString(), [50e6 + (60 - i) * 1e6, 5e9], {}, 50000 + (60 - i) * 3000));
+    }
+    const r = computeChange(long, CITY_KEY, 60, {});
+    expect(r.status).toBe('ok');
+    expect(computeChange(long, CITY_KEY, 48, {}).status).toBe('ok');
   });
   it('رتبه‌بندی محله‌ها + اختلاف با کل اهواز', () => {
     const { city, rows } = neighborhoodChanges(series, 12, {});
@@ -206,5 +220,22 @@ describe('منطقه/میانگین در مقایسه زمانی', () => {
     expect(r.now!.ppmUsd).toBe(400);
     expect(r.base!.totalUsd).toBe(35000);
     expect(r.totalUsdPct).toBeCloseTo(14.2857, 3);
+  });
+});
+
+describe('مقایسه هم‌نوع (کلید اول / N سال ساخت)', () => {
+  it('byType در Snapshot → تغییر دلاری فقط بین آگهی‌های هم‌نوع', () => {
+    const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, 200000);
+    a.cityStats.byType = { 'first-key': { count: 5, medianPpm: 100e6, meanPpm: 100e6, medianTotal: 10e9, meanTotal: 10e9 } };
+    const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], {}, 250000);
+    b.cityStats.byType = { 'first-key': { count: 6, medianPpm: 130e6, meanPpm: 130e6, medianTotal: 13e9, meanTotal: 13e9 } };
+    const r = computeChange([a, b], CITY_KEY, 3, {}, 'median', 'first-key');
+    // $500 → $520
+    expect(r.base!.ppmUsd).toBe(500);
+    expect(r.now!.ppmUsd).toBe(520);
+    expect(r.ppmUsdPct).toBeCloseTo(4, 6);
+    expect(r.totalUsdPct).toBeCloseTo(4, 6);
+    // نوعی که در Snapshot مبنا نیست → no-area (نه عدد ساختگی)
+    expect(computeChange([a, b], CITY_KEY, 3, {}, 'median', 'age3').status).toBe('no-area');
   });
 });

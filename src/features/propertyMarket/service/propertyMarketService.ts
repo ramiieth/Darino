@@ -8,7 +8,7 @@
  * ⚠️ نرخ‌ها از منبع موجود دارینو (fx_rates) می‌آیند — اینجا فقط مصرف.
  * ============================================================ */
 import { calculateUsdScenario } from '../domain/scenarioEngine';
-import { buildAreaStats, buildCityStats, buildNeighborhoodStats, median } from '../domain/stats';
+import { buildAreaStats, buildCityStats, buildNeighborhoodStats, mean, median } from '../domain/stats';
 import {
   AGE_BANDS,
   AREA_BANDS,
@@ -16,8 +16,11 @@ import {
   ageBandOf,
   areaBandOf,
   buildingAgeYears,
+  matchesPriceType,
+  PRICE_TYPES,
   type AgeBand,
-  type AreaBand
+  type AreaBand,
+  type PriceType
 } from '../domain/segments';
 import { changePercent, classifyPosition, relativePercent, tomanToUsd } from '../domain/fx';
 import type {
@@ -345,7 +348,7 @@ export function toListingViews(
   });
 }
 
-export type SegmentDim = 'age' | 'area';
+export type SegmentDim = 'age' | 'area' | 'exact';
 
 export interface SegmentRow {
   key: string;
@@ -369,8 +372,13 @@ export function buildSegmentRows(views: ListingView[], dim: SegmentDim, usdRateT
   ];
   const total = views.length;
   const rows: SegmentRow[] = [];
-  for (const d of defs) {
-    const group = views.filter((v) => (dim === 'age' ? v.ageBand : v.areaBand) === d.key);
+  // «کلید اول» (متن صریح) — ردیف جدا بالای دسته‌های سن بنا (هم‌پوشان با «نوساز»)
+  const allDefs = dim === 'age' ? [{ key: 'first-key', label: 'کلید اول' }, ...defs] : defs;
+  for (const d of allDefs) {
+    const group =
+      d.key === 'first-key'
+        ? views.filter((v) => v.firstKey === true)
+        : views.filter((v) => (dim === 'age' ? v.ageBand : v.areaBand) === d.key);
     if (group.length === 0) continue;
     const ppm = median(group.map((v) => v.pricePerSqmToman).filter((x): x is number => x !== null));
     const tot = median(group.map((v) => v.totalPriceToman).filter((x): x is number => x !== null));
@@ -387,4 +395,123 @@ export function buildSegmentRows(views: ListingView[], dim: SegmentDim, usdRateT
     });
   }
   return rows;
+}
+
+/* ---------------- ماتریس «منطقه × نوع قیمت» (کلید اول، ۱ تا ۷ سال ساخت) ---------------- */
+
+export interface TypeCell {
+  count: number;
+  medianPpmToman: number | null;
+  meanPpmToman: number | null;
+  medianTotalToman: number | null;
+  meanTotalToman: number | null;
+  medianPpmUsd: number | null;
+  meanPpmUsd: number | null;
+  medianTotalUsd: number | null;
+  meanTotalUsd: number | null;
+}
+
+export interface TypeMatrixRow {
+  key: string;
+  displayName: string;
+  count: number;
+  cells: Partial<Record<PriceType, TypeCell>>;
+}
+
+function typeCell(group: ListingView[], rate: number): TypeCell {
+  const ppm = group.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0);
+  const tot = group.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0);
+  const mPpm = median(ppm);
+  const aPpm = mean(ppm);
+  const mTot = median(tot);
+  const aTot = mean(tot);
+  return {
+    count: group.length,
+    medianPpmToman: mPpm,
+    meanPpmToman: aPpm,
+    medianTotalToman: mTot,
+    meanTotalToman: aTot,
+    medianPpmUsd: tomanToUsd(mPpm, rate),
+    meanPpmUsd: tomanToUsd(aPpm, rate),
+    medianTotalUsd: tomanToUsd(mTot, rate),
+    meanTotalUsd: tomanToUsd(aTot, rate)
+  };
+}
+
+/** ماتریس قیمت هر منطقه/محله به تفکیک نوع — ردیف اول «کل اهواز» */
+export function buildTypeMatrix(
+  views: ListingView[],
+  level: AreaLevel,
+  usdRateToman: number | null,
+  currentJalaliYear: number
+): TypeMatrixRow[] {
+  const rate = usdRateToman ?? 0;
+  const keyOf = (l: ListingView) => (level === 'area' ? areaKeyOf(l.neighborhoodKey) : l.neighborhoodKey);
+  const rowFor = (key: string, name: string, group: ListingView[]): TypeMatrixRow => {
+    const cells: Partial<Record<PriceType, TypeCell>> = {};
+    for (const t of PRICE_TYPES) {
+      const g = group.filter((l) => matchesPriceType(l, t.key, currentJalaliYear));
+      if (g.length > 0) cells[t.key] = typeCell(g, rate);
+    }
+    return { key, displayName: name, count: group.length, cells };
+  };
+  const keys = [...new Set(views.map(keyOf).filter((k): k is string => !!k))];
+  const rows = keys
+    .map((k) => rowFor(k, neighborhoodDisplayName(k), views.filter((l) => keyOf(l) === k)))
+    .sort((a, b) => b.count - a.count);
+  return [rowFor('__city__', 'کل اهواز', views), ...rows];
+}
+
+/* ---------------- متراژ دقیق (هر متراژی که در آگهی آمده، جداگانه) ---------------- */
+
+export type ExactAreaRange = 'lt90' | '90-170' | '171-330' | 'gt330';
+
+export const EXACT_AREA_RANGES: { key: ExactAreaRange; label: string; min: number; max: number }[] = [
+  { key: 'lt90', label: 'کمتر از ۹۰ متر', min: 0, max: 89 },
+  { key: '90-170', label: '۹۰ تا ۱۷۰ متر', min: 90, max: 170 },
+  { key: '171-330', label: '۱۷۱ تا ۳۳۰ متر', min: 171, max: 330 },
+  { key: 'gt330', label: 'بیش از ۳۳۰ متر', min: 331, max: Infinity }
+];
+
+export interface ExactAreaRow {
+  /** متراژ دقیق آگهی (گرد به متر) */
+  areaSqm: number;
+  range: ExactAreaRange;
+  count: number;
+  medianPpmToman: number | null;
+  medianPpmUsd: number | null;
+  medianTotalToman: number | null;
+  medianTotalUsd: number | null;
+}
+
+export function exactAreaRangeOf(area: number): ExactAreaRange {
+  return EXACT_AREA_RANGES.find((r) => area >= r.min && area <= r.max)?.key ?? 'gt330';
+}
+
+/** یک ردیف برای هر متراژ دقیق موجود در آگهی‌ها (صعودی) */
+export function buildExactAreaRows(views: ListingView[], usdRateToman: number | null): ExactAreaRow[] {
+  const rate = usdRateToman ?? 0;
+  const groups = new Map<number, ListingView[]>();
+  for (const v of views) {
+    if (v.areaSqm === null || !(v.areaSqm > 0)) continue;
+    const a = Math.round(v.areaSqm);
+    const g = groups.get(a) ?? [];
+    g.push(v);
+    groups.set(a, g);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([areaSqm, g]) => {
+      const ppm = median(g.map((l) => l.pricePerSqmToman).filter((x): x is number => x !== null && x > 0));
+      const tot = median(g.map((l) => l.totalPriceToman).filter((x): x is number => x !== null && x > 0));
+      return {
+        areaSqm,
+        range: exactAreaRangeOf(areaSqm),
+        count: g.length,
+        medianPpmToman: ppm,
+        medianPpmUsd: tomanToUsd(ppm, rate),
+        medianTotalToman: tot,
+        medianTotalUsd: tomanToUsd(tot, rate)
+      };
+    });
 }

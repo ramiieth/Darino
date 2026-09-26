@@ -20,7 +20,7 @@ import { fmtMillionToman } from './NeighborhoodTable';
 
 type SourceFilter = 'all' | ListingSource;
 type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
-export type AgeFilter = 'all' | AgeBand;
+export type AgeFilter = 'all' | AgeBand | 'first-key';
 export type AreaFilter = 'all' | AreaBand;
 
 const PAGE = 25;
@@ -32,13 +32,23 @@ export function fmtTotalToman(v: number | null): string {
   return v >= 1_000_000_000 ? `${fa.format(v / 1_000_000_000)} میلیارد` : `${fa.format(Math.round(v / 1_000_000))} میلیون`;
 }
 
+/** مبنای «جدیدترین»: آخرین به‌روزرسانی آگهی در منبع */
+function updatedOf(l: ListingView): number {
+  return l.sourceUpdatedAt ?? l.listedAt ?? l.scrapedAt;
+}
+
 export function ListingsExplorer({
   listings,
   age = 'all',
   area = 'all',
   onAge,
-  onArea
+  onArea,
+  exactArea = null,
+  onExactArea
 }: {
+  /** فیلتر متراژ دقیق (از جدول «متراژ دقیق») */
+  exactArea?: number | null;
+  onExactArea?: (v: number | null) => void;
   listings: ListingView[];
   age?: AgeFilter;
   area?: AreaFilter;
@@ -75,21 +85,22 @@ export function ListingsExplorer({
       (l) =>
         (source === 'all' || l.source === source) &&
         (nb === 'all' || l.neighborhoodKey === nb) &&
-        (ageF === 'all' || l.ageBand === ageF) &&
-        (areaF === 'all' || l.areaBand === areaF)
+        (ageF === 'all' || (ageF === 'first-key' ? l.firstKey === true : l.ageBand === ageF)) &&
+        (areaF === 'all' || l.areaBand === areaF) &&
+        (exactArea === null || (l.areaSqm !== null && Math.round(l.areaSqm) === exactArea))
     );
     const ppm = (l: ListingView) => l.pricePerSqmToman ?? 0;
     const tot = (l: ListingView) => l.totalPriceToman ?? 0;
     return [...f].sort((a, b) => {
       switch (sort) {
-        case 'recent': return (b.listedAt ?? b.scrapedAt) - (a.listedAt ?? a.scrapedAt);
+        case 'recent': return updatedOf(b) - updatedOf(a);
         case 'ppm-asc': return ppm(a) - ppm(b);
         case 'ppm-desc': return ppm(b) - ppm(a);
         case 'total-asc': return tot(a) - tot(b);
         case 'total-desc': return tot(b) - tot(a);
       }
     });
-  }, [listings, source, nb, sort, ageF, areaF]);
+  }, [listings, source, nb, sort, ageF, areaF, exactArea]);
 
   if (listings.length === 0) {
     return <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">هنوز آگهی‌ای ثبت نشده است</p>;
@@ -111,6 +122,16 @@ export function ListingsExplorer({
             { value: 'sheypoor', label: LISTING_SOURCE_FA.sheypoor, badge: bySource.sheypoor }
           ]}
         />
+        {exactArea !== null && (
+          <button
+            type="button"
+            onClick={() => onExactArea?.(null)}
+            className="flex h-8 items-center gap-1 rounded-control border border-accent bg-accent-soft px-3 text-xs font-semibold text-accent"
+            aria-label="حذف فیلتر متراژ دقیق"
+          >
+            متراژ {toFaDigits(exactArea)} متر ✕
+          </button>
+        )}
         <div className="flex flex-wrap gap-2 md:ms-auto">
           <div className="w-40">
             <Select
@@ -139,6 +160,7 @@ export function ListingsExplorer({
               }}
             >
               <option value="all">هر سن بنا</option>
+              <option value="first-key">کلید اول</option>
               {AGE_BANDS.map((b) => (
                 <option key={b.key} value={b.key}>{b.label}</option>
               ))}
@@ -193,8 +215,13 @@ export function ListingsExplorer({
                   {l.areaSqm !== null && <> · {toFaDigits(l.areaSqm)} متر</>}
                   {l.rooms !== null && <> · {l.rooms === 0 ? 'بدون اتاق' : `${toFaDigits(l.rooms)} خواب`}</>}
                   {l.ageYears !== null && <> · {l.ageYears === 0 ? 'نوساز' : `${toFaDigits(l.ageYears)} ساله`}</>}
-                  {' · '}
-                  {fmtRelativeAge(l.listedAt ?? l.scrapedAt)}
+                  {l.firstKey && <> · <span className="font-semibold text-accent">کلید اول</span></>}
+                </p>
+                <p className="mt-0.5 text-2xs text-subtle">
+                  {l.sourceUpdatedAt ? <>به‌روزرسانی آگهی: {fmtRelativeAge(l.sourceUpdatedAt)}</> : <>دیده‌شده: {fmtRelativeAge(l.scrapedAt)}</>}
+                  {l.listedAt && l.sourceUpdatedAt && l.sourceUpdatedAt - l.listedAt > 86_400_000 && (
+                    <> · انتشار اولیه: {fmtRelativeAge(l.listedAt)}</>
+                  )}
                 </p>
               </div>
               <div className="shrink-0 text-end">

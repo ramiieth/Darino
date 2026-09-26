@@ -24,8 +24,8 @@ describe('سن بنا', () => {
     expect(buildingAgeYears(87, 1405)).toBeNull();
   });
   it('دسته‌ها دقیقاً ۱، ۲، ۳، ۴ سال و بازه‌ها', () => {
-    expect([0, 1, 2, 3, 4, 5, 10, 11, 20, 21, 40].map(ageBandOf)).toEqual([
-      'y0-1', 'y0-1', 'y2', 'y3', 'y4', 'y5-10', 'y5-10', 'y11-20', 'y11-20', 'y21+', 'y21+'
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 20, 21, 40].map(ageBandOf)).toEqual([
+      'y0-1', 'y0-1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8-10', 'y8-10', 'y11-20', 'y11-20', 'y21+', 'y21+'
     ]);
     expect(ageBandOf(null)).toBe('unknown');
   });
@@ -101,5 +101,65 @@ describe('resolveEffectiveRate', () => {
   it('بدون تتر → نرخ دستی با برچسب manual؛ هیچ‌کدام → none', () => {
     expect(resolveEffectiveRate({ quote: null, status: 'unavailable' }, 1_480_000, now)).toMatchObject({ rate: 1_480_000, kind: 'manual' });
     expect(resolveEffectiveRate({ quote: null, status: 'unavailable' }, null, now)).toMatchObject({ rate: null, kind: 'none' });
+  });
+});
+
+import { matchesPriceType, PRICE_TYPES } from './segments';
+import { buildTypeMatrix } from '../service/propertyMarketService';
+
+describe('انواع قیمت: کلید اول و ۱ تا ۷ سال ساخت', () => {
+  it('ترتیب و برچسب ستون‌ها', () => {
+    expect(PRICE_TYPES.map((t) => t.key)).toEqual(['all', 'first-key', 'age1', 'age2', 'age3', 'age4', 'age5', 'age6', 'age7']);
+  });
+  it('matchesPriceType', () => {
+    const y = 1405;
+    expect(matchesPriceType({ yearBuilt: 1405 }, 'age1', y)).toBe(true); // امسال
+    expect(matchesPriceType({ yearBuilt: 1404 }, 'age1', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1403 }, 'age2', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1398 }, 'age7', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1397 }, 'age7', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: null }, 'age3', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: 1404, firstKey: true }, 'first-key', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1404, firstKey: null }, 'first-key', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: null }, 'all', y)).toBe(true);
+  });
+  it('ماتریس: کل اهواز اول، خانه‌های هر نوع با تومان/دلار/تعداد', () => {
+    const mk = (t: string, key: string, year: number | null, ppm: number, fk = false) => ({ ...l(t, 100, year, ppm), neighborhoodKey: key, firstKey: fk });
+    const views = toListingViews(
+      [mk('a', 'golestan', 1404, 100e6, true), mk('b', 'golestan', 1403, 90e6), mk('c', 'kianpars-east', 1398, 150e6), mk('d', 'kianpars-west', null, 140e6)],
+      250_000,
+      1405
+    );
+    const rows = buildTypeMatrix(views, 'area', 250_000, 1405);
+    expect(rows[0].key).toBe('__city__');
+    expect(rows[0].count).toBe(4);
+    expect(rows[0].cells['first-key']!.count).toBe(1);
+    expect(rows[0].cells.age1!.medianPpmToman).toBe(100e6);
+    expect(rows[0].cells.age1!.medianPpmUsd).toBe(400);
+    expect(rows[0].cells.age2!.medianTotalUsd).toBe(36000);
+    expect(rows[0].cells.age7!.count).toBe(1);
+    // سطح منطقه: شرقی/غربی کیانپارس در یک ردیف
+    const kp = rows.find((r) => r.key === 'kianpars')!;
+    expect(kp.count).toBe(2);
+    expect(kp.cells.all!.medianPpmToman).toBe(145e6);
+    expect(kp.cells.age3).toBeUndefined();
+  });
+});
+
+import { buildExactAreaRows, exactAreaRangeOf } from '../service/propertyMarketService';
+
+describe('متراژ دقیق', () => {
+  it('بازه‌ها: ۹۰ تا ۱۷۰ (شامل ۱۷۰) و ۱۷۱ تا ۳۳۰', () => {
+    expect([89, 90, 170, 171, 330, 331].map(exactAreaRangeOf)).toEqual(['lt90', '90-170', '90-170', '171-330', '171-330', 'gt330']);
+  });
+  it('هر متراژ یک ردیف (گرد به متر)، صعودی، با میانه تومان/دلار', () => {
+    const views = toListingViews([l('a', 120, 1400, 100e6), l('b', 120.4, 1400, 80e6), l('c', 95, 1400, 90e6), l('d', null, 1400, 70e6)], 250_000, 1405);
+    const rows = buildExactAreaRows(views, 250_000);
+    expect(rows.map((r) => r.areaSqm)).toEqual([95, 120]);
+    const r120 = rows[1];
+    expect(r120.count).toBe(2);
+    expect(r120.medianPpmToman).toBe(90e6);
+    expect(r120.medianPpmUsd).toBe(360);
+    expect(r120.range).toBe('90-170');
   });
 });

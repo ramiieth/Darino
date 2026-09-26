@@ -12,8 +12,9 @@
 import type { AreaPriceStats, PropertyMarketSnapshot } from './types';
 import { rateOnDate, type DailyRates } from '@/shared/fx/usdtHistory';
 import { areaGroupOf } from '../data/catalog';
+import type { PriceType } from './segments';
 
-export const CHANGE_PERIODS_MONTHS = [1, 3, 6, 9, 12, 16, 24, 32, 36] as const;
+export const CHANGE_PERIODS_MONTHS = [1, 3, 6, 9, 12, 16, 24, 32, 36, 48, 60] as const;
 export type ChangePeriod = (typeof CHANGE_PERIODS_MONTHS)[number];
 
 /** کلید «کل اهواز» */
@@ -88,19 +89,34 @@ export function pointOf(
   s: PropertyMarketSnapshot,
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median'
+  metric: PriceMetric = 'median',
+  type: PriceType = 'all'
 ): PointValues | null {
   const st = areaStatsOf(s, key);
   const r = snapshotRate(s, daily);
-  const ppm = st ? (metric === 'mean' ? st.meanTomanPerM2 : st.medianTomanPerM2) : null;
-  if (!st || !r || ppm === null) return null;
-  const total = (metric === 'mean' ? st.meanTotalToman : st.medianTotalToman) ?? null;
+  if (!st || !r) return null;
+  let ppm: number | null;
+  let total: number | null;
+  let count: number;
+  if (type === 'all') {
+    ppm = metric === 'mean' ? st.meanTomanPerM2 : st.medianTomanPerM2;
+    total = (metric === 'mean' ? st.meanTotalToman : st.medianTotalToman) ?? null;
+    count = st.listingCount;
+  } else {
+    // نوع قیمت (کلید اول / N سال ساخت) — مقایسه هم‌سن
+    const ts = st.byType?.[type];
+    if (!ts) return null;
+    ppm = metric === 'mean' ? ts.meanPpm : ts.medianPpm;
+    total = metric === 'mean' ? ts.meanTotal : ts.medianTotal;
+    count = ts.count;
+  }
+  if (ppm === null) return null;
   return {
     snapshotId: s.id,
     dateTs: s.dateTs,
     rate: r.rate,
     rateSource: r.source,
-    count: st.listingCount,
+    count,
     ppmToman: ppm,
     ppmUsd: ppm / r.rate,
     totalToman: total,
@@ -133,6 +149,13 @@ export interface ChangeRow {
 
 export const MIN_SAMPLE_FOR_CHANGE = 3;
 
+/** چرا نقطه‌ای در دسترس نیست: ناحیه/نوع ثبت نشده، یا نرخ تتر آن تاریخ */
+function missingReason(s: PropertyMarketSnapshot, key: string, daily: DailyRates): ChangeStatus {
+  if (!areaStatsOf(s, key)) return 'no-area';
+  if (!snapshotRate(s, daily)) return 'no-rate';
+  return 'no-area'; // ناحیه هست ولی این نوع قیمت (مثلاً ۳ سال ساخت) آگهی نداشت
+}
+
 /** Snapshotهای قابل مقایسه (مرتب قدیم→جدید) */
 function ordered(snaps: PropertyMarketSnapshot[]): PropertyMarketSnapshot[] {
   return [...snaps].filter((s) => Number.isFinite(s.dateTs)).sort((a, b) => a.dateTs - b.dateTs);
@@ -164,7 +187,8 @@ export function computeChange(
   key: string,
   months: number,
   daily: DailyRates,
-  metric: PriceMetric = 'median'
+  metric: PriceMetric = 'median',
+  type: PriceType = 'all'
 ): ChangeRow {
   const snaps = ordered(snapsIn);
   const empty: ChangeRow = {
@@ -182,9 +206,9 @@ export function computeChange(
   };
   const current = snaps[snaps.length - 1];
   if (!current) return empty;
-  const now = pointOf(current, key, daily, metric);
+  const now = pointOf(current, key, daily, metric, type);
   if (!now) {
-    return { ...empty, status: areaStatsOf(current, key) ? 'no-rate' : 'no-area' };
+    return { ...empty, status: missingReason(current, key, daily) };
   }
   const baseSnap = findBaseSnapshot(snaps, current, months);
   if (!baseSnap) {
@@ -194,9 +218,9 @@ export function computeChange(
     const tooEarly = monthsBefore(current.dateTs, months) < first.dateTs - toleranceMs(months);
     return { ...empty, now, status: tooEarly ? 'pending' : 'no-data', availableFrom: tooEarly ? availableFrom : null };
   }
-  const base = pointOf(baseSnap, key, daily, metric);
+  const base = pointOf(baseSnap, key, daily, metric, type);
   if (!base) {
-    return { ...empty, now, status: areaStatsOf(baseSnap, key) ? 'no-rate' : 'no-area' };
+    return { ...empty, now, status: missingReason(baseSnap, key, daily) };
   }
   return {
     months,
@@ -218,9 +242,10 @@ export function changeTable(
   snaps: PropertyMarketSnapshot[],
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median'
+  metric: PriceMetric = 'median',
+  type: PriceType = 'all'
 ): ChangeRow[] {
-  return CHANGE_PERIODS_MONTHS.map((m) => computeChange(snaps, key, m, daily, metric));
+  return CHANGE_PERIODS_MONTHS.map((m) => computeChange(snaps, key, m, daily, metric, type));
 }
 
 export interface NeighborhoodChangeRow {
@@ -236,11 +261,12 @@ export function neighborhoodChanges(
   snapsIn: PropertyMarketSnapshot[],
   months: number,
   daily: DailyRates,
-  opts: { level?: 'neighborhood' | 'group'; metric?: PriceMetric } = {}
+  opts: { level?: 'neighborhood' | 'group'; metric?: PriceMetric; type?: PriceType } = {}
 ): { city: ChangeRow; rows: NeighborhoodChangeRow[] } {
   const metric = opts.metric ?? 'median';
   const snaps = ordered(snapsIn);
-  const city = computeChange(snaps, CITY_KEY, months, daily, metric);
+  const type = opts.type ?? 'all';
+  const city = computeChange(snaps, CITY_KEY, months, daily, metric, type);
   const current = snaps[snaps.length - 1];
   if (!current) return { city, rows: [] };
   // منطقه = گروه‌ها + محله‌های مستقل (مثل گلستان) — کل اهواز پوشش داده می‌شود
@@ -249,7 +275,7 @@ export function neighborhoodChanges(
       ? [...(current.groupStats ?? []), ...current.neighborhoodStats.filter((n) => !areaGroupOf(n.neighborhoodKey))]
       : current.neighborhoodStats;
   const rows = list.map((n) => {
-    const change = computeChange(snaps, n.neighborhoodKey, months, daily, metric);
+    const change = computeChange(snaps, n.neighborhoodKey, months, daily, metric, type);
     const vsCityPp =
       change.ppmUsdPct !== null && city.ppmUsdPct !== null ? change.ppmUsdPct - city.ppmUsdPct : null;
     return { key: n.neighborhoodKey, displayName: n.displayName, change, vsCityPp };
@@ -263,10 +289,11 @@ export function usdSeries(
   snapsIn: PropertyMarketSnapshot[],
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median'
+  metric: PriceMetric = 'median',
+  type: PriceType = 'all'
 ): PointValues[] {
   return ordered(snapsIn)
-    .map((s) => pointOf(s, key, daily, metric))
+    .map((s) => pointOf(s, key, daily, metric, type))
     .filter((p): p is PointValues => p !== null);
 }
 

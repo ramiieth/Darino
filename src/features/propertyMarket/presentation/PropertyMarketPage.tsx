@@ -31,6 +31,7 @@ import {
   mostAffordableUsd,
   mostExpensiveUsd,
   toListingViews,
+  buildTypeMatrix,
   type NeighborhoodMarketRow,
   type AreaLevel,
   type PropertyMarketView,
@@ -39,6 +40,7 @@ import {
 import { jalaliYearOf } from '../domain/segments';
 import { SegmentsPanel } from './SegmentsPanel';
 import { PriceChangePanel } from './PriceChangePanel';
+import { PriceTypeMatrix } from './PriceTypeMatrix';
 import { UsdtRateField, describeRate, resolveEffectiveRate, type EffectiveRate } from './UsdtRateField';
 import type { AgeFilter, AreaFilter } from './ListingsExplorer';
 import { filterOutliers, newCleaningReport } from '../collector/pipeline';
@@ -122,6 +124,7 @@ export function PropertyMarketPage() {
   const [tab, setTab] = useState<ViewTab>('areas');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('all');
   const [areaFilter, setAreaFilter] = useState<AreaFilter>('all');
+  const [exactArea, setExactArea] = useState<number | null>(null);
   const [showSparse, setShowSparse] = useState(false);
   useBridgeReceiver();
 
@@ -142,9 +145,18 @@ export function PropertyMarketPage() {
     const market = filterOutliers(activeListings, newCleaningReport());
     return toListingViews(market, effective.rate, jalaliYearOf(Date.now()));
   }, [activeListings, effective.rate]);
+  const typeMatrix = useMemo(
+    () => buildTypeMatrix(listingViews, level, effective.rate, jalaliYearOf(Date.now())),
+    [listingViews, level, effective.rate]
+  );
   const pickSegment = (dim: SegmentDim, key: string) => {
+    setExactArea(null);
     if (dim === 'age') {
       setAgeFilter(key as AgeFilter);
+      setAreaFilter('all');
+    } else if (dim === 'exact') {
+      setExactArea(Number(key));
+      setAgeFilter('all');
       setAreaFilter('all');
     } else {
       setAreaFilter(key as AreaFilter);
@@ -343,6 +355,15 @@ export function PropertyMarketPage() {
                       <NeighborhoodTable rows={tableRows} />
                     </Surface>
                   </Section>
+                  <Section
+                    id="price-types"
+                    title="قیمت به تفکیک کلید اول و سال ساخت"
+                    description="هر ستون یک نوع قیمت — تومان، معادل دلاری تتر و تعداد آگهی"
+                  >
+                    <Surface className="overflow-hidden">
+                      <PriceTypeMatrix rows={typeMatrix} />
+                    </Surface>
+                  </Section>
                   <div className="grid gap-6 md:grid-cols-2">
                     <Section id="expensive" title="گران‌ترین مناطق (دلاری)">
                       <Surface className="px-4">
@@ -417,6 +438,8 @@ export function PropertyMarketPage() {
                     area={areaFilter}
                     onAge={setAgeFilter}
                     onArea={setAreaFilter}
+                    exactArea={exactArea}
+                    onExactArea={setExactArea}
                   />
                 </Surface>
               )}
