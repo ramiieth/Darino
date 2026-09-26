@@ -1,172 +1,165 @@
 // @vitest-environment node
 /**
- * /api/propertyMarket — رگرسیون «کلکشن بدون دیتابیس»
+ * /api/propertyMarket — کلکشنر بدون حالت (بازطراحی ۲۰۲۶-۰۹)
  *
- * باگ اصلی: بدون DATABASE_URL (یا وقتی Neon در دسترس نبود) کل هندلر
- * { configured: false } برمی‌گرداند و کلاینت با خطای «سرور دیتابیس در
- * دسترس نیست» کلکشن را اصلاً شروع نمی‌کرد — درحالی‌که خودِ کلکشن دیوار
- * نیازی به دیتابیس ندارد و فقط از مسیر سرور انجام می‌شود.
- *
- * این تست‌ها حالت بدون دیتابیس را پوشش می‌دهند:
- *  - collectChunk با بافر درون‌حافظه + برگشت آگهی‌ها (persisted: false)
- *  - finalize با آگهی‌های پس‌فرستاده‌شده کلاینت (تحمل چرخش instance)
- *  - GET برای داده‌های همین جلسه
+ * باگ اصلی: کلکشن به health/دیتابیس گره خورده بود → «سرور در دسترس نیست».
+ * حالا: ping و collectChunk هیچ وابستگی‌ای به دیتابیس ندارند؛ خطای منبع
+ * به‌صورت { ok:false } صریح برمی‌گردد (نه ۵۰۰).
  */
-import { describe, expect, it, beforeAll, vi } from 'vitest';
-import handler from './propertyMarket';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 
-// کلکشنر واقعی به شبکه دیوار نیاز دارد — نتیجه‌اش اینجا شبیه‌سازی می‌شود
-// (vi.hoisted چون کارخانه ماک قبل از بدنه ماژول اجرا می‌شود)
-const { SEEDS } = vi.hoisted(() => {
-  const makeSeed = (token: string, nb: string, area: number, ppm: number) => ({
-    token,
-    title: `آپارتمان ${area} متری ${nb}`,
-    neighborhood: nb,
-    propertyKind: 'apartment' as const,
-    areaSqm: area,
-    rooms: 2,
-    yearBuilt: 1398,
-    floor: 3,
-    totalPriceToman: area * ppm,
-    pricePerSqmToman: ppm,
-    parking: true,
-    elevator: true,
-    storage: null,
-    balcony: null,
-    listedAt: null,
-    url: `https://divar.ir/v/${token}`
-  });
+const h = vi.hoisted(() => ({
+  collectChunk: vi.fn(),
+  fetchCities: vi.fn(),
+  fetchListPage: vi.fn(),
+  fetchSheypoorList: vi.fn(),
+  dbCalled: vi.fn()
+}));
+
+vi.mock('../src/features/propertyMarket/collector/run.js', async (orig) => {
+  const actual = await orig<typeof import('../src/features/propertyMarket/collector/run.js')>();
+  return { ...actual, collectChunk: h.collectChunk };
+});
+vi.mock('../src/features/propertyMarket/collector/client.js', async (orig) => {
+  const actual = await orig<typeof import('../src/features/propertyMarket/collector/client.js')>();
+  return { ...actual, fetchCities: h.fetchCities, fetchListPage: h.fetchListPage };
+});
+vi.mock('../src/features/propertyMarket/collector/sheypoor.js', async (orig) => {
+  const actual = await orig<typeof import('../src/features/propertyMarket/collector/sheypoor.js')>();
+  return { ...actual, fetchSheypoorList: h.fetchSheypoorList };
+});
+// دیتابیس تنظیم نشده — هر فراخوانی db() باید رخ ندهد
+vi.mock('./_neon.js', async (orig) => {
+  const actual = await orig<typeof import('./_neon.js')>();
   return {
-    SEEDS: [makeSeed('a1', 'کیانپارس', 100, 50_000_000), makeSeed('b2', 'گلستان', 120, 52_000_000)]
+    ...actual,
+    isDbConfigured: () => false,
+    db: () => {
+      h.dbCalled();
+      throw new Error('no db');
+    }
   };
 });
 
-vi.mock('../src/features/propertyMarket/collector/run.js', () => ({
-  collectChunk: vi.fn(async () => ({
-    cursor: {
-      cityId: '6',
-      paginationData: null,
-      hasNextPage: false,
-      seenTokens: ['a1', 'b2'],
-      pendingTokens: [],
-      pagesRead: 1
-    },
-    seeds: SEEDS,
-    cityId: '6',
-    done: true,
-    fetchedDetails: 0,
-    failedDetails: 0
-  }))
-}));
+import handler from './propertyMarket';
 
-interface FakeResponse {
-  status: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  body: any;
-}
-
-/** فراخوانی درون‌فرآیندی هندلر با شبیه‌سازی req/res */
-function call(method: string, body?: unknown): Promise<FakeResponse> {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : '';
+function call(method: string, body?: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+  return new Promise((resolve) => {
+    const buf = body ? Buffer.from(JSON.stringify(body)) : Buffer.alloc(0);
     const req = {
       method,
-      headers: { 'x-user-id': 'test-user' },
-      on(event: string, cb: (chunk?: Buffer) => void) {
-        if (event === 'data') cb(payload ? Buffer.from(payload) : Buffer.alloc(0));
-        else if (event === 'end') cb();
+      headers: {},
+      on(ev: string, cb: (b?: Buffer) => void) {
+        if (ev === 'data') cb(buf);
+        else if (ev === 'end') cb();
       }
     };
     const res = {
-      statusCode: 200,
-      setHeader(_k: string, _v: string) {
-        /* noop */
-      },
+      statusCode: 0,
+      setHeader() {},
       end(b: string) {
-        resolve({ status: res.statusCode, body: JSON.parse(b) });
+        resolve({ status: this.statusCode, body: JSON.parse(b) });
       }
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handler(req as any, res as any).catch(reject);
+    void handler(req as never, res as never);
   });
 }
 
-beforeAll(() => {
-  // حالت بدون دیتابیس — دقیقاً سناریوی گزارش‌شده
-  delete process.env.DATABASE_URL;
+const SEED = {
+  token: 'gagCBuEm',
+  source: 'divar',
+  title: 't',
+  neighborhood: 'گلستان',
+  propertyKind: 'apartment',
+  areaSqm: 90,
+  rooms: 2,
+  yearBuilt: 1387,
+  floor: 3,
+  totalPriceToman: 3_100_000_000,
+  pricePerSqmToman: null,
+  parking: null,
+  elevator: false,
+  storage: null,
+  balcony: null,
+  listedAt: null,
+  url: 'https://divar.ir/v/gagCBuEm'
+};
+
+beforeEach(() => {
+  h.collectChunk.mockReset();
+  h.fetchCities.mockReset();
+  h.fetchListPage.mockReset();
+  h.fetchSheypoorList.mockReset();
+  h.dbCalled.mockReset();
 });
 
-describe('api/propertyMarket — حالت بدون دیتابیس (کلکشن از مسیر سرور)', () => {
-  it('بدون DATABASE_URL کلکشن مسدود نمی‌شود — persisted:false + آگهی‌ها برمی‌گردند', async () => {
-    const res = await call('POST', { action: 'collectChunk', city: 'ahvaz', cursor: null });
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.persisted).toBe(false);
-    expect(res.body.added).toBe(2);
-    expect(Array.isArray(res.body.listings)).toBe(true);
-    expect(res.body.listings.map((l: { token: string }) => l.token).sort()).toEqual(['a1', 'b2']);
-    // گزارش قیف پاک‌سازی هم برگردانده می‌شود (شفافیت)
-    expect(res.body.report.valid).toBe(2);
+describe('/api/propertyMarket', () => {
+  it('ping بدون دیتابیس و بدون شبکه بیرونی', async () => {
+    const r = await call('POST', { action: 'ping' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, service: 'darino-property-market' });
+    expect(h.dbCalled).not.toHaveBeenCalled();
+    expect(h.collectChunk).not.toHaveBeenCalled();
   });
 
-  it('GET داده‌های همین جلسه را برمی‌گرداند (نه خطای دیتابیس)', async () => {
-    const res = await call('GET');
-    expect(res.status).toBe(200);
-    expect(res.body.configured).toBe(false);
-    expect(res.body.listings.length).toBe(2);
+  it('collectChunk: seedها + کرسر برمی‌گردند (بدون دیتابیس)', async () => {
+    h.collectChunk.mockResolvedValue({
+      source: 'divar',
+      cursor: { source: 'divar', cityId: '7', paginationData: null, hasNextPage: false, seenTokens: ['gagCBuEm'], pendingSeeds: [], pagesRead: 1 },
+      seeds: [SEED],
+      cityId: '7',
+      done: true,
+      fetchedDetails: 1,
+      failedDetails: 0,
+      pending: 0
+    });
+    const r = await call('POST', { action: 'collectChunk', source: 'divar', cursor: null });
+    expect(r.body).toMatchObject({ ok: true, source: 'divar', done: true, cityId: '7', fetchedDetails: 1 });
+    expect((r.body.seeds as unknown[]).length).toBe(1);
+    expect(h.dbCalled).not.toHaveBeenCalled();
+    expect(h.collectChunk.mock.calls[0][0]).toMatchObject({ city: 'ahvaz', source: 'divar' });
   });
 
-  it('finalize از بافر همان نشست → Snapshot ساخته می‌شود', async () => {
-    const res = await call('POST', { action: 'finalize' });
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.persisted).toBe(false);
-    expect(res.body.snapshot.source).toBe('divar');
-    expect(res.body.snapshot.cleaning.market).toBeGreaterThanOrEqual(1);
+  it('collectChunk: منبع شیپور و کرسر پاس داده می‌شود؛ منبع نامعتبر → دیوار', async () => {
+    h.collectChunk.mockResolvedValue({ source: 'sheypoor', cursor: {}, seeds: [], cityId: 'ahvaz', done: true, fetchedDetails: 0, failedDetails: 0, pending: 0 });
+    await call('POST', { action: 'collectChunk', source: 'sheypoor', cursor: { source: 'sheypoor', cityId: 'ahvaz', pagesRead: 2 } });
+    expect(h.collectChunk.mock.calls[0][0].source).toBe('sheypoor');
+    expect(h.collectChunk.mock.calls[0][0].cursor.pagesRead).toBe(2);
+    await call('POST', { action: 'collectChunk', source: 'evil' });
+    expect(h.collectChunk.mock.calls[1][0].source).toBe('divar');
   });
 
-  it('finalize با آگهی‌های پس‌فرستاده کلاینت — تحمل چرخش/سردشدن instance', async () => {
-    // شبیه‌سازی: کلاینت آگهی جدیدی دارد که در بافر این نشست نیست
-    const extra = {
-      token: 'c3',
-      url: 'https://divar.ir/v/c3',
-      city: 'ahvaz',
-      cityId: '6',
-      neighborhood: 'کیانپارس',
-      neighborhoodKey: 'kianpars',
-      propertyKind: 'apartment',
-      areaSqm: 110,
-      rooms: 3,
-      yearBuilt: 1399,
-      floor: 2,
-      totalPriceToman: 110 * 51_000_000,
-      pricePerSqmToman: 51_000_000,
-      parking: true,
-      elevator: true,
-      storage: null,
-      balcony: null,
-      title: null,
-      listedAt: null,
-      scrapedAt: Date.now(),
-      source: 'divar'
-    };
-    // + یک توکن تکراری که نباید دو بار شمرده شود
-    const res = await call('POST', { action: 'finalize', listings: [extra, { ...extra, token: 'a1' }] });
-    expect(res.body.ok).toBe(true);
-    // a1 و b2 از بافر + c3 از body → سه آگهی (تکراری حذف شد)
-    expect(res.body.snapshot.cleaning.raw).toBe(3);
+  it('collectChunk: خطای شبکه منبع → ok:false صریح (نه ۵۰۰)', async () => {
+    h.collectChunk.mockRejectedValue(new TypeError('fetch failed'));
+    const r = await call('POST', { action: 'collectChunk', source: 'divar' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: false, source: 'divar', error: 'source unreachable' });
   });
 
-  it('finalize بدون هیچ آگهی‌ای → خطای صریح، نه کرش', async () => {
-    const res = await call('POST', { action: 'finalize', listings: [] });
-    // بافر این نشست از تست‌های قبل پر است؛ پس اینجا «ناشناخته» نیست —
-    // فقط قرارداد پاسخ بررسی می‌شود.
-    expect(res.status).toBe(200);
-    expect(typeof res.body.ok).toBe('boolean');
+  it('diagnose: وضعیت هر منبع جداگانه', async () => {
+    h.fetchCities.mockResolvedValue([{ id: 7, slug: 'ahvaz', name: 'اهواز' }]);
+    h.fetchListPage.mockResolvedValue({
+      list_widgets: [{ widget_type: 'POST_ROW', data: { action: { payload: { token: 'a', web_info: {} } } } }]
+    });
+    h.fetchSheypoorList.mockRejectedValue(new TypeError('fetch failed'));
+    const r = await call('POST', { action: 'diagnose' });
+    const results = r.body.results as Record<string, { ok: boolean; listings: number; error?: string }>;
+    expect(results.divar).toMatchObject({ ok: true, listings: 1 });
+    expect(results.sheypoor).toMatchObject({ ok: false, error: 'source unreachable' });
   });
 
-  it('اکشن ناشناخته → 400', async () => {
-    const res = await call('POST', { action: 'bogus' });
-    expect(res.status).toBe(400);
+  it('persist بدون دیتابیس → ok با persisted:false', async () => {
+    const r = await call('POST', { action: 'persist', listings: [], snapshot: null });
+    expect(r.body).toEqual({ ok: true, persisted: false });
+  });
+
+  it('GET بدون دیتابیس → configured:false و فهرست خالی', async () => {
+    const r = await call('GET');
+    expect(r.body).toEqual({ configured: false, listings: [], snapshots: [] });
+  });
+
+  it('متد/اکشن نامعتبر', async () => {
+    expect((await call('PUT')).status).toBe(405);
+    expect((await call('POST', { action: 'x' })).status).toBe(400);
   });
 });

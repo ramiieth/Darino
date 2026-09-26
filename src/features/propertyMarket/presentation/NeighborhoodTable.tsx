@@ -70,12 +70,13 @@ export function NeighborhoodTable({ rows }: { rows: NeighborhoodMarketRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="data-table min-w-[640px]">
+      <table className="data-table min-w-[720px]">
         <caption className="sr-only">مناطق — میانه قیمت هر مترمربع</caption>
         <thead>
           <tr>
             <th scope="col" className="!ps-5">منطقه</th>
-            {th('toman', 'تومان/متر')}
+            {th('toman', 'میانه تومان/متر')}
+            <th scope="col" className="col-num">میانگین</th>
             {th('usd', 'دلار/متر')}
             {th('futureUsd', 'دلار آینده')}
             {th('usdChange', 'تغییر دلاری')}
@@ -95,6 +96,7 @@ export function NeighborhoodTable({ rows }: { rows: NeighborhoodMarketRow[] }) {
                 <span className="ms-1 text-xs text-muted">({toFaDigits(r.listingCount)} آگهی)</span>
               </td>
               <td className="col-num">{r.medianTomanPerM2 !== null ? fmtMillionToman(r.medianTomanPerM2) : '—'}</td>
+              <td className="col-num text-muted">{fmtMillionToman(r.meanTomanPerM2)}</td>
               <td className="col-num"><MoneyValue value={r.currentUsdPerM2} /></td>
               <td className="col-num text-muted"><MoneyValue value={r.futureUsdPerM2} /></td>
               <td className="col-num">

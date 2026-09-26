@@ -27,7 +27,7 @@ describe('normalizeAndValidate', () => {
   it('محله دیوار → کلید کاتالوگ (کیانپارس)', () => {
     const l = normalizeAndValidate(seed(50_000_000), 'ahvaz', '3', 100, newCleaningReport());
     expect(l).not.toBeNull();
-    expect(l!.neighborhoodKey).toBe('kianpars');
+    expect(l!.neighborhoodKey).toBe('kianpars-other');
     expect(l!.city).toBe('ahvaz');
     expect(l!.pricePerSqmToman).toBe(50_000_000);
   });

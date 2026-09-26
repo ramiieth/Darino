@@ -1,104 +1,52 @@
 /** ============================================================
- * /api/propertyMarket — بازار املاک (کلکشنر Divar + Snapshot)
+ * /api/propertyMarket — کلکشنر سرور-سمت بازار املاک (بدون حالت)
  *
- * GET                    → آگهی‌ها + Snapshotها (برای داشبورد)
- * POST collectChunk      → یک تکه کلکشن از دیوار (فهرست + جزئیات)
- *                           پارس/اعتبارسنجی/حذف تکراری → ذخیره در Neon
- * POST finalize          → ساخت Snapshot جدید از همه آگهی‌ها
- *                           (پرت‌گیری + آمار میانه/میانگین — الحاق، نه رونویسی)
+ * POST ping           → سلامت خودِ این فانکشن (بدون دیتابیس، بدون شبکه بیرونی)
+ * POST diagnose       → تست زنده دسترسی سرور به دیوار و شیپور (زمان پاسخ/خطا)
+ * POST collectChunk   → یک تکه کلکشن از منبع (divar | sheypoor) → seedهای پارس‌شده
+ * POST persist        → پشتیبان اختیاری در Neon (آگهی‌ها + Snapshot) — best-effort
+ * GET                 → آگهی/Snapshotهای پشتیبان Neon (اگر تنظیم شده باشد)
  *
- * ⚠️ مرورگر مستقیم به دیوار نمی‌زند (CORS) — فقط این فانکشن.
- * ⚠️ کلکشنر: بازنویسی تایپ‌اسکریپت مرجع `mobin-torabi/divar-house-scraper`
- *    مطابق معماری دارینو (کپی مستقیم نشده است).
- *
- * حالت بدون دیتابیس (DATABASE_URL تنظیم نشده یا خطا):
- *   کلکشن دیوار ذاتاً به Neon نیاز ندارد — فقط واکشی سرور-سمت از دیوار است.
- *   در این حالت آگهی‌ها در بافر درون‌حافظهٔ همین instance نگه‌داری می‌شوند،
- *   آگهی‌های جدید هر تکه در پاسخ به کلاینت برمی‌گردند (`persisted: false`)
- *   و کلاینت آن‌ها را در finalize پس می‌فرستد تا حتی با سردشدن/چرخش
- *   instanceها (Vercel) Snapshot کامل ساخته شود. ذخیره نهایی سمت کلاینت
- *   در IndexedDB انجام می‌شود.
+ * طراحی (بازطراحی ۲۰۲۶-۰۹):
+ *  - اپ تک‌کاربره است؛ پاک‌سازی، حذف تکراری و Snapshot سمت کلاینت (IndexedDB)
+ *    انجام می‌شود. این فانکشن فقط «پراکسی واکشی» است و هیچ وابستگی‌ای به
+ *    دیتابیس در مسیر کلکشن ندارد (قبلاً خطای Neon/health کلکشن را متوقف می‌کرد).
+ *  - مرورگر به‌دلیل CORS مستقیم به دیوار/شیپور نمی‌زند؛ مسیر جایگزین بدون
+ *    سرور «پل مرورگر» است (src/features/propertyMarket/bridge).
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
 import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
 import { ensureSchema } from './_schema.js';
-import { collectChunk, type CollectCursor } from '../src/features/propertyMarket/collector/run.js';
-import {
-  deduplicateListings,
-  filterOutliers,
-  newCleaningReport,
-  normalizeAndValidate
-} from '../src/features/propertyMarket/collector/pipeline.js';
-import { buildCityStats, buildNeighborhoodStats } from '../src/features/propertyMarket/domain/stats.js';
-import { neighborhoodDisplayName } from '../src/features/propertyMarket/data/catalog.js';
+import { collectChunk, sanitizeCursor, COLLECT_SOURCES } from '../src/features/propertyMarket/collector/run.js';
+import { fetchCities, fetchListPage, matchCity } from '../src/features/propertyMarket/collector/client.js';
+import { parseListPage } from '../src/features/propertyMarket/collector/parse.js';
+import { fetchSheypoorList, parseSheypoorList } from '../src/features/propertyMarket/collector/sheypoor.js';
+import { PROPERTY_CITIES } from '../src/features/propertyMarket/data/catalog.js';
 import type {
-  NeighborhoodStatsRecord,
+  ListingSource,
   PropertyMarketListing,
   PropertyMarketSnapshot
 } from '../src/features/propertyMarket/domain/types.js';
 
-interface StoredRow {
-  token: string;
-  payload: PropertyMarketListing | string;
-}
+/** سقف زمان هر تکه — زیر maxDuration=60 در vercel.json */
+const CHUNK_TIME_BUDGET_MS = 38_000;
+const MAX_PERSIST_LISTINGS = 3000;
 
-/** payloadهای JSONB ممکن است به‌صورت آبجکت یا رشته برگردند */
 function fromJsonb<T>(p: T | string): T {
   return typeof p === 'string' ? (JSON.parse(p) as T) : p;
 }
 
-/* ---------------- بافر درون‌حافظه (حالت بدون دیتابیس) ----------------
- * روی یک instance گرم بین درخواست‌های متوالی کلکشن زنده می‌ماند؛
- * برای ایمنی در برابر چرخش/سردشدن instance، کلاینت آگهی‌های دریافتی
- * را در finalize پس می‌فرستد و بافر از آن‌ها بازسازی می‌شود. */
-const memListings = new Map<string, PropertyMarketListing[]>();
-const memSnapshots = new Map<string, PropertyMarketSnapshot[]>();
-
-async function loadListingsDb(userId: string): Promise<PropertyMarketListing[]> {
-  const rows = (await db()`
-    SELECT token, payload FROM "pmListings"
-    WHERE "userId" = ${userId}
-  `) as unknown as StoredRow[];
-  return rows.map((r) => fromJsonb<PropertyMarketListing>(r.payload));
+function isSource(v: unknown): v is ListingSource {
+  return typeof v === 'string' && (COLLECT_SOURCES as string[]).includes(v);
 }
 
-async function upsertListingsDb(userId: string, listings: PropertyMarketListing[]): Promise<number> {
-  let added = 0;
-  for (const l of listings) {
-    const res = await db()`
-      INSERT INTO "pmListings" ("userId", token, city, payload, "listedAt", "scrapedAt")
-      VALUES (${userId}, ${l.token}, ${l.city}, ${JSON.stringify(l)}::jsonb, ${l.listedAt}, ${l.scrapedAt})
-      ON CONFLICT ("userId", token) DO UPDATE SET
-        payload = EXCLUDED.payload,
-        "listedAt" = EXCLUDED."listedAt",
-        "scrapedAt" = GREATEST("pmListings"."scrapedAt", EXCLUDED."scrapedAt")
-      RETURNING token
-    `;
-    if (res.length > 0) added += 1;
-  }
-  return added;
+/** پیام خطای شبکه قابل فهم (fetch failed نود مبهم است) */
+function netError(e: unknown): string {
+  const raw = e instanceof Error ? e.message.slice(0, 160) : '';
+  if (!raw || raw === 'fetch failed' || /aborted|abort/i.test(raw)) return 'source unreachable';
+  return raw;
 }
 
-/** ادغام آگهی‌ها بر اساس توکن (بدون رونویسی — اولین نسخه هر توکن می‌ماند) */
-function mergeByToken(
-  base: PropertyMarketListing[],
-  incoming: unknown[]
-): { merged: PropertyMarketListing[]; fresh: PropertyMarketListing[] } {
-  const known = new Set(base.map((l) => l.token));
-  const merged = [...base];
-  const fresh: PropertyMarketListing[] = [];
-  for (const item of incoming) {
-    if (!item || typeof item !== 'object') continue;
-    const l = item as PropertyMarketListing;
-    if (typeof l.token !== 'string' || l.token.length === 0 || known.has(l.token)) continue;
-    known.add(l.token);
-    merged.push(l);
-    fresh.push(l);
-  }
-  return { merged, fresh };
-}
-
-/** آیا دیتابیس قابل استفاده است؟ (تنظیم‌شده + اتصال/schema سالم) */
 async function isDbUsable(): Promise<boolean> {
   if (!isDbConfigured()) return false;
   try {
@@ -108,28 +56,51 @@ async function isDbUsable(): Promise<boolean> {
   }
 }
 
+/** تست زنده یک منبع: یک درخواست فهرست بدون تلاش مجدد */
+async function probeSource(source: ListingSource): Promise<{ ok: boolean; ms: number; listings: number; error?: string }> {
+  const started = Date.now();
+  const city = PROPERTY_CITIES[0];
+  try {
+    if (source === 'divar') {
+      const cities = await fetchCities();
+      const hit = matchCity(cities, city.divarSlugHints);
+      if (!hit) return { ok: false, ms: Date.now() - started, listings: 0, error: 'city not found' };
+      const page = await fetchListPage({ cityId: String(hit.id) });
+      const n = parseListPage(page).seeds.size;
+      return { ok: n > 0, ms: Date.now() - started, listings: n, error: n > 0 ? undefined : 'empty response' };
+    }
+    const page = await fetchSheypoorList({ citySlug: city.sheypoorSlug });
+    const n = parseSheypoorList(page, city.name).seeds.size;
+    return { ok: n > 0, ms: Date.now() - started, listings: n, error: n > 0 ? undefined : 'empty response' };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - started, listings: 0, error: netError(e) };
+  }
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const userId = userIdOf(req);
-  const useDb = await isDbUsable();
-
   try {
-    /* ---------- GET: آگهی‌ها + Snapshotها ---------- */
+    /* ---------- GET: پشتیبان Neon (اختیاری) ---------- */
     if (req.method === 'GET') {
-      if (!useDb) {
-        // حالت بدون دیتابیس — داده‌های همین جلسه کلکشن (ممکن است خالی باشد)
-        json(res, 200, {
-          configured: false,
-          listings: memListings.get(userId) ?? [],
-          snapshots: memSnapshots.get(userId) ?? []
-        });
+      if (!(await isDbUsable())) {
+        json(res, 200, { configured: false, listings: [], snapshots: [] });
         return;
       }
-      const listings = await loadListingsDb(userId);
-      const snapRows = (await db()`
-        SELECT payload FROM "pmSnapshots" WHERE "userId" = ${userId} ORDER BY "dateTs" ASC LIMIT 200
-      `) as unknown as { payload: PropertyMarketSnapshot | string }[];
-      const snapshots = snapRows.map((r) => fromJsonb<PropertyMarketSnapshot>(r.payload));
-      json(res, 200, { configured: true, listings, snapshots });
+      try {
+        const rows = (await db()`
+          SELECT payload FROM "pmListings" WHERE "userId" = ${userId}
+        `) as unknown as { payload: PropertyMarketListing | string }[];
+        const snapRows = (await db()`
+          SELECT payload FROM "pmSnapshots" WHERE "userId" = ${userId} ORDER BY "dateTs" ASC LIMIT 200
+        `) as unknown as { payload: PropertyMarketSnapshot | string }[];
+        json(res, 200, {
+          configured: true,
+          listings: rows.map((r) => fromJsonb(r.payload)),
+          snapshots: snapRows.map((r) => fromJsonb(r.payload))
+        });
+      } catch {
+        json(res, 200, { configured: false, listings: [], snapshots: [] });
+      }
       return;
     }
 
@@ -141,129 +112,78 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const body = await readBody(req);
     const action = typeof body.action === 'string' ? body.action : '';
 
-    /* ---------- POST collectChunk ---------- */
-    if (action === 'collectChunk') {
-      const cursor = (body.cursor as CollectCursor | null | undefined) ?? undefined;
-      // اسکوپ فعلی فقط اهواز است (§ مأموریت) — شهرهای بعدی توسعه‌پذیرند
-      const city = 'ahvaz' as const;
-
-      let result;
-      try {
-        result = await collectChunk({ city, cursor });
-      } catch (e) {
-        const raw = e instanceof Error ? e.message.slice(0, 160) : '';
-        // پیام‌های مبهم شبکه (مثل fetch failed نود) → پیام صریح درباره دیوار
-        const error = !raw || raw === 'fetch failed' ? 'divar unreachable' : raw;
-        json(res, 200, { ok: false, error });
-        return;
-      }
-
-      // پاک‌سازی تکه + ادغام با موجودی (حذف تکراری)
-      const existing = useDb
-        ? await loadListingsDb(userId)
-        : (memListings.get(userId) ?? []);
-      const report = newCleaningReport();
-      const valid: PropertyMarketListing[] = [];
-      const scrapedAt = Date.now();
-      for (const seed of result.seeds) {
-        const l = normalizeAndValidate(seed, city, result.cityId, scrapedAt, report);
-        if (l) valid.push(l);
-      }
-      const merged = deduplicateListings(valid, existing, report);
-      // فقط آگهی‌های جدید ذخیره شوند
-      const known = new Set(existing.map((l) => l.token));
-      const fresh = merged.filter((l) => !known.has(l.token));
-
-      if (useDb) {
-        const added = fresh.length > 0 ? await upsertListingsDb(userId, fresh) : 0;
-        json(res, 200, {
-          ok: true,
-          done: result.done,
-          cursor: result.cursor,
-          added,
-          fetchedDetails: result.fetchedDetails,
-          failedDetails: result.failedDetails,
-          report,
-          persisted: true
-        });
-        return;
-      }
-
-      // حالت بدون دیتابیس → بافر محلی + بازگشت آگهی‌های جدید به کلاینت
-      memListings.set(userId, [...existing, ...fresh]);
-      json(res, 200, {
-        ok: true,
-        done: result.done,
-        cursor: result.cursor,
-        added: fresh.length,
-        fetchedDetails: result.fetchedDetails,
-        failedDetails: result.failedDetails,
-        report,
-        persisted: false,
-        listings: fresh
-      });
+    /* ---------- ping: فقط زنده‌بودن فانکشن ---------- */
+    if (action === 'ping') {
+      json(res, 200, { ok: true, service: 'darino-property-market', sources: COLLECT_SOURCES, ts: Date.now() });
       return;
     }
 
-    /* ---------- POST finalize → Snapshot جدید (الحاق، نه رونویسی) ---------- */
-    if (action === 'finalize') {
-      let all = useDb
-        ? await loadListingsDb(userId)
-        : (memListings.get(userId) ?? []);
+    /* ---------- diagnose: دسترسی سرور به منابع ---------- */
+    if (action === 'diagnose') {
+      const [divar, sheypoor] = await Promise.all([probeSource('divar'), probeSource('sheypoor')]);
+      json(res, 200, { ok: true, results: { divar, sheypoor } });
+      return;
+    }
 
-      // آگهی‌های پس‌فرستاده‌شده از کلاینت (حالت بدون دیتابیس — تضمین کامل
-      // بودن داده حتی اگر بافر این instance به‌دلیل چرخش از دست رفته باشد)
-      if (Array.isArray(body.listings) && body.listings.length > 0) {
-        const { merged, fresh } = mergeByToken(all, body.listings as unknown[]);
-        all = merged;
-        if (useDb && fresh.length > 0) await upsertListingsDb(userId, fresh);
-        if (!useDb) memListings.set(userId, merged);
+    /* ---------- collectChunk ---------- */
+    if (action === 'collectChunk') {
+      const source: ListingSource = isSource(body.source) ? body.source : 'divar';
+      const cursor = sanitizeCursor(body.cursor, source);
+      try {
+        const r = await collectChunk({
+          city: 'ahvaz',
+          source,
+          cursor,
+          pauseMs: 350,
+          timeBudgetMs: CHUNK_TIME_BUDGET_MS
+        });
+        json(res, 200, {
+          ok: true,
+          source,
+          done: r.done,
+          cursor: r.cursor,
+          cityId: r.cityId,
+          seeds: r.seeds,
+          fetchedDetails: r.fetchedDetails,
+          failedDetails: r.failedDetails,
+          pending: r.pending
+        });
+      } catch (e) {
+        json(res, 200, { ok: false, source, error: netError(e) });
       }
+      return;
+    }
 
-      if (all.length === 0) {
-        json(res, 200, { ok: false, error: 'no listings collected yet' });
+    /* ---------- persist: پشتیبان اختیاری ---------- */
+    if (action === 'persist') {
+      if (!(await isDbUsable())) {
+        json(res, 200, { ok: true, persisted: false });
         return;
       }
-      const report = newCleaningReport();
-      report.raw = all.length;
-      report.normalized = all.length;
-      report.valid = all.length;
-      const market = filterOutliers(all, report);
-      report.market = market.length;
-
-      const dateTs = Date.now();
-      const keys = [...new Set(market.map((l) => l.neighborhoodKey).filter((k): k is string => !!k))];
-      const neighborhoodStats: NeighborhoodStatsRecord[] = keys.map((key) => ({
-        neighborhoodKey: key,
-        displayName: neighborhoodDisplayName(key),
-        stats: buildNeighborhoodStats(market, key)
-      }));
-
-      const snapshot: PropertyMarketSnapshot = {
-        id: `pmsnap-${dateTs}`,
-        dateTs,
-        dateLabel: new Date(dateTs).toISOString().slice(0, 10),
-        city: 'ahvaz',
-        source: 'divar',
-        fxRateAtSnapshotToman: null, // نرخ دلار زنده در لایه سرویس اپ اعمال می‌شود
-        cityStats: buildCityStats(market),
-        neighborhoodStats,
-        cleaning: report,
-        createdAt: dateTs
-      };
-
-      if (useDb) {
+      const listings = (Array.isArray(body.listings) ? body.listings : [])
+        .slice(0, MAX_PERSIST_LISTINGS)
+        .filter((l): l is PropertyMarketListing =>
+          !!l && typeof l === 'object' && typeof (l as PropertyMarketListing).token === 'string'
+        );
+      for (const l of listings) {
+        await db()`
+          INSERT INTO "pmListings" ("userId", token, city, payload, "listedAt", "scrapedAt")
+          VALUES (${userId}, ${l.token}, ${l.city ?? 'ahvaz'}, ${JSON.stringify(l)}::jsonb, ${l.listedAt ?? null}, ${l.scrapedAt ?? Date.now()})
+          ON CONFLICT ("userId", token) DO UPDATE SET
+            payload = EXCLUDED.payload,
+            "listedAt" = EXCLUDED."listedAt",
+            "scrapedAt" = GREATEST("pmListings"."scrapedAt", EXCLUDED."scrapedAt")
+        `;
+      }
+      const snap = body.snapshot as PropertyMarketSnapshot | undefined;
+      if (snap && typeof snap === 'object' && typeof snap.id === 'string' && typeof snap.dateTs === 'number') {
         await db()`
           INSERT INTO "pmSnapshots" (id, "userId", "dateTs", payload, "createdAt")
-          VALUES (${snapshot.id}, ${userId}, ${dateTs}, ${JSON.stringify(snapshot)}::jsonb, ${dateTs})
+          VALUES (${snap.id}, ${userId}, ${snap.dateTs}, ${JSON.stringify(snap)}::jsonb, ${snap.createdAt ?? Date.now()})
           ON CONFLICT ("userId", id) DO NOTHING
         `;
-      } else {
-        const snaps = memSnapshots.get(userId) ?? [];
-        if (!snaps.some((s) => s.id === snapshot.id)) snaps.push(snapshot);
-        memSnapshots.set(userId, snaps);
       }
-      json(res, 200, { ok: true, snapshot, persisted: useDb });
+      json(res, 200, { ok: true, persisted: true, listings: listings.length });
       return;
     }
 

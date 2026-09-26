@@ -5,7 +5,7 @@
  * ⚠️ نرخ فعلی فقط از منبع موجود دلار (تنظیمات اپ) خوانده می‌شود؛
  *    نرخ آینده یک «فرض سناریو» است که با همان مقدار اولیه می‌شود.
  * ============================================================ */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
@@ -19,8 +19,11 @@ export function ScenarioPanel({
   currentRate,
   fxHydrated,
   onChange,
-  onReset
+  onReset,
+  rateField
 }: {
+  /** نمایش نرخ فعلی (نرخ زنده تتر) — جایگزین فیلد ثابت */
+  rateField?: ReactNode;
   scenario: PropertyMarketScenario;
   currentRate: number | null;
   fxHydrated: boolean;
@@ -73,8 +76,8 @@ export function ScenarioPanel({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="نرخ دلار فعلی" hint="از تنظیمات اپ تغییر می‌کند">
-          <div className="flex h-10 items-center rounded-field bg-surface-2 px-3.5 text-sm font-semibold text-ink">
+        <Field label="نرخ دلار فعلی (تتر)" hint={rateField ? 'زنده — هر دقیقه به‌روز می‌شود' : 'از تنظیمات اپ تغییر می‌کند'}>
+          {rateField ?? <div className="flex h-10 items-center rounded-field bg-surface-2 px-3.5 text-sm font-semibold text-ink">
             {fxHydrated && currentRate !== null ? (
               <span>
                 <span className="num-ltr">{toFaDigits(fmtIntLatin(currentRate))}</span> تومان
@@ -82,7 +85,7 @@ export function ScenarioPanel({
             ) : (
               '—'
             )}
-          </div>
+          </div>}
         </Field>
         <Field label="نرخ دلار آینده (فرض)" hint="با Enter یا خروج از فیلد اعمال می‌شود">
           <Input

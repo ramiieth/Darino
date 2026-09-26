@@ -64,6 +64,16 @@ export function resetRemoteStatus(): void {
   health = null;
 }
 
+/**
+ * مسیر کامل API — همه فراخواننده‌ها مسیر را با «/api/…» می‌دهند؛ قبلاً
+ * API_BASE دوباره اضافه می‌شد («/api/api/health» → ۴۰۴) و در نتیجه سرور
+ * همیشه «در دسترس نیست» دیده می‌شد. پیشوند فقط اگر نبود اضافه می‌شود.
+ */
+export function apiUrl(path: string): string {
+  if (path === API_BASE || path.startsWith(`${API_BASE}/`)) return path;
+  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 /** درخواست JSON به API سرور (با Timeout و هدر userId) */
 export async function fetchJson<T>(
   path: string,
@@ -73,7 +83,7 @@ export async function fetchJson<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(apiUrl(path), {
       method,
       headers: {
         accept: 'application/json',

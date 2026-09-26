@@ -8,8 +8,9 @@
  *  - ارقام فارسی/عربی → لاتین؛ قیمت کل/هر متر از جدول مشخصات.
  * ⚠️ ساختار دیوار ممکن است تغییر کند — هیچ دسترسی عمیق بدون گارد نیست.
  * ============================================================ */
-import type { PropertyKind } from '../domain/types.js';
+import type { ListingSource, PropertyKind } from '../domain/types.js';
 import { DIVAR_POST_PAGE_URL } from './endpoints.js';
+import { otherCityMarker } from '../data/catalog.js';
 
 /* ---------------- ابزار اعداد/متن ---------------- */
 
@@ -86,7 +87,10 @@ function yesNoFromTitle(title: string): boolean {
 /* ---------------- ساختار مشترک خروجی پارس ---------------- */
 
 export interface ParsedListingSeed {
+  /** شناسه یکتا — دیوار: توکن خام؛ شیپور: «sh-{id}» (بدون برخورد بین منابع) */
   token: string;
+  /** منبع آگهی */
+  source: ListingSource;
   title: string | null;
   neighborhood: string | null;
   propertyKind: PropertyKind;
@@ -102,11 +106,14 @@ export interface ParsedListingSeed {
   balcony: boolean | null;
   listedAt: number | null;
   url: string;
+  /** نشانه «ملک در شهر دیگر» در متن آگهی (مثل «پونک») — پاک‌سازی رد می‌کند */
+  otherCity?: string | null;
 }
 
-export function emptySeed(token: string): ParsedListingSeed {
+export function emptySeed(token: string, source: ListingSource = 'divar'): ParsedListingSeed {
   return {
     token,
+    source,
     title: null,
     neighborhood: null,
     propertyKind: 'unknown',
@@ -169,6 +176,12 @@ export function applySpec(seed: ParsedListingSeed, faTitle: string, raw: unknown
   }
 }
 
+/** قیمت تومانی از متن نمایشی — فقط وقتی واحد «تومان» صریحاً آمده باشد */
+export function priceFromText(v: unknown): number | null {
+  if (typeof v !== 'string' || !v.includes('تومان')) return null;
+  return parseIntLoose(v);
+}
+
 /* ---------------- پارس صفحه فهرست ---------------- */
 
 /**
@@ -207,6 +220,9 @@ export function parseListPage(
     // قیمت/متراژ فرصت‌طلبانه از خود ردیف (اگر دیوار ارائه دهد)
     const price = parseIntLoose((payload as Record<string, unknown>).price ?? (data as Record<string, unknown>).price);
     if (price !== null) seed.totalPriceToman = price;
+    // ساختار فعلی دیوار: قیمت کل به‌صورت متن در middle_description_text
+    // («۳,۱۰۰,۰۰۰,۰۰۰ تومان») — «توافقی»/«پیش‌فروش» نادیده گرفته می‌شوند.
+    if (seed.totalPriceToman === null) seed.totalPriceToman = priceFromText(data.middle_description_text);
     const size = parseIntLoose((wi as Record<string, unknown>).size ?? (payload as Record<string, unknown>).size);
     if (size !== null) seed.areaSqm = size;
     // برخی نسخه‌ها قیمت هر متر را مستقیم دارند
@@ -307,7 +323,11 @@ export function parseIntoSeed(seed: ParsedListingSeed, detail: Record<string, un
           if (cat && CATEGORY_KIND[cat]) seed.propertyKind = CATEGORY_KIND[cat];
         }
       }
-    } else if (wt === 'DESCRIPTION_ROW' && seed.listedAt === null) {
+    } else if (wt === 'DESCRIPTION_ROW' && !seed.otherCity) {
+      // متن توضیحات: نشانه ملکِ شهر دیگر (آژانس‌های تهران در دسته اهواز)
+      seed.otherCity = otherCityMarker(typeof d.text === 'string' ? d.text : null);
+    }
+    if (wt === 'DESCRIPTION_ROW' && seed.listedAt === null) {
       // زمان ثبت اگر دیوار در جزئیات ارائه کند (اختیاری)
       const ts = parseIntLoose(d.date ?? d.created_at);
       if (ts !== null) seed.listedAt = ts;

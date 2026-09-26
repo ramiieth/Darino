@@ -1,0 +1,198 @@
+{
+ "sections": [
+  {
+   "section_name": "BREADCRUMB",
+   "widgets": [
+    {
+     "widget_type": "BREADCRUMB",
+     "data": {
+      "@type": "type.googleapis.com/widgets.BreadcrumbData",
+      "parent_items": [
+       {
+        "title": "املاک",
+        "action": {
+         "type": "OPEN_POSTLIST_PAGE_GRPC",
+         "payload": {
+          "@type": "type.googleapis.com/widgets.OpenPostListPageGRPCPayload",
+          "search_data": {
+           "form_data": {
+            "data": {
+             "category": {
+              "str": {
+               "value": "real-estate"
+              }
+             }
+            }
+           }
+          },
+          "source_view": "CATEGORY_BREAD_CRUMB",
+          "source_view_str": "CATEGORY_BREAD_CRUMB"
+         }
+        }
+       },
+       {
+        "title": "فروش مسکونی",
+        "action": {
+         "type": "OPEN_POSTLIST_PAGE_GRPC",
+         "payload": {
+          "@type": "type.googleapis.com/widgets.OpenPostListPageGRPCPayload",
+          "search_data": {
+           "form_data": {
+            "data": {
+             "category": {
+              "str": {
+               "value": "residential-sell"
+              }
+             }
+            }
+           }
+          },
+          "source_view": "CATEGORY_BREAD_CRUMB",
+          "source_view_str": "CATEGORY_BREAD_CRUMB"
+         }
+        }
+       },
+       {
+        "title": "فروش آپارتمان",
+        "action": {
+         "type": "OPEN_POSTLIST_PAGE_GRPC",
+         "payload": {
+          "@type": "type.googleapis.com/widgets.OpenPostListPageGRPCPayload",
+          "search_data": {
+           "form_data": {
+            "data": {
+             "category": {
+              "str": {
+               "value": "apartment-sell"
+              }
+             }
+            }
+           }
+          },
+          "source_view": "CATEGORY_BREAD_CRUMB",
+          "source_view_str": "CATEGORY_BREAD_CRUMB"
+         }
+        }
+       }
+      ],
+      "current_page_title": "آپارتمان 90 متری ، 2 خواب ،تک واحدی",
+      "padded": true
+     }
+    }
+   ]
+  },
+  {
+   "section_name": "DESCRIPTION",
+   "widgets": [
+    {
+     "widget_type": "DESCRIPTION_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.DescriptionRowData",
+      "text": "با سلام و احترام\nکد:1678\nفروش \n✅آپارتمان حدود 90 متر\n✅2 خواب \n✅طبقه سوم\n✅ تک واحدی\n✅کل طبقات 3 طبقه\n✅خوش نقشه\n✅تراس دارد\n✖️فاقد پارکینگ و آسانسور\n✳️در حال تخلیه\n⭕قیمت :3.050.000.000⭕\n⚡آدرس ملک:«خیابان خوانساری نبش رضایی » ⚡",
+      "is_primary": true,
+      "text_alignment": "RIGHT"
+     }
+    }
+   ]
+  },
+  {
+   "section_name": "LIST_DATA",
+   "widgets": [
+    {
+     "widget_type": "GROUP_INFO_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.GroupInfoRow",
+      "items": [
+       {
+        "title": "متراژ",
+        "value": "۹۰"
+       },
+       {
+        "title": "ساخت",
+        "value": "۱۳۸۷"
+       },
+       {
+        "title": "اتاق",
+        "value": "۲"
+       }
+      ],
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.UnexpandableRowData",
+      "title": "تصویر‌ها برای همین ملک است؟",
+      "value": "خیر",
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.UnexpandableRowData",
+      "title": "قیمت کل",
+      "value": "‏۳,۱۰۰,۰۰۰,۰۰۰ تومان",
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.UnexpandableRowData",
+      "title": "قیمت هر متر",
+      "value": "‏۳۴,۴۴۴,۰۰۰ تومان",
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.UnexpandableRowData",
+      "title": "طبقه",
+      "value": "۳ از ۳",
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "GROUP_FEATURE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.GroupFeatureRow",
+      "items": [
+       {
+        "title": "آسانسور ندارد",
+        "icon": {
+         "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/icon_hint/v1/elevator.png",
+         "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/icon_hint/v1/elevator.png",
+         "icon_name": "ELEVATOR",
+         "icon_color": "ICON_HINT"
+        }
+       },
+       {
+        "title": "پارکینگ ندارد",
+        "icon": {
+         "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/icon_hint/v1/parking.png",
+         "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/icon_hint/v1/parking.png",
+         "icon_name": "PARKING",
+         "icon_color": "ICON_HINT"
+        }
+       },
+       {
+        "title": "انباری",
+        "icon": {
+         "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/icon_secondary/v1/cabinet.png",
+         "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/icon_secondary/v1/cabinet.png",
+         "icon_name": "CABINET",
+         "icon_color": "ICON_SECONDARY"
+        },
+        "available": true
+       }
+      ],
+      "has_divider": true
+     }
+    }
+   ]
+  }
+ ]
+}

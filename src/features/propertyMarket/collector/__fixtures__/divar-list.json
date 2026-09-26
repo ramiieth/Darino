@@ -1,0 +1,270 @@
+{
+ "list_widgets": [
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "آپارتمان 90 متری ، 2 خواب ،تک واحدی",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "gagCBuEm",
+      "web_info": {
+       "title": "آپارتمان 90 متری ، 2 خواب ،تک واحدی",
+       "district_persian": "۳۰ متری",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_gagCBuEm_P"
+     }
+    },
+    "bottom_description_text": "در ۳۰ متری",
+    "red_text": "پله شده",
+    "middle_description_text": "۳,۱۰۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 1,
+    "token": "gagCBuEm",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_gagCBuEm_P",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "gagCBuEm",
+      "index": 0,
+      "post_type": "PELLE",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "sort": {
+         "value": "sort_date"
+        },
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ],
+        "category": {
+         "value": "apartment-sell"
+        }
+       },
+       "search_uid": "d606db66-ce89-4e6d-a001-04ec89d2fd3b",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"apartment-sell\"}}}}",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\", \"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-09-08T13:46:31.911686Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  },
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "پنت هوس ۲۲۰ متر سالن بزرگ حیاط دیزاین سبز",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "gaf-aCiX",
+      "web_info": {
+       "title": "پنت هوس ۲۲۰ متر سالن بزرگ حیاط دیزاین سبز",
+       "district_persian": "زیتون کارمندی",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_gaf-aCiX_P"
+     }
+    },
+    "bottom_description_text": "املاک دی در زیتون کارمندی",
+    "red_text": "پله شده",
+    "middle_description_text": "۳۷,۴۰۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 1,
+    "token": "gaf-aCiX",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_gaf-aCiX_P",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "gaf-aCiX",
+      "index": 1,
+      "post_type": "PELLE",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "category": {
+         "value": "apartment-sell"
+        },
+        "sort": {
+         "value": "sort_date"
+        },
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ]
+       },
+       "search_uid": "d606db66-ce89-4e6d-a001-04ec89d2fd3b",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"apartment-sell\"}}}}",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\", \"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-09-25T14:14:03.331800Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  },
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "۹۰ متر/ گنجینه نور برای سخت پسندان/کیانپارس شرقی",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "garqLV-E",
+      "web_info": {
+       "title": "۹۰ متر/ گنجینه نور برای سخت پسندان/کیانپارس شرقی",
+       "district_persian": "کیانپارس ",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_garqLV-E_N"
+     }
+    },
+    "bottom_description_text": "آژانس هلدینگ باما در کیانپارس",
+    "red_text": "نردبان شده",
+    "middle_description_text": "۱۱,۷۰۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 1,
+    "token": "garqLV-E",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "d606db66-ce89-4e6d-a001-04ec89d2fd3b_garqLV-E_N",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "garqLV-E",
+      "index": 0,
+      "post_type": "SEARCH",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ],
+        "category": {
+         "value": "apartment-sell"
+        },
+        "sort": {
+         "value": "sort_date"
+        }
+       },
+       "search_uid": "d606db66-ce89-4e6d-a001-04ec89d2fd3b",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"apartment-sell\"}}}}",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\", \"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-09-26T12:33:17.085242Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  }
+ ],
+ "pagination": {
+  "has_next_page": true,
+  "data": {
+   "@type": "type.googleapis.com/post_list.PaginationData",
+   "last_post_date": "2026-09-26T12:15:21.722493Z",
+   "page": 1,
+   "layer_page": 1,
+   "search_uid": "d606db66-ce89-4e6d-a001-04ec89d2fd3b",
+   "cumulative_widgets_count": 26,
+   "viewed_tokens": "H4sIAAAAAAAE/ySO0U7DMAxFf8iRNsrGeCwj0xBZEYxEWd8cpTVpKTRBLaVfj9y9Xd17rGPCFJUREgiz4Q6tA8JfFOP6BQi/iu/i9Q0I05847DQQ+u15bwIwrI4fAxDGh+lebvg8utreAKEW74Vtlkb50xkIu65cKeRp3z6XE0+7S20qIFxfQlseWdr5zx+GDzH6bctMcJtRLCH1j/xYFpzUmpsqnfLba+hzlmaVMrMFQrlq5qf8PwAA//+GDaCd1wAAAA==",
+   "search_bookmark_info": {
+    "search_hash": "54e151ab7610ce2780997ee4feddba4d",
+    "bookmark_state": {},
+    "alert_state": {}
+   },
+   "first_page_viewed_at": "2026-09-26T12:33:18.327481523Z",
+   "filters_hash": "VOFRq3YQzieAmX7k/t26TQ=="
+  },
+  "is_first_page": true
+ }
+}

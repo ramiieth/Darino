@@ -105,6 +105,7 @@ export function migrateLegacySnapshot(legacy: LegacySnapshot): PropertyMarketSna
     city: 'ahvaz',
     source: 'manual-legacy',
     fxRateAtSnapshotToman: Number.isFinite(legacy.usdRate) && legacy.usdRate > 0 ? legacy.usdRate : null,
+    fxSource: 'manual-legacy',
     cityStats: buildAreaStats(allValues),
     neighborhoodStats,
     cleaning,
