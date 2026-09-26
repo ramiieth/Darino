@@ -1,82 +1,69 @@
 /** ============================================================
- * MarketsPage — صفحه واحد Markets (بازطراحی سبک)
+ * MarketsPage — Markets module body
  *
- *  تب‌ها:
- *   - همه:      Crypto Top 200 + Ondo + xStocks (هر Symbol یک Row)
- *   - رمزارز:   Crypto Top 200
- *   - توکنایز:  Ondo + xStocks
- *   - سنتی:     کاتالوگ مرجع (قیمت مرجع — بدون داده جعلی)
+ *  Tabs (page sections):
+ *   - همه:        Crypto Top 200 + Ondo + xStocks (one row per symbol)
+ *   - رمزارز:     Crypto Top 200
+ *   - توکن‌ایز:   Ondo + xStocks (source chips)
+ *   - سنتی:       reference catalogue (reference prices — no fake live data)
  *
- *  همه از Pipeline مرکزی می‌خوانند — بدون درخواست مستقیم در Render.
+ *  All reads come from the central pipeline — no requests in render.
  * ============================================================ */
-import { useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { useMarketsStore, refreshAllMarkets } from '../pipeline/store';
+import { useEffect, useMemo, useState } from 'react';
+import { useMarketsStore } from '../pipeline/store';
 import { MarketsTable } from './MarketsTable';
 import { TradFiTable } from './TradFiTable';
-import { cn } from '@/shared/lib/cn';
+import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { useUiStore } from '@/shared/store/uiStore';
 import type { MarketUniverse } from '../pipeline/types';
 
-type Tab = 'all' | 'crypto' | 'tokenized' | 'tradfi';
+export type MarketsTab = 'all' | 'crypto' | 'tokenized' | 'tradfi';
 
-const TABS: { value: Tab; label: string }[] = [
+const TABS: { value: MarketsTab; label: string }[] = [
   { value: 'all', label: 'همه' },
   { value: 'crypto', label: 'رمزارز' },
   { value: 'tokenized', label: 'دارایی توکن‌ایز' },
   { value: 'tradfi', label: 'سنتی (TradFi)' }
 ];
 
-export function MarketsPage() {
-  const [tab, setTab] = useState<Tab>('all');
-  const loading = useMarketsStore((s) => s.loading);
+export const TAB_UNIVERSES: Record<Exclude<MarketsTab, 'tradfi'>, MarketUniverse[]> = {
+  all: ['crypto_top_200', 'ondo_tokenized', 'xstocks'],
+  crypto: ['crypto_top_200'],
+  tokenized: ['ondo_tokenized', 'xstocks']
+};
 
-  const anyLoading = useMemo(
-    () => loading.crypto_top_200 || loading.ondo_tokenized || loading.xstocks,
-    [loading]
+export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange: (t: MarketsTab) => void }) {
+  // search handed over from the command palette (consumed once)
+  const marketSearch = useUiStore((s) => s.marketSearch);
+  const setMarketSearch = useUiStore((s) => s.setMarketSearch);
+  const [initialQuery, setInitialQuery] = useState('');
+  useEffect(() => {
+    if (marketSearch) {
+      setInitialQuery(marketSearch);
+      onTabChange('all');
+      setMarketSearch('');
+    }
+  }, [marketSearch, setMarketSearch, onTabChange]);
+
+  const counts = useMarketsStore((s) => s.data);
+  const tabs = useMemo(
+    () =>
+      TABS.map((t) =>
+        t.value === 'tradfi'
+          ? t
+          : { ...t, badge: TAB_UNIVERSES[t.value].reduce((n, u) => n + counts[u].length, 0) }
+      ),
+    [counts]
   );
 
   return (
-    <div className="space-y-4">
-      {/* سربرگ */}
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-[15px] font-black text-ink">بازار</h1>
-          <p className="mt-0.5 text-[10px] font-bold text-muted">
-            داده زنده از Provider — فقط اطلاعات لازم منتقل می‌شود؛ هر Symbol مستقل است
-          </p>
-        </div>
-        <button
-          onClick={refreshAllMarkets}
-          disabled={anyLoading}
-          className="flex shrink-0 items-center gap-1.5 rounded-full glass-inset px-3 py-1.5 text-[10px] font-black text-ink transition-all hover:text-accent disabled:opacity-50"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', anyLoading && 'animate-spin')} />
-          همگام‌سازی
-        </button>
-      </div>
+    <div className="space-y-5">
+      <Tabs label="دسته بازار" options={tabs} value={tab} onChange={onTabChange} />
 
-      {/* تب‌ها */}
-      <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition-all',
-              tab === t.value ? 'bg-accent text-white shadow-glow' : 'glass-inset text-muted hover:text-ink'
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'all' && (
-        <MarketsTable universes={['crypto_top_200', 'ondo_tokenized', 'xstocks']} title="همه بازارها" />
-      )}
-      {tab === 'crypto' && <MarketsTable universes={['crypto_top_200']} title="۲۰۰ رمزارز برتر (مارکت‌کپ)" />}
+      {tab === 'all' && <MarketsTable universes={TAB_UNIVERSES.all} title="همه بازارها" initialQuery={initialQuery} />}
+      {tab === 'crypto' && <MarketsTable universes={TAB_UNIVERSES.crypto} title="۲۰۰ رمزارز برتر (ارزش بازار)" />}
       {tab === 'tokenized' && (
-        <MarketsTable universes={['ondo_tokenized', 'xstocks']} title="دارایی‌های توکن‌ایز (فقط Market Cap معتبر)" />
+        <MarketsTable universes={TAB_UNIVERSES.tokenized} title="دارایی‌های توکن‌ایز" sourceFilter />
       )}
       {tab === 'tradfi' && <TradFiTable />}
     </div>

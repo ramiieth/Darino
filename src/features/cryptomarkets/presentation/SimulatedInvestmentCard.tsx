@@ -1,21 +1,20 @@
 /**
- * شبیه‌سازی نمایشی سرمایه‌گذاری (Historical Performance Simulation)
+ * What-if (Historical Performance Simulation) — secondary, clearly hypothetical.
+ *   «If my current cash had been invested at the start of the period…»
+ *   result = capital × (1 + period return)
  *
- * کنار کارت «عملکرد» — صرفاً یک سناریوی فرضی:
- *  «اگر ۲۳٬۱۲۶ دلار در ابتدای دوره روی این نماد سرمایه‌گذاری می‌کردم…»
- *  نتیجه احتمالی امروز = سرمایه × (۱ + بازده بازه)
- *
- * ⚠️ کاملاً مستقل و نمایشی:
- *  - هیچ ارتباطی با حسابداری، دفتر کل، ثبت تراکنش و موجودی واقعی ندارد
- *  - هیچ داده‌ای به سیستم مالی اپ منتقل نمی‌شود
- *  - از همان داده استور «عملکرد» (usePerfStore) می‌خواند → همیشه هماهنگ
+ * Fully independent and illustrative: no link to accounting, ledgers or balances.
+ * Reads the same performance store as «Market movers» → always in sync.
  */
-import { useMemo } from 'react';
-import { FlaskConical, TrendingUp, TrendingDown, Info } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { useMemo, useState } from 'react';
+import { FlaskConical } from 'lucide-react';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { AssetLogo } from '@/shared/components/ui/AssetLogo';
+import { Button } from '@/shared/components/ui/Button';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
 import {
   useTopPerformers,
   rankRows,
@@ -24,108 +23,28 @@ import {
   type PerfPeriod
 } from '@/features/cryptomarkets/data/useTopPerformers';
 import { useInvestableCash, investableCashOr } from '@/shared/hooks/useInvestableCash';
-import { fmtUSD, fmtPct } from '@/shared/utils/formatters';
-import { cn } from '@/shared/lib/cn';
+import { fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { t } from '@/shared/i18n/fa';
+import { PERF_PERIODS } from './TopPerformersCard';
 
-const PERIODS: { value: PerfPeriod; label: string }[] = [
-  { value: '1d', label: t('perf1d') },
-  { value: '7d', label: t('perf7d') },
-  { value: '30d', label: t('perf30') },
-  { value: '60d', label: t('perf60') },
-  { value: '90d', label: t('perf90') }
-];
-
-function SimRow({
-  coin,
-  pct,
-  periodLabel,
-  capital
-}: {
-  coin: PerfCoin;
-  pct: number;
-  periodLabel: string;
-  capital: number;
-}) {
+function WhatIfRow({ coin, pct, capital }: { coin: PerfCoin; pct: number; capital: number }) {
   const { profit, finalValue } = simulateInvestment(capital, pct);
-  const isLoss = profit !== null && profit < 0;
-
   return (
-    <div className="rounded-2xl bg-line/5 p-2.5">
-      {/* سربرگ نماد */}
-      <div className="flex items-center gap-2.5">
-        <AssetLogo symbol={coin.symbol} kind={coin.kind} size={26} />
-        <div className="min-w-0 flex-1">
-          <p className="tnum truncate text-[11px] font-extrabold text-ink">{coin.symbol}</p>
-          <p className="truncate text-[9px] font-medium text-muted">{coin.nameFa}</p>
-        </div>
-        <span
-          className={cn(
-            'badge shrink-0 ring-1',
-            pct >= 0
-              ? 'bg-positive/10 text-positive ring-positive/20'
-              : 'bg-negative/10 text-negative ring-negative/20'
-          )}
-        >
-          {periodLabel}: {fmtPct(pct)}
-        </span>
+    <li className="flex items-center gap-3 py-2.5">
+      <AssetLogo symbol={coin.symbol} kind={coin.kind} size={28} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-ink">{coin.nameFa}</p>
+        <PercentValue value={pct} className="text-xs" />
       </div>
-      {/* نتیجه شبیه‌سازی */}
-      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] font-medium">
-        <span className="text-muted">{t('hypCapital')}</span>
-        <span className="num-ltr text-end font-bold text-ink">{fmtUSD(capital)}</span>
-        <span className={isLoss ? 'text-negative' : 'text-positive'}>
-          {isLoss ? t('hypLoss') : t('hypGain')}
-        </span>
-        <span
-          className={cn(
-            'num-ltr text-end font-black',
-            isLoss ? 'text-negative' : 'text-positive'
-          )}
-        >
-          {profit !== null ? `${profit >= 0 ? '+' : ''}${fmtUSD(profit)}` : '—'}
-        </span>
-        <span className="text-muted">{t('hypFinalValue')}</span>
-        <span className="num-ltr text-end font-black text-ink">
-          {finalValue !== null ? fmtUSD(finalValue) : '—'}
-        </span>
+      <div className="shrink-0 text-end">
+        <p className="text-sm font-semibold text-ink">
+          <MoneyValue value={finalValue} />
+        </p>
+        <p className="text-xs">
+          <MoneyValue value={profit} signed tone="auto" />
+        </p>
       </div>
-    </div>
-  );
-}
-
-function SimBlock({
-  title,
-  icon,
-  rows,
-  tone,
-  periodLabel,
-  capital
-}: {
-  title: string;
-  icon: React.ReactNode;
-  rows: { coin: PerfCoin; pct: number }[];
-  tone: 'up' | 'down';
-  periodLabel: string;
-  capital: number;
-}) {
-  return (
-    <div className="glass-soft rounded-2xl p-3">
-      <p
-        className={cn(
-          'mb-1.5 flex items-center gap-1.5 text-[11px] font-black',
-          tone === 'up' ? 'text-positive' : 'text-negative'
-        )}
-      >
-        {icon}
-        {title}
-      </p>
-      <div className="space-y-2">
-        {rows.map((r) => (
-          <SimRow key={r.coin.symbol} coin={r.coin} pct={r.pct} periodLabel={periodLabel} capital={capital} />
-        ))}
-      </div>
-    </div>
+    </li>
   );
 }
 
@@ -133,85 +52,93 @@ export function SimulatedInvestmentCard({
   period: periodProp,
   onPeriodChange
 }: {
-  /** بازه کنترل‌شده (همگام با کارت عملکرد) — اختیاری */
   period?: PerfPeriod;
   onPeriodChange?: (p: PerfPeriod) => void;
 }) {
   const { coins, perf1d, perf7d, perf30, perf60, perf90, loading, historyDone } = useTopPerformers();
   const investable = useInvestableCash();
-  // سرمایه فرضی = موجودی نقد واقعی و به‌روز (پس از برداشت‌های مخارج کاهش می‌یابد)
+  // hypothetical capital = current real cash balance
   const capital = investableCashOr(investable.cash);
   const period = periodProp ?? '30d';
+  const [expanded, setExpanded] = useState(false);
 
   const perf =
-    period === '1d' ? perf1d
-    : period === '7d' ? perf7d
-    : period === '30d' ? perf30
-    : period === '60d' ? perf60
-    : perf90;
-  // ۳۰ نماد بیشترین رشد / بیشترین افت
+    period === '1d' ? perf1d : period === '7d' ? perf7d : period === '30d' ? perf30 : period === '60d' ? perf60 : perf90;
   const { gainers, losers } = useMemo(() => rankRows(coins, perf, 30), [coins, perf]);
   const noData = gainers.length === 0 && losers.length === 0;
-
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? t('perf30');
+  const limit = expanded ? 30 : 3;
 
   return (
-    <GlassCard variant="soft" className="p-4">
-      {/* سربرگ */}
-      <div className="mb-2.5 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-400/15 text-teal-400">
-          <FlaskConical className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-black text-ink">{t('hypTitle')}</h3>
-        </div>
-      </div>
-
-      {/* سوییچ بازه — هماهنگ با کارت عملکرد */}
-      <SegmentedControl
-        options={PERIODS}
-        value={period}
-        onChange={onPeriodChange ?? (() => undefined)}
-        className="mb-3"
-      />
-
-      {/* بدنه */}
-      {loading && noData ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-          ))}
-        </div>
-      ) : noData ? (
-        <p className="rounded-2xl bg-line/5 px-4 py-6 text-center text-[11px] font-bold leading-6 text-muted">
-          {historyDone ? t('perfUnavailable') : t('perfEmpty')}
-        </p>
-      ) : (
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          <SimBlock
-            title={t('topGainers')}
-            icon={<TrendingUp className="h-3.5 w-3.5" />}
-            rows={gainers}
-            tone="up"
-            periodLabel={periodLabel}
-            capital={capital}
+    <Section
+      id="whatif"
+      title={t('hypTitle')}
+      description={`اگر ${fmtUSD(capital)} (موجودی نقد فعلی) در ابتدای بازه سرمایه‌گذاری شده بود`}
+    >
+      <Surface className="p-4 md:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SegmentedControl
+            options={PERF_PERIODS}
+            value={period}
+            onChange={onPeriodChange ?? (() => undefined)}
+            label="بازه زمانی"
+            size="sm"
           />
-          <SimBlock
-            title={t('topLosers')}
-            icon={<TrendingDown className="h-3.5 w-3.5" />}
-            rows={losers}
-            tone="down"
-            periodLabel={periodLabel}
-            capital={capital}
-          />
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+            <FlaskConical aria-hidden className="h-3.5 w-3.5" />
+            فرضی — بدون اثر روی حساب‌ها
+          </span>
         </div>
-      )}
 
-      {/* سلب مسئولیت */}
-      <p className="mt-3 flex items-start gap-1.5 text-[9px] font-medium leading-4 text-muted/70">
-        <Info className="mt-0.5 h-3 w-3 shrink-0" />
-        {t('hypDisclaimer')}
-      </p>
-    </GlassCard>
+        <div className="mt-4">
+          {loading && noData ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : noData ? (
+            <p className="rounded-field bg-surface-2 px-4 py-6 text-center text-sm text-muted">
+              {historyDone ? t('perfUnavailable') : t('perfEmpty')}
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+                <div>
+                  <h3 className="mb-1 text-sm font-semibold text-positive">{t('topGainers')}</h3>
+                  <ul className="divide-y divide-divider">
+                    {gainers.slice(0, limit).map((r) => (
+                      <WhatIfRow key={r.coin.symbol} coin={r.coin} pct={r.pct} capital={capital} />
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="mb-1 text-sm font-semibold text-negative">{t('topLosers')}</h3>
+                  <ul className="divide-y divide-divider">
+                    {losers.slice(0, limit).map((r) => (
+                      <WhatIfRow key={r.coin.symbol} coin={r.coin} pct={r.pct} capital={capital} />
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              {Math.max(gainers.length, losers.length) > 3 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 w-full text-accent"
+                  onClick={() => setExpanded((e) => !e)}
+                  aria-expanded={expanded}
+                >
+                  {expanded ? 'نمایش کمتر' : `نمایش ${toFaDigits(Math.max(gainers.length, losers.length))} مورد`}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+
+        <Notice tone="neutral" className="mt-4">
+          {t('hypDisclaimer')}
+        </Notice>
+      </Surface>
+    </Section>
   );
 }

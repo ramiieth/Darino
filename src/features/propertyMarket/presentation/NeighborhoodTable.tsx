@@ -8,7 +8,9 @@
 import { useState } from 'react';
 import { ArrowDownUp } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
-import { fmtIntLatin, fmtUSD, fmtPct } from '@/shared/utils/formatters';
+import { fmtIntLatin, toFaDigits } from '@/shared/utils/formatters';
+import { Badge } from '@/shared/components/ui/Badge';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { MARKET_SORT_FA, type MarketSortKey, type NeighborhoodMarketRow } from '../service/propertyMarketService';
 
 /** «۵۰ میلیون» — نمایش فشرده تومان/متر با ارقام فارسی */
@@ -18,17 +20,17 @@ export function fmtMillionToman(v: number | null): string {
   return `${fa.format(v / 1_000_000)}M`;
 }
 
+/** position vs the city median — neutral (above/below the median is not a gain or loss) */
 function PositionBadge({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-muted">—</span>;
-  const cls = pct > 5 ? 'bg-negative/10 text-negative' : pct < -5 ? 'bg-positive/10 text-positive' : 'bg-line/20 text-muted';
+  if (pct === null) return <span className="text-subtle">—</span>;
   return (
-    <span className={cn('num-ltr rounded-full px-1.5 py-0.5 text-[8px] font-extrabold', cls)}>
-      {pct >= 0 ? '+' : ''}{fmtIntLatin(Math.round(pct * 10) / 10)}٪
-    </span>
+    <Badge tone="neutral" ltr>
+      {pct > 0 ? '+' : ''}
+      {fmtIntLatin(Math.round(pct * 10) / 10)}%
+    </Badge>
   );
 }
 
-const SORT_KEYS: MarketSortKey[] = ['toman', 'usd', 'futureUsd', 'usdChange', 'distanceFromMedian'];
 
 export function NeighborhoodTable({ rows }: { rows: NeighborhoodMarketRow[] }) {
   const [sortKey, setSortKey] = useState<MarketSortKey>('toman');
@@ -54,71 +56,55 @@ export function NeighborhoodTable({ rows }: { rows: NeighborhoodMarketRow[] }) {
   };
 
   if (rows.length === 0) {
-    return <p className="py-6 text-center text-[10px] font-bold text-muted">هنوز داده‌ای برای مناطق ثبت نشده است</p>;
+    return <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">هنوز داده‌ای برای مناطق ثبت نشده است</p>;
   }
 
-  return (
-    <div className="space-y-2">
-      {/* پریست‌های رتبه‌بندی سریع */}
-      <div className="flex flex-wrap gap-1.5">
-        {SORT_KEYS.map((k) => (
-          <button
-            key={k}
-            onClick={() => toggleSort(k)}
-            className={cn(
-              'flex items-center gap-1 rounded-full border px-2 py-1 text-[8px] font-extrabold transition-colors',
-              sortKey === k
-                ? 'border-accent/50 bg-accent/10 text-accent'
-                : 'border-line/15 bg-card text-muted hover:text-ink'
-            )}
-          >
-            {sortKey === k && <ArrowDownUp className="h-2.5 w-2.5" />}
-            {MARKET_SORT_FA[k]}
-          </button>
-        ))}
-      </div>
+  const th = (k: MarketSortKey, label: string) => (
+    <th scope="col" className="col-num" aria-sort={sortKey === k ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" onClick={() => toggleSort(k)} className={cn('inline-flex items-center gap-1 hover:text-ink', sortKey === k && 'text-ink')}>
+        {label}
+        <ArrowDownUp aria-hidden className={cn('h-3 w-3', sortKey !== k && 'opacity-40')} />
+      </button>
+    </th>
+  );
 
-      <div className="overflow-x-auto rounded-xl border border-line/10">
-        <table className="w-full min-w-[560px] text-right">
-          <thead>
-            <tr className="border-b border-line/10 bg-surface-2/50 text-[8px] font-extrabold text-muted">
-              <th className="px-2 py-2">منطقه</th>
-              <th className="px-2 py-2">تومان/متر</th>
-              <th className="px-2 py-2">دلار/متر</th>
-              <th className="px-2 py-2">دلار آینده</th>
-              <th className="px-2 py-2">تغییر دلاری</th>
-              <th className="px-2 py-2">نسبت به میانه</th>
+  return (
+    <div className="overflow-x-auto">
+      <table className="data-table min-w-[640px]">
+        <caption className="sr-only">مناطق — میانه قیمت هر مترمربع</caption>
+        <thead>
+          <tr>
+            <th scope="col" className="!ps-5">منطقه</th>
+            {th('toman', 'تومان/متر')}
+            {th('usd', 'دلار/متر')}
+            {th('futureUsd', 'دلار آینده')}
+            {th('usdChange', 'تغییر دلاری')}
+            <th scope="col" className="!pe-5" aria-sort={sortKey === 'distanceFromMedian' ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+              <button type="button" onClick={() => toggleSort('distanceFromMedian')} className={cn('inline-flex items-center gap-1 hover:text-ink', sortKey === 'distanceFromMedian' && 'text-ink')}>
+                {MARKET_SORT_FA.distanceFromMedian}
+                <ArrowDownUp aria-hidden className={cn('h-3 w-3', sortKey !== 'distanceFromMedian' && 'opacity-40')} />
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((r) => (
+            <tr key={r.neighborhoodKey}>
+              <td className="!ps-5">
+                <span className="font-semibold text-ink">{r.displayName}</span>
+                <span className="ms-1 text-xs text-muted">({toFaDigits(r.listingCount)} آگهی)</span>
+              </td>
+              <td className="col-num">{r.medianTomanPerM2 !== null ? fmtMillionToman(r.medianTomanPerM2) : '—'}</td>
+              <td className="col-num"><MoneyValue value={r.currentUsdPerM2} /></td>
+              <td className="col-num text-muted"><MoneyValue value={r.futureUsdPerM2} /></td>
+              <td className="col-num">
+                <PercentValue value={r.usdChangePercent !== null ? Math.round(r.usdChangePercent * 10) / 10 : null} digits={1} />
+              </td>
+              <td className="!pe-5"><PositionBadge pct={r.positionVsCityPct} /></td>
             </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => (
-              <tr key={r.neighborhoodKey} className="border-b border-line/5 text-[10px] font-bold last:border-0">
-                <td className="px-2 py-2">
-                  <span className="text-ink">{r.displayName}</span>
-                  <span className="mr-1 text-[7px] font-medium text-muted">
-                    ({fmtIntLatin(r.listingCount)} آگهی)
-                  </span>
-                </td>
-                <td className="num-ltr px-2 py-2 text-ink">
-                  {r.medianTomanPerM2 !== null ? fmtMillionToman(r.medianTomanPerM2) : '—'}
-                </td>
-                <td className="num-ltr px-2 py-2 text-ink">
-                  {r.currentUsdPerM2 !== null ? fmtUSD(r.currentUsdPerM2) : '—'}
-                </td>
-                <td className="num-ltr px-2 py-2 text-indigo-300">
-                  {r.futureUsdPerM2 !== null ? fmtUSD(r.futureUsdPerM2) : '—'}
-                </td>
-                <td className={cn('num-ltr px-2 py-2 font-extrabold', r.usdChangePercent === null ? 'text-muted' : r.usdChangePercent >= 0 ? 'text-positive' : 'text-negative')}>
-                  {r.usdChangePercent !== null ? fmtPct(Math.round(r.usdChangePercent * 10) / 10) : '—'}
-                </td>
-                <td className="px-2 py-2">
-                  <PositionBadge pct={r.positionVsCityPct} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

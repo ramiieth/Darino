@@ -1,5 +1,6 @@
 /**
- * نمودارهای مشترک ماشین‌حساب‌ها (Chart.js — RTL)
+ * Calculator charts — Chart.js on the shared chart theme.
+ * Colours are design tokens (chart-1…6 for series, gain/loss for signed bars).
  */
 import {
   Chart as ChartJS,
@@ -13,8 +14,9 @@ import {
   Filler
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { fmtUSD } from '@/shared/utils/formatters';
+import { axisUsd, baseChartOptions, cssColor, SERIES, type ChartToken } from '@/shared/design/chartTheme';
 
 ChartJS.register(LineElement, PointElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
@@ -30,103 +32,100 @@ export function fmtFaDate(ts: number): string {
 
 export function LineChartCard({
   title,
+  description,
   labels,
   datasets,
-  height = 180,
-  prefix = '$'
+  height = 220,
+  prefix = '$',
+  suffix = ''
 }: {
   title: string;
+  description?: string;
   labels: string[];
-  datasets: { label: string; data: number[]; color: string; fill?: boolean }[];
+  /** `color` is a chart token; series without one take chart-1…6 in order */
+  datasets: { label: string; data: number[]; color?: ChartToken; fill?: boolean; dashed?: boolean }[];
   height?: number;
-  prefix?: string;
+  prefix?: '$' | '';
+  suffix?: string;
 }) {
+  const fmt = (v: number) => (prefix === '$' ? fmtUSD(v) : `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}${suffix}`);
+  const options = baseChartOptions({
+    legend: datasets.length > 1,
+    formatTooltip: (v) => fmt(v),
+    formatY: prefix === '$' ? axisUsd : (v) => `${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}${suffix}`
+  });
   return (
-    <GlassCard className="p-4">
-      <h4 className="mb-3 text-[12px] font-extrabold text-ink">{title}</h4>
-      <div style={{ height }}>
+    <Surface className="p-4 md:p-5">
+      <h3 className="text-sm font-bold text-ink">{title}</h3>
+      {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+      <div className="mt-3" style={{ height }} dir="ltr">
         <Line
           data={{
             labels,
-            datasets: datasets.map((d) => ({
-              label: d.label,
-              data: d.data,
-              borderColor: d.color,
-              backgroundColor: d.color + '22',
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.3,
-              fill: d.fill ?? false
-            }))
+            datasets: datasets.map((d, i) => {
+              const token = d.color ?? SERIES[i % SERIES.length];
+              return {
+                label: d.label,
+                data: d.data,
+                borderColor: cssColor(token),
+                backgroundColor: cssColor(token, 0.08),
+                borderWidth: 2,
+                borderDash: d.dashed ? [4, 4] : undefined,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                fill: d.fill ?? false
+              };
+            })
           }}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { labels: { font: { family: 'Vazirmatn' }, color: '#94a3b8', boxWidth: 10 } },
-              tooltip: {
-                rtl: true,
-                textDirection: 'rtl',
-                callbacks: {
-                  label: (c) => ` ${c.dataset.label}: ${prefix === '$' ? fmtUSD(c.parsed.y) : c.parsed.y}`
-                }
-              }
-            },
-            scales: {
-              x: { ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
-              y: { grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { font: { size: 9 } } }
-            }
-          }}
+          options={options as never}
         />
       </div>
-    </GlassCard>
+    </Surface>
   );
 }
 
 export function BarChartCard({
   title,
+  description,
   labels,
   values,
-  height = 160
+  height = 200,
+  unit = '$'
 }: {
   title: string;
+  description?: string;
   labels: string[];
   values: number[];
   height?: number;
+  unit?: '$' | '%';
 }) {
+  const fmt = (v: number) => (unit === '$' ? fmtUSD(v) : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`);
+  const options = baseChartOptions({
+    formatTooltip: (v) => fmt(v),
+    formatY: unit === '$' ? axisUsd : (v) => `${v.toFixed(0)}%`,
+    maxXTicks: 10
+  });
   return (
-    <GlassCard className="p-4">
-      <h4 className="mb-3 text-[12px] font-extrabold text-ink">{title}</h4>
-      <div style={{ height }}>
+    <Surface className="p-4 md:p-5">
+      <h3 className="text-sm font-bold text-ink">{title}</h3>
+      {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
+      <div className="mt-3" style={{ height }} dir="ltr">
         <Bar
           data={{
             labels,
             datasets: [
               {
                 data: values,
-                backgroundColor: values.map((v) => (v >= 0 ? 'rgba(4,120,87,0.75)' : 'rgba(225,29,72,0.75)')),
-                borderRadius: 6
+                backgroundColor: values.map((v) => (v >= 0 ? cssColor('gain', 0.85) : cssColor('loss', 0.85))),
+                borderRadius: 4,
+                maxBarThickness: 32
               }
             ]
           }}
-          options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                rtl: true,
-                textDirection: 'rtl',
-                callbacks: { label: (c) => ` ${fmtUSD(c.parsed.y)}` }
-              }
-            },
-            scales: {
-              x: { ticks: { maxTicksLimit: 8, font: { size: 9 } }, grid: { display: false } },
-              y: { grid: { color: 'rgba(148,163,184,0.12)' }, ticks: { font: { size: 9 } } }
-            }
-          }}
+          options={options as never}
         />
       </div>
-    </GlassCard>
+    </Surface>
   );
 }

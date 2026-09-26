@@ -1,22 +1,16 @@
 /**
- * نمودار بازده میانگین بر اساس دسته (Chart.js — ممیزی §۶)
- * میله‌ای افقی از میانگین بازده هر دسته در بازه فعال
+ * Average return by category — horizontal bars (answers: which asset class did best?)
  */
 import { useMemo } from 'react';
-import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, type ChartOptions } from 'chart.js';
+import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import type { TimelineResult } from '@/shared/types';
 import { t } from '@/shared/i18n/fa';
-import { fmtPctEn } from '@/shared/utils/formatters';
+import { fmtPct } from '@/shared/utils/formatters';
+import { baseChartOptions, cssColor } from '@/shared/design/chartTheme';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
-
-const COLORS: Record<string, string> = {
-  crypto: '#8b5cf6',
-  tokenized: '#0ea5e9',
-  tradfi: '#10b981'
-};
 
 export function CategoryReturnChart({ result }: { result: TimelineResult }) {
   const data = useMemo(() => {
@@ -27,63 +21,53 @@ export function CategoryReturnChart({ result }: { result: TimelineResult }) {
     ];
     for (const r of result.rows) {
       if (r.changePct === null) continue;
-      const group = cats.find((c) => c.key === r.kind);
-      group?.values.push(r.changePct);
+      cats.find((c) => c.key === r.kind)?.values.push(r.changePct);
     }
     return cats
       .filter((c) => c.values.length > 0)
-      .map((c) => ({
-        ...c,
-        avg: c.values.reduce((a, b) => a + b, 0) / c.values.length
-      }));
+      .map((c) => ({ ...c, avg: c.values.reduce((a, b) => a + b, 0) / c.values.length }));
   }, [result.rows]);
 
   if (data.length === 0) return null;
 
-  const chartData = {
-    labels: data.map((d) => d.label),
-    datasets: [
-      {
-        data: data.map((d) => d.avg),
-        backgroundColor: data.map((d) => COLORS[d.key] ?? '#94a3b8'),
-        borderRadius: 8,
-        barThickness: 22
-      }
-    ]
-  };
-
-  const options: ChartOptions<'bar'> = {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
+  const base = baseChartOptions({ formatTooltip: (v) => `میانگین بازده ${fmtPct(v)}` }) as Record<string, unknown>;
+  const scales = base.scales as { x: Record<string, unknown>; y: Record<string, unknown> };
+  const options = {
+    ...base,
+    indexAxis: 'y' as const,
     plugins: {
-      legend: { display: false },
+      ...(base.plugins as object),
       tooltip: {
-        rtl: true,
-        textDirection: 'rtl',
-        callbacks: {
-          label: (ctx) => {
-            const v = ctx.parsed as unknown as { x: number };
-            return ` میانگین بازده: ${fmtPctEn(v.x)}`;
-          }
-        }
+        ...((base.plugins as { tooltip: object }).tooltip),
+        callbacks: { label: (ctx: { parsed: { x: number } }) => ` میانگین بازده ${fmtPct(ctx.parsed.x)}` }
       }
     },
     scales: {
-      x: {
-        grid: { color: 'rgba(148,163,184,0.12)' },
-        ticks: { font: { family: 'Vazirmatn' }, color: '#94a3b8' }
-      },
-      y: { grid: { display: false }, ticks: { font: { family: 'Vazirmatn' }, color: '#94a3b8' } }
+      x: { ...scales.y, position: 'bottom', ticks: { ...(scales.y.ticks as object), callback: (v: number | string) => `${Number(v).toFixed(0)}%` } },
+      y: { ...scales.x, position: 'right' }
     }
   };
 
   return (
-    <GlassCard animated className="p-5">
-      <h3 className="mb-4 text-sm font-extrabold text-ink">میانگین بازده به تفکیک دسته</h3>
-      <div className="h-36">
-        <Bar data={chartData} options={options} />
+    <Surface className="p-4 md:p-5">
+      <h3 className="text-sm font-bold text-ink">میانگین بازده به تفکیک دسته</h3>
+      <p className="text-xs text-muted">میانگین ساده بازده دارایی‌های دارای داده در این بازه</p>
+      <div className="mt-3 h-40" dir="ltr">
+        <Bar
+          data={{
+            labels: data.map((d) => d.label),
+            datasets: [
+              {
+                data: data.map((d) => d.avg),
+                backgroundColor: data.map((d) => (d.avg >= 0 ? cssColor('gain', 0.85) : cssColor('loss', 0.85))),
+                borderRadius: 4,
+                barThickness: 20
+              }
+            ]
+          }}
+          options={options as never}
+        />
       </div>
-    </GlassCard>
+    </Surface>
   );
 }

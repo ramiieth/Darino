@@ -39,6 +39,8 @@ const enSig4 = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 4 });
 /** قیمت/ارزش دلاری: $ + ارقام لاتین (compact برای اعداد بزرگ) */
 export function fmtUSD(v: number | null | undefined, compact = false): string {
   if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
+  // علامت منفی پیش از نماد ارز: «-$12.50» (نه «$-12.50»)
+  if (v < 0) return `-${fmtUSD(-v, compact)}`;
   if (compact) return `$${enCompact.format(v)}`;
   // قیمت‌های زیر ۱ دلار — دقت بیشتر تا هیچ‌وقت $0.00 نمایش داده نشود
   if (v > 0 && v < 1) {
@@ -46,6 +48,15 @@ export function fmtUSD(v: number | null | undefined, compact = false): string {
     return `$${enPriceLow.format(v)}`;
   }
   return `$${enDecimal.format(v)}`;
+}
+
+/** مبلغ دلاری با علامت صریح برای سود/زیان: «+$12.50» / «-$12.50» / «$0.00» */
+export function fmtUsdSigned(v: number | null | undefined, compact = false): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
+  // amounts (P/L, flows) — always 2 decimals; the extra precision is for unit prices only
+  const abs = Math.abs(v);
+  const body = compact ? `$${enCompact.format(abs)}` : `$${enDecimal.format(abs)}`;
+  return v > 0 ? `+${body}` : v < 0 ? `-${body}` : body;
 }
 
 /** عدد لاتین با دو رقم اعشار (مثل مقدار ETH) */

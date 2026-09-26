@@ -55,37 +55,34 @@ export function InstallPromptSheet() {
   };
 
   return (
-    <Sheet open={promptVisible} onClose={closePrompt} title={t('installTitle')}>
-      <div className="space-y-4">
-        <div className="glass-inset flex items-start gap-3 rounded-2xl p-4">
-          {isIOS ? (
-            <Share className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-          ) : (
-            <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-          )}
-          <p className="text-xs font-medium leading-6 text-ink">
-            {t('installDescription')}
-            {isIOS && <span className="mt-1 block text-muted">{t('installIOSHint')}</span>}
-          </p>
+    <Sheet open={promptVisible} onClose={closePrompt} title={t('installTitle')} size="sm">
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-field bg-accent-soft text-accent">
+            {isIOS ? <Share className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+          </span>
+          <div className="text-sm leading-6 text-ink">
+            <p>{t('installDescription')}</p>
+            {isIOS && <p className="mt-1 text-muted">{t('installIOSHint')}</p>}
+          </div>
         </div>
+        <ul className="space-y-1.5 text-sm text-muted">
+          <li>• اجرای تمام‌صفحه، بدون نوار مرورگر</li>
+          <li>• نمایش آخرین داده‌های ذخیره‌شده در حالت آفلاین</li>
+          <li>• باز شدن سریع از صفحه اصلی دستگاه</li>
+        </ul>
 
         {!isIOS && deferredPrompt && (
-          <Button size="lg" className="w-full" onClick={handleInstall}>
-            <Download className="h-4 w-4" />
+          <Button size="lg" className="w-full" icon={<Download />} onClick={handleInstall}>
             {t('installButton')}
           </Button>
         )}
-        {isIOS && (
+        {(isIOS || !deferredPrompt) && (
           <Button size="lg" variant="outline" className="w-full" onClick={closePrompt}>
             {t('close')}
           </Button>
         )}
-
-        {installed && (
-          <p className="text-center text-xs font-bold text-positive">
-            ✓ {t('installedBadge')}
-          </p>
-        )}
+        {installed && <p className="text-center text-sm font-semibold text-positive">{t('installedBadge')}</p>}
       </div>
     </Sheet>
   );

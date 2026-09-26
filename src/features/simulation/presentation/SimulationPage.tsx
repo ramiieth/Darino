@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, SlidersHorizontal, CalendarRange, Layers } from 'lucide-react';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { RefreshCw, SlidersHorizontal, Layers } from 'lucide-react';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { Section } from '@/shared/components/ui/GlassCard';
+import { Notice } from '@/shared/components/ui/StateViews';
 import { Button } from '@/shared/components/ui/Button';
 import { TableSkeleton } from '@/shared/components/ui/Skeleton';
 import { useTimeline } from '@/features/simulation/data/useTimeline';
@@ -14,7 +14,7 @@ import { SimContextChips } from './SimContextChips';
 import { CategoryReturnChart } from './CategoryReturnChart';
 import { FiltersBar, type CategoryFilter, type SortKey } from './FiltersBar';
 import { startStockCycle } from '@/features/simulation/data/useStockPrices';
-import { normalizeForSearch, fmtUSD } from '@/shared/utils/formatters';
+import { normalizeForSearch } from '@/shared/utils/formatters';
 import { rowsToCsv, downloadCsv } from '@/shared/utils/csv';
 import { toast } from '@/shared/store/toastStore';
 import { t } from '@/shared/i18n/fa';
@@ -158,62 +158,58 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
   };
 
   return (
-    <div className="space-y-4">
+    <Page>
       <PageHeader
         title={t('simTitle')}
         subtitle={t('simSubtitle')}
         actions={
-          <Button variant="outline" size="sm" onClick={onOpenScenario}>
-            <SlidersHorizontal className="h-3.5 w-3.5" />
+          <Button variant="outline" size="sm" icon={<SlidersHorizontal />} onClick={onOpenScenario}>
             {t('customScenario')}
           </Button>
         }
       />
 
-      <SegmentedControl<TimelineTab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 't1', label: t('timeline1'), icon: <CalendarRange className="h-3.5 w-3.5" /> },
-          { value: 't2', label: t('timeline2'), icon: <CalendarRange className="h-3.5 w-3.5" /> }
-        ]}
-      />
+      <div className="space-y-4">
+        <Tabs<TimelineTab>
+          label="بازه زمانی"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 't1', label: t('timeline1') },
+            { value: 't2', label: t('timeline2') }
+          ]}
+        />
+        <p className="text-sm text-muted">
+          {tab === 't1' ? t('timeline1Desc') : t('timeline2DescTpl').replace('{n}', String(COVERAGE.tokenizedCount))}
+        </p>
+        <StockProgress result={result} onRefresh={() => startStockCycle()} />
+        <TokenSyncBar result={result} />
+      </div>
 
-      <motion.div key={tab} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <GlassCard variant="soft" className="px-4 py-3">
-          <p className="text-[11px] font-semibold leading-6 text-muted">
-            {tab === 't1'
-              ? t('timeline1Desc')
-              : t('timeline2DescTpl').replace('{n}', String(COVERAGE.tokenizedCount))}
-          </p>
-        </GlassCard>
-      </motion.div>
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <SimContextChips result={result} />
+        </div>
+        <div className="lg:col-span-7">
+          <CategoryReturnChart result={result} />
+        </div>
+      </div>
 
-      <StockProgress result={result} onRefresh={() => startStockCycle()} />
-      <TokenSyncBar result={result} />
+      <Section id="insights" title="یافته‌های کلیدی" description="فرضی و گذشته‌نگر — پیش‌بینی آینده نیست">
+        <AnalyticsCards result={result} timeline={timeline} />
+      </Section>
 
-      <SimContextChips result={result} />
-      <AnalyticsCards result={result} timeline={timeline} />
-      <CategoryReturnChart result={result} />
-
-      <FiltersBar
-        query={query}
-        onQuery={setQuery}
-        category={category}
-        onCategory={setCategory}
-        grouped={grouped}
-        onToggleGroup={() => setGrouped((g) => !g)}
-        onExport={exportCsv}
-      />
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${tab}-${result.totals.totalRows}`}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        >
+      <Section id="assets" title="همه دارایی‌ها">
+        <div className="space-y-4">
+          <FiltersBar
+            query={query}
+            onQuery={setQuery}
+            category={category}
+            onCategory={setCategory}
+            grouped={grouped}
+            onToggleGroup={() => setGrouped((g) => !g)}
+            onExport={exportCsv}
+          />
           <SimulationTable
             result={result}
             visibleRows={visibleRows}
@@ -223,13 +219,11 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
             onSort={handleSort}
             onSelectRow={setSelectedRow}
           />
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      </Section>
 
       <AssetDetailSheet row={selectedRow} onClose={() => setSelectedRow(null)} />
-
-      <div className="h-2" />
-    </div>
+    </Page>
   );
 }
 
@@ -249,48 +243,23 @@ function StockProgress({
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
-    <GlassCard
-      variant="soft"
-      className={cn('flex items-center gap-3 px-4 py-3', budgetExhausted && 'border-warn/30')}
+    <Notice
+      tone={budgetExhausted ? 'warn' : refreshing ? 'info' : 'neutral'}
+      title={refreshing ? t('refreshingStocks') : budgetExhausted ? t('avBudgetExhausted') : t('marketRefreshDone')}
+      action={
+        !refreshing && !budgetExhausted ? (
+          <Button variant="ghost" size="sm" icon={<RefreshCw />} onClick={onRefresh}>
+            {t('refresh')}
+          </Button>
+        ) : undefined
+      }
     >
-      <RefreshCw
-        className={cn('h-4 w-4 shrink-0', refreshing ? 'animate-spin text-accent' : budgetExhausted ? 'text-warn' : 'text-accent')}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold text-ink">
-          {refreshing
-            ? t('refreshingStocks')
-            : budgetExhausted
-              ? t('avBudgetExhausted')
-              : t('marketRefreshDone')}
-        </p>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line/10">
-          <div
-            className={cn(
-              'h-full rounded-full transition-all duration-700',
-              budgetExhausted ? 'bg-warn' : 'bg-accent'
-            )}
-            style={{ width: refreshing ? `${Math.max(pct, 4)}%` : '100%' }}
-          />
-        </div>
-        {/* سهمیه امروز */}
-        <p className="num-ltr mt-1 text-[10px] font-bold text-muted">
-          {t('avBudgetLabel')}: {used} / {budgetTotal}
-          {keys > 1 && ` · ${keys} کلید فعال`}
-        </p>
-      </div>
-      {refreshing && (
-        <span className="num-ltr shrink-0 text-[11px] font-black text-muted">
-          {done} {t('doneOf')} {total}
-        </span>
-      )}
-      {!refreshing && !budgetExhausted && (
-        <Button variant="ghost" size="sm" onClick={onRefresh}>
-          <RefreshCw className="h-3.5 w-3.5" />
-          {t('refresh')}
-        </Button>
-      )}
-    </GlassCard>
+      <span className="num-ltr">
+        {t('avBudgetLabel')}: {used} / {budgetTotal}
+        {keys > 1 && ` · ${keys} کلید فعال`}
+        {refreshing && ` · ${done}/${total} (${pct}%)`}
+      </span>
+    </Notice>
   );
 }
 
@@ -298,18 +267,14 @@ function StockProgress({
 function TokenSyncBar({ result }: { result: ReturnType<typeof useTimeline> }) {
   const { syncing, liveCount } = result.tokenizedStatus;
   if (!syncing && liveCount === 0) return null;
-
   return (
-    <GlassCard variant="soft" className="flex items-center gap-2.5 px-4 py-2.5">
-      <Layers className={cn('h-4 w-4 shrink-0 text-sky-400', syncing && 'animate-pulse-soft')} />
-      <p className="text-[11px] font-bold text-ink">
-        {syncing ? t('tokenizedSync') : `${t('tokenizedLiveCount')}: ${liveCount}`}
-      </p>
-    </GlassCard>
+    <p className="flex items-center gap-2 text-xs text-muted" role="status">
+      <Layers aria-hidden className={cn('h-4 w-4 shrink-0 text-subtle', syncing && 'animate-pulse-soft')} />
+      {syncing ? t('tokenizedSync') : `${t('tokenizedLiveCount')}: ${liveCount}`}
+    </p>
   );
 }
 
-export { fmtUSD as _fmtUSD };
 
 /** حالت بارگذاری اولیه */
 export function SimulationSkeleton() {

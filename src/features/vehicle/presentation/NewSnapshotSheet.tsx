@@ -11,14 +11,16 @@
  * ⚠️ Snapshot جدید ساخته می‌شود؛ Snapshotهای قبلی هرگز تغییر نمی‌کنند.
  * ⚠️ قیمت خالی = N/A (نه ۰).
  */
-import { useMemo, useState } from 'react';
-import { Save, AlertTriangle, PlusCircle, PencilLine } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Save, PlusCircle, PencilLine } from 'lucide-react';
 import { Sheet } from '@/shared/components/ui/Sheet';
-import { Input } from '@/shared/components/ui/Input';
+import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Notice } from '@/shared/components/ui/StateViews';
 import { useVehicleStore } from '../data/useVehicles';
 import { formatJalali, jalaaliToTimestamp, tsToJalaali } from '@/shared/utils/jalali';
-import { fmtTomanAmount, toFaDigits } from '@/shared/utils/formatters';
+import { toFaDigits } from '@/shared/utils/formatters';
 import { findExistingVehicle } from '../domain/engine';
 import type { NewSnapshotInput, Vehicle } from '../domain/types';
 import { cn } from '@/shared/lib/cn';
@@ -51,8 +53,8 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // پیش‌فرض قیمت‌ها از آخرین Snapshot (یک بار هنگام باز شدن)
-  useMemo(() => {
+  // پیش‌فرض قیمت‌ها از آخرین Snapshot (یک بار هنگام باز شدن) — اثر جانبی → useEffect
+  useEffect(() => {
     if (!open) return;
     if (!latest) return;
     const m: Record<string, string> = {};
@@ -197,192 +199,177 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="ثبت قیمت خودرو">
-      <div className="space-y-3">
-        <div className="rounded-lg border border-warn/20 bg-warn/5 px-2.5 py-2 text-[8px] font-medium leading-4 text-muted">
-          <AlertTriangle className="me-1 inline h-3 w-3 text-warn" />
-          این عمل یک Snapshot تاریخی جدید می‌سازد. قیمت‌های Snapshotهای قبلی به هیچ عنوان تغییر نمی‌کنند.
-          قیمت خالی = N/A (نه صفر).
-        </div>
-
-        {/* انتخاب حالت */}
-        <div className="flex gap-1 rounded-xl bg-surface-2/70 p-1">
-          <button
-            onClick={() => { setMode('update'); setError(''); }}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-black transition-colors',
-              mode === 'update' ? 'bg-card text-accent shadow-card' : 'text-muted hover:text-ink'
-            )}
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="ثبت قیمت خودرو"
+      description="یک Snapshot تاریخی جدید ساخته می‌شود؛ Snapshotهای قبلی تغییر نمی‌کنند. قیمت خالی = N/A (نه صفر)."
+      variant="panel"
+      size="lg"
+      footer={
+        <div className="space-y-2">
+          {error && <p className="text-sm text-negative" role="alert">{error}</p>}
+          {saved && <p className="text-sm text-positive" role="status">Snapshot ثبت شد — Snapshotهای قبلی تغییری نکردند.</p>}
+          <Button
+            onClick={() => void submit()}
+            className="w-full"
+            size="lg"
+            icon={<Save />}
+            disabled={saved || (mode === 'new-car' && !!dupVehicle)}
           >
-            <PencilLine className="h-3.5 w-3.5" /> به‌روزرسانی قیمت خودروهای موجود
-          </button>
-          <button
-            onClick={() => { setMode('new-car'); setError(''); }}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-black transition-colors',
-              mode === 'new-car' ? 'bg-card text-accent shadow-card' : 'text-muted hover:text-ink'
-            )}
-          >
-            <PlusCircle className="h-3.5 w-3.5" /> ثبت خودرو جدید
-          </button>
+            {mode === 'update' ? `ثبت Snapshot (${toFaDigits(visible.length)} خودرو)` : 'ثبت خودرو جدید و Snapshot'}
+          </Button>
         </div>
+      }
+    >
+      <div className="space-y-6">
+        <SegmentedControl<Mode>
+          label="نوع ثبت"
+          fill
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setError('');
+          }}
+          options={[
+            { value: 'update', label: 'به‌روزرسانی قیمت‌ها', icon: <PencilLine /> },
+            { value: 'new-car', label: 'خودرو جدید', icon: <PlusCircle /> }
+          ]}
+        />
 
-        {/* تاریخ + نرخ دلار (مشترک) */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">سال</label>
-            <Input dir="ltr" value={jy} onChange={(e) => setJy(e.target.value)} className="h-9 text-[10px] text-start" />
+        <fieldset className="space-y-3">
+          <legend className="mb-2 text-sm font-bold text-ink">تاریخ و نرخ دلار</legend>
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <Field label="سال">
+              <Input dir="ltr" inputMode="numeric" value={jy} onChange={(e) => setJy(e.target.value)} />
+            </Field>
+            <Field label="ماه">
+              <Input dir="ltr" inputMode="numeric" value={jm} onChange={(e) => setJm(e.target.value)} />
+            </Field>
+            <Field label="روز">
+              <Input dir="ltr" inputMode="numeric" value={jd} onChange={(e) => setJd(e.target.value)} />
+            </Field>
+            <Field label="نرخ دلار همان روز" className="col-span-3 sm:col-span-1">
+              <Input dir="ltr" inputMode="numeric" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} suffix="تومان" />
+            </Field>
           </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">ماه</label>
-            <Input dir="ltr" value={jm} onChange={(e) => setJm(e.target.value)} className="h-9 text-[10px] text-start" />
-          </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">روز</label>
-            <Input dir="ltr" value={jd} onChange={(e) => setJd(e.target.value)} className="h-9 text-[10px] text-start" />
-          </div>
-          <div>
-            <label className="mb-1 block text-[9px] font-bold text-muted">نرخ دلار روز</label>
-            <Input dir="ltr" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} className="h-9 text-[10px] text-start" />
-          </div>
-        </div>
-        {dateLabel && <p className="text-[9px] font-bold text-ink">تاریخ: {dateLabel}</p>}
+          {dateLabel && <p className="text-xs text-muted">تاریخ Snapshot: <span className="font-semibold text-ink">{dateLabel}</span></p>}
+        </fieldset>
 
-        {/* ===== حالت A: به‌روزرسانی ===== */}
         {mode === 'update' && (
-          <>
-            {/* انتخاب خودرو — بدون تایپ دستی */}
-            <div>
-              <label className="mb-1 block text-[9px] font-bold text-muted">
-                انتخاب خودرو (از لیست — بدون تایپ نام)
-              </label>
-              <select
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-                className="h-10 w-full rounded-xl border border-line/15 bg-card px-2 text-[10px] font-bold text-ink shadow-card outline-none hover:border-line/25"
-              >
-                <option value="all">همه خودروها ({toFaDigits(vehicles.length)}) — به‌روزرسانی دسته‌جمعی</option>
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-bold text-ink">قیمت‌ها</legend>
+            <Field
+              label="خودرو"
+              hint={
+                selectedVehicle
+                  ? 'سایر خودروها با آخرین قیمت ثبت‌شده در Snapshot قرار می‌گیرند.'
+                  : 'همه خودروها با امکان ویرایش دسته‌جمعی'
+              }
+            >
+              <Select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+                <option value="all">همه خودروها ({toFaDigits(vehicles.length)})</option>
                 {grouped.map(([brand, list]) => (
                   <optgroup key={brand} label={brand}>
                     {list.map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.name}
                         {v.modelYear ? ` (${v.modelYear})` : ''}
-                        {prices[v.id] ? ` — ${fmtTomanAmount(Number(prices[v.id]))}` : ''}
                       </option>
                     ))}
                   </optgroup>
                 ))}
-              </select>
-              {selectedVehicle && (
-                <p className="mt-1 text-[8px] font-medium text-muted">
-                  خودروی انتخابی: <span className="font-bold text-ink">{selectedVehicle.brand} · {selectedVehicle.name}</span>
-                  {selectedVehicle.modelYear && <span className="num-ltr"> ({selectedVehicle.modelYear})</span>}
-                  — سایر خودروها با آخرین قیمت ثبت‌شده در Snapshot قرار می‌گیرند (برای تغییر آن‌ها «همه خودروها» را انتخاب کنید).
-                </p>
-              )}
-            </div>
+              </Select>
+            </Field>
 
-            {/* لیست قیمت‌ها (فیلترشده) */}
-            <div className={cn('space-y-1 overflow-y-auto rounded-xl border border-line/10 bg-surface-2/40 p-2', selectedId === 'all' ? 'max-h-[38vh]' : '')}>
-              {visible.map((v) => (
-                <div key={v.id} className="flex items-center gap-2 rounded-lg bg-card px-2 py-1.5 shadow-card">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[9px] font-extrabold text-ink">
-                      {v.brand} · {v.name}
-                      {v.modelYear && <span className="num-ltr text-[8px] text-muted"> ({v.modelYear})</span>}
-                    </p>
-                    {prices[v.id] && (
-                      <p className="num-ltr text-[8px] font-medium text-muted">
-                        قبلی: {fmtTomanAmount(Number(prices[v.id]))}
-                      </p>
-                    )}
-                  </div>
-                  <div className="w-28">
-                    <label className="block text-[9px] font-bold text-muted">بازار (تومان)</label>
-                    <Input dir="ltr" value={prices[v.id] ?? ''} onChange={(e) => setPrices((p) => ({ ...p, [v.id]: e.target.value }))} className="h-7 text-[9px] text-start" />
-                  </div>
-                  <div className="w-28">
-                    <label className="block text-[9px] font-bold text-muted">نمایندگی (تومان)</label>
-                    <Input dir="ltr" value={dealerPrices[v.id] ?? ''} onChange={(e) => setDealerPrices((p) => ({ ...p, [v.id]: e.target.value }))} className="h-7 text-[9px] text-start" />
-                  </div>
-                </div>
-              ))}
-              {visible.length === 0 && (
-                <p className="py-4 text-center text-[9px] font-bold text-muted">خودرویی یافت نشد</p>
-              )}
+            <div className={cn('overflow-y-auto rounded-field border border-divider', selectedId === 'all' && 'max-h-[45dvh]')}>
+              <table className="data-table is-compact">
+                <caption className="sr-only">قیمت خودروها</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="!ps-3">خودرو</th>
+                    <th scope="col" className="w-36">بازار (تومان)</th>
+                    <th scope="col" className="w-36 !pe-3">نمایندگی (تومان)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((v) => (
+                    <tr key={v.id}>
+                      <td className="!ps-3 !whitespace-normal">
+                        <p className="text-sm font-semibold text-ink">
+                          {v.brand} · {v.name}
+                          {v.modelYear && <span className="num-ltr text-xs font-normal text-muted"> ({v.modelYear})</span>}
+                        </p>
+                      </td>
+                      <td>
+                        <Input
+                          dir="ltr"
+                          inputMode="numeric"
+                          aria-label={`قیمت بازار ${v.name}`}
+                          value={prices[v.id] ?? ''}
+                          onChange={(e) => setPrices((p) => ({ ...p, [v.id]: e.target.value }))}
+                          className="h-9"
+                        />
+                      </td>
+                      <td className="!pe-3">
+                        <Input
+                          dir="ltr"
+                          inputMode="numeric"
+                          aria-label={`قیمت نمایندگی ${v.name}`}
+                          value={dealerPrices[v.id] ?? ''}
+                          onChange={(e) => setDealerPrices((p) => ({ ...p, [v.id]: e.target.value }))}
+                          className="h-9"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                  {visible.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-6 text-center text-sm text-muted">خودرویی یافت نشد</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </>
+          </fieldset>
         )}
 
-        {/* ===== حالت B: خودرو جدید ===== */}
         {mode === 'new-car' && (
-          <>
-            <div className="rounded-lg border border-info/20 bg-info/5 px-2.5 py-2 text-[8px] font-medium leading-4 text-muted">
-              فقط وقتی از این بخش استفاده کنید که خودرو **جدید** است و قبلاً در تاریخچه Snapshot وجود ندارد
-              (برند/مدل جدید). اگر خودرو در لیست است، از حالت «به‌روزرسانی قیمت» انتخاب کنید.
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">برند *</label>
-                <Input dir="rtl" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="مثلاً: چری" className="h-9 text-[10px]" />
-              </div>
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">نام مدل *</label>
-                <Input dir="rtl" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثلاً: تیگو ۹" className="h-9 text-[10px]" />
-              </div>
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">سال/مدل (اختیاری)</label>
-                <Input dir="ltr" value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="1405 یا 2025" className="h-9 text-[10px] text-start" />
-              </div>
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">دسته</label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as 'imported' | 'domestic')}
-                  className="h-9 w-full rounded-xl border border-line/15 bg-card px-2 text-[10px] font-bold text-ink shadow-card outline-none"
-                >
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-bold text-ink">مشخصات خودرو جدید</legend>
+            <Notice tone="info">
+              فقط برای برند یا مدلی که در تاریخچه نیست. اگر خودرو در فهرست هست، از «به‌روزرسانی قیمت‌ها» استفاده کنید.
+            </Notice>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="برند">
+                <Input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="مثلاً: چری" />
+              </Field>
+              <Field label="نام مدل">
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثلاً: تیگو ۹" />
+              </Field>
+              <Field label="سال/مدل" hint="اختیاری">
+                <Input dir="ltr" value={newYear} onChange={(e) => setNewYear(e.target.value)} placeholder="1405" />
+              </Field>
+              <Field label="دسته">
+                <Select value={newCategory} onChange={(e) => setNewCategory(e.target.value as 'imported' | 'domestic')}>
                   <option value="domestic">داخلی</option>
                   <option value="imported">وارداتی</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">قیمت بازار (تومان) *</label>
-                <Input dir="ltr" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} placeholder="مثلاً 2500000000" className="h-9 text-[10px] text-start" />
-              </div>
-              <div>
-                <label className="mb-1 block text-[9px] font-bold text-muted">قیمت نمایندگی (اختیاری)</label>
-                <Input dir="ltr" value={newDealer} onChange={(e) => setNewDealer(e.target.value)} className="h-9 text-[10px] text-start" />
-              </div>
+                </Select>
+              </Field>
+              <Field label="قیمت بازار">
+                <Input dir="ltr" inputMode="numeric" value={newMarket} onChange={(e) => setNewMarket(e.target.value)} suffix="تومان" />
+              </Field>
+              <Field label="قیمت نمایندگی" hint="اختیاری">
+                <Input dir="ltr" inputMode="numeric" value={newDealer} onChange={(e) => setNewDealer(e.target.value)} suffix="تومان" />
+              </Field>
             </div>
-
-            {/* هشدار تکراری */}
             {dupVehicle && (
-              <p className="rounded-lg border border-negative/20 bg-negative/8 px-2.5 py-2 text-[9px] font-bold text-negative">
-                ⚠ این خودرو قبلاً در سیستم ثبت شده است: {dupVehicle.brand} · {dupVehicle.name}
-                — از حالت «به‌روزرسانی قیمت» انتخاب کنید، نه ثبت جدید.
-              </p>
+              <Notice tone="error">
+                این خودرو قبلاً ثبت شده است ({dupVehicle.brand} · {dupVehicle.name}) — از «به‌روزرسانی قیمت‌ها» انتخاب کنید.
+              </Notice>
             )}
-          </>
+          </fieldset>
         )}
-
-        {error && <p className="text-[9px] font-bold text-negative">{error}</p>}
-        {saved && (
-          <p className="rounded-lg bg-positive/10 px-2.5 py-2 text-[10px] font-black text-positive">
-            ✓ Snapshot ثبت شد — Snapshotهای قبلی تغییری نکردند.
-          </p>
-        )}
-
-        <Button
-          onClick={() => void submit()}
-          className="w-full"
-          disabled={saved || (mode === 'new-car' && !!dupVehicle)}
-        >
-          <Save className="h-3.5 w-3.5" />
-          {mode === 'update'
-            ? `ثبت Snapshot (${toFaDigits(visible.length)} خودرو)`
-            : 'ثبت خودرو جدید + Snapshot'}
-        </Button>
       </div>
     </Sheet>
   );

@@ -1,4 +1,4 @@
-/** نمایش اعلان‌های داخلی (Toast) */
+/** In-app notifications — polite live region above the mobile nav */
 import { CheckCircle2, Info, AlertTriangle, X } from 'lucide-react';
 import { useToastStore } from '@/shared/store/toastStore';
 import { cn } from '@/shared/lib/cn';
@@ -10,49 +10,51 @@ const ICONS = {
 };
 
 const COLORS = {
-  success: 'text-positive',
+  success: 'text-gain',
   error: 'text-negative',
-  info: 'text-accent'
+  info: 'text-brand-500'
 };
 
 export function ToastViewport() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
 
-  // بالای BottomNav — با در نظر گرفتن Safe Area پایین (حالت standalone)
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] z-[90] flex flex-col items-center gap-2 px-4 lg:bottom-6">
-        {toasts.map((toast) => {
-          const Icon = ICONS[toast.type];
-          return (
-            <div
-              key={toast.id}
-              className="anim-toast-in pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-xl border border-line/10 bg-card px-3.5 py-3 shadow-pop"
-              role="status"
-            >
-              <Icon className={cn('h-4 w-4 shrink-0', COLORS[toast.type])} />
-              <p className="min-w-0 flex-1 text-[11px] font-bold leading-5 text-ink">{toast.msg}</p>
-              {toast.action && (
-                <button
-                  onClick={() => {
-                    toast.action?.fn();
-                    dismiss(toast.id);
-                  }}
-                  className="shrink-0 rounded-xl bg-accent px-2.5 py-1 text-[11px] font-bold text-white"
-                >
-                  {toast.action.label}
-                </button>
-              )}
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottomnav-h)+0.75rem)] z-toast flex flex-col items-center gap-2 px-4 md:bottom-6 md:items-start md:ps-[calc(theme(spacing.rail)+1.5rem)] lg:ps-[calc(theme(spacing.sidebar)+1.5rem)]"
+    >
+      {toasts.map((toast) => {
+        const Icon = ICONS[toast.type];
+        return (
+          <div
+            key={toast.id}
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            className="anim-toast-in pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-field bg-ink px-4 py-3 text-card shadow-pop"
+          >
+            <Icon aria-hidden className={cn('h-4 w-4 shrink-0', COLORS[toast.type])} />
+            <p className="min-w-0 flex-1 text-sm">{toast.msg}</p>
+            {toast.action && (
               <button
-                onClick={() => dismiss(toast.id)}
-                className="shrink-0 rounded-lg p-1 text-muted hover:bg-line/5"
-                aria-label="بستن"
+                onClick={() => {
+                  toast.action?.fn();
+                  dismiss(toast.id);
+                }}
+                className="shrink-0 rounded-control px-2 py-1 text-sm font-semibold text-brand-100 hover:bg-white/10"
               >
-                <X className="h-3 w-3" />
+                {toast.action.label}
               </button>
-            </div>
-          );
-        })}
+            )}
+            <button
+              onClick={() => dismiss(toast.id)}
+              className="-me-1.5 shrink-0 rounded-control p-1.5 text-card/70 hover:bg-white/10 hover:text-card"
+              aria-label="بستن"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

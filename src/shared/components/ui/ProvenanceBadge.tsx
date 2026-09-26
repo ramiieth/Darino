@@ -1,32 +1,26 @@
 /**
- * ProvenanceBadge — نشان منبع داده (اعتماد و شفافیت)
+ * ProvenanceBadge — where a number comes from (trust & transparency)
  * LIVE · BOROS · CALCULATED · SIMULATED · ESTIMATED · N/A
  */
-import { cn } from '@/shared/lib/cn';
+import { Badge, type Tone } from '@/shared/components/ui/Badge';
 
-export type ProvenanceKind =
-  | 'live'
-  | 'boros'
-  | 'calculated'
-  | 'simulated'
-  | 'estimated'
-  | 'na';
+export type ProvenanceKind = 'live' | 'boros' | 'calculated' | 'simulated' | 'estimated' | 'na';
 
-const STYLES: Record<ProvenanceKind, string> = {
-  live: 'bg-emerald-400/10 text-emerald-600 ring-emerald-400/25 dark:text-emerald-300',
-  boros: 'bg-accent/10 text-accent ring-accent/25',
-  calculated: 'bg-info/10 text-info ring-info/25',
-  simulated: 'bg-indigo-400/10 text-indigo-500 ring-indigo-400/25 dark:text-indigo-300',
-  estimated: 'bg-warn/10 text-warn ring-warn/25',
-  na: 'bg-line/5 text-muted ring-line/10'
+const TONE: Record<ProvenanceKind, Tone> = {
+  live: 'gain',
+  boros: 'brand',
+  calculated: 'info',
+  simulated: 'neutral',
+  estimated: 'warn',
+  na: 'neutral'
 };
 
 const DEFAULT_LABEL: Record<ProvenanceKind, string> = {
   live: 'LIVE',
   boros: 'BOROS',
-  calculated: 'CALCULATED',
-  simulated: 'SIMULATED',
-  estimated: 'ESTIMATED',
+  calculated: 'CALC',
+  simulated: 'SIM',
+  estimated: 'EST',
   na: 'N/A'
 };
 
@@ -40,14 +34,8 @@ export function ProvenanceBadge({
   className?: string;
 }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[8px] font-black leading-4 ring-1',
-        STYLES[kind],
-        className
-      )}
-    >
+    <Badge tone={TONE[kind]} ltr className={className}>
       {label ?? DEFAULT_LABEL[kind]}
-    </span>
+    </Badge>
   );
 }

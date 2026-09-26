@@ -1,89 +1,100 @@
 /**
- * ممیزی Boros — Breakdown کامل هر بازار (شفافیت کامل)
- *  - PnL تفکیکی: Gross Settlement / Realized / Unrealized MTM / Total Gross / Net
- *  - هزینه‌ها خط‌به‌خط با Source (API / Market Data / User Input / N/A)
- *  - Margin مستقل با پارامترهای ورودی
- *  - چهار معیار بازده جدا
+ * Boros audit — full per-market breakdown (complete transparency)
+ *  - PnL split: gross settlement / unrealized MTM / total gross / net
+ *  - costs line by line with their source (API / market data / user input / N/A)
+ *  - independent margin with its inputs
+ *  - four separate return measures
+ * Each market is a collapsed row; open it to audit.
  */
 import { useMemo, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { fmtPct, fmtUSD } from '@/shared/utils/formatters';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
+import { Badge, type Tone } from '@/shared/components/ui/Badge';
+import { Button } from '@/shared/components/ui/Button';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
+import { KeyValueList, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { auditMarkets, type MarketAuditBreakdown } from '@/features/boros/domain/engine/audit';
 import { AuditReportTable } from './AuditReportTable';
 import type { BorosMarket } from '@/features/boros/domain/types';
-import { cn } from '@/shared/lib/cn';
+import { fmtPct, toFaDigits } from '@/shared/utils/formatters';
 
-const SOURCE_LABEL: Record<string, string> = {
-  api: 'API',
-  'market-data': 'داده بازار',
-  'user-input': 'ورودی کاربر',
-  na: 'N/A'
+const SOURCE: Record<string, { label: string; tone: Tone }> = {
+  api: { label: 'API', tone: 'brand' },
+  'market-data': { label: 'داده بازار', tone: 'info' },
+  'user-input': { label: 'ورودی کاربر', tone: 'neutral' },
+  na: { label: 'N/A', tone: 'neutral' }
 };
 
 function AuditRow({ b }: { b: MarketAuditBreakdown }) {
   return (
-    <div className="rounded-2xl bg-line/5 p-3">
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-extrabold text-ink">
-          {b.asset} · {b.venue} <span className="num-ltr text-[9px] text-muted">({b.daysToMaturity} روز)</span>
-        </p>
-        <p className="num-ltr text-[9px] font-bold text-muted">
-          Fixed {fmtPct(b.fixedApr * 100)} · Floating {fmtPct(b.floatingApr * 100)}
-        </p>
-      </div>
-
-      {/* PnL تفکیکی */}
-      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] font-bold sm:grid-cols-4">
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">Gross Settlement Long</p><p className={cn('num-ltr', b.grossSettlementLong >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.grossSettlementLong)}</p></div>
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">Gross Settlement Short</p><p className={cn('num-ltr', b.grossSettlementShort >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.grossSettlementShort)}</p></div>
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">MTM Long (Unrealized)</p><p className="num-ltr text-ink">{fmtUSD(b.unrealizedMtmLong)}</p></div>
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">MTM Short (Unrealized)</p><p className="num-ltr text-ink">{fmtUSD(b.unrealizedMtmShort)}</p></div>
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">Total Gross Long</p><p className={cn('num-ltr', b.totalGrossLong >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.totalGrossLong)}</p></div>
-        <div className="rounded-lg bg-line/5 px-2 py-1"><p className="text-muted">Total Gross Short</p><p className={cn('num-ltr', b.totalGrossShort >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.totalGrossShort)}</p></div>
-        <div className="rounded-lg bg-positive/10 px-2 py-1"><p className="text-muted">Net Long</p><p className={cn('num-ltr font-black', b.netLong >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.netLong)}</p></div>
-        <div className="rounded-lg bg-negative/10 px-2 py-1"><p className="text-muted">Net Short</p><p className={cn('num-ltr font-black', b.netShort >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(b.netShort)}</p></div>
-      </div>
-
-      {/* هزینه‌ها با Source */}
-      <div className="mt-1.5 space-y-0.5">
-        {b.feeLines.map((l) => (
-          <div key={l.label} className="flex items-center justify-between text-[9px] font-bold">
-            <span className="text-muted">
-              {l.label}
-              <span className={cn('badge ms-1.5 ring-1', l.source === 'na' ? 'bg-line/5 text-muted/60 ring-line/10' : 'bg-accent/10 text-accent ring-accent/20')}>
-                {SOURCE_LABEL[l.source]}
-              </span>
+    <li className="px-4 md:px-5">
+      <Disclosure
+        summary={
+          <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-ink">
+            <span className="font-semibold">
+              <bdi dir="ltr">{b.asset}</bdi> · {b.venue}{' '}
+              <span className="text-xs font-normal text-muted">({toFaDigits(b.daysToMaturity)} روز)</span>
             </span>
-            <span className="num-ltr text-ink">{l.amount === 0 && l.source === 'na' ? 'N/A' : fmtUSD(l.amount)}</span>
+            <span className="flex items-center gap-3 text-xs font-normal text-muted">
+              <span>Net لانگ <MoneyValue value={b.netLong} signed tone="auto" className="font-semibold" /></span>
+              <span>Net شورت <MoneyValue value={b.netShort} signed tone="auto" className="font-semibold" /></span>
+            </span>
+          </span>
+        }
+      >
+        <div className="grid gap-6 pb-4 lg:grid-cols-3">
+          <div>
+            <h4 className="text-xs font-semibold text-muted">سود و زیان تفکیکی</h4>
+            <KeyValueList
+              dense
+              rows={[
+                { label: 'تسویه ناخالص لانگ', value: <MoneyValue value={b.grossSettlementLong} signed tone="auto" /> },
+                { label: 'تسویه ناخالص شورت', value: <MoneyValue value={b.grossSettlementShort} signed tone="auto" /> },
+                { label: 'MTM لانگ (تحقق‌نیافته)', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
+                { label: 'MTM شورت (تحقق‌نیافته)', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
+                { label: 'ناخالص کل لانگ', value: <MoneyValue value={b.totalGrossLong} signed tone="auto" /> },
+                { label: 'ناخالص کل شورت', value: <MoneyValue value={b.totalGrossShort} signed tone="auto" /> },
+                { label: 'خالص لانگ', emphasis: true, value: <MoneyValue value={b.netLong} signed tone="auto" /> },
+                { label: 'خالص شورت', emphasis: true, value: <MoneyValue value={b.netShort} signed tone="auto" /> }
+              ]}
+            />
           </div>
-        ))}
-        <div className="my-1 border-t border-line/10" />
-        <div className="flex justify-between text-[10px] font-black">
-          <span className="text-ink">مجموع هزینه‌ها</span>
-          <span className="num-ltr text-negative">{fmtUSD(b.totalCostsLong)}</span>
+          <div>
+            <h4 className="text-xs font-semibold text-muted">هزینه‌ها و منبع</h4>
+            <KeyValueList
+              dense
+              rows={[
+                ...b.feeLines.map((l) => ({
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      {l.label} <Badge tone={SOURCE[l.source]?.tone ?? 'neutral'}>{SOURCE[l.source]?.label ?? l.source}</Badge>
+                    </span>
+                  ),
+                  value: l.amount === 0 && l.source === 'na' ? <span className="text-subtle">N/A</span> : <MoneyValue value={l.amount} />
+                })),
+                { label: 'مجموع هزینه‌ها', emphasis: true, value: <MoneyValue value={b.totalCostsLong} /> }
+              ]}
+            />
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold text-muted">مارجین و بازده</h4>
+            <KeyValueList
+              dense
+              rows={[
+                { label: 'Notional', value: <span className="num-ltr">{b.marginParams.size}</span> },
+                { label: 'نرخ / کف', value: <span className="num-ltr">{fmtPct(b.marginParams.rate * 100)} / {fmtPct(b.marginParams.rateFloor * 100)}</span> },
+                { label: 'YTM / کف', value: <span className="num-ltr">{b.marginParams.ytm.toFixed(3)} / {b.marginParams.ytmFloor}</span> },
+                { label: 'IM', value: <PercentValue value={b.marginParams.imRatio * 100} signed={false} tone="none" /> },
+                { label: 'مارجین', emphasis: true, value: <MoneyValue value={b.marginRequired} /> },
+                { label: 'ROI مارجین لانگ', value: <PercentValue value={b.roiLongMargin} /> },
+                { label: 'ROI notional لانگ', value: <PercentValue value={b.roiLongNotional} /> },
+                { label: 'سالانه‌شده لانگ', value: <PercentValue value={b.annualizedLong} /> },
+                { label: 'ROI مارجین شورت', value: <PercentValue value={b.roiShortMargin} /> }
+              ]}
+            />
+          </div>
         </div>
-      </div>
-
-      {/* Margin مستقل */}
-      <div className="mt-2 grid grid-cols-4 gap-1.5 rounded-lg bg-line/5 p-2 text-[8px] font-bold sm:grid-cols-7">
-        <span className="text-muted">Notional: <span className="num-ltr text-ink">{b.marginParams.size}</span></span>
-        <span className="text-muted">Rate: <span className="num-ltr text-ink">{fmtPct(b.marginParams.rate * 100)}</span></span>
-        <span className="text-muted">Floor: <span className="num-ltr text-ink">{fmtPct(b.marginParams.rateFloor * 100)}</span></span>
-        <span className="text-muted">YTM: <span className="num-ltr text-ink">{b.marginParams.ytm.toFixed(3)}</span></span>
-        <span className="text-muted">YTMFloor: <span className="num-ltr text-ink">{b.marginParams.ytmFloor}</span></span>
-        <span className="text-muted">IM: <span className="num-ltr text-ink">{fmtPct(b.marginParams.imRatio * 100)}</span></span>
-        <span className="text-muted">مارجین: <span className="num-ltr font-black text-ink">{fmtUSD(b.marginRequired)}</span></span>
-      </div>
-
-      {/* چهار معیار بازده */}
-      <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-[9px] font-bold sm:grid-cols-4">
-        <span className="text-muted">ROI Margin Long: <span className={cn('num-ltr', b.roiLongMargin >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(b.roiLongMargin)}</span></span>
-        <span className="text-muted">ROI Notional Long: <span className={cn('num-ltr', b.roiLongNotional >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(b.roiLongNotional)}</span></span>
-        <span className="text-muted">Annualized Long: <span className={cn('num-ltr', b.annualizedLong >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(b.annualizedLong)}</span></span>
-        <span className="text-muted">ROI Margin Short: <span className={cn('num-ltr', b.roiShortMargin >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(b.roiShortMargin)}</span></span>
-      </div>
-    </div>
+      </Disclosure>
+    </li>
   );
 }
 
@@ -92,30 +103,27 @@ export function AuditTab({ markets }: { markets: BorosMarket[] }) {
   const audits = useMemo(() => auditMarkets(markets, 1000), [markets]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-8">
       <AuditReportTable markets={markets} />
 
-      <GlassCard variant="soft" className="p-3.5">
-        <p className="flex items-center gap-1.5 text-[12px] font-black text-ink">
-          <ShieldCheck className="h-4 w-4 text-positive" /> ممیزی موتور — Breakdown شفاف
-        </p>
-        <p className="mt-1 text-[10px] font-medium leading-5 text-muted">
-          هر بازار با PnL تفکیکی (Settlement واقعی / MTM تحقق‌نیافته — بدون Double Counting)، هزینه‌های
-          خط‌به‌خط با Source، مارجین مستقل (فقط پارامترهای Market) و چهار معیار بازده جدا.
-        </p>
-      </GlassCard>
-
-      <div className="space-y-2">
-        {audits.slice(0, limit).map((b) => (
-          <AuditRow key={b.marketId} b={b} />
-        ))}
-      </div>
-
-      {audits.length > limit && (
-        <button onClick={() => setLimit((l) => l + 10)} className="w-full rounded-2xl bg-line/5 py-2.5 text-[11px] font-black text-accent">
-          نمایش بیشتر ({audits.length - limit} باقی)
-        </button>
-      )}
+      <Section
+        id="engine-audit"
+        title="ممیزی موتور"
+        description="PnL تفکیکی بدون دوبار‌شماری، هزینه‌های خط‌به‌خط با منبع، مارجین مستقل و چهار معیار بازده"
+      >
+        <Surface>
+          <ul className="divide-y divide-divider">
+            {audits.slice(0, limit).map((b) => (
+              <AuditRow key={b.marketId} b={b} />
+            ))}
+          </ul>
+        </Surface>
+        {audits.length > limit && (
+          <Button variant="ghost" size="sm" className="mt-2 w-full text-accent" onClick={() => setLimit((l) => l + 10)}>
+            نمایش بیشتر ({toFaDigits(audits.length - limit)} باقی‌مانده)
+          </Button>
+        )}
+      </Section>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 /**
- * نمودار مینیاتوری (Sparkline) — روند TVL با SVG خالص
+ * Sparkline — TVL trend, pure SVG. Line only (no gradient fill): the change
+ * badge next to it carries the number; the line carries the shape.
+ * Time runs left → right (charts stay LTR in the RTL layout).
  */
-import { useId } from 'react';
 import type { TvlPoint } from '@/features/defi/domain/tvlFlow';
 
 export function Sparkline({
@@ -15,9 +16,12 @@ export function Sparkline({
   height?: number;
   positive: boolean;
 }) {
-  const gid = useId().replace(/[:]/g, '');
   if (!points || points.length < 2) {
-    return <div style={{ width, height }} className="text-center text-[8px] text-muted">—</div>;
+    return (
+      <div style={{ width, height }} className="flex items-center justify-center text-2xs text-subtle">
+        —
+      </div>
+    );
   }
 
   const vals = points.map((p) => p.tvl);
@@ -25,39 +29,22 @@ export function Sparkline({
   const max = Math.max(...vals);
   const range = max - min || 1;
   const stepX = width / (points.length - 1);
-  const path = points
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = height - 3 - ((p.tvl - min) / range) * (height - 6);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const color = positive ? 'rgb(var(--c-positive))' : 'rgb(var(--c-negative))';
+  const y = (v: number) => height - 3 - ((v - min) / range) * (height - 6);
+  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${(i * stepX).toFixed(1)},${y(p.tvl).toFixed(1)}`).join(' ');
+  const color = positive ? 'rgb(var(--c-gain))' : 'rgb(var(--c-loss))';
   const last = points[points.length - 1];
-  const first = points[0];
-  const up = last.tvl >= first.tvl;
 
   return (
-    // Responsive: SVG به عرض کانتینر مقصد مقیاس می‌شود (بدون تغییر داده/منطق)
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block h-7 w-full">
-      <defs>
-        <linearGradient id={`sg-${gid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.28" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path
-        d={`${path} L${width},${height} L0,${height} Z`}
-        fill={`url(#sg-${gid})`}
-        stroke="none"
-      />
-      <path d={path} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
-      <circle
-        cx={width}
-        cy={height - 3 - ((last.tvl - min) / range) * (height - 6)}
-        r="2"
-        fill={up ? 'rgb(var(--c-positive))' : 'rgb(var(--c-negative))'}
-      />
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="block h-7 w-full"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={width} cy={y(last.tvl)} r="2" fill={color} />
     </svg>
   );
 }

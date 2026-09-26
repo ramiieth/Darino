@@ -1,146 +1,116 @@
 /**
- * Hero ارزش خالص دارایی (ممیزی §۴) — فقط دارایی‌های واقعی کاربر:
- *   3.33 ETH + 23,216 USDT
- * نمایش: دلار (لاتین/LTR) + معادل تومانی (فارسی) + تغییر ۲۴ساعته + تخصیص
- * بازطراحی UI/UX: سلسله‌مراتب عددی قوی — عدد اصلی ≫ برچسب ≫ جزئیات
+ * Portfolio hero — the first answer on the Dashboard:
+ *   how much is it worth · what changed in 24h · how it is allocated
+ * Only real holdings from accounting; no placeholder numbers.
  */
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { USER_ASSETS } from './EthSummaryCard';
-import { useCoinLivePrice } from '@/features/simulation/data/useCryptoPrices';
-import { useCryptoPrices } from '@/features/simulation/data/useCryptoPrices';
-import { useAccounting } from '@/features/accounting/data/useAccounting';
-import { isCashStablecoin } from '@/features/accounting/domain/types';
-import { COINS } from '@/features/simulation/domain/constants';
-import { useMergedCryptoPrices } from '@/shared/hooks/useMergedCryptoPrices';
+import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { DeltaValue, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { StatusDot } from '@/shared/components/ui/Badge';
 import { useFxStore } from '@/shared/store/fxStore';
-import { PRICE_SNAPSHOT_FALLBACK } from '@/features/simulation/domain/constants';
-import { fmtUSD, fmtToman, fmtPct, fmtIntLatin } from '@/shared/utils/formatters';
-import { t } from '@/shared/i18n/fa';
+import { useNow } from '@/shared/hooks/useNow';
+import { fmtRelativeAge, fmtToman } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
+import type { PortfolioOverview } from './usePortfolioOverview';
 
-const SYMBOL_TO_ID = Object.fromEntries(Object.entries(COINS).map(([id, sym]) => [sym, id]));
+const SLICE_COLORS = ['bg-chart-1', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4', 'bg-chart-5'];
 
-export function NetWorthHero() {
-  const liveEth = useCoinLivePrice('ethereum');
-  const crypto = useCryptoPrices();
+function sliceColor(key: string, i: number): string {
+  return key === 'cash' ? 'bg-chart-6' : SLICE_COLORS[i % SLICE_COLORS.length];
+}
+
+export function NetWorthHero({ o }: { o: PortfolioOverview }) {
   const fxRate = useFxStore((s) => s.rate);
-  // دارایی واقعی از حسابداری (Single Source of Truth) — فالبک: مقادیر ثابت فعلی
-  const acc = useAccounting();
-  const merged = useMergedCryptoPrices();
-  const accReady = !acc.loading;
-
-  const ethPrice = liveEth ?? PRICE_SNAPSHOT_FALLBACK.ethereum ?? null;
-
-  // ارزش نگهداری‌ها (بدون استیبل‌کوین — آن‌ها = نقد)
-  const holdingsValue = useMemo(() => {
-    if (!accReady) return USER_ASSETS.ETH * (ethPrice ?? 0);
-    let total = 0;
-    for (const h of acc.holdings) {
-      if (isCashStablecoin(h.symbol)) continue;
-      const id = SYMBOL_TO_ID[h.symbol];
-      const p = id ? merged.prices[id] : undefined;
-      if (typeof p === 'number' && Number.isFinite(p)) total += p * h.qty;
-    }
-    return total;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accReady, acc.holdings, merged.prices, ethPrice]);
-
-  const cashUsd = accReady ? acc.cashBalance : USER_ASSETS.USDT;
-  const ethValue = accReady
-    ? (acc.holdings.find((h) => h.symbol === 'ETH')?.qty ?? USER_ASSETS.ETH) * (ethPrice ?? 0)
-    : USER_ASSETS.ETH * (ethPrice ?? 0);
-  const netUsd = cashUsd + holdingsValue;
-
-  const change24h = crypto.data?.changes24h?.ethereum ?? null;
-
-  const ethShare = netUsd && netUsd > 0 ? ((ethValue ?? 0) / netUsd) * 100 : 0;
-  const usdtShare = netUsd && netUsd > 0 ? (cashUsd / netUsd) * 100 : 0;
-
-  const positive = change24h !== null && change24h >= 0;
+  const now = useNow(30_000);
+  const loading = o.state === 'loading';
+  const partial = o.unpriced.length > 0;
 
   return (
-    <GlassCard className="relative overflow-hidden p-5 md:p-6">
-      {/* خط تاکید ظریف بالای کارت — به‌جای بلاک رنگی */}
-      <div
-        aria-hidden
-        className={cn(
-          'absolute inset-x-0 top-0 h-[3px]',
-          positive
-            ? 'bg-gradient-to-e from-transparent via-positive/70 to-transparent'
-            : 'bg-gradient-to-e from-transparent via-negative/70 to-transparent'
-        )}
-      />
-
-      <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-[11px] font-bold text-muted">
-          <Wallet className="h-3.5 w-3.5 text-accent" />
-          {t('netWorth')}
+    <Surface variant="focal" className="p-5 md:p-7" aria-labelledby="networth-label">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p id="networth-label" className="text-sm font-semibold text-muted">
+          ارزش خالص دارایی
         </p>
-        <span className="text-[10px] font-medium text-muted/80">{t('netWorthHint')}</span>
-      </div>
-
-      {/* عدد اصلی — بزرگ‌ترین عنصر صفحه */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <motion.span
-          key={netUsd ?? 'na'}
-          initial={{ opacity: 0.5 }}
-          animate={{ opacity: 1 }}
-          className="num-ltr text-[26px] font-black leading-none tracking-tight text-ink sm:text-[34px] md:text-[40px]"
-        >
-          {fmtUSD(netUsd)}
-        </motion.span>
-        {change24h !== null && (
-          <span
-            className={cn(
-              'num-ltr inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-extrabold',
-              positive ? 'bg-positive/8 text-positive' : 'bg-negative/8 text-negative'
-            )}
-          >
-            {positive ? (
-              <TrendingUp className="h-3.5 w-3.5" />
-            ) : (
-              <TrendingDown className="h-3.5 w-3.5" />
-            )}
-            {fmtPct(change24h)}
-            <span className="text-[10px] font-bold text-muted">۲۴ساعته</span>
-          </span>
+        {!loading && (
+          <StatusDot
+            tone={o.stale ? 'warn' : 'gain'}
+            label={
+              o.stale
+                ? 'قیمت ذخیره‌شده'
+                : o.fetchedAt
+                  ? `قیمت زنده · ${fmtRelativeAge(o.fetchedAt, now)}`
+                  : 'قیمت زنده'
+            }
+            className="font-normal"
+          />
         )}
       </div>
 
-      {/* معادل تومانی — ارقام فارسی طبق دستور کارفرما */}
-      <p className="mt-2 text-[13px] font-bold text-accent">{fmtToman(netUsd, fxRate)}</p>
-
-      {/* تخصیص ETH / USDT — با جداساز ظریف به‌جای کارت دوم */}
-      <div className="mt-5 border-t border-line/10 pt-4">
-        <div className="mb-2.5 flex h-1.5 overflow-hidden rounded-full bg-line/10">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${ethShare}%` }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="h-full bg-info"
-          />
-          <div className="h-full flex-1 bg-emerald-400/80" style={{ width: `${usdtShare}%` }} />
-        </div>
-        <div className="flex items-center justify-between gap-3 text-[11px] font-bold">
-          <span className="flex min-w-0 items-center gap-1.5 text-muted">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-info" />
-            {t('allocationEth')}
-            <span className="num-ltr truncate text-ink">
-              {fmtIntLatin(ethShare)}٪ · {fmtUSD(ethValue)}
-            </span>
-          </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-muted">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-            {t('allocationUsdt')}
-            <span className="num-ltr truncate text-ink">
-              {fmtIntLatin(usdtShare)}٪ · {fmtUSD(cashUsd)}
-            </span>
-          </span>
-        </div>
+      {/* primary figure */}
+      <div className="mt-2">
+        {loading ? (
+          <Skeleton className="h-11 w-56 md:h-12" />
+        ) : (
+          <p className="text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-5xl">
+            <MoneyValue value={o.netWorth} />
+          </p>
+        )}
       </div>
-    </GlassCard>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+        {loading ? (
+          <Skeleton className="h-5 w-40" />
+        ) : (
+          <>
+            <DeltaValue pct={o.change24hPct} usd={o.change24hUsd} period="۲۴ ساعت" compact={false} />
+            <span className="text-muted">{fmtToman(o.netWorth, fxRate)}</span>
+          </>
+        )}
+      </div>
+
+      {partial && (
+        <p className="mt-2 text-xs text-warn">
+          قیمت {o.unpriced.join('، ')} در دسترس نیست — ارزش کل بدون این دارایی‌ها محاسبه شده است.
+        </p>
+      )}
+
+      {/* allocation */}
+      <div className="mt-6 border-t border-divider pt-5">
+        <p className="mb-3 text-xs font-semibold text-muted">ترکیب دارایی</p>
+        {loading ? (
+          <Skeleton className="h-2.5 w-full" />
+        ) : o.allocation.length === 0 ? (
+          <p className="text-sm text-muted">هنوز دارایی‌ای ثبت نشده است.</p>
+        ) : (
+          <>
+            <div
+              className="flex h-2.5 gap-0.5 overflow-hidden rounded-full"
+              role="img"
+              aria-label={o.allocation.map((s) => `${s.label} ${Math.round(s.share)}٪`).join('، ')}
+            >
+              {o.allocation.map((s, i) => (
+                <div
+                  key={s.key}
+                  className={cn('h-full first:rounded-s-full last:rounded-e-full', sliceColor(s.key, i))}
+                  style={{ width: `${Math.max(s.share, 1.5)}%` }}
+                />
+              ))}
+            </div>
+            <ul className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2">
+              {o.allocation.map((s, i) => (
+                <li key={s.key} className="flex items-center gap-2.5 text-sm">
+                  <span aria-hidden className={cn('h-2.5 w-2.5 shrink-0 rounded-sm', sliceColor(s.key, i))} />
+                  <span className="min-w-0 flex-1 truncate text-ink">{s.label}</span>
+                  <PercentValue value={s.share} signed={false} tone="none" digits={1} className="shrink-0 text-muted" />
+                  <span className="num-ltr w-28 shrink-0 text-end font-semibold text-ink">
+                    <MoneyValue value={s.value} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </Surface>
   );
 }

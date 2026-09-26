@@ -2,7 +2,7 @@
  * تست‌ها — قالب‌بندی قیمت (fmtUSD): اعداد بزرگ، قیمت‌های ریز، استیبل‌کوین
  */
 import { describe, expect, it } from 'vitest';
-import { fmtUSD, fmtPct, fmtToman, fmtRelativeAge } from '@/shared/utils/formatters';
+import { fmtUSD, fmtUsdSigned, fmtPct, fmtToman, fmtRelativeAge } from '@/shared/utils/formatters';
 
 describe('fmtUSD — نمایش قیمت دلاری', () => {
   it('اعداد بزرگ: دو رقم اعشار با جداکننده هزارگان', () => {
@@ -37,6 +37,24 @@ describe('fmtUSD — نمایش قیمت دلاری', () => {
   it('حالت compact برای اعداد خیلی بزرگ', () => {
     expect(fmtUSD(1_290_000_000_000, true)).toBe('$1.3T');
     expect(fmtUSD(72_100_000, true)).toBe('$72.1M');
+  });
+
+  it('منفی: علامت پیش از نماد ارز (نه «$-12.50»)', () => {
+    expect(fmtUSD(-12.5)).toBe('-$12.50');
+    expect(fmtUSD(-72_100_000, true)).toBe('-$72.1M');
+    expect(fmtUSD(-0.5)).toBe('-$0.50');
+  });
+});
+
+describe('fmtUsdSigned — سود/زیان دلاری با علامت صریح', () => {
+  it('مثبت/منفی/صفر/نامشخص', () => {
+    expect(fmtUsdSigned(12.5)).toBe('+$12.50');
+    expect(fmtUsdSigned(-12.5)).toBe('-$12.50');
+    expect(fmtUsdSigned(0)).toBe('$0.00');
+    expect(fmtUsdSigned(null)).toBe('N/A');
+    // amounts never use the sub-dollar price precision
+    expect(fmtUsdSigned(-0.657706)).toBe('-$0.66');
+    expect(fmtUsdSigned(0.025306)).toBe('+$0.03');
   });
 });
 

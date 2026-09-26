@@ -1,32 +1,28 @@
-import { cn } from '@/shared/lib/cn';
+import { Badge, StatusDot } from '@/shared/components/ui/Badge';
 import type { PriceSource } from '@/shared/types';
 import { t } from '@/shared/i18n/fa';
 
-/** نشان منبع داده: زنده / اسنپ‌شات / N/A */
+/** Data source badge: live / snapshot / N/A */
 export function SourceBadge({ source, className }: { source: PriceSource; className?: string }) {
   if (source === 'live') {
-    return (
-      <span className={cn('badge bg-positive/10 text-positive', className)}>
-        <span className="h-1.5 w-1.5 rounded-full bg-positive animate-pulse-soft" />
-        {t('live')}
-      </span>
-    );
+    return <StatusDot tone="gain" label={t('live')} className={className} />;
   }
   if (source === 'snapshot') {
     return (
-      <span className={cn('badge bg-warn/10 text-warn', className)}>{t('snapshot')}</span>
+      <Badge tone="warn" className={className}>
+        {t('snapshot')}
+      </Badge>
     );
   }
-  return <span className={cn('badge bg-muted/10 text-muted', className)}>N/A</span>;
+  return (
+    <Badge tone="neutral" className={className}>
+      N/A
+    </Badge>
+  );
 }
 
-/** نشان دسته دارایی */
+/** Asset-class marker (paired with a text label wherever it appears) */
 export function KindDot({ kind }: { kind: 'crypto' | 'tokenized' | 'tradfi' }) {
-  const color =
-    kind === 'crypto'
-      ? 'bg-violet-400'
-      : kind === 'tokenized'
-        ? 'bg-sky-400'
-        : 'bg-emerald-400';
-  return <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', color)} />;
+  const color = kind === 'crypto' ? 'bg-accent' : kind === 'tokenized' ? 'bg-ink' : 'bg-gold';
+  return <span aria-hidden className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${color}`} />;
 }

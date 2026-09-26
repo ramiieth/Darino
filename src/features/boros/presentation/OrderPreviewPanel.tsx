@@ -1,19 +1,19 @@
 /**
- * Order Preview (MODE C) — «قصد باز کردن Position واقعی دارم»
- *  ورودی: Collateral موجود · جهت · حجم (YU) · Fixed APR
- *  خروجی: Margin / Sensitivity / Fees / Slippage / Expected PnL / ROI
- *  Liquidation APR = N/A (نیازمند Position واقعی) — مگر Boros مقدار رسمی Preview بدهد
+ * Order preview (MODE C) — "I intend to open a real position"
+ *  input: available collateral · direction · size (YU) · fixed APR
+ *  output: margin / sensitivity / fees / slippage / expected PnL / ROI
+ *  Liquidation APR = N/A (needs a real position) unless Boros returns an official preview value
  */
 import { useMemo, useState } from 'react';
-import { FileCheck2 } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { Input } from '@/shared/components/ui/Input';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Field, Input } from '@/shared/components/ui/Input';
+import { Badge } from '@/shared/components/ui/Badge';
 import { ProvenanceBadge } from '@/shared/components/ui/ProvenanceBadge';
-import { fmtPct, fmtUSD } from '@/shared/utils/formatters';
+import { KeyValueList, Metric, MetricGrid, MoneyValue, PercentValue, QuantityValue } from '@/shared/components/ui/FinancialValue';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
 import { orderPreview } from '@/features/boros/domain/preview';
 import { isLiquidationAPRAvailable, LIQUIDATION_SOURCE_FA } from '@/features/boros/domain/liquidationApr';
 import type { BorosDirection, BorosMarket } from '@/features/boros/domain/types';
-import { cn } from '@/shared/lib/cn';
 
 export function OrderPreviewPanel({
   market,
@@ -42,138 +42,116 @@ export function OrderPreviewPanel({
       fixedApr: fixedRate ?? market.markApr,
       underlyingApr,
       gasUsd: 0,
-      slippageRate: null, // بدون Order Book عمومی → N/A (نه صفر جعلی)
+      slippageRate: null, // no public order book → N/A (not a fake zero)
       maxSlippageRate: null
     });
   }, [market, direction, fixedRate, underlyingApr, collateralPriceUsd, notional, collateral]);
 
+  const inputs = (
+    <Surface className="p-4 md:p-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Field label="حجم">
+          <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} suffix="YU" />
+        </Field>
+        <Field label="Collateral موجود">
+          <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} suffix="ETH" />
+        </Field>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-muted">جهت</p>
+          <Badge tone={direction === 'long' ? 'gain' : 'loss'} className="h-10 px-3 text-sm">
+            {direction === 'long' ? 'لانگ' : 'شورت'}
+          </Badge>
+        </div>
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-muted">Fixed APR</p>
+          <p className="flex h-10 items-center text-sm font-semibold text-ink">
+            <PercentValue value={(fixedRate ?? market.markApr) * 100} signed={false} tone="none" />
+          </p>
+        </div>
+      </div>
+    </Surface>
+  );
+
   if (!preview) {
     return (
-      <GlassCard variant="soft" className="p-4 text-center text-[10px] font-bold text-muted">
-        برای پیش‌نمایش، حجم معتبر (YU) وارد کنید.
-      </GlassCard>
+      <div className="space-y-5">
+        {inputs}
+        <EmptyState message="برای پیش‌نمایش، حجم معتبر (YU) وارد کنید." />
+      </div>
     );
   }
 
   const liqAvail = isLiquidationAPRAvailable(preview.liquidationApr);
 
   return (
-    <GlassCard className="border-info/30 p-3.5">
-      <h4 className="mb-2 flex items-center gap-1.5 text-[12px] font-black text-ink">
-        <FileCheck2 className="h-4 w-4 text-info" /> Order Preview (MODE C) — قصد باز کردن Position
-      </h4>
-      <p className="mb-2 text-[8px] font-medium leading-4 text-muted">
-        ⚠ پیش‌نمایش سفارش — هنوز Position واقعی در Boros ایجاد نشده است. هیچ مقداری به‌عنوان «Position واقعی» نمایش داده نمی‌شود.
-      </p>
+    <div className="space-y-5">
+      <Notice tone="info">پیش‌نمایش سفارش — هنوز Position واقعی در Boros ایجاد نشده و هیچ مقداری «Position واقعی» نیست.</Notice>
+      {inputs}
 
-      {/* ورودی‌ها */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div>
-          <label className="mb-1 block text-[9px] font-bold text-muted">حجم (YU)</label>
-          <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} className="h-9 text-[10px] text-start" />
+      <Surface variant="focal" className="p-5 md:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-muted">سود خالص موردانتظار</p>
+            <p className="mt-1 text-4xl font-extrabold tracking-tight">
+              <MoneyValue value={preview.expectedNetPnl} signed tone="auto" />
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              ROI روی مارجین <PercentValue value={preview.roiOnMargin} className="font-semibold" />
+            </p>
+          </div>
+          <ProvenanceBadge kind="simulated" />
         </div>
-        <div>
-          <label className="mb-1 block text-[9px] font-bold text-muted">Collateral موجود (ETH)</label>
-          <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} className="h-9 text-[10px] text-start" />
-        </div>
-        <div>
-          <label className="mb-1 block text-[9px] font-bold text-muted">جهت</label>
-          <p className={cn('h-9 rounded-lg px-2 py-1.5 text-[10px] font-black', direction === 'long' ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative')}>
-            {direction === 'long' ? 'لانگ' : 'شورت'}
-          </p>
-        </div>
-        <div>
-          <label className="mb-1 block text-[9px] font-bold text-muted">Fixed APR</label>
-          <p className="num-ltr h-9 rounded-lg bg-surface-2 px-2 py-1.5 text-[10px] font-black text-ink">
-            {fmtPct((fixedRate ?? market.markApr) * 100)}
-          </p>
-        </div>
-      </div>
+        <MetricGrid cols={3} className="mt-6 border-t border-divider pt-5">
+          <Metric
+            label="مارجین موردنیاز"
+            value={<MoneyValue value={preview.marginRequiredUsd} />}
+            sub={<QuantityValue value={preview.marginRequiredAsset} unit="ETH" />}
+          />
+          <Metric
+            label="حساسیت به ۱٪ نرخ"
+            value={<MoneyValue value={preview.rateSensitivityUsd} />}
+            sub={<QuantityValue value={preview.rateSensitivityAsset} unit="ETH" />}
+          />
+          <Metric label="Notional / Collateral" value={<span className="num-ltr">{preview.effectiveExposure.toFixed(1)}x</span>} sub="لوریج متعارف نیست" />
+        </MetricGrid>
+      </Surface>
 
-      {/* نتایج */}
-      <div className="mt-2.5 grid grid-cols-2 gap-1.5 text-[9px] font-bold sm:grid-cols-3">
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Margin Required <ProvenanceBadge kind="calculated" /></p>
-          <p className="num-ltr text-ink">{fmtUSD(preview.marginRequiredUsd)}</p>
-          <p className="num-ltr text-[8px] text-muted">{preview.marginRequiredAsset !== null ? `${preview.marginRequiredAsset.toFixed(6)} ETH` : 'N/A'}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Rate Sensitivity/1% <ProvenanceBadge kind="calculated" /></p>
-          <p className="num-ltr text-ink">{fmtUSD(preview.rateSensitivityUsd)}</p>
-          <p className="num-ltr text-[8px] text-muted">{preview.rateSensitivityAsset !== null ? `${preview.rateSensitivityAsset.toFixed(6)} ETH` : 'N/A'}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="text-muted">Effective Exposure</p>
-          <p className="num-ltr text-ink">{preview.effectiveExposure.toFixed(1)}x</p>
-          <p className="text-[8px] text-muted">⚠ لوریج متعارف نیست</p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Available Margin <ProvenanceBadge kind="calculated" /></p>
-          <p className={cn('num-ltr', (preview.availableMarginAsset ?? -1) >= 0 ? 'text-positive' : 'text-negative')}>
-            {preview.availableMarginAsset !== null ? `${preview.availableMarginAsset.toFixed(6)} ETH` : 'N/A'}
-          </p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Fees <ProvenanceBadge kind="boros" label="BOROS DOC" /></p>
-          <p className="num-ltr text-ink">{fmtUSD(preview.fees.total)}</p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Slippage (تخمینی) <ProvenanceBadge kind="na" /></p>
-          <p className="num-ltr text-ink">{preview.slippageUsd !== null ? fmtUSD(preview.slippageUsd) : 'N/A'}</p>
-          <p className="text-[8px] text-muted">بدون Order Book → N/A</p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Settlement PnL <ProvenanceBadge kind="calculated" /></p>
-          <p className={cn('num-ltr', preview.expectedSettlementPnl >= 0 ? 'text-positive' : 'text-negative')}>
-            {preview.expectedSettlementPnl >= 0 ? '+' : ''}{fmtUSD(preview.expectedSettlementPnl)}
-          </p>
-        </div>
-        <div className="rounded-lg bg-line/5 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">MTM (Mark vs Entry) <ProvenanceBadge kind="calculated" /></p>
-          <p className={cn('num-ltr', preview.expectedMtm >= 0 ? 'text-positive' : 'text-negative')}>
-            {preview.expectedMtm >= 0 ? '+' : ''}{fmtUSD(preview.expectedMtm)}
-          </p>
-        </div>
-        <div className="rounded-lg bg-positive/10 px-2 py-1.5">
-          <p className="flex items-center gap-1 text-muted">Expected Net PnL <ProvenanceBadge kind="simulated" /></p>
-          <p className={cn('num-ltr font-black', (preview.expectedNetPnl ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-            {preview.expectedNetPnl !== null ? `${preview.expectedNetPnl >= 0 ? '+' : ''}${fmtUSD(preview.expectedNetPnl)}` : 'N/A'}
-          </p>
-          <p className={cn('num-ltr text-[8px]', (preview.roiOnMargin ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-            ROI {preview.roiOnMargin !== null ? fmtPct(preview.roiOnMargin) : 'N/A'}
-          </p>
-        </div>
-      </div>
+      <Surface className="px-4 md:px-5">
+        <KeyValueList
+          rows={[
+            {
+              label: 'مارجین در دسترس',
+              value: <QuantityValue value={preview.availableMarginAsset} unit="ETH" className={(preview.availableMarginAsset ?? -1) >= 0 ? '' : 'text-negative'} />
+            },
+            { label: 'کارمزدها (مستندات Boros)', value: <MoneyValue value={preview.fees.total} /> },
+            { label: 'لغزش', hint: 'بدون Order Book عمومی → N/A', value: <MoneyValue value={preview.slippageUsd} /> },
+            { label: 'سود تسویه', value: <MoneyValue value={preview.expectedSettlementPnl} signed tone="auto" /> },
+            { label: 'MTM (Mark در برابر ورود)', value: <MoneyValue value={preview.expectedMtm} signed tone="auto" /> },
+            {
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  Liquidation Implied APR <ProvenanceBadge kind={liqAvail ? 'boros' : 'na'} label={liqAvail ? 'BOROS PREVIEW' : 'نیازمند Position'} />
+                </span>
+              ),
+              hint: liqAvail
+                ? `${LIQUIDATION_SOURCE_FA[preview.liquidationApr.source]} — مخصوص همین Position`
+                : 'فقط با Position فعال، Collateral واقعی و وضعیت Position قابل محاسبه است',
+              value: liqAvail ? <span className="num-ltr">{preview.liquidationApr.value!.toFixed(2)}%</span> : <span className="text-subtle">N/A</span>
+            },
+            ...(preview.liquidationBufferPct !== null
+              ? [{ label: 'حاشیه لیکوییدیشن', value: <span className="num-ltr">{preview.liquidationBufferPct.toFixed(2)} pp</span> }]
+              : [])
+          ]}
+        />
+      </Surface>
 
-      {/* Liquidation — MODE C */}
-      <div className="mt-2 rounded-lg border border-line/10 bg-surface-2/50 p-2">
-        <p className="flex items-center justify-between text-[9px] font-black text-ink">
-          <span>Liquidation Implied APR</span>
-          <span className="flex items-center gap-1.5">
-            <ProvenanceBadge kind={liqAvail ? 'boros' : 'na'} label={liqAvail ? 'BOROS PREVIEW' : 'REQUIRES ACTIVE POSITION'} />
-            <span className={cn('num-ltr', liqAvail ? 'text-accent' : 'text-muted')}>
-              {liqAvail ? `${preview.liquidationApr.value!.toFixed(2)}٪` : 'N/A'}
-            </span>
-          </span>
-        </p>
-        <p className="mt-1 text-[8px] font-medium leading-4 text-muted">
-          {liqAvail
-            ? `${LIQUIDATION_SOURCE_FA[preview.liquidationApr.source]} — Position-Specific`
-            : 'Liquidation APR requires an active Boros position with actual collateral and position state. این مقدار از داده بازار حدس زده نمی‌شود.'}
-        </p>
-        {preview.liquidationBufferPct !== null && (
-          <p className="mt-1 text-[8px] font-bold text-ink">
-            Liquidation Buffer: <span className="num-ltr text-accent">{preview.liquidationBufferPct.toFixed(2)} pp</span>
-          </p>
-        )}
-        <p className={cn('mt-1 text-[8px] font-bold', preview.collateralSufficient ? 'text-positive' : 'text-warn')}>
-          {preview.collateralSufficient === null
-            ? 'کفایت Collateral: N/A (Collateral یا قیمت وارد نشده)'
-            : preview.collateralSufficient
-              ? 'Collateral واردشده از مارجین موردنیاز بیشتر است (بررسی ریاضی — نه تضمین)'
-              : '⚠ Collateral واردشده کمتر از مارجین موردنیاز است'}
-        </p>
-      </div>
-    </GlassCard>
+      {preview.collateralSufficient === null ? (
+        <Notice tone="neutral">کفایت Collateral: N/A — Collateral یا قیمت وارد نشده است.</Notice>
+      ) : preview.collateralSufficient ? (
+        <Notice tone="success">Collateral واردشده از مارجین موردنیاز بیشتر است (بررسی ریاضی — نه تضمین).</Notice>
+      ) : (
+        <Notice tone="warn">Collateral واردشده کمتر از مارجین موردنیاز است.</Notice>
+      )}
+    </div>
   );
 }

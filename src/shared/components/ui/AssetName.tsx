@@ -37,7 +37,7 @@ export function AssetName({
       <p
         title={d.name}
         className={cn(
-          'truncate text-start text-[12px] font-extrabold leading-tight text-ink',
+          'truncate text-start text-sm font-semibold leading-5 text-ink',
           nameClassName
         )}
       >
@@ -46,13 +46,13 @@ export function AssetName({
       {(!sameAsTicker || meta) && (
         <p
           className={cn(
-            'flex min-w-0 items-center gap-1.5 text-start text-[9px] font-black leading-tight tracking-wide text-muted/70',
+            'flex min-w-0 items-center gap-1.5 text-start text-2xs font-semibold leading-4 text-muted',
             tickerClassName
           )}
         >
           {!sameAsTicker && <bdi dir="ltr" className="truncate">{d.ticker}</bdi>}
           {meta && (
-            <span className="shrink-0 truncate font-bold text-muted/50">{meta}</span>
+            <span className="shrink-0 truncate font-normal text-subtle">{meta}</span>
           )}
         </p>
       )}

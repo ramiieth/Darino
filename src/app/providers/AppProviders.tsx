@@ -1,19 +1,30 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TopBar } from '@/shared/components/layout/TopBar';
-import { BottomNav } from '@/shared/components/layout/BottomNav';
+import { TopBar, OfflineBanner } from '@/shared/components/layout/TopBar';
+import { BottomNav, MoreSheet, NavRail } from '@/shared/components/layout/BottomNav';
 import { Sidebar } from '@/shared/components/layout/Sidebar';
-import { AmbientBackground } from '@/shared/components/layout/Page';
 import { InstallPromptSheet, useInstallPrompt } from '@/shared/components/layout/InstallPrompt';
-import { CommandPalette } from '@/shared/components/layout/CommandPalette';
 import { ToastViewport } from '@/shared/components/ui/ToastViewport';
-import { SettingsSheet } from '@/features/simulation/presentation/SettingsSheet';
+// overlays closed at startup load on first open (keeps the startup bundle small)
+const SettingsSheet = lazy(() => import('@/features/simulation/presentation/SettingsSheet').then((m) => ({ default: m.SettingsSheet })));
+const CommandPalette = lazy(() => import('@/shared/components/layout/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 import { useSidebarStore } from '@/shared/store/sidebarStore';
-import { t } from '@/shared/i18n/fa';
+import { useShellStore } from '@/shared/store/shellStore';
 import { useSettingsStore } from '@/shared/store/settingsStore';
 import { useFxStore } from '@/shared/store/fxStore';
 import { useWatchlistStore } from '@/shared/store/watchlistStore';
+import { cn } from '@/shared/lib/cn';
 
+/**
+ * AppShell — adaptive navigation architecture
+ *
+ *   < 768   top bar (compact title) + bottom bar + «More» sheet
+ *   768+    navigation rail (icons + labels)
+ *   1024+   full sidebar (collapsible), no top bar
+ *
+ * Content column: 20px gutter (reference) → 24 → 32; max 1280, 1440 on ≥1728.
+ */
 export function AppShell({
   children,
   settingsOpen,
@@ -25,86 +36,82 @@ export function AppShell({
   onOpenSettings: () => void;
   onCloseSettings: () => void;
 }) {
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const sidebarCollapsed = useSidebarStore((s) => s.collapsed);
+  const paletteOpen = useShellStore((s) => s.paletteOpen);
+  const setPaletteOpen = useShellStore((s) => s.setPaletteOpen);
   const hydrate = useSettingsStore((s) => s.hydrate);
   const fxHydrate = useFxStore((s) => s.hydrate);
   const watchHydrate = useWatchlistStore((s) => s.hydrate);
+  const { pathname } = useLocation();
+  const firstRoute = useRef(true);
+  const closePalette = useCallback(() => setPaletteOpen(false), [setPaletteOpen]);
 
   useInstallPrompt();
 
-  // هیدراته‌کردن تنظیمات/نرخ ارز/watchlist از IndexedDB
+  // hydrate settings / FX / watchlist from IndexedDB
   useEffect(() => {
     void hydrate();
     void fxHydrate();
     void watchHydrate();
   }, [hydrate, fxHydrate, watchHydrate]);
 
-  // Command Palette: Ctrl/⌘K
+  // Command palette: Ctrl/⌘K
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
-        setPaletteOpen((o) => !o);
+        setPaletteOpen(!useShellStore.getState().paletteOpen);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [setPaletteOpen]);
 
-  const pageTitle =
-    window.location.hash.includes('dashboard')
-      ? t('appShortName')
-      : window.location.hash.includes('simulation')
-      ? t('simTitle')
-      : window.location.hash.includes('market')
-        ? t('marketTitle')
-        : window.location.hash.includes('defi')
-          ? t('defiTitle')
-          : window.location.hash.includes('vehicle')
-            ? 'سرمایه‌گذاری خودرو'
-            : window.location.hash.includes('realestate')
-            ? 'بازار املاک اهواز'
-            : window.location.hash.includes('calculators')
-            ? 'ماشین‌حساب سرمایه‌گذاری'
-            : window.location.hash.includes('providers')
-              ? 'Providers و Markets'
-              : window.location.hash.includes('hyperliquid')
-                ? 'Hyperliquid Watch Only'
-                : t('appShortName');
+  // Route change: start at the top and move focus to the content (screen readers)
+  useEffect(() => {
+    if (firstRoute.current) {
+      firstRoute.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0 });
+    document.getElementById('main')?.focus({ preventScroll: true });
+  }, [pathname]);
 
   return (
     <div className="min-h-dvh">
       <a href="#main" className="skip-link">
         پرش به محتوای اصلی
       </a>
-      <AmbientBackground />
 
-      {/* سایدبار دسکتاپ — جمع‌شونده (فقط lg+) */}
-      <Sidebar />
+      <Sidebar onOpenSettings={onOpenSettings} />
+      <NavRail onOpenSettings={onOpenSettings} />
 
-      {/* محتوای اصلی — در دسکتاپ با فاصله از سایدبار (RTL: start = راست) */}
-      <div className={sidebarCollapsed ? 'lg:ps-[76px]' : 'lg:ps-[248px]'}>
-        <TopBar
-          title={pageTitle}
-          onOpenSettings={onOpenSettings}
-          onOpenPalette={() => setPaletteOpen(true)}
-        />
-
+      <div className={cn('md:ps-rail', sidebarCollapsed ? 'lg:ps-sidebar-collapsed' : 'lg:ps-sidebar')}>
+        <TopBar onOpenSettings={onOpenSettings} />
         <main
           id="main"
           tabIndex={-1}
-          className="relative z-10 mx-auto w-full max-w-lg px-4 pb-safe-nav pt-4 outline-none md:max-w-3xl md:px-6 lg:max-w-5xl lg:px-8 lg:pb-12"
+          className="mx-auto w-full max-w-content px-gutter pb-safe-nav pt-4 outline-none md:px-6 md:pb-16 md:pt-6 lg:px-8 lg:pt-10 3xl:max-w-content-wide"
         >
+          <OfflineBanner />
           {children}
         </main>
       </div>
 
       <BottomNav />
-      <SettingsSheet open={settingsOpen} onClose={onCloseSettings} />
+      <MoreSheet onOpenSettings={onOpenSettings} />
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsSheet open={settingsOpen} onClose={onCloseSettings} />
+        </Suspense>
+      )}
       <InstallPromptSheet />
       <ToastViewport />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette open={paletteOpen} onClose={closePalette} />
+        </Suspense>
+      )}
     </div>
   );
 }

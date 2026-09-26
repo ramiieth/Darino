@@ -152,6 +152,37 @@ export function fifoConsume(lots: FifoLot[], sellQty: number): FifoConsumption {
   return { consumed, costBasis, remaining };
 }
 
+/**
+ * اعمال مصرف FIFO روی لات‌ها پس از فروش (رفع باگ):
+ *  - لات کاملاً مصرف‌شده → qty = 0 و closedAt (بسته شدن «کامل» — طبق تعریف FifoLot)
+ *  - لات بخشی مصرف‌شده → فقط qty کاهش می‌یابد و باز می‌ماند
+ * نسخه قبلی لات بخشی‌مصرف‌شده را هم می‌بست؛ باقی‌مانده از FIFO و نگهداری‌ها حذف
+ * می‌شد درحالی‌که بهای تمام‌شده‌اش در دفتر کل باقی بود.
+ */
+export function applyFifoConsumption(
+  lots: FifoLot[],
+  consumed: FifoConsumption['consumed'],
+  now: number
+): FifoLot[] {
+  const used = new Map<number, number>();
+  for (const c of consumed) used.set(c.lotId, (used.get(c.lotId) ?? 0) + c.qty);
+  return lots.map((l) => {
+    const u = used.get(l.id);
+    if (u === undefined || l.closedAt) return l;
+    const left = l.qty - u;
+    return left > EPS ? { ...l, qty: left } : { ...l, qty: 0, closedAt: now };
+  });
+}
+
+/**
+ * ترمیم لات‌هایی که نسخه قبلی پس از فروش «جزئی» به‌اشتباه بسته بود.
+ * تنها نویسنده closedAt فروش است و لات واقعاً بسته همیشه qty≈0 دارد؛
+ * بنابراین «closedAt + qty باقی‌مانده» فقط حاصل آن باگ است و دوباره باز می‌شود.
+ */
+export function repairPartiallyClosedLots(lots: FifoLot[]): FifoLot[] {
+  return lots.map((l) => (l.closedAt && l.qty > EPS ? { ...l, closedAt: undefined } : l));
+}
+
 /** لات‌های باز یک دارایی */
 export function openLotsOf(lots: FifoLot[], asset: string): FifoLot[] {
   return lots.filter((l) => l.asset === asset && !l.closedAt);

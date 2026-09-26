@@ -19,6 +19,8 @@ import {
   makeWithdrawEntry,
   makeExpenseEntry,
   entryTotal,
+  applyFifoConsumption,
+  repairPartiallyClosedLots,
   EPS
 } from '@/features/accounting/domain/engine';
 import { DESTINATION_ACCOUNT } from '@/features/accounting/domain/types';
@@ -359,5 +361,56 @@ describe('سند فروش استیبل‌کوین (USDT = معادل نقد)', (
     expect(e.lines.find((l) => l.account === DESTINATION_ACCOUNT.expense)!.debit).toBeCloseTo(995, 6);
     expect(e.lines.find((l) => l.account === 'expense:fee')!.debit).toBeCloseTo(5, 6);
     expect(e.lines.find((l) => l.account === 'cash:usd')!.credit).toBeCloseTo(1000, 6);
+  });
+});
+
+describe('applyFifoConsumption — بستن لات فقط پس از مصرف کامل (رفع باگ فروش جزئی)', () => {
+  const lots: FifoLot[] = [
+    { id: 1, asset: 'ETH', qty: 3.33, unitCost: 2820, openedAt: T },
+    { id: 2, asset: 'ETH', qty: 1, unitCost: 3000, openedAt: T + 1 }
+  ];
+
+  it('فروش جزئی: لات باز می‌ماند و فقط qty کم می‌شود', () => {
+    const { consumed } = fifoConsume(lots, 1);
+    const next = applyFifoConsumption(lots, consumed, T + 10);
+    expect(next[0].closedAt).toBeUndefined();
+    expect(next[0].qty).toBeCloseTo(2.33, 10);
+    expect(next[1]).toEqual(lots[1]);
+    // موجودی و بهای تمام‌شده باقی‌مانده با دفتر کل سازگار است
+    const after = avgCostOf(next, 'ETH');
+    expect(after.qty).toBeCloseTo(3.33, 10);
+    expect(after.basis).toBeCloseTo(2.33 * 2820 + 3000, 6);
+  });
+
+  it('فروش کامل یک لات: همان لات بسته می‌شود (qty=0) و لات بعدی دست‌نخورده', () => {
+    const { consumed } = fifoConsume(lots, 3.33);
+    const next = applyFifoConsumption(lots, consumed, T + 10);
+    expect(next[0].closedAt).toBe(T + 10);
+    expect(next[0].qty).toBe(0);
+    expect(next[1].closedAt).toBeUndefined();
+    expect(avgCostOf(next, 'ETH').qty).toBeCloseTo(1, 10);
+  });
+
+  it('فروش دوم پس از فروش جزئی همچنان از باقی‌مانده لات اول مصرف می‌کند (FIFO)', () => {
+    const first = applyFifoConsumption(lots, fifoConsume(lots, 1).consumed, T + 10);
+    const second = fifoConsume(first, 2);
+    expect(second.consumed[0].lotId).toBe(1);
+    expect(second.consumed[0].qty).toBeCloseTo(2, 10);
+    expect(second.costBasis).toBeCloseTo(2 * 2820, 6);
+  });
+});
+
+describe('repairPartiallyClosedLots — ترمیم داده آسیب‌دیده نسخه قبلی', () => {
+  it('لات بسته با qty باقی‌مانده دوباره باز می‌شود؛ لات واقعاً بسته (qty=0) بسته می‌ماند', () => {
+    const damaged: FifoLot[] = [
+      { id: 1, asset: 'ETH', qty: 2.33, unitCost: 2820, openedAt: T, closedAt: T + 5 },
+      { id: 2, asset: 'BTC', qty: 0, unitCost: 60000, openedAt: T, closedAt: T + 5 },
+      { id: 3, asset: 'SOL', qty: 4, unitCost: 100, openedAt: T }
+    ];
+    const fixed = repairPartiallyClosedLots(damaged);
+    expect(fixed[0].closedAt).toBeUndefined();
+    expect(fixed[0].qty).toBe(2.33);
+    expect(fixed[1].closedAt).toBe(T + 5);
+    expect(fixed[2]).toEqual(damaged[2]);
   });
 });

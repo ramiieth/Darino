@@ -3,61 +3,131 @@
 @tailwind utilities;
 
 /* ============================================================
-   دارینو — سیستم طراحی (بازطراحی UI/UX)
-   اصل: آرام، ممتاز، حرفه‌ای — سطح‌های کنترل‌شده به‌جای شیشه
+   Darino Design System — foundations
+   Values follow the Darino reference system (brand blue, navy ink,
+   canvas/white surfaces, gain green, gold). Every value here is
+   documented on the live /design-system page.
+   Channels are "R G B" so Tailwind can apply alpha: rgb(var(--x) / a)
    ============================================================ */
 
-/* ---------- Design tokens (Light) ---------- */
+/* ---------- Light (default) ---------- */
 :root {
-  --c-surface: 246 247 250;      /* پس‌زمینه — خاکستری سرد ملایم */
-  --c-surface-2: 239 241 246;    /* سطح ثانویه (حوزه ورودی/جدول) */
-  --c-card: 255 255 255;         /* سطح اصلی */
-  --c-line: 15 23 42;            /* خط/حاشیه (با آلفای کم مصرف می‌شود) */
-  --c-ink: 17 24 39;             /* متن اصلی */
-  --c-muted: 100 116 139;        /* متن ثانویه */
-  --c-accent: 13 110 101;        /* برند — سبزآبی عمیق (teal-750): 5.3:1 روی سفید */
-  --c-accent-soft: 214 245 238;
-  --c-positive: 4 120 87;        /* emerald-700: 4.6:1 */
-  --c-negative: 190 18 60;       /* rose-700: 5.6:1 */
-  --c-warn: 180 83 9;            /* amber-700: 4.8:1 */
-  --c-info: 29 78 216;           /* indigo-700: 6.3:1 */
+  /* Brand */
+  --c-brand-50: 238 243 255;   /* #EEF3FF */
+  --c-brand-100: 220 230 255;  /* #DCE6FF */
+  --c-brand-500: 46 91 255;    /* #2E5BFF  primary action · 5.2:1 on white */
+  --c-brand-600: 31 71 224;    /* #1F47E0  hover / pressed */
+  --c-brand-700: 24 55 176;    /* #1837B0 */
+  --c-brand-900: 11 27 92;     /* #0B1B5C */
+  --c-on-accent: 255 255 255;  /* text on brand-500 (5.2:1) */
+
+  /* Text */
+  --c-ink: 14 21 48;           /* #0E1530  primary text */
+  --c-ink-muted: 91 100 128;   /* #5B6480  supporting · 5.9:1 */
+  --c-ink-subtle: 138 146 171; /* #8A92AB  metadata ≥ 14px / non-essential · 3.1:1 */
+
+  /* Surfaces */
+  --c-canvas: 246 248 252;     /* #F6F8FC  app background */
+  --c-surface-2: 239 242 248;  /* #EFF2F8  inset fields, neutral tint */
+  --c-card: 255 255 255;       /* #FFFFFF  primary surface */
+  --c-divider: 230 233 242;    /* #E6E9F2  reference "line" */
+  --c-divider-strong: 213 218 231; /* #D5DAE7 control borders */
+  --c-line: 14 21 48;          /* translucent base (scrims, hairlines) */
+  --c-shadow: 14 21 48;
+
+  /* Financial semantics */
+  --c-gain: 15 157 107;        /* #0F9D6B  reference gain — fills, large figures, charts */
+  --c-gain-text: 11 127 87;    /* #0B7F57  gain for text < 18px · 5.0:1 */
+  --c-loss: 200 41 63;         /* #C8293F  loss (extension) · 5.5:1 */
+  --c-gold: 183 134 31;        /* #B7861F  reference gold — fills/icons */
+  --c-gold-text: 143 104 18;   /* #8F6812  gold for text · 5.0:1 */
+
+  /* System status */
+  --c-warn: 180 83 9;          /* #B45309  stale / caution · 4.8:1 */
+  --c-info: 31 71 224;         /* = brand-600 */
+
+  /* Data visualisation — categorical (allocation/series) + axis/grid.
+     Gain/loss/gold keep their financial meaning and are not categorical. */
+  --c-chart-1: 46 91 255;      /* brand-500 */
+  --c-chart-2: 11 27 92;       /* brand-900 */
+  --c-chart-3: 124 149 255;    /* brand-300 */
+  --c-chart-4: 91 100 128;     /* ink-muted */
+  --c-chart-5: 186 196 224;    /* brand-grey */
+  --c-chart-6: 214 219 232;    /* neutral (cash / other) */
+  --c-chart-grid: 230 233 242;
+  --c-chart-axis: 138 146 171;
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* Layout metrics (safe areas included where relevant) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bottomnav-h: calc(4rem + var(--safe-bottom));
+
   color-scheme: light;
 }
 
-/* ---------- Design tokens (Dark) ---------- */
+/* ---------- Dark ---------- */
 .dark {
-  --c-surface: 9 13 23;          /* پس‌زمینه — سرمه‌ای عمیق آرام */
-  --c-surface-2: 15 21 36;
-  --c-card: 18 25 42;            /* سطح اصلی */
-  --c-line: 226 232 240;
-  --c-ink: 232 237 247;
-  --c-muted: 148 163 184;
-  --c-accent: 45 212 191;        /* teal-300 — روی سطح تیره */
-  --c-accent-soft: 20 44 46;
-  --c-positive: 52 211 153;
-  --c-negative: 251 113 133;
-  --c-warn: 251 191 36;
-  --c-info: 129 140 248;
+  --c-brand-50: 26 36 78;      /* tinted surface for selected states */
+  --c-brand-100: 36 50 104;
+  --c-brand-500: 110 139 255;  /* #6E8BFF  on #111830 ≈ 5.6:1 */
+  --c-brand-600: 138 162 255;
+  --c-brand-700: 170 188 255;
+  --c-brand-900: 220 230 255;
+  --c-on-accent: 9 13 27;      /* dark text on light-blue primary (≈6:1) */
+
+  --c-ink: 231 235 245;
+  --c-ink-muted: 160 168 192;
+  --c-ink-subtle: 112 121 148;
+
+  --c-canvas: 9 13 27;         /* #090D1B */
+  --c-surface-2: 24 31 54;     /* #181F36 */
+  --c-card: 16 22 42;          /* #10162A */
+  --c-divider: 36 44 70;
+  --c-divider-strong: 52 61 92;
+  --c-line: 231 235 245;
+  --c-shadow: 0 0 0;
+
+  --c-gain: 45 190 134;
+  --c-gain-text: 64 206 150;
+  --c-loss: 255 112 128;
+  --c-gold: 217 166 64;
+  --c-gold-text: 230 184 92;
+
+  --c-warn: 245 165 36;
+  --c-info: 138 162 255;
+
+  --c-chart-1: 110 139 255;
+  --c-chart-2: 196 208 255;
+  --c-chart-3: 64 90 200;
+  --c-chart-4: 160 168 192;
+  --c-chart-5: 82 94 130;
+  --c-chart-6: 52 61 92;
+  --c-chart-grid: 36 44 70;
+  --c-chart-axis: 112 121 148;
+
   color-scheme: dark;
 }
 
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
-    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-surface text-ink font-sans antialiased;
-    /* پس‌زمینه آرام — بدون گرادیان‌های رنگی/بلاک‌ها */
-    background-image:
-      linear-gradient(180deg, rgb(var(--c-surface-2) / 0.55), transparent 320px);
-    background-attachment: fixed;
+    @apply bg-canvas font-sans text-base text-ink antialiased;
     min-height: 100dvh;
     text-rendering: optimizeLegibility;
-    font-size: 15px;
-    /* تضمین سراسری: هیچ عنصری نباید اسکرول افقی Body ایجاد کند
-       (clip = بدون ساخت Scroll Container — Stickyها دست‌نخورده می‌مانند) */
+    /* Global guarantee: no element may create horizontal body scroll
+       (clip does not create a scroll container — sticky stays intact) */
     overflow-x: clip;
   }
 
@@ -66,97 +136,140 @@
     overscroll-behavior-y: none;
   }
 
+  /* Vazirmatn stylistic set: Persian digits for Persian text */
   * {
     -webkit-font-feature-settings: 'ss01';
     font-feature-settings: 'ss01';
   }
 
-  ::selection {
-    background: rgb(var(--c-accent) / 0.25);
+  h1, h2, h3, h4 {
+    text-wrap: balance;
   }
 
-  /* ---------- دسترس‌پذیری: حلقه فوکوس سراسری ---------- */
+  ::selection {
+    background: rgb(var(--c-brand-500) / 0.2);
+  }
+
+  /* ---------- Accessibility: one focus ring for every control ---------- */
   :focus-visible {
-    outline: 2px solid rgb(var(--c-accent));
+    outline: 2px solid rgb(var(--c-brand-500));
     outline-offset: 2px;
-    border-radius: 8px;
+    border-radius: 0.5rem;
   }
   :focus:not(:focus-visible) {
     outline: none;
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgb(var(--c-muted) / 0.3);
+    background: rgb(var(--c-ink-subtle) / 0.35);
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  /* Grid items default to min-width:auto — a scrollable chip row or long
+     number would push its column past a 320px screen. Explicit min-w-* wins. */
+  .grid > * {
+    min-width: 0;
+  }
 }
 
 @layer components {
   /* ============================================================
-     سطوح — جایگزین Glassmorphism
-     سه سطح با هماهنگی کامل: default (برجسته) / strong (بیشتر) / soft (کمتر)
+     Typography — semantic roles (use these, not raw sizes)
+     ============================================================ */
+  .t-display   { @apply text-5xl font-extrabold tracking-tight; }
+  .t-headline  { @apply text-2xl font-extrabold tracking-tight md:text-3xl; }
+  .t-title     { @apply text-lg font-bold; }
+  .t-section   { @apply text-base font-bold; }
+  .t-body-lg   { @apply text-lg font-normal; line-height: 2rem; }
+  .t-body      { @apply text-base font-normal; }
+  .t-body-sm   { @apply text-sm font-normal; }
+  .t-label     { @apply text-sm font-semibold; line-height: 1.25rem; }
+  .t-caption   { @apply text-xs font-normal; }
+  .t-micro     { @apply text-2xs font-semibold; }
+  .t-overline  { @apply text-xs font-semibold text-muted; }
+  /* Financial figures — always LTR-isolated, tabular */
+  .t-figure-hero { @apply num-ltr text-3xl font-extrabold tracking-tight md:text-4xl; }
+  .t-figure      { @apply num-ltr text-2xl font-extrabold tracking-tight; }
+  .t-figure-md   { @apply num-ltr text-lg font-bold; }
+  .t-figure-sm   { @apply num-ltr text-sm font-semibold; }
+  .t-table       { @apply text-sm tnum; }
+  .t-table-head  { @apply text-xs font-semibold text-muted; }
+
+  /* ============================================================
+     Surfaces — hierarchy by space first, surfaces second
+       .glass        raised: white card + hairline (primary content block)
+       .glass-strong focal: hero / primary result
+       .glass-soft   subtle: tinted, no border (secondary grouping)
+       .glass-inset  inset: field-like tint inside a card
+     (legacy class names kept so every module inherits the system)
      ============================================================ */
   .glass {
-    @apply border border-line/10 bg-card shadow-card;
+    @apply border border-divider bg-card;
   }
   .glass-strong {
-    @apply border border-line/10 bg-card shadow-card-hover;
+    @apply border border-divider bg-card shadow-card;
   }
   .glass-soft {
-    @apply border border-line/8 bg-surface-2/60;
+    @apply bg-surface-2/70;
   }
   .glass-inset {
-    @apply border border-line/10 bg-surface-2/80;
+    @apply bg-surface-2;
   }
 
-  /* ---------- ایزوله‌سازی LTR داده‌های مالی ---------- */
+  /* ---------- LTR isolation for financial data ---------- */
   .num-ltr {
     direction: ltr;
     unicode-bidi: isolate;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
   }
 
-  /* ---------- Safe-area ---------- */
+  /* ---------- Safe area ---------- */
   .pt-safe {
-    padding-top: max(env(safe-area-inset-top), 0px);
+    padding-top: var(--safe-top);
   }
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+    padding-bottom: var(--safe-bottom);
   }
+  /* Content clearance above the mobile bottom nav */
   .pb-safe-nav {
-    padding-bottom: calc(max(env(safe-area-inset-bottom), 0px) + 92px);
+    padding-bottom: calc(var(--bottomnav-h) + 1.5rem);
   }
   .h-safe-nav {
-    height: calc(72px + max(env(safe-area-inset-bottom), 0px));
+    height: var(--bottomnav-h);
   }
 
-  /* ---------- Skeleton (ظریف و آرام) ---------- */
+  /* ---------- Skeleton ---------- */
   .skeleton {
     @apply rounded-lg;
     background: linear-gradient(
       90deg,
-      rgb(var(--c-muted) / 0.07) 25%,
-      rgb(var(--c-muted) / 0.14) 50%,
-      rgb(var(--c-muted) / 0.07) 75%
+      rgb(var(--c-ink-subtle) / 0.10) 25%,
+      rgb(var(--c-ink-subtle) / 0.18) 50%,
+      rgb(var(--c-ink-subtle) / 0.10) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.8s linear infinite;
   }
 
-  .tnum {
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-  }
-
-  /* ---------- ریل‌های اسکرولی موبایل (تب/چیپ) بدون نوار اسکرول ---------- */
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -165,92 +278,143 @@
     display: none;
   }
 
-  /* ---------- جدول استاندارد (سطوح داده مات) ---------- */
-  .sim-table {
+  /* ============================================================
+     Data table — one financial table system
+     sticky header · tabular numerics · quiet row dividers
+     ============================================================ */
+  .sim-table,
+  .data-table {
     @apply w-full border-separate;
     border-spacing: 0;
   }
-  .sim-table thead th {
-    @apply sticky top-0 z-20 whitespace-nowrap px-3 py-2.5 text-[10px] font-bold text-muted;
-    background: rgb(var(--c-card) / 0.98);
-    border-bottom: 1px solid rgb(var(--c-line) / 0.12);
-    letter-spacing: 0.02em;
+  .sim-table thead th,
+  .data-table thead th {
+    @apply sticky top-0 z-10 whitespace-nowrap bg-card px-3 py-2.5 text-start text-xs font-semibold text-muted;
+    box-shadow: inset 0 -1px 0 rgb(var(--c-divider));
   }
-  .sim-table tbody td {
-    @apply whitespace-nowrap border-b border-line/6 px-3 py-2.5 text-[13px];
+  .sim-table tbody td,
+  .data-table tbody td,
+  .data-table tbody th {
+    @apply whitespace-nowrap border-b border-divider px-3 py-3 text-sm;
+    font-variant-numeric: tabular-nums;
   }
-  .sim-table tbody tr:last-child td {
+  .sim-table tbody tr:last-child td,
+  .data-table tbody tr:last-child td,
+  .data-table tbody tr:last-child th {
     border-bottom: none;
   }
-  .sim-table tbody tr {
-    transition: background-color 120ms ease;
+  /* several <tbody> groups: keep the divider between groups */
+  .data-table tbody + tbody tr:first-child > * {
+    border-top: 1px solid rgb(var(--c-divider));
   }
-  .sim-table tbody tr:hover {
-    background: rgb(var(--c-muted) / 0.04);
+  .sim-table tbody tr,
+  .data-table tbody tr {
+    transition: background-color var(--dur-fast) var(--ease-standard);
+  }
+  .sim-table tbody tr:hover,
+  .data-table tbody tr:hover {
+    background: rgb(var(--c-surface-2) / 0.6);
+  }
+  /* Numbers align on their last digit: physical right in both directions
+     (tabular numerals + fixed decimals → decimal points line up) */
+  .data-table .col-num,
+  .sim-table .col-num {
+    text-align: right;
+  }
+  .data-table.is-compact tbody td {
+    @apply py-2;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold leading-4;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-control px-2 py-0.5 text-2xs font-semibold;
   }
 
-  /* ---------- لینک پرش به محتوا (دسترس‌پذیری) ---------- */
+  /* ---------- Skip link ---------- */
   .skip-link {
-    @apply sr-only;
+    @apply sr-only start-2 top-2;
   }
   .skip-link:focus {
-    @apply not-sr-only fixed right-4 top-4 z-[100] rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-accent;
+    @apply not-sr-only fixed start-4 top-4 z-[100] rounded-field bg-accent px-4 py-2 text-sm font-semibold text-on-accent;
   }
 
-  /* ---------- تایپوگرافی کمکی ---------- */
+  /* ---------- Legacy helpers (mapped onto the type roles) ---------- */
   .num-label {
-    @apply text-[10px] font-bold text-muted;
-    letter-spacing: 0.02em;
+    @apply text-xs font-semibold text-muted;
   }
   .value-main {
     @apply num-ltr font-extrabold text-ink;
   }
 }
 
-/* ---------- Reduced motion ---------- */
+/* ---------- Reduced motion: the interface must stay fast without animation ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* ---------- حالت چاپ (گزارش PDF) ---------- */
+/* ---------- Print (PDF reports) ---------- */
+.report-print-clone {
+  display: none;
+}
 @media print {
+  body.print-report .report-print-clone {
+    display: block;
+    border: none;
+  }
   body.print-report * {
     visibility: hidden;
   }
-  body.print-report .report-print-area,
-  body.print-report .report-print-area * {
+  body.print-report .report-print-clone,
+  body.print-report .report-print-clone * {
     visibility: visible;
   }
-  body.print-report .report-print-area {
+  body.print-report .report-print-clone {
     position: absolute;
     inset: 0;
     width: 100%;
     background: white;
     color: black;
   }
-  body.print-report .report-print-area .num-ltr {
+  body.print-report .report-print-clone .num-ltr {
     direction: ltr;
   }
 }
 
-/* ---------- انیمیشن‌های سبک (جایگزین framer-motion در shared) ---------- */
+/* ============================================================
+   Motion — restrained: 120 / 200 / 280 ms, standard easing.
+   Used for state change, sheet/dialog entry and feedback only.
+   ============================================================ */
 @keyframes darino-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes darino-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes darino-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes darino-slide-up { from { transform: translateY(100%); } to { transform: none; } }
-@keyframes darino-pop { from { opacity: 0; transform: translateY(-14px) scale(0.98); } to { opacity: 1; transform: none; } }
-@keyframes darino-toast-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes darino-slide-in-start { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes darino-pop { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes darino-dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes darino-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.anim-fade-in { animation: darino-fade-in 0.25s ease both; }
-.anim-fade-up { animation: darino-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.anim-slide-up { animation: darino-slide-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.anim-pop { animation: darino-pop 0.18s ease both; }
-.anim-toast-in { animation: darino-toast-in 0.22s ease both; }
+.anim-fade-in { animation: darino-fade-in var(--dur-base) var(--ease-standard) both; }
+.anim-fade-up { animation: darino-fade-up var(--dur-slow) var(--ease-emphasized) both; }
+.anim-slide-up { animation: darino-slide-up var(--dur-slow) var(--ease-emphasized) both; }
+.anim-pop { animation: darino-pop var(--dur-base) var(--ease-standard) both; }
+.anim-dialog-in { animation: darino-dialog-in var(--dur-base) var(--ease-emphasized) both; }
+.anim-toast-in { animation: darino-toast-in var(--dur-base) var(--ease-standard) both; }
+
+/* Sheet presentation — uses the individual `translate`/`scale` properties so
+   entry motion composes with Tailwind's centring transforms. */
+@keyframes darino-sheet-up { from { translate: 0 100%; } to { translate: 0 0; } }
+@keyframes darino-dialog-fade { from { opacity: 0; scale: 0.98; } to { opacity: 1; scale: 1; } }
+@keyframes darino-panel-rtl { from { translate: -100% 0; } to { translate: 0 0; } }
+@keyframes darino-panel-ltr { from { translate: 100% 0; } to { translate: 0 0; } }
+.sheet-anim { animation: darino-sheet-up var(--dur-slow) var(--ease-emphasized) both; }
+.sheet-anim[data-variant='dialog'] { animation: darino-dialog-fade var(--dur-base) var(--ease-emphasized) both; }
+@media (min-width: 768px) {
+  .sheet-anim { animation: darino-dialog-fade var(--dur-base) var(--ease-emphasized) both; }
+  [dir='rtl'] .sheet-anim[data-variant='panel'] { animation: darino-panel-rtl var(--dur-slow) var(--ease-emphasized) both; }
+  [dir='ltr'] .sheet-anim[data-variant='panel'] { animation: darino-panel-ltr var(--dur-slow) var(--ease-emphasized) both; }
+}

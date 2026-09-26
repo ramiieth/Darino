@@ -2,7 +2,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense, useState } from 'react';
 import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
-import { BrandSplash } from '@/shared/components/brand/DarinoLogo';
+import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 
 // ⚠️ فقط صفحه اصلی (بازار) مستقیم import می‌شود — بقیه lazy تا باندل
 // اولیه سبک بماند و اپ زود بالا بیاید (تغییر اساسی برای روان‌سازی)
@@ -17,10 +17,11 @@ const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/C
 const AccountingPage = lazy(() => import('@/features/accounting/presentation/AccountingPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
 const LoopPage = lazy(() => import('@/features/defi-loop/presentation/LoopAnalysisPage'));
+const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 
-/** Suspense مشترک برای همه صفحات lazy */
+/** Suspense مشترک برای همه صفحات lazy — اسکلتون هم‌ریتم صفحه (نه اسپلش لوگو) */
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
-  return <Suspense fallback={<BrandSplash label={label} />}>{children}</Suspense>;
+  return <Suspense fallback={<PageSkeleton label={label} />}>{children}</Suspense>;
 }
 
 export function App() {
@@ -129,6 +130,14 @@ export function App() {
             element={
               <Lazy label="Yield Loop">
                 <LoopPage />
+              </Lazy>
+            }
+          />
+          <Route
+            path="/design-system"
+            element={
+              <Lazy label="سیستم طراحی">
+                <DesignSystemPage />
               </Lazy>
             }
           />

@@ -8,9 +8,10 @@
  * Position واقعی) همیشه N/A نمایش داده می‌شود؛ نقدشوندگی (Liquidity) ستون جدا دارد.
  */
 import { useMemo } from 'react';
-import { FileCheck2 } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { fmtPct, fmtUSD } from '@/shared/utils/formatters';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
+import { Badge, type Tone } from '@/shared/components/ui/Badge';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { toFaDigits } from '@/shared/utils/formatters';
 import { projectCapital } from '@/features/boros/domain/engine/projection';
 import { BorosCalculationEngine } from '@/features/boros/domain/engine';
 import type { BorosMarket } from '@/features/boros/domain/types';
@@ -20,7 +21,6 @@ import {
   NA_LIQUIDATION_APR,
   type LiquidationAPRData
 } from '@/features/boros/domain/liquidationApr';
-import { cn } from '@/shared/lib/cn';
 
 export interface AuditReportRow {
   market: string;
@@ -121,97 +121,104 @@ function statusRank(s: string): number {
   }
 }
 
+const STATUS_BADGE: Record<string, { label: string; tone: Tone }> = {
+  potential: { label: 'فرصت', tone: 'gain' },
+  conditional: { label: 'مشروط', tone: 'info' },
+  'anomaly-detected': { label: 'ناهنجاری', tone: 'loss' },
+  'not-attractive': { label: 'جذاب نیست', tone: 'warn' }
+};
+
+const ANOMALY_FA: Record<string, string> = {
+  'extreme-dislocation': 'انحراف شدید',
+  'thin-liquidity': 'نقدشوندگی کم',
+  'stale-data': 'داده کهنه'
+};
+
 export function AuditReportTable({ markets }: { markets: BorosMarket[] }) {
   const rows = useMemo(() => buildAuditReport(markets), [markets]);
 
   return (
-    <div className="space-y-3">
-      <GlassCard variant="soft" className="p-3.5">
-        <p className="flex items-center gap-1.5 text-[12px] font-black text-ink">
-          <FileCheck2 className="h-4 w-4 text-positive" /> Audit Report نهایی ({rows.length} بازار)
-        </p>
-        <p className="mt-1 text-[9px] font-medium leading-4 text-muted">
-          Capital: $1,000 (لانگ) · Round Trip تضمین‌شده · Exposure = Notional/Margin ·
-          Annualized = نظری (extrapolation) · Liquidation APR = N/A (ویژگی Position است؛ بدون
-          Position واقعی محاسبه نمی‌شود) · Status از Minimum Economic Edge (App-defined) عبور می‌کند.
-        </p>
-      </GlassCard>
-
-      <GlassCard variant="soft" className="overflow-x-auto p-2">
-        <table className="w-full min-w-[1100px] text-[8px]">
-          <thead>
-            <tr className="text-muted">
-              {['#', 'بازار', 'Venue', 'روز', 'Fixed', 'Under', 'Edge', 'Notional', 'Margin', 'Gross', 'MTM', 'Costs', 'Net', 'Econ Edge', 'ROI M', 'ROI N', 'Ann.*', 'Liq APR', 'Liqty', 'ریسک', 'Conf', 'Anomaly', 'Robust', 'Status'].map((h) => (
-                <th key={h} className="px-1 py-1 text-end font-black first:text-start">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className="border-t border-line/5">
-                <td className="num-ltr px-1 py-1 text-end font-black text-muted">{r.rank || '—'}</td>
-                <td className="px-1 py-1 text-start font-extrabold text-ink">{r.market}</td>
-                <td className="px-1 py-1 text-end text-muted">{r.venue}</td>
-                <td className="num-ltr px-1 py-1 text-end text-muted">{r.maturityDays}d</td>
-                <td className="num-ltr px-1 py-1 text-end text-ink">{fmtPct(r.fixedApr * 100)}</td>
-                <td className="num-ltr px-1 py-1 text-end text-ink">{fmtPct(r.floatingApr * 100)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end font-black', r.edge >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(r.edge * 100)}</td>
-                <td className="num-ltr px-1 py-1 text-end text-ink">{fmtUSD(r.notional, true)}</td>
-                <td className="num-ltr px-1 py-1 text-end text-ink">${r.margin}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end', r.settlementPnl >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(r.settlementPnl)}</td>
-                <td className="num-ltr px-1 py-1 text-end text-muted">{fmtUSD(r.mtmPnl)}</td>
-                <td className="num-ltr px-1 py-1 text-end text-negative">{fmtUSD(r.costs)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end font-black', r.netPnl >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(r.netPnl)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end font-black', r.economicEdge >= 0 ? 'text-positive' : 'text-negative')}>{fmtUSD(r.economicEdge)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end', r.roiMargin >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(r.roiMargin)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end', r.roiNotional >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(r.roiNotional)}</td>
-                <td className={cn('num-ltr px-1 py-1 text-end', r.annualized >= 0 ? 'text-positive' : 'text-negative')}>{fmtPct(r.annualized)}</td>
-                {/* Liquidation Implied APR — بدون Position واقعی همیشه N/A */}
-                <td className="px-1 py-1 text-end">
-                  <span
-                    title={LIQUIDATION_NA_REASON}
-                    className={cn(
-                      'badge',
-                      isLiquidationAPRAvailable(r.liquidationApr)
-                        ? 'bg-accent/10 text-accent ring-1 ring-accent/20'
-                        : 'bg-line/5 text-muted ring-1 ring-line/10'
-                    )}
-                  >
-                    {isLiquidationAPRAvailable(r.liquidationApr)
-                      ? `${r.liquidationApr.value!.toFixed(2)}٪`
-                      : 'N/A'}
-                  </span>
-                </td>
-                <td className="num-ltr px-1 py-1 text-end text-muted">{Math.round(r.liquidity * 100)}٪</td>
-                <td className={cn('px-1 py-1 text-end font-black', r.risk === 'کم' ? 'text-positive' : r.risk === 'متوسط' ? 'text-warn' : 'text-negative')}>{r.risk}</td>
-                <td className="num-ltr px-1 py-1 text-end text-muted">{r.confidence}%</td>
-                <td className="px-1 py-1 text-end">
-                  {r.anomaly !== 'none' ? (
-                    <span className="badge bg-negative/10 text-negative ring-1 ring-negative/20">
-                      {r.anomaly === 'extreme-dislocation' ? 'انحراف شدید' : r.anomaly === 'thin-liquidity' ? 'نقدشوندگی کم' : r.anomaly === 'stale-data' ? 'داده کهنه' : r.anomaly}
-                    </span>
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )}
-                </td>
-                <td className="px-1 py-1 text-end text-muted">
-                  {r.robustness === 'robust' ? 'پایدار' : r.robustness === 'conditional' ? 'مشروط' : r.robustness === 'not-attractive' ? 'ناپایدار' : 'N/A'}
-                </td>
-                <td className="px-1 py-1 text-end">
-                  <span className={cn('badge ring-1', r.status === 'potential' ? 'bg-positive/10 text-positive ring-positive/20' : r.status === 'conditional' ? 'bg-info/10 text-info ring-info/20' : r.status === 'anomaly-detected' ? 'bg-negative/10 text-negative ring-negative/20' : r.status === 'not-attractive' ? 'bg-warn/10 text-warn ring-warn/20' : 'bg-line/5 text-muted ring-line/10')}>
-                    {r.status === 'potential' ? 'فرصت' : r.status === 'conditional' ? 'مشروط' : r.status === 'anomaly-detected' ? 'ناهنجاری' : r.status === 'not-attractive' ? 'جذاب نیست' : 'ناکافی'}
-                  </span>
-                </td>
+    <Section
+      id="audit-report"
+      title="گزارش ممیزی"
+      description={`${toFaDigits(rows.length)} بازار · سرمایه ۱٬۰۰۰ دلار (لانگ) · Notional/مارجین · سالانه‌شده فقط نظری · Liquidation APR بدون Position واقعی N/A`}
+    >
+      <Surface className="overflow-hidden">
+        <div className="max-h-[70dvh] overflow-auto">
+          <table className="data-table is-compact min-w-[1180px]">
+            <caption className="sr-only">گزارش ممیزی بازارهای Boros</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="!ps-5">#</th>
+                <th scope="col" className="sticky start-0 z-20">بازار</th>
+                <th scope="col" className="col-num">روز</th>
+                <th scope="col" className="col-num">Fixed</th>
+                <th scope="col" className="col-num">شناور</th>
+                <th scope="col" className="col-num">لبه</th>
+                <th scope="col" className="col-num">Notional</th>
+                <th scope="col" className="col-num">مارجین</th>
+                <th scope="col" className="col-num">تسویه</th>
+                <th scope="col" className="col-num">MTM</th>
+                <th scope="col" className="col-num">هزینه</th>
+                <th scope="col" className="col-num">خالص</th>
+                <th scope="col" className="col-num">لبه اقتصادی</th>
+                <th scope="col" className="col-num">ROI م</th>
+                <th scope="col" className="col-num">ROI N</th>
+                <th scope="col" className="col-num">سالانه*</th>
+                <th scope="col" className="col-num">Liq APR</th>
+                <th scope="col" className="col-num">نقدشوندگی</th>
+                <th scope="col">ریسک</th>
+                <th scope="col" className="col-num">اطمینان</th>
+                <th scope="col">ناهنجاری</th>
+                <th scope="col" className="!pe-5">وضعیت</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </GlassCard>
-
-      <p className="text-center text-[8px] font-medium text-muted/70">
-        *Annualized فقط نظری است (extrapolation ریاضی) — پیش‌بینی بازده آینده نیست.
-        Min Economic Edge معیار داخلی اپ است (نه رسمی Boros).
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const st = STATUS_BADGE[r.status] ?? { label: 'ناکافی', tone: 'neutral' as Tone };
+                return (
+                  <tr key={i}>
+                    <td className="num-ltr !ps-5 text-xs text-subtle">{r.rank || '—'}</td>
+                    <td className="sticky start-0 z-10 bg-card">
+                      <p className="font-semibold text-ink"><bdi dir="ltr">{r.market}</bdi></p>
+                      <p className="text-xs text-muted">{r.venue}</p>
+                    </td>
+                    <td className="col-num num-ltr text-muted">{r.maturityDays}</td>
+                    <td className="col-num"><PercentValue value={r.fixedApr * 100} signed={false} tone="none" /></td>
+                    <td className="col-num"><PercentValue value={r.floatingApr * 100} signed={false} tone="none" /></td>
+                    <td className="col-num"><PercentValue value={r.edge * 100} /></td>
+                    <td className="col-num"><MoneyValue value={r.notional} compact /></td>
+                    <td className="col-num"><MoneyValue value={r.margin} /></td>
+                    <td className="col-num"><MoneyValue value={r.settlementPnl} signed tone="auto" /></td>
+                    <td className="col-num text-muted"><MoneyValue value={r.mtmPnl} signed /></td>
+                    <td className="col-num text-muted"><MoneyValue value={r.costs} /></td>
+                    <td className="col-num font-semibold"><MoneyValue value={r.netPnl} signed tone="auto" /></td>
+                    <td className="col-num"><MoneyValue value={r.economicEdge} signed tone="auto" /></td>
+                    <td className="col-num"><PercentValue value={r.roiMargin} /></td>
+                    <td className="col-num"><PercentValue value={r.roiNotional} /></td>
+                    <td className="col-num"><PercentValue value={r.annualized} /></td>
+                    <td className="col-num" title={LIQUIDATION_NA_REASON}>
+                      {isLiquidationAPRAvailable(r.liquidationApr) ? (
+                        <span className="num-ltr">{r.liquidationApr.value!.toFixed(2)}%</span>
+                      ) : (
+                        <span className="text-subtle">N/A</span>
+                      )}
+                    </td>
+                    <td className="col-num"><PercentValue value={r.liquidity * 100} signed={false} tone="none" digits={0} /></td>
+                    <td><Badge tone={r.risk === 'کم' ? 'gain' : r.risk === 'متوسط' ? 'warn' : 'loss'}>{r.risk}</Badge></td>
+                    <td className="col-num num-ltr text-muted">{r.confidence}%</td>
+                    <td>{r.anomaly !== 'none' ? <Badge tone="loss">{ANOMALY_FA[r.anomaly] ?? r.anomaly}</Badge> : <span className="text-subtle">—</span>}</td>
+                    <td className="!pe-5"><Badge tone={st.tone}>{st.label}</Badge></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Surface>
+      <p className="mt-2 text-xs text-muted">
+        *سالانه‌شده فقط برون‌یابی ریاضی است و پیش‌بینی بازده آینده نیست. حداقل لبه اقتصادی معیار داخلی دارینو است (نه رسمی Boros).
       </p>
-    </div>
+    </Section>
   );
 }

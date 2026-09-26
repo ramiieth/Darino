@@ -1,19 +1,26 @@
 /**
- * صفحه جزئیات بازار Pendle — نمودار قیمت/APY/TVL + تفکیک APY + مشخصات کامل
- * ⚠️ فقط مشاهده؛ لینک رسمی Pendle برای هر اقدام
+ * Pendle market detail — primary yield first, then market depth, history,
+ * yield breakdown and technical specification.
+ * ⚠️ View only; every action links to the official Pendle app.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Check, Copy, ExternalLink, Star } from 'lucide-react';
 import { Chart as ChartJS, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Button, buttonClass } from '@/shared/components/ui/Button';
+import { KeyValueList, Metric, MetricGrid, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
 import { usePendleMarkets } from '@/features/pendle/data/usePendleMarkets';
 import { fetchMarketHistory, type PendleHistoryPoint } from '@/features/pendle/data/pendleService';
-import { chainName, fmtExpiry, pendleMarketLink, PENDLE_SORT_LABELS, type PendleSortKey } from '@/features/pendle/domain/pendle';
-import { fmtUSD, fmtPct, fmtInt } from '@/shared/utils/formatters';
+import { chainName, fmtExpiry, pendleMarketLink } from '@/features/pendle/domain/pendle';
+import { useWatchlistStore } from '@/shared/store/watchlistStore';
+import { axisUsd, baseChartOptions, cssColor } from '@/shared/design/chartTheme';
+import { fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler);
@@ -22,206 +29,272 @@ const FA_TIME = new Intl.DateTimeFormat('fa-IR', { month: 'short', day: 'numeric
 
 export function PendleMarketDetailPage() {
   const { chainId, address } = useParams<{ chainId: string; address: string }>();
-  const navigate = useNavigate();
   const { markets, loading } = usePendleMarkets();
   const [history, setHistory] = useState<PendleHistoryPoint[] | null>(null);
   const [histLoading, setHistLoading] = useState(true);
+  const watch = useWatchlistStore((s) => s.items);
+  const toggleWatch = useWatchlistStore((s) => s.toggle);
 
   const market = useMemo(
     () => markets.find((m) => m.address.toLowerCase() === (address ?? '').toLowerCase()),
     [markets, address]
   );
 
-  const loadHistory = async () => {
+  useEffect(() => {
+    let cancelled = false;
     if (!chainId || !address) return;
     setHistLoading(true);
-    try {
-      const h = await fetchMarketHistory(Number(chainId), address);
-      setHistory(h.length > 1 ? h : null);
-    } catch {
-      setHistory(null);
-    } finally {
-      setHistLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchMarketHistory(Number(chainId), address)
+      .then((h) => !cancelled && setHistory(h.length > 1 ? h : null))
+      .catch(() => !cancelled && setHistory(null))
+      .finally(() => !cancelled && setHistLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [chainId, address]);
 
-  if (loading || !market) {
+  if (loading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-48 w-full rounded-2xl" />
-        <Skeleton className="h-32 w-full rounded-2xl" />
-      </div>
+      <Page>
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </Page>
+    );
+  }
+
+  if (!market) {
+    return (
+      <Page>
+        <PageHeader back={{ label: 'بازارهای Pendle', to: '/pendle' }} title="بازار یافت نشد" />
+        <EmptyState
+          message="این بازار در فهرست بازارهای فعال نیست"
+          hint="ممکن است سررسید شده باشد یا TVL آن کمتر از حد نمایش باشد."
+        />
+      </Page>
     );
   }
 
   const m = market;
+  const fav = watch[`pendle:${m.address}`] !== undefined;
   const labels = (history ?? []).map((h) => FA_TIME.format(new Date(h.timestamp)));
-  const chartData = (key: (h: PendleHistoryPoint) => number, color: string) => ({
-    labels,
-    datasets: [
-      {
-        label: 'ارزش',
-        data: (history ?? []).map(key),
-        borderColor: color,
-        backgroundColor: color + '22',
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.3,
-        fill: true
-      }
-    ]
-  });
-  const chartOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { rtl: true, textDirection: 'rtl', callbacks: { label: (c: { parsed: { y: number } }) => ` ${fmtUSD(c.parsed.y, true)}` } }
-    },
-    scales: { x: { ticks: { maxTicksLimit: 6, font: { size: 8 } }, grid: { display: false } }, y: { grid: { color: 'rgba(148,163,184,0.1)' }, ticks: { font: { size: 8 } } } }
-  } as never;
 
-  const apyCards: { label: string; v: number | null; tone: 'pos' | 'neg' | 'accent' | 'neutral' }[] = [
-    { label: 'APY ثابت (Fixed)', v: m.fixedApyPct, tone: 'accent' },
-    { label: 'APY پایه (Underlying)', v: m.underlyingApyPct, tone: 'neutral' },
-    { label: 'LP APY', v: m.lpApyPct, tone: 'pos' },
-    { label: 'YT APY', v: m.ytApyPct, tone: 'pos' },
-    { label: 'Reward APR', v: m.rewardAprPct, tone: 'pos' },
-    { label: 'APY سواپ', v: m.swapFeeApyPct, tone: 'neutral' },
-    { label: 'بازده کل', v: m.totalApyPct, tone: 'accent' },
-    { label: 'تخفیف PT', v: m.ptDiscountPct, tone: m.ptDiscountPct !== null && m.ptDiscountPct >= 0 ? 'pos' : 'neg' }
+  const apyRows = [
+    { label: 'APY ثابت (PT)', value: m.fixedApyPct, emphasis: true },
+    { label: 'APY دارایی پایه', value: m.underlyingApyPct },
+    { label: 'LP APY', value: m.lpApyPct },
+    { label: 'YT APY', value: m.ytApyPct },
+    { label: 'Reward APR', value: m.rewardAprPct },
+    { label: 'APY کارمزد سواپ', value: m.swapFeeApyPct },
+    { label: 'بازده کل (Aggregated)', value: m.totalApyPct }
   ];
 
   return (
-    <div className="space-y-4">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-[11px] font-bold text-accent">
-        <ChevronRight className="h-3.5 w-3.5" /> بازگشت به بازارهای Pendle
-      </button>
+    <Page>
+      <PageHeader
+        back={{ label: 'بازارهای Pendle', to: '/pendle' }}
+        eyebrow={`${m.protocol} · ${chainName(m.chainId)}`}
+        title={<bdi dir="ltr">{m.name}</bdi>}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-pressed={fav}
+              icon={<Star className={cn(fav && 'fill-current text-gold')} />}
+              onClick={() => void toggleWatch(`pendle:${m.address}`)}
+            >
+              {fav ? 'در لیست پیگیری' : 'پیگیری'}
+            </Button>
+            <a href={pendleMarketLink(m.chainId, m.address)} target="_blank" rel="noreferrer" className={buttonClass('primary', 'sm')}>
+              مشاهده در Pendle
+              <ExternalLink />
+            </a>
+          </>
+        }
+      />
 
-      <PageHeader title={m.name} subtitle={`${m.protocol} · ${chainName(m.chainId)} · ${fmtExpiry(m.expiry)}`} />
-
-      {/* سربرگ */}
-      <GlassCard animated className="flex items-center gap-3 p-4">
-        {m.icon && <img src={m.icon} alt={m.name} className="h-12 w-12 shrink-0 rounded-full bg-card object-contain ring-1 ring-line/10" loading="lazy" referrerPolicy="no-referrer" />}
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-extrabold text-ink">{m.name}</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            <span className="badge bg-info/10 text-info ring-1 ring-info/20">{m.marketType}</span>
-            <span className="badge bg-line/5 text-muted ring-1 ring-line/10">{chainName(m.chainId)}</span>
-            {m.daysToExpiry !== null && <span className="badge bg-accent/10 text-accent ring-1 ring-accent/20">{fmtInt(m.daysToExpiry)} روز تا سررسید</span>}
-          </div>
-        </div>
-        <div className="shrink-0 text-end">
-          <p className="num-ltr text-lg font-black text-accent">{fmtPct(m.fixedApyPct)}</p>
-          <p className="text-[9px] font-bold text-muted">APY ثابت</p>
-        </div>
-      </GlassCard>
-
-      {/* کارت‌های APY */}
-      <div className="grid grid-cols-2 gap-2">
-        {apyCards.map((c) => (
-          <div key={c.label} className="glass-soft rounded-2xl p-3">
-            <p className="text-[9px] font-bold text-muted">{c.label}</p>
-            <p className={cn('num-ltr mt-1 text-[15px] font-black', c.tone === 'pos' ? 'text-positive' : c.tone === 'neg' ? 'text-negative' : c.tone === 'accent' ? 'text-accent' : 'text-ink')}>
-              {c.v !== null ? fmtPct(c.v) : '—'}
+      {/* primary yield + market depth */}
+      <Surface variant="focal" className="p-5 md:p-7">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="text-sm font-semibold text-muted">APY ثابت (implied)</p>
+            <p className="mt-1 text-4xl font-extrabold tracking-tight text-ink md:text-5xl">
+              <PercentValue value={m.fixedApyPct} signed={false} tone="none" />
+            </p>
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+              سررسید {fmtExpiry(m.expiry)}
+              {m.daysToExpiry !== null && <Badge tone="brand">{toFaDigits(m.daysToExpiry)} روز مانده</Badge>}
+              <Badge tone="neutral" ltr>{m.marketType}</Badge>
             </p>
           </div>
-        ))}
+          {m.ptDiscountPct !== null && (
+            <Metric
+              size="md"
+              align="end"
+              label="تخفیف PT نسبت به دارایی پایه"
+              value={<PercentValue value={m.ptDiscountPct} signed={false} tone="none" />}
+            />
+          )}
+        </div>
+        <MetricGrid cols={3} className="mt-6 border-t border-divider pt-5">
+          <Metric size="md" label="TVL" value={<MoneyValue value={m.details.totalTvl} compact />} />
+          <Metric size="md" label="نقدشوندگی" value={<MoneyValue value={m.details.liquidity} compact />} />
+          <Metric size="md" label="حجم ۲۴ ساعت" value={<MoneyValue value={m.details.tradingVolume} compact />} />
+        </MetricGrid>
+      </Surface>
+
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* history */}
+        <div className="space-y-6 lg:col-span-8">
+          {histLoading ? (
+            <Skeleton className="h-72 w-full" />
+          ) : history ? (
+            <>
+              <HistoryChart
+                title="APY ضمنی — ۹۰ روز"
+                labels={labels}
+                data={history.map((h) => h.impliedApy * 100)}
+                format={(v) => `${v.toFixed(2)}%`}
+                color="chart-1"
+              />
+              <HistoryChart
+                title="TVL — ۹۰ روز"
+                labels={labels}
+                data={history.map((h) => h.tvl)}
+                format={(v) => fmtUSD(v, true)}
+                axis={axisUsd}
+                color="chart-2"
+              />
+            </>
+          ) : (
+            <Notice tone="neutral">داده تاریخی برای این بازار در دسترس نیست.</Notice>
+          )}
+        </div>
+
+        {/* yield breakdown */}
+        <div className="space-y-6 lg:col-span-4">
+          <Section id="yield" title="تفکیک بازده" headingLevel={2}>
+            <Surface className="px-4">
+              <KeyValueList
+                rows={apyRows.map((r) => ({
+                  label: r.label,
+                  emphasis: r.emphasis,
+                  value: <PercentValue value={r.value} signed={false} tone="none" />
+                }))}
+              />
+            </Surface>
+          </Section>
+          {m.lpApyBreakdown?.categories?.length > 0 && (
+            <Section id="lp-breakdown" title="اجزای LP APY" headingLevel={2}>
+              <Surface className="px-4">
+                <KeyValueList
+                  dense
+                  rows={m.lpApyBreakdown.categories.map((c) => ({
+                    label: c.label,
+                    value: <PercentValue value={c.apy * 100} signed={false} tone="none" />
+                  }))}
+                />
+              </Surface>
+            </Section>
+          )}
+        </div>
       </div>
 
-      {/* KPI بازار */}
-      <GlassCard className="grid grid-cols-3 gap-2 p-4">
-        <Kpi label="TVL" value={fmtUSD(m.details.totalTvl, true)} />
-        <Kpi label="نقدشوندگی" value={fmtUSD(m.details.liquidity, true)} />
-        <Kpi label="حجم ۲۴h" value={fmtUSD(m.details.tradingVolume, true)} />
-      </GlassCard>
+      <Section id="spec" title="مشخصات فنی">
+        <Surface className="px-4 md:px-6">
+          <dl className="grid divide-y divide-divider md:grid-cols-2 md:gap-x-10 md:divide-y-0">
+            <Spec label="PT" value={m.pt} copy />
+            <Spec label="YT" value={m.yt} copy />
+            <Spec label="SY" value={m.sy} copy />
+            <Spec label="دارایی پایه" value={m.underlyingAsset} copy />
+            <Spec label="آدرس بازار" value={m.address} copy />
+            <Spec label="زنجیره" value={`${chainName(m.chainId)} (${m.chainId})`} />
+            <Spec label="پروتکل" value={m.protocol} />
+            <Spec label="کارمزد" value={m.details.feeRate ? `${(m.details.feeRate * 100).toFixed(2)}%` : '—'} />
+          </dl>
+        </Surface>
+      </Section>
 
-      {/* نمودارهای تاریخی */}
-      {histLoading && <Skeleton className="h-40 w-full rounded-2xl" />}
-      {!histLoading && history && (
-        <>
-          <GlassCard className="p-4">
-            <h4 className="mb-2 text-[11px] font-extrabold text-ink">روند TVL (۹۰ روز)</h4>
-            <div className="h-36"><Line data={chartData((h) => h.tvl, '#0d9488')} options={chartOpts} /></div>
-          </GlassCard>
-          <GlassCard className="p-4">
-            <h4 className="mb-2 text-[11px] font-extrabold text-ink">روند APY ضمنی (۹۰ روز)</h4>
-            <div className="h-36"><Line data={chartData((h) => h.impliedApy * 100, '#8b5cf6')} options={chartOpts} /></div>
-          </GlassCard>
-        </>
-      )}
-      {!histLoading && !history && (
-        <p className="glass-soft rounded-2xl px-4 py-3 text-center text-[10px] font-bold text-muted">
-          داده تاریخی برای این بازار در دسترس نیست
-        </p>
-      )}
-
-      {/* تفکیک APY */}
-      {m.lpApyBreakdown?.categories?.length > 0 && (
-        <GlassCard className="p-4">
-          <h4 className="mb-2 text-[11px] font-extrabold text-ink">تفکیک LP APY</h4>
-          <div className="space-y-1.5">
-            {m.lpApyBreakdown.categories.map((c) => (
-              <div key={c.label} className="flex items-center justify-between rounded-lg bg-line/[0.03] px-3 py-1.5">
-                <span className="text-[10px] font-bold text-muted">{c.label}</span>
-                <span className="num-ltr text-[11px] font-black text-positive">{fmtPct(c.apy * 100)}</span>
-              </div>
-            ))}
-          </div>
-        </GlassCard>
-      )}
-
-      {/* مشخصات کامل */}
-      <GlassCard className="p-4">
-        <h4 className="mb-2 text-[11px] font-extrabold text-ink">مشخصات کامل</h4>
-        <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-          <Spec label="PT" value={m.pt} />
-          <Spec label="YT" value={m.yt} />
-          <Spec label="SY" value={m.sy} />
-          <Spec label="دارایی پایه" value={m.underlyingAsset} />
-          <Spec label="پروتکل" value={m.protocol} />
-          <Spec label="زنجیره" value={`${chainName(m.chainId)} (${m.chainId})`} />
-          <Spec label="سررسید" value={fmtExpiry(m.expiry)} />
-          <Spec label="کارمزد" value={m.details.feeRate ? `${(m.details.feeRate * 100).toFixed(2)}٪` : '—'} />
-        </div>
-      </GlassCard>
-
-      {/* لینک رسمی */}
-      <a
-        href={pendleMarketLink(m.chainId, m.address)}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-[12px] font-bold text-white shadow-glow"
-      >
-        <ExternalLink className="h-4 w-4" />
-        مشاهده در Pendle (اقدامات رسمی)
-      </a>
-    </div>
+      <p className="text-xs text-subtle">داده‌ها از Pendle Core API. بازده اعلام‌شده یا گذشته تضمینی برای آینده نیست.</p>
+    </Page>
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function HistoryChart({
+  title,
+  labels,
+  data,
+  format,
+  axis,
+  color
+}: {
+  title: string;
+  labels: string[];
+  data: number[];
+  format: (v: number) => string;
+  axis?: (v: number) => string;
+  color: 'chart-1' | 'chart-2';
+}) {
+  const line = cssColor(color);
+  const options = baseChartOptions({ formatTooltip: (v) => format(v), formatY: axis ?? format });
   return (
-    <div className="text-center">
-      <p className="text-[9px] font-bold text-muted">{label}</p>
-      <p className="num-ltr mt-1 text-[14px] font-black text-ink">{value}</p>
-    </div>
+    <Surface className="p-4 md:p-5">
+      <h3 className="mb-3 text-sm font-bold text-ink">{title}</h3>
+      <div className="h-56" dir="ltr">
+        <Line
+          data={{
+            labels,
+            datasets: [
+              {
+                data,
+                borderColor: line,
+                backgroundColor: cssColor(color, 0.08),
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                fill: true
+              }
+            ]
+          }}
+          options={options as never}
+        />
+      </div>
+    </Surface>
   );
 }
 
-function Spec({ label, value }: { label: string; value: string }) {
+function shorten(v: string): string {
+  // chain-prefixed ids ("1-0xabc…") and addresses keep head + tail
+  return v.length > 20 ? `${v.slice(0, 10)}…${v.slice(-6)}` : v;
+}
+
+function Spec({ label, value, copy }: { label: string; value: string; copy?: boolean }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <div className="rounded-lg bg-line/[0.03] px-2.5 py-1.5">
-      <p className="text-[8px] font-bold text-muted">{label}</p>
-      <p dir="ltr" className="tnum truncate text-[9px] font-bold text-ink">{value.slice(0, 22)}{value.length > 22 ? '…' : ''}</p>
+    <div className="flex items-center justify-between gap-3 py-3 md:border-b md:border-divider">
+      <dt className="text-sm text-muted">{label}</dt>
+      <dd className="flex min-w-0 items-center gap-1.5">
+        <bdi dir="ltr" title={value} className="truncate font-mono text-sm text-ink">
+          {copy ? shorten(value) : value}
+        </bdi>
+        {copy && value && (
+          <button
+            type="button"
+            aria-label={`کپی ${label}`}
+            onClick={() => {
+              void navigator.clipboard?.writeText(value).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-subtle hover:bg-surface-2 hover:text-ink"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-positive" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+        )}
+      </dd>
     </div>
   );
 }
-
-export { PENDLE_SORT_LABELS as _PSL, type PendleSortKey as _SK };

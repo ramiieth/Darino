@@ -8,20 +8,16 @@
  * ⚠️ سناریوی آینده پیش‌بینی قیمت ملک نیست — برچسب‌گذاری صریح (§۲۳/§۲۴).
  * ============================================================ */
 import { useEffect, useMemo } from 'react';
-import { Building2, MapPin, TrendingDown, TrendingUp } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { PageHeader } from '@/shared/components/layout/Page';
+import { Building2, MapPin } from 'lucide-react';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { EmptyState } from '@/shared/components/ui/StateViews';
+import { PageSkeleton } from '@/shared/components/ui/Skeleton';
+import { KeyValueList, Metric, MetricGrid, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { ProvenanceBadge } from '@/shared/components/ui/ProvenanceBadge';
 import { useFxStore } from '@/shared/store/fxStore';
-import {
-  fmtIntLatin,
-  fmtPct,
-  fmtRelativeAge,
-  fmtUSD,
-  toFaDigits
-} from '@/shared/utils/formatters';
+import { fmtIntLatin, fmtRelativeAge, fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { formatJalali } from '@/shared/utils/jalali';
-import { cn } from '@/shared/lib/cn';
 import { usePropertyMarket, usePropertyMarketStore } from '../data/store';
 import {
   buildMarketView,
@@ -37,35 +33,6 @@ import { NeighborhoodTable, fmtMillionToman } from './NeighborhoodTable';
 import { CollectorPanel } from './CollectorPanel';
 import { LegacyPanel } from './LegacyPanel';
 import { HBarChart, PairedBarChart, PositionChart } from './MarketCharts';
-
-/* ---------------- کارت‌های بالای صفحه ---------------- */
-
-function HeroCard({
-  title,
-  value,
-  sub,
-  accent
-}: {
-  title: string;
-  value: string;
-  sub?: React.ReactNode;
-  accent?: 'up' | 'down' | 'neutral';
-}) {
-  return (
-    <GlassCard className="p-3.5">
-      <p className="mb-1 text-[9px] font-extrabold text-muted">{title}</p>
-      <p
-        className={cn(
-          'num-ltr text-xl font-black leading-7',
-          accent === 'up' ? 'text-positive' : accent === 'down' ? 'text-negative' : 'text-ink'
-        )}
-      >
-        {value}
-      </p>
-      {sub && <div className="mt-1 text-[9px] font-bold text-muted">{sub}</div>}
-    </GlassCard>
-  );
-}
 
 /** ساخت ویوی بازار — ترجیحاً آخرین Snapshot، وگرنه آگهی‌های محلی */
 function useMarketView(): { view: PropertyMarketView | null; hasAnyData: boolean } {
@@ -104,45 +71,158 @@ export function PropertyMarketPage() {
 
   const fxRate = view?.currentUsdRateToman ?? null;
   const futureRate = view?.futureUsdRateToman ?? null;
-
   const expensive = view ? mostExpensiveUsd(view.rows, 3) : [];
   const affordable = view ? mostAffordableUsd(view.rows, 3) : [];
+  const change = view?.cityUsdChangePercent ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-3 pb-24 pt-4 md:px-6">
+    <Page>
       <PageHeader
         title="بازار املاک — اهواز"
-        subtitle="قیمت آپارتمان‌های فروشی از دیوار + تحلیل دلاری با سناریوی نرخ آینده"
-        actions={<ProvenanceBadge kind="live" label="DIVAR" />}
+        subtitle="قیمت آپارتمان‌های فروشی از دیوار و تحلیل دلاری با سناریوی نرخ آینده"
+        meta={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+            <span className="inline-flex items-center gap-1">
+              <MapPin aria-hidden className="h-3.5 w-3.5" /> اهواز
+            </span>
+            <span>
+              آخرین به‌روزرسانی:{' '}
+              <span className="text-ink">
+                {view?.lastPropertyUpdate ? `${formatJalali(view.lastPropertyUpdate)} · ${fmtRelativeAge(view.lastPropertyUpdate)}` : '—'}
+              </span>
+            </span>
+            <span>
+              آگهی معتبر: <span className="text-ink">{view ? toFaDigits(view.totalListings) : '۰'}</span>
+            </span>
+            <ProvenanceBadge kind="live" label="DIVAR" />
+          </div>
+        }
       />
 
-      {/* نوار وضعیت شهر + نرخ‌ها */}
-      <GlassCard className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 p-3.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-ink">
-          <MapPin className="h-3.5 w-3.5 text-accent" />
-          اهواز
-        </span>
-        <span className="text-[9px] font-bold text-muted">
-          دلار فعلی:{' '}
-          <span className="num-ltr text-ink">{fxRate !== null ? `${fmtIntLatin(fxRate)} تومان` : '—'}</span>
-        </span>
-        <span className="text-[9px] font-bold text-muted">
-          دلار آینده (سناریو):{' '}
-          <span className="num-ltr text-ink">{futureRate !== null ? `${fmtIntLatin(futureRate)} تومان` : '—'}</span>
-        </span>
-        <span className="text-[9px] font-bold text-muted">
-          آخرین به‌روزرسانی ملک:{' '}
-          <span className="text-ink">
-            {view?.lastPropertyUpdate ? `${formatJalali(view.lastPropertyUpdate)} · ${fmtRelativeAge(view.lastPropertyUpdate)}` : '—'}
-          </span>
-        </span>
-        <span className="text-[9px] font-bold text-muted">
-          آگهی معتبر: <span className="num-ltr text-ink">{view ? fmtIntLatin(view.totalListings) : '۰'}</span>
-        </span>
-      </GlassCard>
+      {!hasAnyData && !st.loading ? (
+        <EmptyState
+          icon={<Building2 />}
+          message="هنوز داده‌ای از بازار املاک اهواز ثبت نشده است"
+          hint="با «جمع‌آوری از دیوار»، آگهی‌های آپارتمان فروشی اهواز استخراج، پاک‌سازی و به Snapshot بازار تبدیل می‌شوند. داده‌های ماژول قدیمی به‌صورت خودکار مهاجرت می‌شوند."
+        />
+      ) : view ? (
+        <>
+          <Surface variant="focal" className="p-5 md:p-6">
+            <MetricGrid cols={4}>
+              <Metric
+                size="lg"
+                label="میانه قیمت اهواز (تومان/متر)"
+                value={view.cityStatsToman.medianTomanPerM2 !== null ? fmtMillionToman(view.cityStatsToman.medianTomanPerM2) : '—'}
+                sub={<>میانگین {fmtMillionToman(view.cityStatsToman.meanTomanPerM2)}</>}
+              />
+              <Metric
+                size="lg"
+                label="میانه به دلار (فعلی)"
+                value={<MoneyValue value={view.cityCurrentUsdPerM2} />}
+                sub={fxRate !== null ? <>دلار {toFaDigits(fmtIntLatin(fxRate))} تومان</> : undefined}
+              />
+              <Metric
+                size="lg"
+                label="میانه به دلار (سناریو)"
+                value={<MoneyValue value={view.cityFutureUsdPerM2} />}
+                sub={futureRate !== null ? <>دلار {toFaDigits(fmtIntLatin(futureRate))} تومان</> : undefined}
+              />
+              <Metric
+                size="lg"
+                label="تغییر دلاری (سناریو)"
+                value={<PercentValue value={change !== null ? Math.round(change * 10) / 10 : null} digits={1} />}
+                sub={view.scenarioBasis === 'constant-property' ? 'با قیمت تومانی ثابت' : 'با رشد تومانی سناریو'}
+              />
+            </MetricGrid>
+          </Surface>
 
-      {/* سناریو */}
-      <div className="mb-3">
+          <ScenarioPanel
+            scenario={st.scenario}
+            currentRate={fxRate}
+            fxHydrated={fxHydrated}
+            onChange={(patch) => void usePropertyMarketStore.getState().setScenario(patch)}
+            onReset={() => void usePropertyMarketStore.getState().resetScenario()}
+          />
+
+          <Section id="areas" title="مناطق اهواز" description="میانه قیمت هر مترمربع — روی سرستون‌ها بزنید تا مرتب شود">
+            <Surface className="overflow-hidden">
+              <NeighborhoodTable rows={view.rows} />
+            </Surface>
+          </Section>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Section id="expensive" title="گران‌ترین مناطق (دلاری)">
+              <Surface className="px-4">
+                {expensive.length === 0 ? (
+                  <p className="py-4 text-sm text-muted">داده کافی نیست</p>
+                ) : (
+                  <KeyValueList
+                    rows={expensive.map((r, i) => ({
+                      label: `${toFaDigits(i + 1)}. ${r.displayName}`,
+                      value: <MoneyValue value={r.currentUsdPerM2} />
+                    }))}
+                  />
+                )}
+              </Surface>
+            </Section>
+            <Section id="affordable" title="ارزان‌ترین مناطق (دلاری)">
+              <Surface className="px-4">
+                {affordable.length === 0 ? (
+                  <p className="py-4 text-sm text-muted">داده کافی نیست</p>
+                ) : (
+                  <KeyValueList
+                    rows={affordable.map((r, i) => ({
+                      label: `${toFaDigits(i + 1)}. ${r.displayName}`,
+                      value: <MoneyValue value={r.currentUsdPerM2} />
+                    }))}
+                  />
+                )}
+              </Surface>
+            </Section>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Surface className="p-4 md:p-5">
+              <h3 className="mb-4 text-sm font-bold text-ink">نمودار ۱ — قیمت فعلی مناطق (تومان/متر)</h3>
+              <HBarChart data={view.rows.map((r) => ({ label: r.displayName, value: r.medianTomanPerM2 }))} format={(v) => fmtMillionToman(v)} />
+            </Surface>
+            <Surface className="p-4 md:p-5">
+              <h3 className="mb-4 text-sm font-bold text-ink">نمودار ۲ — قیمت فعلی مناطق (دلار/متر)</h3>
+              <HBarChart
+                data={view.rows.map((r) => ({ label: r.displayName, value: r.currentUsdPerM2 }))}
+                format={(v) => fmtUSD(v)}
+                color="rgb(var(--c-chart-2))"
+              />
+            </Surface>
+            <Surface className="p-4 md:p-5">
+              <h3 className="mb-4 text-sm font-bold text-ink">نمودار ۳ — نرخ دلار فعلی در برابر آینده</h3>
+              <PairedBarChart
+                data={view.rows.map((r) => ({ label: r.displayName, current: r.currentUsdPerM2, future: r.futureUsdPerM2 }))}
+                format={(v) => fmtUSD(v)}
+              />
+              <p className="mt-3 text-xs text-muted">
+                {view.scenarioBasis === 'constant-property'
+                  ? 'قیمت تومانی ملک ثابت فرض شده است.'
+                  : `رشد تومانی ${toFaDigits(String(view.propertyTomanGrowthPct ?? 0))}٪ اعمال شده است.`}{' '}
+                این سناریو پیش‌بینی قیمت ملک نیست.
+              </p>
+            </Surface>
+            <Surface className="p-4 md:p-5">
+              <h3 className="mb-4 text-sm font-bold text-ink">نمودار ۴ — موقعیت نسبی نسبت به میانه اهواز</h3>
+              <PositionChart data={view.rows.map((r) => ({ label: r.displayName, pct: r.positionVsCityPct }))} cityLabel="اهواز" />
+            </Surface>
+          </div>
+        </>
+      ) : (
+        <PageSkeleton />
+      )}
+
+      <CollectorPanel
+        collect={st.collect}
+        lastSnapshot={st.snapshots.length > 0 ? st.snapshots[st.snapshots.length - 1] : null}
+        onCollect={() => void usePropertyMarketStore.getState().startCollection()}
+      />
+      {!hasAnyData && !st.loading && (
         <ScenarioPanel
           scenario={st.scenario}
           currentRate={fxRate}
@@ -150,167 +230,8 @@ export function PropertyMarketPage() {
           onChange={(patch) => void usePropertyMarketStore.getState().setScenario(patch)}
           onReset={() => void usePropertyMarketStore.getState().resetScenario()}
         />
-      </div>
-
-      {!hasAnyData && !st.loading ? (
-        <GlassCard className="p-6 text-center">
-          <Building2 className="mx-auto mb-2 h-8 w-8 text-muted" />
-          <p className="text-[12px] font-extrabold text-ink">هنوز داده‌ای از بازار املاک اهواز ثبت نشده است</p>
-          <p className="mx-auto mt-1.5 max-w-md text-[10px] font-medium leading-5 text-muted">
-            با اجرای «جمع‌آوری از دیوار» آگهی‌های آپارتمان فروشی اهواز استخراج، پاک‌سازی و به
-            Snapshot بازار تبدیل می‌شوند. داده‌های ماژول قدیمی (در صورت وجود) به‌صورت خودکار
-            مهاجرت می‌شوند.
-          </p>
-        </GlassCard>
-      ) : view ? (
-        <>
-          {/* کارت‌های اصلی §۸ */}
-          <div className="mb-3 grid grid-cols-2 gap-2.5 md:grid-cols-4">
-            <HeroCard
-              title="میانه قیمت اهواز (تومان/متر)"
-              value={view.cityStatsToman.medianTomanPerM2 !== null ? fmtMillionToman(view.cityStatsToman.medianTomanPerM2) : '—'}
-              sub={
-                <span>
-                  میانگین: <span className="num-ltr">{fmtMillionToman(view.cityStatsToman.meanTomanPerM2)}</span>
-                </span>
-              }
-            />
-            <HeroCard
-              title="میانه اهواز به دلار (فعلی)"
-              value={view.cityCurrentUsdPerM2 !== null ? fmtUSD(view.cityCurrentUsdPerM2) : '—'}
-              sub={<span>با دلار {fmtIntLatin(view.currentUsdRateToman ?? 0)} تومانی</span>}
-            />
-            <HeroCard
-              title="دلار آینده — میانه اهواز (سناریو)"
-              value={view.cityFutureUsdPerM2 !== null ? fmtUSD(view.cityFutureUsdPerM2) : '—'}
-              sub={<span>فرض: قیمت تومانی {view.scenarioBasis === 'constant-property' ? 'ثابت' : 'سناریوشده'}</span>}
-            />
-            <HeroCard
-              title="تغییر دلاری (سناریو)"
-              value={view.cityUsdChangePercent !== null ? fmtPct(Math.round(view.cityUsdChangePercent * 10) / 10) : '—'}
-              accent={view.cityUsdChangePercent !== null && view.cityUsdChangePercent < 0 ? 'down' : view.cityUsdChangePercent !== null && view.cityUsdChangePercent > 0 ? 'up' : 'neutral'}
-              sub={
-                view.cityUsdChangePercent !== null && view.cityUsdChangePercent < 0 ? (
-                  <span className="flex items-center gap-1">
-                    <TrendingDown className="h-3 w-3" /> افت ارزش دلاری با دلار گران‌تر
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" /> بدون افت دلاری در این سناریو
-                  </span>
-                )
-              }
-            />
-          </div>
-
-          {/* جدول مناطق */}
-          <GlassCard className="mb-3 p-3.5">
-            <h3 className="mb-2 text-[11px] font-extrabold text-ink">مناطق اهواز — میانه قیمت هر مترمربع</h3>
-            <NeighborhoodTable rows={view.rows} />
-          </GlassCard>
-
-          {/* رتبه‌های دلاری §۱۰/§۱۱ */}
-          <div className="mb-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">گران‌ترین مناطق دلاری</h3>
-              <div className="space-y-1.5">
-                {expensive.length === 0 && <p className="text-[9px] text-muted">داده کافی نیست</p>}
-                {expensive.map((r, i) => (
-                  <div key={r.neighborhoodKey} className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="text-ink">
-                      {toFaDigits(i + 1)}. {r.displayName}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="num-ltr text-ink">{fmtUSD(r.currentUsdPerM2)}</span>
-                      {r.position === 'above' && (
-                        <span className="rounded-full bg-negative/10 px-1.5 py-0.5 text-[7px] font-extrabold text-negative">بالاتر از بازار</span>
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">ارزان‌ترین مناطق دلاری</h3>
-              <div className="space-y-1.5">
-                {affordable.length === 0 && <p className="text-[9px] text-muted">داده کافی نیست</p>}
-                {affordable.map((r, i) => (
-                  <div key={r.neighborhoodKey} className="flex items-center justify-between text-[10px] font-bold">
-                    <span className="text-ink">
-                      {toFaDigits(i + 1)}. {r.displayName}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="num-ltr text-ink">{fmtUSD(r.currentUsdPerM2)}</span>
-                      {r.position === 'below' && (
-                        <span className="rounded-full bg-positive/10 px-1.5 py-0.5 text-[7px] font-extrabold text-positive">پایین‌تر از بازار</span>
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          </div>
-
-          {/* نمودارها §۲۲ */}
-          <div className="mb-3 grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">
-                نمودار ۱ — قیمت فعلی مناطق (تومان/متر)
-              </h3>
-              <HBarChart
-                data={view.rows.map((r) => ({ label: r.displayName, value: r.medianTomanPerM2 }))}
-                format={(v) => fmtMillionToman(v)}
-              />
-            </GlassCard>
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">
-                نمودار ۲ — قیمت فعلی مناطق (دلار/متر)
-              </h3>
-              <HBarChart
-                data={view.rows.map((r) => ({ label: r.displayName, value: r.currentUsdPerM2 }))}
-                format={(v) => fmtUSD(v)}
-                color="rgb(129 140 248)"
-              />
-            </GlassCard>
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">
-                نمودار ۳ — سناریوی نرخ دلار: فعلی در مقابل آینده
-              </h3>
-              <PairedBarChart
-                data={view.rows.map((r) => ({ label: r.displayName, current: r.currentUsdPerM2, future: r.futureUsdPerM2 }))}
-                format={(v) => fmtUSD(v)}
-              />
-              <p className="mt-2 text-[7px] font-medium leading-3 text-muted">
-                سناریوی آینده: {view.scenarioBasis === 'constant-property'
-                  ? 'قیمت تومانی ملک ثابت فرض شده است.'
-                  : `فرض رشد تومانی ${toFaDigits(String(view.propertyTomanGrowthPct ?? 0))}٪ اعمال شده است.`}{' '}
-                این سناریو پیش‌بینی قیمت ملک نیست.
-              </p>
-            </GlassCard>
-            <GlassCard className="p-3.5">
-              <h3 className="mb-2 text-[10px] font-extrabold text-ink">
-                نمودار ۴ — موقعیت نسبی مناطق نسبت به میانه اهواز
-              </h3>
-              <PositionChart
-                data={view.rows.map((r) => ({ label: r.displayName, pct: r.positionVsCityPct }))}
-                cityLabel="اهواز"
-              />
-            </GlassCard>
-          </div>
-        </>
-      ) : (
-        <GlassCard className="p-6 text-center text-[10px] font-bold text-muted">در حال بارگذاری…</GlassCard>
       )}
-
-      {/* کلکشنر + داده قدیمی */}
-      <div className="space-y-3">
-        <CollectorPanel
-          collect={st.collect}
-          lastSnapshot={st.snapshots.length > 0 ? st.snapshots[st.snapshots.length - 1] : null}
-          onCollect={() => void usePropertyMarketStore.getState().startCollection()}
-        />
-        <LegacyPanel assets={st.legacyAssets} />
-      </div>
-    </div>
+      <LegacyPanel assets={st.legacyAssets} />
+    </Page>
   );
 }

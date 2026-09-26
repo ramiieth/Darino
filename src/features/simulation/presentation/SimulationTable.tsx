@@ -1,20 +1,19 @@
 /**
- * جدول شبیه‌سازی — ستون‌های استاندارد الزامی:
- *   Asset | Buy/Reference Price | Current Price | Value ($) | Profit/Loss | Vs ETH ($)
+ * Simulation table — required columns:
+ *   asset | buy/reference price | current price | value | profit/loss | vs ETH
  *
- * بهبودهای ممیزی:
- *  - مرتب‌سازی با کلیک روی هدر (aria-sort + نشانگر ▲▼)
- *  - گروه‌بندی اختیاری با ردیف‌های سرگروه
- *  - ایزوله LTR ارقام (num-ltr) + سطوح مات
- *  - کلیک روی ردیف → شیت جزئیات (Drill-Down)
- *  - دسترس‌پذیری: scope/caption/aria-live
+ *  desktop: sortable table (aria-sort), optional group header rows, sticky asset column
+ *  phones:  list rows (value + P/L), tap → detail sheet
+ *  numbers LTR-isolated; unavailable → "—"; source counts in the status line
  */
-import { motion } from 'framer-motion';
-import { ChevronUp, ChevronDown, ChevronsUpDown, AlertTriangle, Info } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Info } from 'lucide-react';
 import type { SimAssetRow, TimelineResult } from '@/shared/types';
-import { fmtUSD, fmtPct, fmtPctEn, pnlClass } from '@/shared/utils/formatters';
-import { SourceBadge } from '@/shared/components/ui/SourceBadge';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { AssetLogo } from '@/shared/components/ui/AssetLogo';
+import { Badge, StatusDot } from '@/shared/components/ui/Badge';
+import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { toFaDigits } from '@/shared/utils/formatters';
 import { t } from '@/shared/i18n/fa';
 import { cn } from '@/shared/lib/cn';
 import type { SortKey } from './FiltersBar';
@@ -31,7 +30,6 @@ interface GroupSpec {
 interface Props {
   result: TimelineResult;
   visibleRows: SimAssetRow[];
-  /** وقتی تعریف شود، جدول گروه‌بندی‌شده رندر می‌شود */
   groups?: GroupSpec[] | null;
   sort: SortKey;
   dir: SortDir;
@@ -39,207 +37,159 @@ interface Props {
   onSelectRow: (row: SimAssetRow) => void;
 }
 
-const HEADERS: { key: SortKey | null; label: string; col: string }[] = [
-  { key: 'name', label: t('colAsset'), col: 'asset' },
-  { key: 'buy', label: t('colBuyPrice'), col: 'buy' },
-  { key: 'current', label: t('colCurrentPrice'), col: 'current' },
-  { key: 'value', label: t('colValue'), col: 'value' },
-  { key: 'profit', label: t('colProfitLoss'), col: 'pl' },
-  { key: 'vseth', label: t('colVsEth'), col: 'vseth' }
+const HEADERS: { key: SortKey; label: string; num: boolean }[] = [
+  { key: 'name', label: t('colAsset'), num: false },
+  { key: 'buy', label: t('colBuyPrice'), num: true },
+  { key: 'current', label: t('colCurrentPrice'), num: true },
+  { key: 'value', label: t('colValue'), num: true },
+  { key: 'profit', label: t('colProfitLoss'), num: true },
+  { key: 'vseth', label: t('colVsEth'), num: true }
 ];
+
+function Price({ row, v }: { row: SimAssetRow; v: number | null }) {
+  return row.unit === 'pct' ? <PercentValue value={v} signed={false} tone="none" /> : <MoneyValue value={v} />;
+}
 
 export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort, onSelectRow }: Props) {
   const rows = groups ? groups.flatMap((g) => g.rows) : visibleRows;
-
-  return (
-    <div className="glass overflow-hidden rounded-2xl">
-      <DataStatusStrip result={result} />
-
-      <div className="flex items-start gap-2 border-b border-line/10 px-4 py-2.5">
-        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
-        <p className="text-[11px] font-medium leading-5 text-muted">{t('rowSemanticsNote')}</p>
-      </div>
-
-      <div className="max-h-[62dvh] overflow-auto overscroll-contain bg-card">
-        <table className="sim-table min-w-[680px] text-start">
-          <caption className="sr-only">جدول شبیه‌سازی سرمایه‌گذاری</caption>
-          <thead>
-            <tr>
-              {HEADERS.map((h) => {
-                const active = h.key !== null && sort === h.key;
-                const ariaSort =
-                  active && dir === 'asc'
-                    ? 'ascending'
-                    : active && dir === 'desc'
-                      ? 'descending'
-                      : 'none';
-                return (
-                  <th
-                    key={h.key ?? h.label}
-                    scope="col"
-                    aria-sort={h.key ? ariaSort : undefined}
-                    className={cn('sticky start-0 z-30 !text-start', h.key === 'name' && 'sticky')}
-                  >
-                    {h.key ? (
-                      <button
-                        onClick={() => onSort(h.key as SortKey)}
-                        className="flex items-center gap-1 transition-colors hover:text-ink"
-                      >
-                        {h.label}
-                        {active && dir === 'asc' ? (
-                          <ChevronUp className="h-3 w-3 text-accent" />
-                        ) : active && dir === 'desc' ? (
-                          <ChevronDown className="h-3 w-3 text-accent" />
-                        ) : (
-                          <ChevronsUpDown className="h-3 w-3 opacity-40" />
-                        )}
-                      </button>
-                    ) : (
-                      h.label
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="!py-10 text-center">
-                  <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-warn" />
-                  <p className="text-xs font-bold text-muted">{t('noAssetsFound')}</p>
-                </td>
-              </tr>
-            )}
-
-            {groups
-              ? groups.map((g) => (
-                  <GroupRows key={g.label} group={g} onSelectRow={onSelectRow} />
-                ))
-              : rows.map((row, i) => (
-                  <Row key={row.key} row={row} index={i} onSelectRow={onSelectRow} />
-                ))}
-          </tbody>
-        </table>
-      </div>
-
-      {result.totals.naCount > 0 && (
-        <div className="flex items-center gap-2 border-t border-line/10 px-4 py-2.5">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn" />
-          <p className="text-[11px] font-medium leading-5 text-muted">{t('naNotice')}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function GroupRows({ group, onSelectRow }: { group: GroupSpec; onSelectRow: (r: SimAssetRow) => void }) {
-  return (
-    <>
-      <tr className="bg-accent/[0.06]">
-        <td colSpan={6} className="!border-b !border-line/10 !px-4 !py-2">
-          <span className="flex items-center gap-2 text-[11px] font-extrabold text-ink">
-            {group.label}
-            <span className="badge bg-accent/15 text-accent">{group.count}</span>
-            <span className="num-ltr ms-auto text-[11px] font-bold text-muted">
-              Σ {fmtUSD(group.value)}
-            </span>
-          </span>
-        </td>
-      </tr>
-      {group.rows.map((row, i) => (
-        <Row key={row.key} row={row} index={i} onSelectRow={onSelectRow} />
-      ))}
-    </>
-  );
-}
-
-function Row({
-  row,
-  index,
-  onSelectRow
-}: {
-  row: SimAssetRow;
-  index: number;
-  onSelectRow: (r: SimAssetRow) => void;
-}) {
-  const na = row.currentPrice === null || row.buyPrice === null;
-
-  return (
-    <motion.tr
-      initial={{ opacity: 0, x: 6 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25, delay: Math.min(index * 0.004, 0.3) }}
-      onClick={() => onSelectRow(row)}
-      className={cn(
-        'group cursor-pointer transition-colors hover:bg-line/[0.04]',
-        na && 'opacity-60'
-      )}
-    >
-      {/* دارایی: لوگو + نماد + نام فارسی */}
-      <td className="sticky start-0 z-10 bg-card group-hover:bg-line/[0.04]">
-        <div className="flex min-w-[150px] items-center gap-2.5">
-          <AssetLogo symbol={row.symbol} kind={row.kind} size={32} />
-          <div className="min-w-0">
-            <p className="tnum text-[13px] font-extrabold text-ink">{row.symbol}</p>
-            <p className="max-w-[140px] truncate text-[11px] font-medium text-muted">{row.nameFa}</p>
-          </div>
-        </div>
-      </td>
-
-      <td className="num-ltr text-muted">
-        {row.unit === 'pct' ? fmtPctEn(row.buyPrice) : fmtUSD(row.buyPrice)}
-      </td>
-
-      <td>
-        <div className="flex flex-col items-start gap-1">
-          <span className="num-ltr font-bold text-ink">
-            {row.unit === 'pct' ? fmtPctEn(row.currentPrice) : fmtUSD(row.currentPrice)}
-          </span>
-          <SourceBadge source={row.source} />
-        </div>
-      </td>
-
-      <td className="num-ltr font-extrabold text-ink">{fmtUSD(row.valueUsd)}</td>
-
-      <td className={cn('num-ltr font-bold', pnlClass(row.profitLoss))}>
-        {row.profitLoss !== null ? fmtUSD(row.profitLoss) : 'N/A'}
-      </td>
-
-      <td>
-        <div className="flex flex-col items-start gap-1">
-          <span className={cn('num-ltr font-bold', pnlClass(row.vsEth))}>{fmtUSD(row.vsEth)}</span>
-          {row.changePct !== null && (
-            <span className={cn('num-ltr text-[11px] font-bold', pnlClass(row.changePct))}>
-              {fmtPct(row.changePct)}
-            </span>
-          )}
-        </div>
-      </td>
-    </motion.tr>
-  );
-}
-
-/** نوار وضعیت منبع داده — با aria-live برای به‌روزرسانی‌ها */
-function DataStatusStrip({ result }: { result: TimelineResult }) {
   const { liveCount, snapshotCount, naCount, totalRows } = result.totals;
+  const sections = groups ?? [{ label: '', rows: visibleRows, value: 0, count: visibleRows.length }];
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-line/10 px-4 py-2.5">
-      <div className="flex items-center gap-2" aria-live="polite">
-        <span className="text-[11px] font-bold text-muted">{t('source')}:</span>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="badge bg-positive/10 text-positive">
-            <span className="h-1.5 w-1.5 rounded-full bg-positive" />
-            {t('live')} {liveCount}
-          </span>
-          <span className="badge bg-warn/10 text-warn">{t('snapshot')} {snapshotCount}</span>
-          <span className="badge bg-muted/10 text-muted">N/A {naCount}</span>
-        </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted" aria-live="polite">
+        <span>{toFaDigits(totalRows)} {t('rowsCount')}</span>
+        <StatusDot tone="gain" label={`${t('live')} ${toFaDigits(liveCount)}`} className="font-normal" />
+        <StatusDot tone="warn" label={`${t('snapshot')} ${toFaDigits(snapshotCount)}`} className="font-normal" />
+        <StatusDot tone="neutral" label={`N/A ${toFaDigits(naCount)}`} className="font-normal" />
       </div>
-      <span className="num-ltr shrink-0 text-[11px] font-bold text-muted">
-        {totalRows} {t('rowsCount')}
-      </span>
+
+      {rows.length === 0 ? (
+        <EmptyState message={t('noAssetsFound')} />
+      ) : (
+        <Surface className="overflow-hidden">
+          {/* desktop */}
+          <div className="hidden max-h-[70dvh] overflow-auto md:block">
+            <table className="data-table min-w-[720px]">
+              <caption className="sr-only">جدول شبیه‌سازی سرمایه‌گذاری</caption>
+              <thead>
+                <tr>
+                  {HEADERS.map((h, i) => {
+                    const active = sort === h.key && dir !== null;
+                    const Icon = !active ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
+                    return (
+                      <th
+                        key={h.key}
+                        scope="col"
+                        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        className={cn(h.num && 'col-num', i === 0 && 'sticky start-0 z-20 !ps-5', i === HEADERS.length - 1 && '!pe-5')}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSort(h.key)}
+                          className={cn('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')}
+                        >
+                          {h.label}
+                          <Icon aria-hidden className={cn('h-3 w-3', !active && 'opacity-40')} />
+                        </button>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              {sections.map((g) => (
+                <tbody key={g.label || 'all'}>
+                  {groups && (
+                    <tr>
+                      <th scope="rowgroup" colSpan={6} className="bg-surface-2/60 !ps-5 text-start">
+                        <span className="flex items-center gap-2 text-xs font-semibold text-ink">
+                          {g.label}
+                          <Badge tone="neutral">{toFaDigits(g.count)}</Badge>
+                          <span className="ms-auto font-normal text-muted">
+                            جمع <MoneyValue value={g.value} />
+                          </span>
+                        </span>
+                      </th>
+                    </tr>
+                  )}
+                  {g.rows.map((row) => {
+                    const na = row.currentPrice === null || row.buyPrice === null;
+                    return (
+                      <tr key={row.key} onClick={() => onSelectRow(row)} className={cn('group cursor-pointer', na && 'text-muted')}>
+                        <td className="sticky start-0 z-10 bg-card !ps-5 group-hover:bg-surface-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectRow(row);
+                            }}
+                            className="flex min-w-[10rem] items-center gap-3 text-start"
+                          >
+                            <AssetLogo symbol={row.symbol} kind={row.kind} size={32} />
+                            <span className="min-w-0">
+                              <span className="block max-w-[11rem] truncate font-semibold text-ink">{row.nameFa}</span>
+                              <span className="block text-2xs font-semibold text-muted">
+                                <bdi dir="ltr">{row.symbol}</bdi>
+                                {row.source === 'snapshot' && <span className="text-warn"> · {t('snapshot')}</span>}
+                              </span>
+                            </span>
+                          </button>
+                        </td>
+                        <td className="col-num text-muted"><Price row={row} v={row.buyPrice} /></td>
+                        <td className="col-num font-semibold text-ink"><Price row={row} v={row.currentPrice} /></td>
+                        <td className="col-num font-semibold text-ink"><MoneyValue value={row.valueUsd} /></td>
+                        <td className="col-num">
+                          <MoneyValue value={row.profitLoss} signed tone="auto" />
+                          <span className="block text-2xs"><PercentValue value={row.changePct} /></span>
+                        </td>
+                        <td className="col-num !pe-5"><MoneyValue value={row.vsEth} signed tone="auto" /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              ))}
+            </table>
+          </div>
+
+          {/* phones */}
+          <div className="md:hidden">
+            {sections.map((g) => (
+              <div key={g.label || 'all'}>
+                {groups && (
+                  <p className="flex items-center gap-2 bg-surface-2/60 px-4 py-2 text-xs font-semibold text-ink">
+                    {g.label} <Badge tone="neutral">{toFaDigits(g.count)}</Badge>
+                    <span className="ms-auto font-normal text-muted"><MoneyValue value={g.value} /></span>
+                  </p>
+                )}
+                <ul className="divide-y divide-divider px-4">
+                  {g.rows.map((row) => (
+                    <li key={row.key}>
+                      <button type="button" onClick={() => onSelectRow(row)} className="flex w-full items-center gap-3 py-3 text-start">
+                        <AssetLogo symbol={row.symbol} kind={row.kind} size={36} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-ink">{row.nameFa}</span>
+                          <span className="block text-2xs text-muted">
+                            <bdi dir="ltr">{row.symbol}</bdi> · {t('colCurrentPrice')} <Price row={row} v={row.currentPrice} />
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-end">
+                          <span className="block text-sm font-semibold text-ink"><MoneyValue value={row.valueUsd} /></span>
+                          <span className="block text-xs"><PercentValue value={row.changePct} /></span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Surface>
+      )}
+
+      <Notice tone="neutral" icon={<Info />}>
+        {t('rowSemanticsNote')}
+        {naCount > 0 && <> {t('naNotice')}</>}
+      </Notice>
     </div>
   );
 }

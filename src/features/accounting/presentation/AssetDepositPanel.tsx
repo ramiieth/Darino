@@ -1,31 +1,30 @@
 /**
- * واریز دارایی (Deposit Asset)
+ * Deposit asset — record any supported digital asset entering the system.
+ *  - pick the asset from a searchable list (logo · name · kind · live price)
+ *  - USD and Toman value computed from the live price and the system FX rate
+ *  - review (dialog) → final confirmation → standard transaction engine
  *
- * ثبت ورود هر نوع دارایی دیجیتال به سیستم — کاملاً مستقل:
- *  - انتخاب دارایی فقط از طریق Asset Explorer (جستجو/فیلتر/لوگو/نوع)
- *  - محاسبه خودکار ارزش دلاری و تومانی (قیمت لحظه‌ای + نرخ ارز سیستم)
- *  - پیش‌نمایش کامل ← «تأیید نهایی» ← ثبت از مسیر استاندارد Transaction Engine
- *
- * ⚠️ فقط ورود موجودی: بدون فروش/خرید/برداشت مخارج — بدون FIFO مصرفی، بدون Realized P&L
- * افزایش دارایی (و Net Worth) بدون تغییر در Cost Basis یا تاریخچه معاملات قبلی
+ * ⚠️ Inflow only: no sale/purchase/withdrawal, no FIFO consumption, no realized P&L.
  */
 import { useMemo, useState } from 'react';
-import { Search, Plus, Eye, CheckCheck, Coins, Lock } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
+import { Eye, CheckCheck, Lock, Check } from 'lucide-react';
+import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
-import { Input } from '@/shared/components/ui/Input';
+import { Field, Input, SearchField } from '@/shared/components/ui/Input';
 import { SmartDateField } from '@/shared/components/ui/SmartDateField';
 import { AssetLogo } from '@/shared/components/ui/AssetLogo';
-import { useAccounting } from '@/features/accounting/data/useAccounting';
-import { isCashStablecoin } from '@/features/accounting/domain/types';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Dialog } from '@/shared/components/ui/Sheet';
+import { KeyValueList, MoneyValue, QuantityValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { useAccountingData } from './AccountingContext';
 import { COINS, COIN_NAMES_FA } from '@/features/simulation/domain/constants';
 import { useMergedCryptoPrices } from '@/shared/hooks/useMergedCryptoPrices';
 import { useFxStore } from '@/shared/store/fxStore';
-import { fmtUSD, fmtToman, fmtInt } from '@/shared/utils/formatters';
+import { fmtToman, fmtInt } from '@/shared/utils/formatters';
 import { formatDualDate } from '@/shared/utils/jalali';
 import { cn } from '@/shared/lib/cn';
 
-/** تمام دارایی‌های پشتیبانی‌شده: رمزارزها (CoinGecko) + استیبل‌کوین‌های نقدی */
 const STABLES = [
   { symbol: 'USDT', nameFa: 'تتر' },
   { symbol: 'USDC', nameFa: 'یواس‌دی کوین' },
@@ -49,17 +48,8 @@ const ASSETS: AssetOption[] = [
   ...STABLES.map((s) => ({ symbol: s.symbol, id: '', nameFa: s.nameFa, kind: 'stablecoin' as const }))
 ].sort((a, b) => a.symbol.localeCompare(b.symbol));
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between text-[10px] font-bold">
-      <span className="text-muted">{label}</span>
-      <span className="num-ltr text-ink">{value}</span>
-    </div>
-  );
-}
-
 export function AssetDepositPanel() {
-  const { depositAsset } = useAccounting();
+  const { depositAsset } = useAccountingData();
   const merged = useMergedCryptoPrices();
   const fxRate = useFxStore((s) => s.rate);
 
@@ -69,19 +59,17 @@ export function AssetDepositPanel() {
   const [date, setDate] = useState<number | null>(Date.now());
   const [memo, setMemo] = useState('');
   const [previewing, setPreviewing] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return ASSETS;
     return ASSETS.filter(
-      (a) =>
-        a.symbol.toLowerCase().includes(q) ||
-        a.nameFa.toLowerCase().includes(q) ||
-        (a.id && a.id.includes(q))
+      (a) => a.symbol.toLowerCase().includes(q) || a.nameFa.toLowerCase().includes(q) || (a.id && a.id.includes(q))
     );
   }, [query]);
 
-  /** قیمت لحظه‌ای دارایی (استیبل‌کوین = ۱ دلار) */
+  /** live price (stablecoin = $1) */
   const priceOf = (a: AssetOption): number | null => {
     if (a.kind === 'stablecoin') return 1;
     const p = merged.prices[a.id];
@@ -95,100 +83,87 @@ export function AssetDepositPanel() {
 
   const confirm = async () => {
     if (!selected || !price || qtyNum <= 0) return;
-    const ok = await depositAsset({
-      symbol: selected.symbol,
-      qty: qtyNum,
-      unitPrice: price,
-      date: date ?? Date.now(),
-      memo: memo.trim() || undefined
-    });
-    if (ok) {
-      setQty('');
-      setMemo('');
-      setPreviewing(false);
-      setSelected(null);
+    setBusy(true);
+    try {
+      const ok = await depositAsset({
+        symbol: selected.symbol,
+        qty: qtyNum,
+        unitPrice: price,
+        date: date ?? Date.now(),
+        memo: memo.trim() || undefined
+      });
+      if (ok) {
+        setQty('');
+        setMemo('');
+        setPreviewing(false);
+        setSelected(null);
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="space-y-3">
-      {/* Explorer انتخاب دارایی */}
-      <GlassCard className="p-3.5">
-        <h4 className="mb-2 flex items-center gap-1.5 text-[12px] font-black text-ink">
-          <Coins className="h-4 w-4 text-accent" /> انتخاب دارایی (Explorer)
-        </h4>
-        <div className="relative mb-2">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="جستجوی دارایی…"
-            className="glass-inset h-10 w-full rounded-2xl ps-9 pe-3 text-[11px] font-bold text-ink outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-accent/40"
-          />
-        </div>
-        <div className="max-h-64 space-y-1 overflow-y-auto pe-1">
-          {filtered.length === 0 && (
-            <p className="py-4 text-center text-[11px] font-medium text-muted">
-              دارایی‌ای یافت نشد
-            </p>
-          )}
+    <div className="grid gap-6 lg:grid-cols-12">
+      {/* asset picker */}
+      <Surface className="p-4 md:p-5 lg:col-span-5">
+        <h3 className="mb-3 text-sm font-bold text-ink">۱. انتخاب دارایی</h3>
+        <SearchField value={query} onChange={setQuery} placeholder="جستجوی دارایی…" />
+        <ul className="mt-2 max-h-80 divide-y divide-divider overflow-y-auto" role="listbox" aria-label="دارایی‌ها">
+          {filtered.length === 0 && <li className="py-6 text-center text-sm text-muted">دارایی‌ای یافت نشد</li>}
           {filtered.map((a) => {
             const p = priceOf(a);
             const isSel = selected?.symbol === a.symbol;
             return (
-              <button
-                key={a.symbol}
-                onClick={() => {
-                  setSelected(a);
-                  setPreviewing(false);
-                }}
-                className={cn(
-                  'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-start transition-all',
-                  isSel ? 'bg-accent/15 ring-1 ring-accent/40' : 'hover:bg-line/5'
-                )}
-              >
-                <AssetLogo symbol={a.symbol} kind={a.kind === 'stablecoin' ? 'crypto' : 'crypto'} size={26} />
-                <div className="min-w-0 flex-1">
-                  <p className="tnum truncate text-[11px] font-extrabold text-ink">{a.symbol}</p>
-                  <p className="truncate text-[9px] font-medium text-muted">{a.nameFa}</p>
-                </div>
-                <span
+              <li key={a.symbol} role="option" aria-selected={isSel}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelected(a);
+                    setPreviewing(false);
+                  }}
                   className={cn(
-                    'badge shrink-0 ring-1',
-                    a.kind === 'stablecoin'
-                      ? 'bg-emerald-400/10 text-emerald-400 ring-emerald-400/20'
-                      : 'bg-line/5 text-muted ring-line/10'
+                    '-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-field px-2 py-2.5 text-start transition-colors',
+                    isSel ? 'bg-accent-soft' : 'hover:bg-surface-2'
                   )}
                 >
-                  {a.kind === 'stablecoin' ? 'استیبل‌کوین' : 'رمزارز'}
-                </span>
-                {p !== null && (
-                  <span className="num-ltr shrink-0 text-[9px] font-bold text-muted">
-                    {fmtUSD(p)}
-                  </span>
-                )}
-              </button>
+                  <AssetLogo symbol={a.symbol} kind="crypto" size={28} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">{a.nameFa}</p>
+                    <p className="text-2xs font-semibold text-muted">
+                      <bdi dir="ltr">{a.symbol}</bdi>
+                      {a.kind === 'stablecoin' && ' · استیبل‌کوین'}
+                    </p>
+                  </div>
+                  <MoneyValue value={p} className="shrink-0 text-xs text-muted" />
+                  {isSel && <Check aria-hidden className="h-4 w-4 shrink-0 text-accent" />}
+                </button>
+              </li>
             );
           })}
-        </div>
-      </GlassCard>
+        </ul>
+      </Surface>
 
-      {/* فرم مقدار */}
-      {selected && (
-        <GlassCard className="p-3.5">
-          <div className="mb-2.5 flex items-center gap-2.5">
-            <AssetLogo symbol={selected.symbol} kind="crypto" size={28} />
-            <div className="min-w-0 flex-1">
-              <p className="tnum text-[12px] font-extrabold text-ink">{selected.symbol}</p>
-              <p className="text-[9px] font-medium text-muted">{selected.nameFa}</p>
+      {/* amount + details */}
+      <Surface className="space-y-5 p-4 md:p-6 lg:col-span-7">
+        <h3 className="text-sm font-bold text-ink">۲. مقدار و جزئیات</h3>
+        {!selected ? (
+          <p className="rounded-field bg-surface-2 px-4 py-8 text-center text-sm text-muted">
+            ابتدا دارایی را از فهرست انتخاب کنید.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <AssetLogo symbol={selected.symbol} kind="crypto" size={36} />
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold text-ink">{selected.nameFa}</p>
+                <p className="text-xs text-muted">
+                  قیمت لحظه‌ای <MoneyValue value={price} />
+                </p>
+              </div>
+              <Badge tone="brand">انتخاب‌شده</Badge>
             </div>
-            <span className="badge bg-accent/10 text-accent ring-1 ring-accent/20">انتخاب‌شده</span>
-          </div>
-          <div className="space-y-2.5">
-            <div>
-              <label className="mb-1 block text-[11px] font-bold text-muted">
-                مقدار ({selected.symbol})
-              </label>
+            <Field label={`مقدار (${selected.symbol})`}>
               <Input
                 dir="ltr"
                 inputMode="decimal"
@@ -198,76 +173,73 @@ export function AssetDepositPanel() {
                   setPreviewing(false);
                 }}
                 placeholder="0.00"
-                className="h-10 text-xs text-start"
+                suffix={selected.symbol}
+                
               />
-            </div>
-            {price !== null ? (
-              <div className="grid grid-cols-2 gap-2 rounded-xl bg-line/5 px-3 py-2 text-[10px] font-bold">
-                <span className="text-muted">ارزش دلاری</span>
-                <span className="num-ltr text-end text-positive">{fmtUSD(valueUsd ?? 0)}</span>
-                <span className="text-muted">ارزش تومانی</span>
-                <span className="num-ltr text-end text-accent">
-                  {valueUsd ? fmtToman(valueUsd, fxRate) : '—'}
-                </span>
+            </Field>
+            {price === null && (
+              <Notice tone="warn">قیمت لحظه‌ای {selected.symbol} در دسترس نیست؛ ارزش‌گذاری و ثبت پس از دریافت قیمت ممکن است.</Notice>
+            )}
+            {valueUsd !== null && (
+              <div className="grid grid-cols-2 gap-4 rounded-field bg-surface-2 p-4">
+                <div>
+                  <p className="text-xs text-muted">ارزش دلاری</p>
+                  <p className="text-lg font-bold text-ink"><MoneyValue value={valueUsd} /></p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted">معادل تومانی</p>
+                  <p className="text-sm font-semibold text-ink">{fmtToman(valueUsd, fxRate)}</p>
+                </div>
               </div>
-            ) : (
-              <p className="rounded-xl bg-warn/10 px-3 py-2 text-[10px] font-bold text-warn">
-                قیمت لحظه‌ای {selected.symbol} در دسترس نیست — بعداً تلاش کنید
-              </p>
             )}
             <SmartDateField value={date} onChange={setDate} label="تاریخ واریز" />
-            <Input
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="توضیحات (اختیاری)"
-              className="h-10 text-xs"
-            />
-            <Button onClick={() => setPreviewing(true)} disabled={!canPreview} className="w-full" size="sm">
-              <Eye className="h-3.5 w-3.5" /> پیش‌نمایش واریز
+            <Field label="توضیحات" hint="اختیاری">
+              <Input value={memo} onChange={(e) => setMemo(e.target.value)} />
+            </Field>
+            <Button onClick={() => setPreviewing(true)} disabled={!canPreview} className="w-full" size="lg" icon={<Eye />}>
+              بررسی و تأیید
             </Button>
-          </div>
-        </GlassCard>
-      )}
+          </>
+        )}
+      </Surface>
 
-      {/* پیش‌نمایش کامل — قبل از ثبت نهایی */}
-      {previewing && selected && price !== null && valueUsd !== null && (
-        <GlassCard className="border-accent/30 p-3.5">
-          <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-black text-ink">
-            <Eye className="h-3.5 w-3.5 text-accent" /> پیش‌نمایش — بررسی و تأیید نهایی
-          </p>
-          <div className="space-y-1.5 rounded-2xl bg-line/5 p-3">
-            <p className="mb-1 text-[10px] font-black text-muted">اطلاعات دارایی</p>
-            <PreviewRow label="نام دارایی" value={selected.nameFa} />
-            <PreviewRow label="نماد" value={selected.symbol} />
-            <PreviewRow label="مقدار" value={`${qtyNum} ${selected.symbol}`} />
-            <div className="my-1 border-t border-line/10" />
-            <p className="mb-1 text-[10px] font-black text-muted">ارزش‌گذاری</p>
-            <PreviewRow label="قیمت لحظه‌ای" value={fmtUSD(price)} />
-            <PreviewRow label="ارزش دلاری" value={fmtUSD(valueUsd)} />
-            <PreviewRow label="ارزش تومانی" value={fmtToman(valueUsd, fxRate)} />
-            <PreviewRow label="نرخ دلار استفاده‌شده" value={`${fmtInt(fxRate)} تومان / دلار`} />
-            <div className="my-1 border-t border-line/10" />
-            <p className="mb-1 text-[10px] font-black text-muted">اطلاعات تراکنش</p>
-            <PreviewRow label="تاریخ شمسی" value={formatDualDate(date ?? Date.now()).split(' · ')[0]} />
-            <PreviewRow label="تاریخ میلادی" value={formatDualDate(date ?? Date.now()).split(' · ')[1]} />
-            <PreviewRow label="نوع عملیات" value="واریز دارایی" />
-            {memo.trim() && <PreviewRow label="توضیحات" value={memo.trim()} />}
-          </div>
-          <p className="mt-2 flex items-start gap-1.5 text-[9px] font-medium leading-4 text-muted/70">
-            <Lock className="mt-0.5 h-3 w-3 shrink-0" />
-            واریز فقط ورود موجودی است: بدون FIFO، بدون سود/زیان؛ دارایی و ارزش خالص افزایش
-            می‌یابد و سند به‌صورت غیرقابل تغییر در دفتر کل ثبت می‌شود.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <Button onClick={() => setPreviewing(false)} variant="outline" size="sm" className="flex-1">
+      <Dialog
+        open={previewing && !!selected && price !== null && valueUsd !== null}
+        onClose={() => setPreviewing(false)}
+        title="تأیید واریز دارایی"
+        description="واریز فقط ورود موجودی است: بدون FIFO و بدون سود/زیان."
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setPreviewing(false)}>
               انصراف
             </Button>
-            <Button onClick={() => void confirm()} size="sm" className="flex-1">
-              <CheckCheck className="h-3.5 w-3.5" /> تأیید نهایی
+            <Button className="flex-1" loading={busy} icon={<CheckCheck />} onClick={() => void confirm()}>
+              تأیید نهایی
             </Button>
           </div>
-        </GlassCard>
-      )}
+        }
+      >
+        {selected && price !== null && valueUsd !== null && (
+          <>
+            <KeyValueList
+              rows={[
+                { label: 'دارایی', value: `${selected.nameFa} (${selected.symbol})` },
+                { label: 'مقدار', value: <QuantityValue value={qtyNum} unit={selected.symbol} /> },
+                { label: 'قیمت لحظه‌ای', value: <MoneyValue value={price} /> },
+                { label: 'ارزش دلاری', emphasis: true, value: <MoneyValue value={valueUsd} /> },
+                { label: 'ارزش تومانی', value: fmtToman(valueUsd, fxRate) },
+                { label: 'نرخ دلار', value: `${fmtInt(fxRate)} تومان / دلار` },
+                { label: 'تاریخ', value: formatDualDate(date ?? Date.now()) },
+                ...(memo.trim() ? [{ label: 'توضیحات', value: memo.trim() }] : [])
+              ]}
+            />
+            <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted">
+              <Lock aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              دارایی و ارزش خالص افزایش می‌یابد و سند به‌صورت غیرقابل تغییر در دفتر کل ثبت می‌شود.
+            </p>
+          </>
+        )}
+      </Dialog>
     </div>
   );
 }

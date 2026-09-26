@@ -1,16 +1,23 @@
 /**
- * حسابداری — Accounting Core
- * سند دوطرفه (Double-Entry) · دفتر روزنامه · دفتر کل · موتور تراکنش
- * FIFO Cost Basis · تاریخچه ممیزی · ثبت‌های غیرقابل تغییر
+ * Accounting — overview first, then act, then records.
+ *   summary:  cash · holdings value · realized P/L · open P/L
+ *   tabs:     ثبت تراکنش (trade · deposit asset · cash withdrawal · cash & manual)
+ *             دفتر روزنامه · دفتر کل · سود و زیان · ممیزی
+ * Double-entry · FIFO cost basis · immutable history — engine unchanged.
+ * Deep links: /accounting?tab=trade|deposit|expense|cash|journal|ledger|pnl|audit
  */
-import { useState } from 'react';
-import { BookOpen, ScrollText, ArrowLeftRight, TrendingUp, ShieldCheck, Wallet, ArrowDownToLine } from 'lucide-react';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Skeleton } from '@/shared/components/ui/Skeleton';
-import { useAccounting } from '@/features/accounting/data/useAccounting';
-import { JournalPanel } from './JournalPanel';
+import { useSearchParams } from 'react-router-dom';
+import { BookOpen, ScrollText, ShieldCheck, TrendingUp, PlusCircle } from 'lucide-react';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Tabs, SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Metric, MetricGrid, MoneyValue } from '@/shared/components/ui/FinancialValue';
+import { PageSkeleton } from '@/shared/components/ui/Skeleton';
+import { AccountingProvider, useAccountingData } from './AccountingContext';
+import { usePortfolioOverview } from '@/features/eth-summary/presentation/usePortfolioOverview';
+import { useFxStore } from '@/shared/store/fxStore';
+import { fmtToman } from '@/shared/utils/formatters';
+import { JournalPanel, CashEntryForm } from './JournalPanel';
 import { TradePanel } from './TradePanel';
 import { CashWithdrawalPanel } from './CashWithdrawalPanel';
 import { AssetDepositPanel } from './AssetDepositPanel';
@@ -18,70 +25,107 @@ import { LedgerPanel } from './LedgerPanel';
 import { PnlPanel } from './PnlPanel';
 import { AuditPanel } from './AuditPanel';
 
-type Tab = 'trade' | 'expense' | 'deposit' | 'journal' | 'ledger' | 'pnl' | 'audit';
+type Section = 'record' | 'journal' | 'ledger' | 'pnl' | 'audit';
+type RecordKind = 'trade' | 'deposit' | 'expense' | 'cash';
 
-const TABS = [
-  { value: 'trade' as const, label: 'خرید/فروش', icon: <ArrowLeftRight className="h-3.5 w-3.5" /> },
-  { value: 'expense' as const, label: 'برداشت نقدی مخارج', icon: <Wallet className="h-3.5 w-3.5" /> },
-  { value: 'deposit' as const, label: 'واریز دارایی', icon: <ArrowDownToLine className="h-3.5 w-3.5" /> },
-  { value: 'journal' as const, label: 'معاملات', icon: <ScrollText className="h-3.5 w-3.5" /> },
-  { value: 'ledger' as const, label: 'دفتر کل', icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { value: 'pnl' as const, label: 'سود/زیان', icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { value: 'audit' as const, label: 'ممیزی', icon: <ShieldCheck className="h-3.5 w-3.5" /> }
+const SECTIONS = [
+  { value: 'record' as const, label: 'ثبت تراکنش', icon: <PlusCircle /> },
+  { value: 'journal' as const, label: 'دفتر روزنامه', icon: <ScrollText /> },
+  { value: 'ledger' as const, label: 'دفتر کل', icon: <BookOpen /> },
+  { value: 'pnl' as const, label: 'سود و زیان', icon: <TrendingUp /> },
+  { value: 'audit' as const, label: 'ممیزی', icon: <ShieldCheck /> }
 ];
 
+// short labels keep the four kinds on one line at 320px
+const KINDS = [
+  { value: 'trade' as const, label: 'خرید/فروش' },
+  { value: 'deposit' as const, label: 'واریز دارایی' },
+  { value: 'expense' as const, label: 'برداشت نقد' },
+  { value: 'cash' as const, label: 'سند دستی' }
+];
+
+const RECORD_KINDS: RecordKind[] = ['trade', 'deposit', 'expense', 'cash'];
+
 export default function AccountingPage() {
-  const [tab, setTab] = useState<Tab>('trade');
-  const { loading } = useAccounting();
+  return (
+    <AccountingProvider>
+      <AccountingScreen />
+    </AccountingProvider>
+  );
+}
+
+function AccountingScreen() {
+  const [params, setParams] = useSearchParams();
+  const acc = useAccountingData();
+  const { loading } = acc;
+  const o = usePortfolioOverview(acc);
+  const fxRate = useFxStore((s) => s.rate);
+
+  // ?tab= accepts a section or a record kind (legacy deep links)
+  const raw = params.get('tab') ?? 'trade';
+  const kind: RecordKind = (RECORD_KINDS as string[]).includes(raw) ? (raw as RecordKind) : 'trade';
+  const section: Section = (RECORD_KINDS as string[]).includes(raw) ? 'record' : (SECTIONS.some((s) => s.value === raw) ? (raw as Section) : 'record');
+
+  const go = (tab: string) => setParams({ tab }, { replace: true });
 
   return (
-    <div className="space-y-4">
+    <Page>
       <PageHeader
         title="حسابداری"
-        subtitle="دفتر دوطرفه · دفتر کل · FIFO · تاریخچه غیرقابل تغییر — تاریخ شمسی/میلادی خودکار"
+        subtitle="دفتر دوطرفه، بهای تمام‌شده FIFO و تاریخچه غیرقابل تغییر — تاریخ شمسی و میلادی"
       />
 
-      <SegmentedControl options={TABS} value={tab} onChange={setTab} />
+      {/* overview — what is on the books right now */}
+      <Surface className="p-4 md:p-6">
+        <MetricGrid cols={4}>
+          <Metric
+            size="lg"
+            label="موجودی نقد"
+            value={<MoneyValue value={o.cash} state={o.state === 'loading' ? 'loading' : 'ready'} />}
+            sub={o.cash !== null ? fmtToman(o.cash, fxRate) : undefined}
+          />
+          <Metric
+            size="lg"
+            label="ارزش دارایی‌ها"
+            value={<MoneyValue value={o.holdingsValue} state={o.state === 'loading' ? 'loading' : 'ready'} />}
+            sub={o.unpriced.length > 0 ? 'بدون دارایی‌های فاقد قیمت' : 'به قیمت روز'}
+          />
+          <Metric
+            size="md"
+            label="سود/زیان تحقق‌یافته"
+            value={<MoneyValue value={o.realizedPnl} signed tone="auto" state={o.state === 'loading' ? 'loading' : 'ready'} />}
+          />
+          <Metric
+            size="md"
+            label="سود/زیان باز"
+            value={<MoneyValue value={o.unrealizedTotal} signed tone="auto" state={o.state === 'loading' ? 'loading' : 'ready'} />}
+          />
+        </MetricGrid>
+      </Surface>
 
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-          ))}
-        </div>
-      ) : (
-        <>
-          {tab === 'journal' && <JournalPanel />}
-          {tab === 'trade' && <TradePanel />}
-          {tab === 'expense' && (
-            <div className="space-y-3">
-              <GlassCard className="p-4">
-                <h3 className="text-[14px] font-black text-ink">
-                  برداشت نقدی و تخصیص بودجه مخارج
-                </h3>
-                <p className="mt-1 text-[11px] font-bold text-muted">
-                  Cash Withdrawal &amp; Expense Funding — فقط انتقال موجودی نقد برای هزینه‌های زندگی
-                </p>
-              </GlassCard>
-              <CashWithdrawalPanel />
-            </div>
-          )}
-          {tab === 'deposit' && (
-            <div className="space-y-3">
-              <GlassCard className="p-4">
-                <h3 className="text-[14px] font-black text-ink">واریز دارایی</h3>
-                <p className="mt-1 text-[11px] font-bold text-muted">
-                  ثبت ورود هر نوع دارایی دیجیتال به سیستم — انتخاب از Explorer، پیش‌نمایش و ثبت استاندارد
-                </p>
-              </GlassCard>
-              <AssetDepositPanel />
-            </div>
-          )}
-          {tab === 'ledger' && <LedgerPanel />}
-          {tab === 'pnl' && <PnlPanel />}
-          {tab === 'audit' && <AuditPanel />}
-        </>
-      )}
-    </div>
+      <div className="space-y-6">
+        <Tabs label="بخش‌های حسابداری" options={SECTIONS} value={section} onChange={(s) => go(s === 'record' ? kind : s)} />
+
+        {loading ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            {section === 'record' && (
+              <div className="space-y-6">
+                <SegmentedControl label="نوع تراکنش" options={KINDS} value={kind} onChange={(k) => go(k)} fill className="md:w-auto md:inline-flex" />
+                {kind === 'trade' && <TradePanel />}
+                {kind === 'deposit' && <AssetDepositPanel />}
+                {kind === 'expense' && <CashWithdrawalPanel />}
+                {kind === 'cash' && <CashEntryForm />}
+              </div>
+            )}
+            {section === 'journal' && <JournalPanel />}
+            {section === 'ledger' && <LedgerPanel />}
+            {section === 'pnl' && <PnlPanel />}
+            {section === 'audit' && <AuditPanel />}
+          </>
+        )}
+      </div>
+    </Page>
   );
 }

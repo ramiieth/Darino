@@ -1,79 +1,92 @@
 /**
- * صفحه دیفای — ۴ تب با پنل‌های همیشه-mount (حفظ state بدون Re-render بی‌مورد)
+ * DeFi — capital flow, market overview, stablecoins.
+ * Panels stay mounted (state kept) and are hidden with `inert` when inactive.
+ * Yield products (Pendle · Boros · Yield Loop) are cross-linked, not nested.
  */
 import { useEffect, useState } from 'react';
-import { PageHeader } from '@/shared/components/layout/Page';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { Percent, Radar, Repeat } from 'lucide-react';
+import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { Section, Surface } from '@/shared/components/ui/GlassCard';
+import { ListRow } from '@/shared/components/ui/ListRow';
 import { OverviewPanel } from './OverviewPanel';
 import { StablecoinsCG } from './StablecoinsCG';
 import { TvlFlowDashboard } from './TvlFlowDashboard';
-import { Link } from 'react-router-dom';
-import { Repeat } from 'lucide-react';
-import { GlassCard } from '@/shared/components/ui/GlassCard';
 import { useUiStore } from '@/shared/store/uiStore';
-import { t } from '@/shared/i18n/fa';
 import { cn } from '@/shared/lib/cn';
-import type { YieldPool } from '@/features/defi/domain/logic';
 
-type DeFiTab = 'flow' | 'loop' | 'overview' | 'stablecoins';
+type DeFiTab = 'flow' | 'overview' | 'stablecoins';
+
+const YIELD_LINKS = [
+  { to: '/pendle', title: 'Pendle', desc: 'بازده ثابت PT، YT و LP', icon: Percent },
+  { to: '/boros', title: 'Boros', desc: 'بازارهای نرخ تأمین مالی', icon: Radar },
+  { to: '/defi-loop', title: 'Yield Loop', desc: 'استراتژی‌های اهرمی و ریسک آن‌ها', icon: Repeat }
+];
 
 export function DeFiPage() {
   const [tab, setTab] = useState<DeFiTab>('flow');
-  const [pendingPool, setPendingPool] = useState<YieldPool | null>(null);
   const pendingDefi = useUiStore((s) => s.pendingDefi);
   const clearDefi = useUiStore((s) => s.clearDefi);
 
-  // پرش از داشبورد (کارت رادار) → تب بازدهی + باز کردن شیت استخر
+  // deep link from elsewhere (legacy «yields» → overview)
   useEffect(() => {
     if (pendingDefi) {
-      setTab(pendingDefi.tab as DeFiTab);
-      if (pendingDefi.tab === 'yields') {
-        setPendingPool(pendingDefi.pool as YieldPool);
-      }
+      const t = pendingDefi.tab;
+      setTab(t === 'stablecoins' ? 'stablecoins' : t === 'overview' || t === 'yields' ? 'overview' : 'flow');
       clearDefi();
     }
   }, [pendingDefi, clearDefi]);
 
+  const panel = (id: DeFiTab) => ({
+    className: cn(tab !== id && 'hidden'),
+    'aria-hidden': tab !== id,
+    inert: tab !== id ? ('' as const) : undefined
+  });
+
   return (
-    <div className="space-y-4">
-      <PageHeader title={t('defiTitle')} subtitle={t('defiSubtitle')} />
+    <Page>
+      <PageHeader title="دیفای" subtitle="جریان سرمایه بین زنجیره‌ها و پروتکل‌ها، نمای کلی بازار و استیبل‌کوین‌ها" />
 
-      <SegmentedControl<DeFiTab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'flow', label: 'جریان سرمایه' },
-          { value: 'loop', label: 'Yield Loop' },
-          { value: 'overview', label: t('defiOverview') },
-          { value: 'stablecoins', label: t('defiStablecoins') }
-        ]}
-      />
-
-      {/* همه پنل‌ها mount می‌مانند — فقط visibility عوض می‌شود */}
-      <div className={cn(tab !== 'flow' && 'hidden')} aria-hidden={tab !== 'flow'} inert={tab !== 'flow' ? '' : undefined}>
-        <TvlFlowDashboard />
+      <div className="space-y-6">
+        <Tabs<DeFiTab>
+          label="بخش‌های دیفای"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'flow', label: 'جریان سرمایه' },
+            { value: 'overview', label: 'نمای کلی بازار' },
+            { value: 'stablecoins', label: 'استیبل‌کوین‌ها' }
+          ]}
+        />
+        <div {...panel('flow')}>
+          <TvlFlowDashboard />
+        </div>
+        <div {...panel('overview')}>
+          <OverviewPanel />
+        </div>
+        <div {...panel('stablecoins')}>
+          <StablecoinsCG />
+        </div>
       </div>
-      {tab === 'loop' && (
-        <Link to="/defi-loop" className="block">
-          <GlassCard className="flex items-center gap-3 p-4 transition-all hover:bg-line/[0.04] active:scale-[0.99]">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/15 text-accent">
-              <Repeat className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-extrabold text-ink">Yield Loop Analytics</p>
-              <p className="truncate text-[10px] font-medium text-muted">
-                DeFiLlama Yields → Loop — کشف فرصت‌های Leveraged Yield، محاسبه سود خالص و ریسک
-              </p>
+
+      <Section id="yield-products" title="محصولات بازدهی" description="تحلیل تخصصی بازدهی در بخش‌های جداگانه">
+        <Surface className="divide-y divide-divider px-4 md:grid md:grid-cols-3 md:divide-x md:divide-y-0 md:px-0 md:rtl:divide-x-reverse">
+          {YIELD_LINKS.map((l) => (
+            <div key={l.to} className="md:px-5">
+              <ListRow
+                to={l.to}
+                leading={
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
+                    <l.icon className="h-5 w-5" />
+                  </span>
+                }
+                title={l.title}
+                subtitle={l.desc}
+              />
             </div>
-          </GlassCard>
-        </Link>
-      )}
-      <div className={cn(tab !== 'overview' && 'hidden')} aria-hidden={tab !== 'overview'} inert={tab !== 'overview' ? '' : undefined}>
-        <OverviewPanel />
-      </div>
-      <div className={cn(tab !== 'stablecoins' && 'hidden')} aria-hidden={tab !== 'stablecoins'} inert={tab !== 'stablecoins' ? '' : undefined}>
-        <StablecoinsCG />
-      </div>
-    </div>
+          ))}
+        </Surface>
+      </Section>
+    </Page>
   );
 }

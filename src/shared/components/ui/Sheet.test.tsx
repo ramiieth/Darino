@@ -18,7 +18,7 @@ describe('Bottom Sheet', () => {
     );
     expect(screen.getByText('جزئیات')).toBeTruthy();
     // کلیک روی overlay
-    const overlay = document.querySelector('.fixed.inset-0.z-50.bg-black\\/50');
+    const overlay = document.querySelector('[data-sheet-overlay]');
     fireEvent.click(overlay as Element);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
