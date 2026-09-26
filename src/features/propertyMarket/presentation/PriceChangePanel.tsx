@@ -27,6 +27,7 @@ import {
   type PriceMetric
 } from '../domain/history';
 import { snapshotAreaRecords } from '../service/propertyMarketService';
+import { PRICE_TYPES, priceTypeLabel, type PriceType } from '../domain/segments';
 import { TrendChart } from './MarketCharts';
 
 export function periodLabel(m: number): string {
@@ -59,7 +60,7 @@ function statusText(r: ChangeRow): string {
     case 'pending':
       return r.availableFrom ? `از ${formatJalali(r.availableFrom)} قابل نمایش` : 'هنوز داده کافی نیست';
     case 'no-area':
-      return 'این محله در آن تاریخ آگهی نداشت';
+      return 'در آن تاریخ آگهیِ این نوع/محله ثبت نشده (یا Snapshot قدیمی تفکیک نوع ندارد)';
     case 'no-rate':
       return 'نرخ تتر آن تاریخ در دسترس نیست';
     case 'no-data':
@@ -74,6 +75,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
   const [area, setArea] = useState<string>(CITY_KEY);
   const [period, setPeriod] = useState<string>('3');
   const [metric, setMetric] = useState<PriceMetric>('median');
+  const [ptype, setPtype] = useState<PriceType>('all');
   const [rankLevel, setRankLevel] = useState<'group' | 'neighborhood'>('group');
 
   // نرخ روزانه تتر از قدیمی‌ترین Snapshot تا امروز
@@ -87,23 +89,23 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
     b.stats.listingCount - a.stats.listingCount;
   const areaOptions = useMemo(() => (latest ? [...snapshotAreaRecords(latest, 'area')].sort(byCount) : []), [latest]);
   const nbOptions = useMemo(() => (latest ? [...latest.neighborhoodStats].sort(byCount) : []), [latest]);
-  const rows = useMemo(() => changeTable(snapshots, area, history.rates, metric), [snapshots, area, history.rates, metric]);
+  const rows = useMemo(() => changeTable(snapshots, area, history.rates, metric, ptype), [snapshots, area, history.rates, metric, ptype]);
   const cityRows = useMemo(
-    () => (area === CITY_KEY ? rows : changeTable(snapshots, CITY_KEY, history.rates, metric)),
-    [area, rows, snapshots, history.rates, metric]
+    () => (area === CITY_KEY ? rows : changeTable(snapshots, CITY_KEY, history.rates, metric, ptype)),
+    [area, rows, snapshots, history.rates, metric, ptype]
   );
   const ranking = useMemo(
-    () => neighborhoodChanges(snapshots, Number(period), history.rates, { level: rankLevel, metric }),
-    [snapshots, period, history.rates, rankLevel, metric]
+    () => neighborhoodChanges(snapshots, Number(period), history.rates, { level: rankLevel, metric, type: ptype }),
+    [snapshots, period, history.rates, rankLevel, metric, ptype]
   );
-  const series = useMemo(() => usdSeries(snapshots, area, history.rates, metric), [snapshots, area, history.rates, metric]);
+  const series = useMemo(() => usdSeries(snapshots, area, history.rates, metric, ptype), [snapshots, area, history.rates, metric, ptype]);
   const anyOk = rows.some((r) => r.status === 'ok');
   const first = earliest !== null ? formatJalali(earliest) : null;
   const areaName =
     area === CITY_KEY
       ? 'کل اهواز'
       : [...areaOptions, ...nbOptions].find((a) => a.neighborhoodKey === area)?.displayName ?? '';
-  const metricFa = metric === 'median' ? 'میانه' : 'میانگین';
+  const metricFa = `${metric === 'median' ? 'میانه' : 'میانگین'}${ptype === 'all' ? '' : ` (${priceTypeLabel(ptype)})`}`;
 
   return (
     <div className="space-y-5">
@@ -133,6 +135,15 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
                 </option>
               ))}
             </optgroup>
+          </Select>
+        </div>
+        <div className="w-48">
+          <Select aria-label="نوع قیمت" value={ptype} onChange={(e) => setPtype(e.target.value as PriceType)}>
+            {PRICE_TYPES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.key === 'all' ? 'همه آگهی‌ها' : t.label}
+              </option>
+            ))}
           </Select>
         </div>
         <SegmentedControl<PriceMetric>

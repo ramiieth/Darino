@@ -16,6 +16,7 @@ import { requestJson, safeHeaders, type Fetcher } from './client.js';
 import { cleanText, emptySeed, faToEnDigits, parseIntLoose, type ParsedListingSeed } from './parse.js';
 import { otherCityMarker } from '../data/catalog.js';
 import { jalaliYearOf } from '../domain/segments.js';
+import { detectFirstKey, parseRelativeAgeFa } from './dates.js';
 
 export const SHEYPOOR_BASE = 'https://www.sheypoor.com';
 export const SHEYPOOR_API_VERSION = 'v10.0.0';
@@ -92,7 +93,7 @@ export interface SheypoorListResult {
   normalCount: number;
 }
 
-export function parseSheypoorList(page: unknown, cityFa: string): SheypoorListResult {
+export function parseSheypoorList(page: unknown, cityFa: string, now: number = Date.now()): SheypoorListResult {
   const seeds = new Map<string, ParsedListingSeed>();
   let normalCount = 0;
   if (!isObj(page)) return { seeds, nextCursor: null, normalCount };
@@ -115,6 +116,8 @@ export function parseSheypoorList(page: unknown, cityFa: string): SheypoorListRe
     seed.title = cleanText(a.title);
     seed.neighborhood = loc.neighborhood;
     seed.totalPriceToman = sheypoorPrice(a.price);
+    // «ساعاتی پیش» / «۲ هفته پیش» = آخرین به‌روزرسانی (addedAt انتشار اولیه است)
+    seed.sourceUpdatedAt = parseRelativeAgeFa(a.timePassedLabel, now);
     if (typeof a.url === 'string' && a.url.startsWith('http')) seed.url = a.url;
     seeds.set(token, seed);
   }
@@ -162,6 +165,9 @@ export function parseSheypoorDetail(seed: ParsedListingSeed, detail: unknown, ci
   if (seed.neighborhood === null) seed.neighborhood = sheypoorNeighborhood(a.location, cityFa).neighborhood;
   if (seed.listedAt === null) seed.listedAt = sheypoorDate(a.addedAt);
   if (typeof a.url === 'string' && a.url.startsWith('http')) seed.url = a.url;
+  const upd = parseRelativeAgeFa(a.timePassedLabel, Date.now());
+  if (upd !== null) seed.sourceUpdatedAt = upd;
+  seed.firstKey = detectFirstKey(seed.title, typeof a.description === 'string' ? a.description : null);
   if (!seed.otherCity) {
     seed.otherCity = otherCityMarker(seed.title) ?? otherCityMarker(typeof a.description === 'string' ? a.description : null);
   }

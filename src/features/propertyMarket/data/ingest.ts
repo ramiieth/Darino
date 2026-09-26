@@ -10,6 +10,7 @@
  * ⚠️ اپ تک‌کاربره است: منبع حقیقت IndexedDB است؛ سرور فقط واکشی می‌کند.
  * ============================================================ */
 import type {
+  TypeStats,
   AreaPriceStats,
   CleaningReport,
   ListingSource,
@@ -22,9 +23,12 @@ import type { ParsedListingSeed } from '../collector/parse';
 import {
   deduplicateListings,
   filterOutliers,
+  isStaleAd,
   newCleaningReport,
   normalizeAndValidate
 } from '../collector/pipeline';
+import { detectFirstKey } from '../collector/dates';
+import { PRICE_TYPES, jalaliYearOf, matchesPriceType } from '../domain/segments';
 import { buildAreaStats, buildCityStats, buildNeighborhoodStats, mean, median } from '../domain/stats';
 import { areaGroupName, areaGroupOf, neighborhoodDisplayName, resolveNeighborhood } from './catalog';
 
@@ -73,7 +77,14 @@ export function listingsInWindow(
   windowDays: number = MARKET_WINDOW_DAYS
 ): PropertyMarketListing[] {
   const from = now - windowDays * DAY_MS;
-  return listings.filter((l) => l.source !== 'manual-legacy' && l.scrapedAt >= from && l.pricePerSqmToman !== null);
+  return listings.filter(
+    (l) =>
+      l.source !== 'manual-legacy' &&
+      l.scrapedAt >= from &&
+      l.pricePerSqmToman !== null &&
+      // آخرین به‌روزرسانی آگهی در منبع — آگهی کهنه در بازار فعلی حساب نمی‌شود
+      !isStaleAd(l.sourceUpdatedAt, now)
+  );
 }
 
 /** ساخت Snapshot جدید از آگهی‌های پنجره بازار — داده ناکافی → null (هرگز Snapshot خالی) */
@@ -103,8 +114,10 @@ export function buildSnapshot(opts: {
   if (market.length === 0) return null;
 
   const keys = [...new Set(market.map((l) => l.neighborhoodKey).filter((k): k is string => !!k))];
+  const jy = jalaliYearOf(now);
   const withTotals = (stats: AreaPriceStats, group: PropertyMarketListing[]): AreaPriceStats => ({
     ...stats,
+    byType: typeStatsOf(group, jy),
     medianTotalToman: median(group.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0)),
     meanTotalToman: mean(group.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0)),
     medianAreaSqm: median(group.map((l) => l.areaSqm).filter((v): v is number => v !== null && v > 0))
@@ -164,11 +177,27 @@ export function rekeyListings(listings: PropertyMarketListing[]): {
   const changed: PropertyMarketListing[] = [];
   const out = listings.map((l) => {
     if (l.source === 'manual-legacy' || !l.neighborhood) return l;
-    const key = resolveNeighborhood(l.neighborhood, l.title).key;
-    if (!key || key === l.neighborhoodKey) return l;
-    const next = { ...l, neighborhoodKey: key };
+    const key = resolveNeighborhood(l.neighborhood, l.title).key ?? l.neighborhoodKey;
+    // نسخه‌های قبلی فیلد «کلید اول» نداشتند → از عنوان (تنها متن ذخیره‌شده)
+    const firstKey = l.firstKey === undefined ? detectFirstKey(l.title) : l.firstKey;
+    if (key === l.neighborhoodKey && firstKey === l.firstKey) return l;
+    const next = { ...l, neighborhoodKey: key, firstKey };
     changed.push(next);
     return next;
   });
   return { listings: out, changed };
+}
+
+/** آمار انواع قیمت (کلید اول، ۱ تا ۷ سال) برای یک گروه آگهی — نوع خالی ذخیره نمی‌شود */
+export function typeStatsOf(group: PropertyMarketListing[], currentJalaliYear: number): Partial<Record<string, TypeStats>> {
+  const out: Partial<Record<string, TypeStats>> = {};
+  for (const t of PRICE_TYPES) {
+    if (t.key === 'all') continue;
+    const g = group.filter((l) => matchesPriceType(l, t.key, currentJalaliYear));
+    if (g.length === 0) continue;
+    const ppm = g.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0);
+    const tot = g.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0);
+    out[t.key] = { count: g.length, medianPpm: median(ppm), meanPpm: mean(ppm), medianTotal: median(tot), meanTotal: mean(tot) };
+  }
+  return out;
 }

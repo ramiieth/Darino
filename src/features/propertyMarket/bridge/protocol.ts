@@ -89,6 +89,8 @@ export function sanitizeSeed(raw: unknown, source: ListingSource): ParsedListing
   s.balcony = bool(r.balcony);
   s.listedAt = num(r.listedAt);
   s.otherCity = text(r.otherCity, 40);
+  s.sourceUpdatedAt = num(r.sourceUpdatedAt);
+  s.firstKey = bool(r.firstKey);
   const url = text(r.url, 500);
   if (url && /^https:\/\/([\w-]+\.)*(divar\.ir|sheypoor\.com)\//.test(url)) s.url = url;
   return s;
