@@ -71,6 +71,25 @@ describe('ingestSeeds', () => {
     expect(r.report.rejectReasons['not-apartment']).toBe(1);
   });
 
+  it('آگهی شناخته‌شده بدون جزئیات → متراژ/سال ساخت از نسخه ذخیره؛ قیمت تازه از فهرست', () => {
+    const first = seed('k', 'گلستان', 120, 90e6);
+    first.yearBuilt = 1402;
+    first.floor = 3;
+    const stored = ingestSeeds({ existing: [], seeds: [first], city: 'ahvaz', now: NOW - DAY }).listings;
+    const fromList = emptySeed('k');
+    fromList.neighborhood = 'گلستان';
+    fromList.propertyKind = 'apartment';
+    fromList.totalPriceToman = 120 * 100e6; // قیمت تازه
+    const r = ingestSeeds({ existing: stored, seeds: [fromList], city: 'ahvaz', now: NOW });
+    const l = r.listings[0];
+    expect(r.listings.length).toBe(1);
+    expect(l.areaSqm).toBe(120);
+    expect(l.yearBuilt).toBe(1402);
+    expect(l.floor).toBe(3);
+    expect(l.pricePerSqmToman).toBe(100e6);
+    expect(l.scrapedAt).toBe(NOW);
+  });
+
   it('seed خراب (بدون توکن) بی‌صدا نادیده گرفته می‌شود', () => {
     const r = ingestSeeds({ existing: [], seeds: [null as unknown as ParsedListingSeed, { token: '' } as ParsedListingSeed], city: 'ahvaz', now: NOW });
     expect(r.listings).toEqual([]);

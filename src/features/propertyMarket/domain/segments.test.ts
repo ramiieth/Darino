@@ -17,16 +17,15 @@ function l(token: string, area: number | null, year: number | null, ppm: number)
 }
 
 describe('سن بنا', () => {
-  it('سال جاری − سال ساخت؛ پیش‌فروش → ۰؛ نامعتبر → null', () => {
+  it('سال جاری − سال ساخت؛ سال آینده (ساخته‌نشده) یا نامعتبر → null', () => {
     expect(buildingAgeYears(1401, 1405)).toBe(4);
-    expect(buildingAgeYears(1406, 1405)).toBe(0);
+    expect(buildingAgeYears(1405, 1405)).toBe(0);
+    expect(buildingAgeYears(1406, 1405)).toBeNull();
     expect(buildingAgeYears(null, 1405)).toBeNull();
     expect(buildingAgeYears(87, 1405)).toBeNull();
   });
-  it('دسته‌ها دقیقاً ۱، ۲، ۳، ۴ سال و بازه‌ها', () => {
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 20, 21, 40].map(ageBandOf)).toEqual([
-      'y0-1', 'y0-1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8-10', 'y8-10', 'y11-20', 'y11-20', 'y21+', 'y21+'
-    ]);
+  it('هر سال جدا: ۰ (نوساز) تا ۷ سال، ۸ به بالا یک دسته', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 20].map(ageBandOf)).toEqual(['y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7', 'y8+', 'y8+']);
     expect(ageBandOf(null)).toBe('unknown');
   });
   it('سال شمسی', () => {
@@ -57,7 +56,7 @@ describe('toListingViews / متراژ × نوع', () => {
   it('معادل دلاری هر آگهی (هر متر و کل) با نرخ تتر', () => {
     const a = views.find((v) => v.token === 'a')!;
     expect(a.ageYears).toBe(1);
-    expect(a.ageBand).toBe('y0-1');
+    expect(a.ageBand).toBe('y1');
     expect(a.areaBand).toBe('a90-100');
     expect(a.pricePerSqmUsd).toBeCloseTo(100_000_000 / RATE, 6);
     expect(a.totalPriceUsd).toBeCloseTo((90 * 100_000_000) / RATE, 6);
@@ -73,15 +72,15 @@ describe('toListingViews / متراژ × نوع', () => {
   it('بازه‌های متراژ: ترتیب ثابت، بازه خالی/نامشخص حذف، میانگین هر نوع', () => {
     const rows = buildSizeTypeMatrix(views, RATE, 1405);
     expect(rows.map((r) => r.key)).toEqual(['a90-100', 'a150-200']);
-    const age1 = rows[0].cells.age1!;
+    const age1 = rows[0].cells.b1!;
     expect(age1.count).toBe(2);
     expect(age1.ppmToman).toBe(110_000_000);
     expect(age1.ppmUsd).toBeCloseTo(110_000_000 / RATE, 6);
     expect(age1.totalToman).toBe(9_900_000_000);
-    // ۱۵۰ متری ۱۵ ساله در هیچ نوعی نیست → «۰ از ۱»
+    // ۱۵۰ متری ساخت ۱۳۹۰ → ستون «۱۳۹۷ و قبل‌تر» (دیگر «۰ از ۱» نیست)
     expect(rows[1].total).toBe(1);
-    expect(rows[1].count).toBe(0);
-    expect(Object.keys(rows[1].cells)).toEqual([]);
+    expect(rows[1].count).toBe(1);
+    expect(Object.keys(rows[1].cells)).toEqual(['old']);
   });
 });
 
@@ -100,37 +99,43 @@ describe('resolveEffectiveRate', () => {
   });
 });
 
-import { ageFilterOfType, matchesPriceType, PRICE_TYPES } from './segments';
+import { bandOfType, matchesPriceType, PRICE_TYPES, priceTypeLabel, priceTypeSub, priceTypeYear } from './segments';
 import { buildAreaTypeMatrix } from '../service/propertyMarketService';
 
-describe('انواع قیمت: کلید اول و ۱ تا ۷ سال ساخت', () => {
-  it('ترتیب و برچسب ستون‌ها', () => {
-    expect(PRICE_TYPES.map((t) => t.key)).toEqual(['first-key', 'age1', 'age2', 'age3', 'age4', 'age5', 'age6', 'age7']);
-    expect(PRICE_TYPES.map((t) => t.label)).toEqual(['کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال']);
-    expect(['first-key', 'age1', 'age4'].map((t) => ageFilterOfType(t as never))).toEqual(['first-key', 'y0-1', 'y4']);
+describe('ستون‌ها فقط بر اساس سال ساخت (بدون «کلید اول»)', () => {
+  it('۱۴۰۵ نوساز، ۱۴۰۴ یک سال … ۱۳۹۸ هفت سال، ۱۳۹۷ و قبل‌تر', () => {
+    expect(PRICE_TYPES.map((t) => priceTypeYear(t.key, 1405))).toEqual([
+      '۱۴۰۵', '۱۴۰۴', '۱۴۰۳', '۱۴۰۲', '۱۴۰۱', '۱۴۰۰', '۱۳۹۹', '۱۳۹۸', '۱۳۹۷ و قبل‌تر'
+    ]);
+    expect(PRICE_TYPES.map((t) => priceTypeSub(t.key))).toEqual([
+      'نوساز', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال', '۸ سال به بالا'
+    ]);
+    expect(priceTypeLabel('b1', 1405)).toBe('ساخت ۱۴۰۴ (۱ سال)');
+    expect(['b0', 'b4', 'old'].map((t) => bandOfType(t as never))).toEqual(['y0', 'y4', 'y8+']);
+    // سال بعد ستون‌ها خودکار جابه‌جا می‌شوند
+    expect(priceTypeYear('b0', 1406)).toBe('۱۴۰۶');
   });
-  it('matchesPriceType', () => {
+  it('matchesPriceType: هر آگهی دقیقاً در یک ستون', () => {
     const y = 1405;
-    expect(matchesPriceType({ yearBuilt: 1405 }, 'age1', y)).toBe(true); // امسال
-    expect(matchesPriceType({ yearBuilt: 1404 }, 'age1', y)).toBe(true);
-    expect(matchesPriceType({ yearBuilt: 1403 }, 'age2', y)).toBe(true);
-    expect(matchesPriceType({ yearBuilt: 1398 }, 'age7', y)).toBe(true);
-    expect(matchesPriceType({ yearBuilt: 1397 }, 'age7', y)).toBe(false);
-    expect(matchesPriceType({ yearBuilt: null }, 'age3', y)).toBe(false);
-    expect(matchesPriceType({ yearBuilt: 1404, firstKey: true }, 'first-key', y)).toBe(true);
-    expect(matchesPriceType({ yearBuilt: 1404, firstKey: null }, 'first-key', y)).toBe(false);
-    // جدا از هم: آگهی کلید اول در ستون «۱ سال» نمی‌آید
-    expect(matchesPriceType({ yearBuilt: 1404, firstKey: true }, 'age1', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: 1405 }, 'b0', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1404 }, 'b0', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: 1404 }, 'b1', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1398 }, 'b7', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1397 }, 'old', y)).toBe(true);
+    expect(matchesPriceType({ yearBuilt: 1397 }, 'b7', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: null }, 'b3', y)).toBe(false);
+    expect(matchesPriceType({ yearBuilt: 1406 }, 'b0', y)).toBe(false);
   });
-  it('ماتریس مناطق: بدون «کل اهواز»، خانه‌های هر نوع با میانگین تومان/دلار/تعداد', () => {
-    const mk = (t: string, key: string, year: number | null, ppm: number, fk = false) => ({ ...l(t, 100, year, ppm), neighborhoodKey: key, firstKey: fk });
+  it('ماتریس مناطق: «کلید اول» در متن اثری ندارد؛ ۱۴۰۴ همان «۱ سال» است', () => {
+    const mk = (t: string, key: string, year: number | null, ppm: number, title = '') => ({ ...l(t, 100, year, ppm), neighborhoodKey: key, title });
     const views = toListingViews(
       [
-        mk('a', 'golestan', 1404, 100e6, true),
+        mk('a', 'golestan', 1404, 100e6, 'آپارتمان کلید اول'),
         mk('e', 'golestan', 1405, 120e6),
         mk('b', 'golestan', 1403, 90e6),
         mk('c', 'kianpars-east', 1398, 150e6),
-        mk('d', 'kianpars-west', null, 140e6)
+        mk('d', 'kianpars-west', null, 140e6),
+        mk('f', 'kianpars-west', 1380, 70e6)
       ],
       250_000,
       1405
@@ -138,19 +143,16 @@ describe('انواع قیمت: کلید اول و ۱ تا ۷ سال ساخت', (
     const rows = buildAreaTypeMatrix(views, 250_000, 1405);
     expect(rows.map((r) => r.key)).toEqual(['golestan', 'kianpars']);
     const g = rows[0];
-    expect(g.count).toBe(3);
-    // کلید اول و «۱ سال» جدا: کلید اول ۱۰۰M، نوساز غیرکلیداول ۱۲۰M
-    expect(g.cells['first-key']!.ppmToman).toBe(100e6);
-    expect(g.cells.age1!.count).toBe(1);
-    expect(g.cells.age1!.ppmToman).toBe(120e6);
-    expect(g.cells.age1!.ppmUsd).toBe(480);
-    expect(g.cells.age2!.totalUsd).toBe(36000);
-    // شرقی/غربی کیانپارس در یک ردیف؛ «۱ از ۲» (بدون سال ساخت در هیچ ستونی نیست)
+    expect(g.cells.b0!.ppmToman).toBe(120e6);
+    expect(g.cells.b1!.ppmToman).toBe(100e6); // «کلید اول» ۱۴۰۴ → ۱ سال
+    expect(g.cells.b1!.ppmUsd).toBe(400);
+    expect(g.cells.b2!.totalUsd).toBe(36000);
+    // کیانپارس شرقی/غربی یک ردیف؛ ۱۳۸۰ در «قبل‌تر»؛ فقط بدون سال ساخت بیرون می‌ماند
     const kp = rows[1];
-    expect(kp.total).toBe(2);
-    expect(kp.count).toBe(1);
-    expect(kp.cells.age7!.ppmToman).toBe(150e6);
-    expect(kp.cells.age3).toBeUndefined();
+    expect(kp.total).toBe(3);
+    expect(kp.count).toBe(2);
+    expect(kp.cells.b7!.ppmToman).toBe(150e6);
+    expect(kp.cells.old!.ppmToman).toBe(70e6);
   });
 });
 

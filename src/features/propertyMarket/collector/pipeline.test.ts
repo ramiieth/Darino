@@ -241,7 +241,7 @@ describe('runCleaningPipeline (مسیر کامل)', () => {
 
 import { STALE_AD_DAYS } from './pipeline';
 
-describe('آگهی کهنه و کلید اول', () => {
+describe('آگهی کهنه', () => {
   const now = Date.parse('2026-09-26T12:00:00Z');
   const base = () => {
     const s = emptySeed('st1');
@@ -268,9 +268,10 @@ describe('آگهی کهنه و کلید اول', () => {
   it('بدون تاریخ منبع → کهنه حساب نمی‌شود (هرگز حدس)', () => {
     expect(normalizeAndValidate(base(), 'ahvaz', '7', now, newCleaningReport())).not.toBeNull();
   });
-  it('کلید اول از عنوان وقتی جزئیات نیامده', () => {
+  it('عبارت «کلید اول» در عنوان هیچ اثری ندارد (فقط سال ساخت مبناست)', () => {
     const s = base();
     s.title = 'فروش ۹۰ متری کلید اول';
-    expect(normalizeAndValidate(s, 'ahvaz', '7', now, newCleaningReport())!.firstKey).toBe(true);
+    const l = normalizeAndValidate(s, 'ahvaz', '7', now, newCleaningReport())!;
+    expect('firstKey' in l).toBe(false);
   });
 });

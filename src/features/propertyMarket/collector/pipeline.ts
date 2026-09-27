@@ -8,7 +8,6 @@
  * ============================================================ */
 import type { CleaningReport, PropertyCity, PropertyMarketListing } from '../domain/types.js';
 import { areaKeyOf, conflictingPlace, otherCityMarker, resolveNeighborhood } from '../data/catalog.js';
-import { detectFirstKey } from './dates.js';
 import type { ParsedListingSeed } from './parse.js';
 import { derivePricePerSqm } from './parse.js';
 import { percentile } from '../domain/stats.js';
@@ -95,7 +94,6 @@ export function normalizeAndValidate(
     title: seed.title,
     listedAt: seed.listedAt,
     sourceUpdatedAt: seed.sourceUpdatedAt ?? null,
-    firstKey: seed.firstKey ?? detectFirstKey(seed.title),
     scrapedAt,
     source: 'divar'
   };

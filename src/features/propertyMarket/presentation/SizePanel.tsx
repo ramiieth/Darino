@@ -1,7 +1,7 @@
 /** ============================================================
  * Property Market — قیمت بر اساس متراژ
  *
- *  بازه متراژ × نوع قیمت (کلید اول، ۱ تا ۷ سال) · یا فهرست متراژ دقیق
+ *  بازه متراژ × سال ساخت · یا فهرست متراژ دقیق
  *  ⚠️ فقط نمایش — اعداد از سرویس
  * ============================================================ */
 import { useMemo, useState } from 'react';
@@ -54,8 +54,9 @@ export function SizePanel({
     return (
       <PriceTypeMatrix
         rows={matrix}
+        jalaliYear={jalaliYear}
         rowHeader="متراژ"
-        caption="قیمت بر اساس متراژ و نوع"
+        caption="قیمت بر اساس متراژ و سال ساخت"
         toolbar={modeControl}
         onPick={onPickBand}
         onPickRow={(band) => onPickBand(band, null)}

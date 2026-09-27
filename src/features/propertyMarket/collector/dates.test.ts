@@ -2,7 +2,7 @@
  * تاریخ انتشار/آخرین به‌روزرسانی آگهی و «کلید اول» — متن واقعی دیوار/شیپور
  */
 import { describe, it, expect } from 'vitest';
-import { detectFirstKey, findDivarDates, parseDivarDatesText, parseJalaliDateTimeFa, parseRelativeAgeFa } from './dates';
+import { findDivarDates, parseDivarDatesText, parseJalaliDateTimeFa, parseRelativeAgeFa } from './dates';
 
 // متن واقعی صفحه جزئیات دیوار (مهر ۱۴۰۵)
 const REAL = 'انتشار آگهی: ۵ شهریور ۱۴۰۵، ۱۸:۱۲\nآخرین نردبان: ۴ مهر ۱۴۰۵، ۱۸:۵۹\nآخرین به‌روز‌رسانی: ۴ مهر ۱۴۰۵، ۱۸:۵۹';
@@ -27,7 +27,7 @@ describe('تاریخ شمسی', () => {
   });
 });
 
-describe('برچسب نسبی (شیپور)', () => {
+describe('برچسب نسبی', () => {
   const now = Date.parse('2026-09-26T12:00:00Z');
   const D = 86_400_000;
   it('ساعاتی/دقایقی پیش، دیروز، N روز/هفته/ماه', () => {
@@ -42,16 +42,5 @@ describe('برچسب نسبی (شیپور)', () => {
     expect(parseRelativeAgeFa('ماه پیش', now)).toBe(now - 30 * D);
     expect(parseRelativeAgeFa('', now)).toBeNull();
     expect(parseRelativeAgeFa(null, now)).toBeNull();
-  });
-});
-
-describe('کلید اول', () => {
-  it('فقط متن صریح', () => {
-    expect(detectFirstKey('تکواحدی 140 متری کلیداول 1405')).toBe(true);
-    expect(detectFirstKey(null, 'سال ساخت: نوساز کلید اول\nفول امکانات')).toBe(true);
-    expect(detectFirstKey('کلید‌اول، ۲ خواب')).toBe(true);
-    expect(detectFirstKey('نوساز ۱۴۰۴، کلید دوم')).toBe(false);
-    expect(detectFirstKey('نوساز')).toBe(false);
-    expect(detectFirstKey(null, undefined)).toBe(false);
   });
 });

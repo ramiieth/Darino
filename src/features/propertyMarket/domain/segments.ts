@@ -5,8 +5,8 @@
  *  آگهی بدون سال ساخت/متراژ → دسته «نامشخص» (هرگز حدس زده نمی‌شود)
  * ============================================================ */
 
-export type AgeBand =
-  | 'y0-1' | 'y2' | 'y3' | 'y4' | 'y5' | 'y6' | 'y7' | 'y8-10' | 'y11-20' | 'y21+' | 'unknown';
+/** سن بنا: y0 = سال جاری (نوساز) … y7 = ۷ سال، y8+ = ۸ سال و بیشتر */
+export type AgeBand = 'y0' | 'y1' | 'y2' | 'y3' | 'y4' | 'y5' | 'y6' | 'y7' | 'y8+' | 'unknown';
 export type AreaBand = 'a90-100' | 'a100-120' | 'a120-150' | 'a150-200' | 'a200+' | 'unknown';
 
 export interface BandDef<T extends string> {
@@ -19,16 +19,8 @@ export interface BandDef<T extends string> {
 }
 
 export const AGE_BANDS: BandDef<Exclude<AgeBand, 'unknown'>>[] = [
-  { key: 'y0-1', label: '۱ سال (نوساز)', min: 0, max: 1 },
-  { key: 'y2', label: '۲ سال', min: 2, max: 2 },
-  { key: 'y3', label: '۳ سال', min: 3, max: 3 },
-  { key: 'y4', label: '۴ سال', min: 4, max: 4 },
-  { key: 'y5', label: '۵ سال', min: 5, max: 5 },
-  { key: 'y6', label: '۶ سال', min: 6, max: 6 },
-  { key: 'y7', label: '۷ سال', min: 7, max: 7 },
-  { key: 'y8-10', label: '۸ تا ۱۰ سال', min: 8, max: 10 },
-  { key: 'y11-20', label: '۱۱ تا ۲۰ سال', min: 11, max: 20 },
-  { key: 'y21+', label: 'بیش از ۲۰ سال', min: 21, max: Infinity }
+  ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => ({ key: `y${n}` as Exclude<AgeBand, 'unknown'>, label: '', min: n, max: n })),
+  { key: 'y8+', label: '', min: 8, max: Infinity }
 ];
 
 export const AREA_BANDS: BandDef<Exclude<AreaBand, 'unknown'>>[] = [
@@ -41,10 +33,10 @@ export const AREA_BANDS: BandDef<Exclude<AreaBand, 'unknown'>>[] = [
 
 export const UNKNOWN_BAND_LABEL = 'نامشخص';
 
-/** سن بنا (سال) از سال ساخت شمسی؛ سال آینده (پیش‌فروش) → ۰ */
+/** سن بنا (سال) = سال جاری − سال ساخت؛ سال ساخت آینده (هنوز ساخته نشده) یا نامعتبر → null */
 export function buildingAgeYears(yearBuilt: number | null, currentJalaliYear: number): number | null {
-  if (yearBuilt === null || !Number.isFinite(yearBuilt) || yearBuilt < 1300) return null;
-  return Math.max(0, currentJalaliYear - yearBuilt);
+  if (yearBuilt === null || !Number.isFinite(yearBuilt) || yearBuilt < 1300 || yearBuilt > currentJalaliYear) return null;
+  return currentJalaliYear - yearBuilt;
 }
 
 export function ageBandOf(age: number | null): AgeBand {
@@ -57,9 +49,22 @@ export function areaBandOf(area: number | null): AreaBand {
   return AREA_BANDS.find((b) => area >= b.min && area <= b.max)?.key ?? 'unknown';
 }
 
-export function ageBandLabel(k: AgeBand): string {
-  return AGE_BANDS.find((b) => b.key === k)?.label ?? UNKNOWN_BAND_LABEL;
+/** برچسب سال ساخت یک دسته سن: «۱۴۰۵» … «۱۳۹۷ و قبل‌تر» */
+export function ageBandLabel(k: AgeBand, currentJalaliYear: number): string {
+  if (k === 'unknown') return UNKNOWN_BAND_LABEL;
+  if (k === 'y8+') return `${faYear(currentJalaliYear - 8)} و قبل‌تر`;
+  return faYear(currentJalaliYear - Number(k.slice(1)));
 }
+
+/** «نوساز» / «۱ سال» / «۸ سال به بالا» */
+export function ageBandSub(k: AgeBand): string {
+  if (k === 'unknown') return '';
+  if (k === 'y0') return 'نوساز';
+  if (k === 'y8+') return '۸ سال به بالا';
+  return `${faYear(Number(k.slice(1)))} سال`;
+}
+
+const faYear = (n: number) => new Intl.NumberFormat('fa-IR', { useGrouping: false }).format(n);
 
 export function areaBandLabel(k: AreaBand): string {
   return AREA_BANDS.find((b) => b.key === k)?.label ?? UNKNOWN_BAND_LABEL;
@@ -79,47 +84,44 @@ export function jalaliYearOf(ts: number): number {
   return d.getUTCFullYear() - (afterNowruz ? 621 : 622);
 }
 
-/* ---------------- «نوع قیمت» — محور اصلی ماژول ---------------- */
+/* ---------------- «نوع قیمت» = سال ساخت — محور اصلی ماژول ---------------- */
 
 /**
- * first-key = «کلید اول» (متن صریح)؛ ageN = N سال ساخت (age1 = نوساز تا ۱ سال).
- * دسته‌ها جدا از هم‌اند: آگهی «کلید اول» فقط در ستون کلید اول می‌آید، نه در ۱ سال —
- * وگرنه میانگین «۱ سال» ترکیبی از کلید اول و دست‌دوم می‌شود و دو ستون قابل مقایسه نیستند.
+ * ستون‌های جدول‌ها فقط بر اساس «سال ساخت» آگهی (نه متن آگهی):
+ *   b0 = سال جاری (۱۴۰۵، نوساز)، b1 = ۱۴۰۴ (۱ سال) … b7 = ۱۳۹۸ (۷ سال)، old = ۱۳۹۷ و قبل‌تر
+ * «کلید اول» نوشته‌شده در آگهی مبنا نیست — آگهی ۱۴۰۴ با عبارت «کلید اول» همان «۱ سال» است.
+ * هر آگهی دقیقاً در یک ستون؛ بدون سال ساخت یا سال ساخت آینده → در هیچ ستونی نیست.
  */
-export type PriceType = 'first-key' | 'age1' | 'age2' | 'age3' | 'age4' | 'age5' | 'age6' | 'age7';
+export type PriceType = 'b0' | 'b1' | 'b2' | 'b3' | 'b4' | 'b5' | 'b6' | 'b7' | 'old';
 
-export const PRICE_TYPES: { key: PriceType; label: string }[] = [
-  { key: 'first-key', label: 'کلید اول' },
-  { key: 'age1', label: '۱ سال' },
-  { key: 'age2', label: '۲ سال' },
-  { key: 'age3', label: '۳ سال' },
-  { key: 'age4', label: '۴ سال' },
-  { key: 'age5', label: '۵ سال' },
-  { key: 'age6', label: '۶ سال' },
-  { key: 'age7', label: '۷ سال' }
+export const PRICE_TYPES: { key: PriceType; band: Exclude<AgeBand, 'unknown'> }[] = [
+  ...[0, 1, 2, 3, 4, 5, 6, 7].map((n) => ({ key: `b${n}` as PriceType, band: `y${n}` as Exclude<AgeBand, 'unknown'> })),
+  { key: 'old', band: 'y8+' }
 ];
 
-/** آیا آگهی در این نوع قیمت می‌گنجد؟ */
-export function matchesPriceType(
-  l: { firstKey?: boolean | null; yearBuilt: number | null },
-  type: PriceType,
-  currentJalaliYear: number
-): boolean {
-  if (type === 'first-key') return l.firstKey === true;
-  if (l.firstKey === true) return false;
+/** آیا آگهی (با سال ساخت) در این ستون می‌گنجد؟ */
+export function matchesPriceType(l: { yearBuilt: number | null }, type: PriceType, currentJalaliYear: number): boolean {
   const age = buildingAgeYears(l.yearBuilt, currentJalaliYear);
   if (age === null) return false;
-  const n = Number(type.slice(3));
-  return n === 1 ? age <= 1 : age === n;
+  return type === 'old' ? age >= 8 : age === Number(type.slice(1));
 }
 
-export function priceTypeLabel(t: PriceType): string {
-  const label = PRICE_TYPES.find((p) => p.key === t)?.label ?? t;
-  return t === 'first-key' ? label : `${label} ساخت`;
+/** سرستون: سال ساخت («۱۴۰۴») */
+export function priceTypeYear(t: PriceType, currentJalaliYear: number): string {
+  return ageBandLabel(bandOfType(t), currentJalaliYear);
 }
 
-/** نوع قیمت → فیلتر سن بنای فهرست آگهی‌ها (age1 = «y0-1»، ageN = «yN») */
-export function ageFilterOfType(t: PriceType): AgeBand | 'first-key' {
-  if (t === 'first-key') return 'first-key';
-  return t === 'age1' ? 'y0-1' : (`y${t.slice(3)}` as AgeBand);
+/** زیرنویس سرستون: «نوساز» / «۱ سال» / «۸ سال به بالا» */
+export function priceTypeSub(t: PriceType): string {
+  return ageBandSub(bandOfType(t));
+}
+
+/** متن کامل: «ساخت ۱۴۰۴ (۱ سال)» */
+export function priceTypeLabel(t: PriceType, currentJalaliYear: number): string {
+  return `ساخت ${priceTypeYear(t, currentJalaliYear)} (${priceTypeSub(t)})`;
+}
+
+/** ستون → فیلتر سن بنای فهرست آگهی‌ها */
+export function bandOfType(t: PriceType): Exclude<AgeBand, 'unknown'> {
+  return PRICE_TYPES.find((p) => p.key === t)!.band;
 }

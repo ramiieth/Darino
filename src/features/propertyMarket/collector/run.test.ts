@@ -2,7 +2,7 @@
  * کلکشنر — اجرای تکه‌ای با دیوار شبیه‌سازی‌شده (بدون شبکه)
  */
 import { describe, it, expect } from 'vitest';
-import { collectChunk, newCursor, sanitizeCursor, needsDetail, type CollectCursor } from './run';
+import { collectChunk, newCursor, sanitizeCursor, needsDetail, DEFAULT_MAX_LISTINGS, type CollectCursor } from './run';
 import type { Fetcher } from './client';
 import { emptySeed } from './parse';
 
@@ -63,6 +63,20 @@ describe('collectChunk — دیوار', () => {
     expect(r.seeds.every((s) => s.areaSqm === 100 && s.totalPriceToman === 5_000_000_000)).toBe(true);
     expect(r.fetchedDetails).toBe(2);
     expect(r.done).toBe(true);
+  });
+
+  it('آگهی شناخته‌شده (جزئیات ذخیره) → جزئیات دوباره گرفته نمی‌شود؛ سقف پیش‌فرض همه اهواز را می‌گیرد', async () => {
+    const calls: string[] = [];
+    const fetcher = fakeDivar(
+      [{ list_widgets: [postRow('old1', 'کیانپارس'), postRow('new1', 'گلستان')], pagination: { has_next_page: false, data: null } }],
+      { calls }
+    );
+    const r = await collectChunk({ city: 'ahvaz', source: 'divar', pauseMs: 0, fetcher, knownTokens: ['old1'] });
+    expect(r.seeds.map((s) => s.token).sort()).toEqual(['new1', 'old1']);
+    expect(r.fetchedDetails).toBe(1);
+    expect(calls.some((u) => u.endsWith('/old1'))).toBe(false);
+    expect(r.seeds.find((s) => s.token === 'old1')!.totalPriceToman).toBe(5_000_000_000);
+    expect(DEFAULT_MAX_LISTINGS).toBeGreaterThanOrEqual(3000);
   });
 
   it('رگرسیون: آگهی‌های بیش از بودجه جزئیات دور ریخته نمی‌شوند (به تکه بعد منتقل می‌شوند)', async () => {

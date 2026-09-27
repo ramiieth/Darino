@@ -100,7 +100,3 @@ export function parseRelativeAgeFa(label: unknown, now: number): number | null {
   return now - n * unit * DAY_MS;
 }
 
-/** «کلید اول» — فقط متن صریح (عنوان/توضیحات)؛ «کلید دوم/سوم» یا نبود متن → false */
-export function detectFirstKey(...texts: (string | null | undefined)[]): boolean {
-  return texts.some((t) => typeof t === 'string' && /کلید\s*[‌]?\s*اول/.test(t.replace(/ي/g, 'ی')));
-}

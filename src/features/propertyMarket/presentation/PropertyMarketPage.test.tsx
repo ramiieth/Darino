@@ -100,27 +100,28 @@ describe('PropertyMarketPage', () => {
     expect(screen.queryByText(/کل اهواز/)).toBeNull();
     expect(screen.queryByText(/میانه/)).toBeNull();
     expect(screen.queryByText(/قیمت هر متر در اهواز/)).toBeNull();
-    // سال ساخت ۱۴۰۰ → ستون «۵ سال»: میانگین ۱۵۵ میلیون = ۶۲۰ دلار (تتر ۲۵۰ هزار)
+    expect(document.body.textContent).not.toMatch(/کلید اول/);
+    // سال ساخت ۱۴۰۰ → ستون «۱۴۰۰ (۵ سال)»: میانگین ۱۵۵ میلیون = ۶۲۰ دلار (تتر ۲۵۰ هزار)
     expect(screen.getByText('۱۵۵ میلیون')).toBeTruthy();
     expect(screen.getByText(/۶۲۰ دلار/)).toBeTruthy();
     // هیچ رقم لاتین در جدول
     expect(table.textContent).not.toMatch(/[0-9$]/);
-    // منطقه کم‌نمونه پیش‌فرض پنهان
-    expect(screen.queryAllByText('زرگان').length).toBe(0);
-    fireEvent.click(screen.getByRole('button', { name: /نمایش همه/ }));
-    expect((await screen.findAllByText('زرگان')).length).toBeGreaterThan(0);
+    // هیچ منطقه‌ای پنهان نمی‌شود — حتی با ۱ آگهی (کم‌رنگ)
+    expect(screen.getAllByText('زرگان').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /نمایش همه/ })).toBeNull();
   });
 
-  it('ستون‌ها دقیقاً کلید اول و ۱ تا ۷ سال؛ «۲ از ۳ آگهی» برای آگهی‌های بیرون از ستون‌ها', async () => {
-    const withTypes = MANY.map((l, i) => ({ ...l, yearBuilt: i === 2 ? 1380 : 1405 - (i % 4), firstKey: i === 0 }));
+  it('ستون‌ها = سال ساخت (۱۴۰۵ نوساز … ۱۳۹۸، قبل‌تر)؛ فقط بدون سال ساخت بیرون می‌ماند', async () => {
+    const withTypes = MANY.map((l, i) => ({ ...l, yearBuilt: i === 2 ? null : i === 1 ? 1380 : 1405 - (i % 4) }));
     usePropertyMarketStore.setState({ listings: withTypes });
     render(<PropertyMarketPage />);
     await screen.findByRole('table');
-    fireEvent.click(screen.getByRole('button', { name: /نمایش همه/ }));
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
-      'منطقه', 'کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال'
+      'منطقه', '۱۴۰۵نوساز', '۱۴۰۴۱ سال', '۱۴۰۳۲ سال', '۱۴۰۲۳ سال', '۱۴۰۱۴ سال', '۱۴۰۰۵ سال', '۱۳۹۹۶ سال', '۱۳۹۸۷ سال',
+      '۱۳۹۷ و قبل‌تر۸ سال به بالا'
     ]);
-    expect(screen.getByText('۲ از ۳ آگهی')).toBeTruthy();
+    // کیانپارس: ۳ آگهی، یکی بدون سال ساخت؛ ۱۳۸۰ در «قبل‌تر» نمایش داده می‌شود (دیگر «۰ از ۳» نیست)
+    expect(screen.getByText(/۳ آگهی · ۱ بدون سال ساخت/)).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'قیمت کل' }));
     expect(screen.getAllByText(/میلیارد/).length).toBeGreaterThan(0);
   });
@@ -128,7 +129,7 @@ describe('PropertyMarketPage', () => {
   it('کلیک روی خانه → آگهی‌های همان منطقه و نوع؛ قیمت‌ها فارسی', async () => {
     usePropertyMarketStore.setState({ listings: MANY });
     render(<PropertyMarketPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'آگهی‌های گلستان · ۵ سال' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'آگهی‌های گلستان · ساخت ۱۴۰۰' }));
     expect(await screen.findByText('آگهی g1')).toBeTruthy();
     expect(screen.queryByText('آگهی k1')).toBeNull();
     expect((screen.getByRole('combobox', { name: 'سال ساخت' }) as HTMLSelectElement).value).toBe('y5');
@@ -149,7 +150,6 @@ describe('PropertyMarketPage', () => {
     usePropertyMarketStore.setState({ listings: MANY.map((l, i) => ({ ...l, areaSqm: areas[i], totalPriceToman: (l.pricePerSqmToman ?? 0) * areas[i] })) });
     render(<PropertyMarketPage />);
     fireEvent.click(await screen.findByRole('tab', { name: /متراژ/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /نمایش همه/ }));
     expect(await screen.findByText('۹۰ تا ۱۰۰ متر')).toBeTruthy();
     expect(screen.queryByText(/کمتر از (۶۰|۹۰) متر/)).toBeNull();
     fireEvent.click(screen.getByRole('radio', { name: 'متراژ دقیق' }));
@@ -191,7 +191,7 @@ describe('PropertyMarketPage', () => {
     const mk = (id: string, dateTs: number, ppm: number, rate: number): PropertyMarketSnapshot => {
       const stats = {
         medianTomanPerM2: ppm, meanTomanPerM2: ppm, p25TomanPerM2: ppm, p75TomanPerM2: ppm, listingCount: 8,
-        byType: { 'first-key': { count: 8, medianPpm: ppm, meanPpm: ppm, medianTotal: ppm * 100, meanTotal: ppm * 100 } }
+        byType: { b0: { count: 8, medianPpm: ppm, meanPpm: ppm, medianTotal: ppm * 100, meanTotal: ppm * 100 } }
       };
       return {
         id, dateTs, dateLabel: '', city: 'ahvaz', source: 'divar', fxRateAtSnapshotToman: rate, fxSource: 'wallex',

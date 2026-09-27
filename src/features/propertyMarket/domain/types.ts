@@ -56,8 +56,6 @@ export interface PropertyMarketListing {
   listedAt: number | null;
   /** آخرین به‌روزرسانی آگهی در منبع — مبنای تشخیص آگهی کهنه (نسخه‌های قبلی ندارند) */
   sourceUpdatedAt?: number | null;
-  /** «کلید اول» (متن صریح آگهی) */
-  firstKey?: boolean | null;
   /** تاریخ استخراج توسط کلکشنر */
   scrapedAt: number;
   /** منبع داده */
@@ -80,7 +78,7 @@ export interface AreaPriceStats {
   /** میانه متراژ (متر مربع) */
   medianAreaSqm?: number | null;
   /**
-   * آمار به تفکیک «نوع قیمت» (کلید اول، ۱ تا ۷ سال ساخت) — مبنای تاریخچه
+   * آمار به تفکیک سال ساخت (کلیدهای b0…b7، old) — مبنای تاریخچه
    * هم‌سن (حذف اثر تغییر ترکیب آگهی‌ها). Snapshotهای قبل از ۲۰۲۶-۰۹-۲۶ ندارند.
    */
   byType?: Partial<Record<string, TypeStats>>;

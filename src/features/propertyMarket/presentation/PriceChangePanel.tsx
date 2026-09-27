@@ -1,7 +1,7 @@
 /** ============================================================
  * Property Market — تغییر قیمت دلاری در طول زمان (هم‌نوع، هر منطقه)
  *
- *  نوع قیمت (کلید اول / N سال ساخت) + منطقه → تغییر در دوره‌های ۱ تا ۶۰ ماه
+ *  سال ساخت + منطقه → تغییر در دوره‌های ۱ تا ۶۰ ماه
  *  و رتبه‌بندی همه مناطق در یک دوره
  *  ⚠️ فقط نمایش — محاسبه در domain/history.ts
  * ============================================================ */
@@ -23,7 +23,7 @@ import {
   type ChangeRow
 } from '../domain/history';
 import { snapshotAreaRecords } from '../service/propertyMarketService';
-import { PRICE_TYPES, priceTypeLabel, type PriceType } from '../domain/segments';
+import { PRICE_TYPES, jalaliYearOf, priceTypeLabel, priceTypeYear, type PriceType } from '../domain/segments';
 import { TrendChart } from './MarketCharts';
 import { fmtPctFa, fmtUsdFa } from './format';
 
@@ -64,7 +64,8 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
   const history = useUsdtHistoryStore();
   const [picked, setArea] = useState<string | null>(null);
   const [period, setPeriod] = useState<string>('3');
-  const [ptype, setPtype] = useState<PriceType>('first-key');
+  const [ptype, setPtype] = useState<PriceType>('b0');
+  const jy = useMemo(() => jalaliYearOf(Date.now()), []);
 
   // نرخ روزانه تتر از قدیمی‌ترین Snapshot تا امروز
   const earliest = earliestSnapshotTs(snapshots);
@@ -89,7 +90,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
   const pending = rows.filter((r) => r.status === 'pending');
   const nextPending = pending[0] ?? null;
   const areaName = areaOptions.find((a) => a.neighborhoodKey === area)?.displayName ?? '';
-  const typeName = priceTypeLabel(ptype);
+  const typeName = priceTypeLabel(ptype, jy);
 
   if (areaOptions.length === 0) {
     return <p className="py-8 text-center text-sm text-muted">تاریخچه با هر «به‌روزرسانی داده» ساخته می‌شود</p>;
@@ -99,10 +100,10 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <ChipGroup<PriceType>
-          label="نوع قیمت"
+          label="سال ساخت"
           value={ptype}
           onChange={setPtype}
-          options={PRICE_TYPES.map((t) => ({ value: t.key, label: t.label }))}
+          options={PRICE_TYPES.map((t) => ({ value: t.key, label: priceTypeYear(t.key, jy) }))}
         />
         <div className="w-56">
           <Select aria-label="منطقه" value={area} onChange={(e) => setArea(e.target.value)}>
@@ -207,7 +208,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
           </div>
         )}
       </div>
-      <p className="text-2xs text-muted">مقایسه فقط بین آگهی‌های هم‌نوع (میانگین) · هر Snapshot با نرخ تتر همان تاریخ به دلار تبدیل می‌شود</p>
+      <p className="text-2xs text-muted">مقایسه فقط بین آگهی‌های هم‌سال ساخت (میانگین) · هر Snapshot با نرخ تتر همان تاریخ به دلار تبدیل می‌شود</p>
     </div>
   );
 }
