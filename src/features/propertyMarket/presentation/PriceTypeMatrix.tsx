@@ -65,7 +65,7 @@ export function PriceTypeMatrix({
             <caption className="sr-only">{caption}</caption>
             <thead>
               <tr>
-                <th scope="col" className="sticky start-0 z-10 bg-card !ps-5">{rowHeader}</th>
+                <th scope="col" className="sticky-col bg-card !ps-5">{rowHeader}</th>
                 {PRICE_TYPES.map((t) => (
                   <th key={t.key} scope="col" className="col-num whitespace-nowrap">
                     {priceTypeYear(t.key, jalaliYear)}
@@ -77,7 +77,7 @@ export function PriceTypeMatrix({
             <tbody>
               {rows.map((r) => (
                 <tr key={r.key}>
-                  <th scope="row" className="sticky start-0 z-10 bg-card !ps-5 text-start font-semibold text-ink">
+                  <th scope="row" className="sticky-col bg-card !ps-5 text-start font-semibold text-ink">
                     {onPickRow ? (
                       <button type="button" onClick={() => onPickRow(r.key)} className="hover:text-accent">
                         {r.displayName}

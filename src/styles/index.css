@@ -321,6 +321,21 @@
   .sim-table .col-num {
     text-align: right;
   }
+  /* ستون ثابت در جدول‌های اسکرول افقی — iOS/PWA (WebKit) بدون لایهٔ جدا
+     هنگام اسکرول مومنتوم آن را رنگ نمی‌کند و تا لمس بعدی ناپدید می‌ماند */
+  .sticky-col {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 10;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  .data-table thead th.sticky-col {
+    z-index: 20;
+  }
   .data-table.is-compact tbody td {
     @apply py-2;
   }
