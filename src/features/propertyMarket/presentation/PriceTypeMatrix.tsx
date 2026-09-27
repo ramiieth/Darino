@@ -60,24 +60,20 @@ export function PriceTypeMatrix({
       {rows.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">آگهی‌ای نیست</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="data-table min-w-[960px]">
+        /* ستون نام‌ها بیرون از اسکرولر افقی (نه sticky) — در iOS/PWA سلول‌های sticky
+           داخل overflow هنگام اسکرول رنگ نمی‌شوند و تا لمس بعدی ناپدید می‌مانند */
+        <div className="flex">
+          <table className="data-table !w-auto shrink-0 border-e border-divider">
             <caption className="sr-only">{caption}</caption>
             <thead>
-              <tr>
-                <th scope="col" className="sticky-col bg-card !ps-5">{rowHeader}</th>
-                {PRICE_TYPES.map((t) => (
-                  <th key={t.key} scope="col" className="col-num whitespace-nowrap">
-                    {priceTypeYear(t.key, jalaliYear)}
-                    <span className="block text-2xs font-normal text-muted">{priceTypeSub(t.key)}</span>
-                  </th>
-                ))}
+              <tr className="h-14">
+                <th scope="col" className="!ps-5">{rowHeader}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.key}>
-                  <th scope="row" className="sticky-col bg-card !ps-5 text-start font-semibold text-ink">
+                <tr key={r.key} className="h-16">
+                  <th scope="row" className="!ps-5 text-start font-semibold text-ink">
                     {onPickRow ? (
                       <button type="button" onClick={() => onPickRow(r.key)} className="hover:text-accent">
                         {r.displayName}
@@ -90,43 +86,63 @@ export function PriceTypeMatrix({
                       {r.total > r.count && ` · ${toFaDigits(r.total - r.count)} بدون سال ساخت`}
                     </span>
                   </th>
-                  {PRICE_TYPES.map((t) => {
-                    const c = r.cells[t.key];
-                    if (!c) return <td key={t.key} className="col-num text-subtle">—</td>;
-                    const toman = measure === 'ppm' ? c.ppmToman : c.totalToman;
-                    const usd = measure === 'ppm' ? c.ppmUsd : c.totalUsd;
-                    const low = c.count < MIN_SAMPLE_FOR_CHANGE;
-                    const body = (
-                      <>
-                        <span className="block whitespace-nowrap font-semibold text-ink">
-                          {measure === 'ppm' ? fmtMillionToman(toman) : fmtTotalToman(toman)}
-                        </span>
-                        <span className="block whitespace-nowrap text-2xs text-muted">
-                          {fmtUsdFa(usd)} · {toFaDigits(c.count)}
-                        </span>
-                      </>
-                    );
-                    return (
-                      <td key={t.key} className={cn('col-num', low && 'opacity-50')} title={low ? 'کمتر از ۳ آگهی — کم‌اعتبار' : undefined}>
-                        {onPick ? (
-                          <button
-                            type="button"
-                            onClick={() => onPick(r.key, t.key)}
-                            className="-m-1 rounded-control p-1 text-end hover:bg-surface-2"
-                            aria-label={`آگهی‌های ${r.displayName} · ساخت ${priceTypeYear(t.key, jalaliYear)}`}
-                          >
-                            {body}
-                          </button>
-                        ) : (
-                          body
-                        )}
-                      </td>
-                    );
-                  })}
                 </tr>
               ))}
             </tbody>
           </table>
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <table className="data-table !w-max min-w-full">
+              <thead>
+                <tr className="h-14">
+                  {PRICE_TYPES.map((t) => (
+                    <th key={t.key} scope="col" className="col-num whitespace-nowrap">
+                      {priceTypeYear(t.key, jalaliYear)}
+                      <span className="block text-2xs font-normal text-muted">{priceTypeSub(t.key)}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.key} className="h-16">
+                    {PRICE_TYPES.map((t) => {
+                      const c = r.cells[t.key];
+                      if (!c) return <td key={t.key} className="col-num text-subtle">—</td>;
+                      const toman = measure === 'ppm' ? c.ppmToman : c.totalToman;
+                      const usd = measure === 'ppm' ? c.ppmUsd : c.totalUsd;
+                      const low = c.count < MIN_SAMPLE_FOR_CHANGE;
+                      const body = (
+                        <>
+                          <span className="block whitespace-nowrap font-semibold text-ink">
+                            {measure === 'ppm' ? fmtMillionToman(toman) : fmtTotalToman(toman)}
+                          </span>
+                          <span className="block whitespace-nowrap text-2xs text-muted">
+                            {fmtUsdFa(usd)} · {toFaDigits(c.count)}
+                          </span>
+                        </>
+                      );
+                      return (
+                        <td key={t.key} className={cn('col-num', low && 'opacity-50')} title={low ? 'کمتر از ۳ آگهی — کم‌اعتبار' : undefined}>
+                          {onPick ? (
+                            <button
+                              type="button"
+                              onClick={() => onPick(r.key, t.key)}
+                              className="-m-1 rounded-control p-1 text-end hover:bg-surface-2"
+                              aria-label={`آگهی‌های ${r.displayName} · ساخت ${priceTypeYear(t.key, jalaliYear)}`}
+                            >
+                              {body}
+                            </button>
+                          ) : (
+                            body
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       <p className="border-t border-divider px-4 py-2.5 text-2xs text-muted">
