@@ -4,15 +4,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   CHANGE_PERIODS_MONTHS,
-  CITY_KEY,
+  areaChanges,
   changeTable,
   computeChange,
   findBaseSnapshot,
   monthsBefore,
-  neighborhoodChanges,
   snapshotRate,
   usdSeries
 } from './history';
+
+/** یک منطقه آزمایشی (کل اهواز دیگر ردیف ندارد) */
+const CITY_KEY = 'main';
 import type { AreaPriceStats, PropertyMarketSnapshot } from './types';
 import { tehranDayKey } from '@/shared/fx/usdtHistory';
 
@@ -50,7 +52,10 @@ function snap(
     fxRateAtSnapshotToman: rate,
     ...(fxSource ? { fxSource } : rate ? { fxSource: 'wallex' as const } : {}),
     cityStats: stats(city[0], city[1]),
-    neighborhoodStats: Object.entries(nbs).map(([k, v]) => ({ neighborhoodKey: k, displayName: k, stats: stats(v[0], v[1], v[2] ?? 10) })),
+    neighborhoodStats: [
+      { neighborhoodKey: CITY_KEY, displayName: CITY_KEY, stats: stats(city[0], city[1]) },
+      ...Object.entries(nbs).map(([k, v]) => ({ neighborhoodKey: k, displayName: k, stats: stats(v[0], v[1], v[2] ?? 10) }))
+    ],
     cleaning: { raw: 0, normalized: 0, valid: 0, deduplicated: 0, outliersRemoved: 0, market: 0, rejectReasons: {} },
     createdAt: ts
   };
@@ -68,13 +73,13 @@ describe('تقویم و حد تحمل', () => {
 });
 
 describe('نرخ Snapshot', () => {
-  it('ترتیب: نرخ زنده ثبت‌شده → تاریخچه روز → نرخ دستی قدیمی', () => {
+  it('ترتیب: نرخ تتر ثبت‌شده → تاریخچه روز؛ نرخ دستی قدیمی هرگز', () => {
     const daily = { [tehranDayKey(Date.parse('2026-06-26T10:00:00Z'))]: 200000 };
     expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, 210000), daily)).toEqual({ rate: 210000, source: 'snapshot' });
     expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, null), daily)).toEqual({ rate: 200000, source: 'history' });
     // نرخ دستی قدیمی (ممکن است اشتباه باشد) فقط وقتی تاریخچه نیست
     expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, 1_480_000, 'manual-legacy'), daily)).toEqual({ rate: 200000, source: 'history' });
-    expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, 1_480_000, 'manual-legacy'), {})).toEqual({ rate: 1_480_000, source: 'legacy' });
+    expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, 1_480_000, 'manual-legacy'), {})).toBeNull();
     expect(snapshotRate(snap('2026-06-26T10:00:00Z', [1, 1], {}, null), {})).toBeNull();
   });
 });
@@ -186,11 +191,10 @@ describe('جدول و رتبه‌بندی', () => {
     expect(r.status).toBe('ok');
     expect(computeChange(long, CITY_KEY, 48, {}, T).status).toBe('ok');
   });
-  it('رتبه‌بندی محله‌ها + اختلاف با کل اهواز', () => {
-    const { city, rows } = neighborhoodChanges(series, 12, {}, T);
-    expect(city.status).toBe('ok');
+  it('رتبه‌بندی مناطق بر اساس رشد دلاری', () => {
+    const rows = areaChanges(series, 12, {}, T).filter((r) => r.key !== CITY_KEY);
     expect(rows[0].key).toBe('a'); // رشد تومانی بیشتر → بالاتر
-    expect(rows[0].vsCityPp).toBeCloseTo(rows[0].change.ppmUsdPct! - city.ppmUsdPct!, 6);
+    expect(rows[0].change.status).toBe('ok');
     expect(rows[1].change.ppmUsdPct!).toBeLessThan(0); // b ثابت تومانی، تتر رشد → کاهش دلاری
   });
   it('سری دلاری برای نمودار', () => {
@@ -211,15 +215,13 @@ describe('منطقه در مقایسه زمانی', () => {
     expect(computeChange([old, cur], 'kianpars-east', 3, {}, T).status).toBe('no-area');
   });
 
-  it('رتبه‌بندی سطح منطقه = گروه‌ها + محله‌های مستقل', () => {
+  it('رتبه‌بندی = گروه‌ها + محله‌های مستقل (تنها سطح: منطقه)', () => {
     const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], { golestan: [60e6, 6e9], 'kianabad-east': [90e6, 9e9] }, 200000);
     a.groupStats = [{ neighborhoodKey: 'kianabad', displayName: 'کیان‌آباد', stats: stats(90e6, 9e9) }];
     const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], { golestan: [70e6, 7e9], 'kianabad-east': [110e6, 11e9] }, 250000);
     b.groupStats = [{ neighborhoodKey: 'kianabad', displayName: 'کیان‌آباد', stats: stats(110e6, 11e9) }];
-    const g = neighborhoodChanges([a, b], 3, {}, T, 'group');
-    expect(g.rows.map((r) => r.key).sort()).toEqual(['golestan', 'kianabad']);
-    const n = neighborhoodChanges([a, b], 3, {}, T, 'neighborhood');
-    expect(n.rows.map((r) => r.key).sort()).toEqual(['golestan', 'kianabad-east']);
+    const g = areaChanges([a, b], 3, {}, T);
+    expect(g.map((r) => r.key).filter((k) => k !== CITY_KEY).sort()).toEqual(['golestan', 'kianabad']);
   });
 
 });
@@ -227,9 +229,9 @@ describe('منطقه در مقایسه زمانی', () => {
 describe('مقایسه هم‌نوع (کلید اول / N سال ساخت)', () => {
   it('byType در Snapshot → تغییر دلاری فقط بین آگهی‌های هم‌نوع', () => {
     const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, 200000);
-    a.cityStats.byType = { 'first-key': { count: 5, medianPpm: 90e6, meanPpm: 100e6, medianTotal: 9e9, meanTotal: 10e9 } };
+    a.neighborhoodStats[0].stats.byType = { 'first-key': { count: 5, medianPpm: 90e6, meanPpm: 100e6, medianTotal: 9e9, meanTotal: 10e9 } };
     const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], {}, 250000);
-    b.cityStats.byType = { 'first-key': { count: 6, medianPpm: 150e6, meanPpm: 130e6, medianTotal: 15e9, meanTotal: 13e9 } };
+    b.neighborhoodStats[0].stats.byType = { 'first-key': { count: 6, medianPpm: 150e6, meanPpm: 130e6, medianTotal: 15e9, meanTotal: 13e9 } };
     const r = computeChange([a, b], CITY_KEY, 3, {}, 'first-key');
     // میانگین (نه میانه): $500 → $520
     expect(r.base!.ppmUsd).toBe(500);

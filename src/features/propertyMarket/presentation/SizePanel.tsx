@@ -6,40 +6,36 @@
  * ============================================================ */
 import { useMemo, useState } from 'react';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { toFaDigits } from '@/shared/utils/formatters';
 import type { PriceType } from '../domain/segments';
 import {
   EXACT_AREA_RANGES,
   buildExactAreaRows,
   buildSizeTypeMatrix,
-  type FxInput,
   type ListingView
 } from '../service/propertyMarketService';
 import { PriceTypeMatrix } from './PriceTypeMatrix';
-import { fmtMillionToman, fmtTotalToman } from './format';
+import { fmtMillionToman, fmtTotalToman, fmtUsdFa } from './format';
 
 type SizeMode = 'bands' | 'exact';
 
 export function SizePanel({
   views,
-  fx,
+  usdRate,
   jalaliYear,
   onPickBand,
   onPickExact
 }: {
   views: ListingView[];
-  fx: FxInput;
+  /** نرخ زنده تتر (تومان) */
+  usdRate: number | null;
   jalaliYear: number;
-  onPickBand: (band: string, type: PriceType) => void;
+  onPickBand: (band: string, type: PriceType | null) => void;
   onPickExact: (areaSqm: number) => void;
 }) {
   const [mode, setMode] = useState<SizeMode>('bands');
-  const matrix = useMemo(() => buildSizeTypeMatrix(views, fx, jalaliYear), [views, fx, jalaliYear]);
-  const exactRows = useMemo(
-    () => (mode === 'exact' ? buildExactAreaRows(views, fx.currentUsdRateToman) : []),
-    [views, fx.currentUsdRateToman, mode]
-  );
+  const matrix = useMemo(() => buildSizeTypeMatrix(views, usdRate, jalaliYear), [views, usdRate, jalaliYear]);
+  const exactRows = useMemo(() => (mode === 'exact' ? buildExactAreaRows(views, usdRate) : []), [views, usdRate, mode]);
 
   const modeControl = (
     <SegmentedControl<SizeMode>
@@ -55,7 +51,16 @@ export function SizePanel({
   );
 
   if (mode === 'bands') {
-    return <PriceTypeMatrix rows={matrix} rowHeader="متراژ" caption="قیمت بر اساس متراژ و نوع" toolbar={modeControl} onPick={onPickBand} />;
+    return (
+      <PriceTypeMatrix
+        rows={matrix}
+        rowHeader="متراژ"
+        caption="قیمت بر اساس متراژ و نوع"
+        toolbar={modeControl}
+        onPick={onPickBand}
+        onPickRow={(band) => onPickBand(band, null)}
+      />
+    );
   }
 
   return (
@@ -92,9 +97,9 @@ export function SizePanel({
                       <td className="!ps-5 font-semibold text-ink">{toFaDigits(r.areaSqm)} متر</td>
                       <td className="col-num">{toFaDigits(r.count)}</td>
                       <td className="col-num">{fmtMillionToman(r.ppmToman)}</td>
-                      <td className="col-num"><MoneyValue value={r.ppmUsd} /></td>
+                      <td className="col-num">{fmtUsdFa(r.ppmUsd)}</td>
                       <td className="col-num">{fmtTotalToman(r.totalToman)}</td>
-                      <td className="col-num !pe-5"><MoneyValue value={r.totalUsd} /></td>
+                      <td className="col-num !pe-5">{fmtUsdFa(r.totalUsd)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,14 +1,11 @@
 /** ============================================================
  * Property Market — اجرای کلکشنر (تکه‌ای / قابل ازسرگیری / چندمنبعی)
  *
- *  منابع: دیوار (مرجع فنی `mobin-torabi/divar-house-scraper`) و شیپور.
+ *  منبع: دیوار (مرجع فنی `mobin-torabi/divar-house-scraper`) — از مسیر سرور.
  *  هر «تکه» (chunk):
  *   ۱) اگر آگهیِ در انتظار جزئیات داریم → اول همان‌ها (در حد بودجه)
  *   ۲) وگرنه یک صفحه فهرست → آگهی‌های کامل مستقیم خروجی، بقیه → جزئیات
  *   ۳) باقی‌مانده بودجه/زمان → در کرسر می‌ماند (هیچ آگهی‌ای دور ریخته نمی‌شود)
- *
- *  همین کد در سه محیط اجرا می‌شود: فانکشن سرور، اسکریپت محلی Node، و
- *  «پل مرورگر» روی divar.ir / sheypoor.com (با IP خود کاربر).
  *
  * ⚠️ خروجی = seed پارس‌شده (بدون پاک‌سازی)؛ پاک‌سازی در لایه داده انجام می‌شود.
  * ============================================================ */
@@ -17,22 +14,15 @@ import type { ListingSource, PropertyCity } from '../domain/types.js';
 import { fetchCities, fetchDetail, fetchListPage, matchCity, sleep, type Fetcher } from './client.js';
 import { DIVAR_CATEGORY_APARTMENT_SALE, REQUEST_PAUSE_MS } from './endpoints.js';
 import { parseIntoSeed, parseListPage, type ParsedListingSeed } from './parse.js';
-import {
-  fetchSheypoorDetail,
-  fetchSheypoorList,
-  parseSheypoorDetail,
-  parseSheypoorList,
-  sheypoorIdFromToken
-} from './sheypoor.js';
 
-export const COLLECT_SOURCES: ListingSource[] = ['divar', 'sheypoor'];
+export const COLLECT_SOURCES: ListingSource[] = ['divar'];
 
 /** نشانگر پیشرفت کلکشن — بین تکه‌ها ردوبدل می‌شود (سمت کلاینت نگهداری می‌شود) */
 export interface CollectCursor {
   source: ListingSource;
-  /** دیوار: شناسه عددی شهر؛ شیپور: اسلاگ شهر */
+  /** شناسه عددی شهر در دیوار */
   cityId: string | null;
-  /** دیوار: pagination.data؛ شیپور: رشته meta.f */
+  /** pagination.data دیوار */
   paginationData: unknown;
   hasNextPage: boolean;
   /** شناسه‌های دیده‌شده (حذف تکراری بین تکه‌ها) */
@@ -86,8 +76,6 @@ export interface CollectChunkOptions {
   /** فاصله مؤدبانه بین درخواست‌ها */
   pauseMs?: number;
   fetcher?: Fetcher;
-  /** پایه URL شیپور (پل مرورگر روی sheypoor.com از origin همان صفحه استفاده می‌کند) */
-  sheypoorBase?: string;
   /** سقف صفحات فهرست (محافظ حلقه) */
   maxPages?: number;
 }
@@ -110,9 +98,8 @@ export const DEFAULT_DETAIL_BUDGET = 30;
 export const DEFAULT_TIME_BUDGET_MS = 40_000;
 export const DEFAULT_MAX_PAGES = 40;
 
-/** نیاز به جزئیات دارد؟ دیوار: وقتی قیمت/متر محاسبه‌پذیر نیست. شیپور: همیشه (فهرست متراژ ندارد). */
+/** نیاز به جزئیات دارد؟ وقتی قیمت/متر از فهرست محاسبه‌پذیر نیست */
 export function needsDetail(seed: ParsedListingSeed): boolean {
-  if (seed.source === 'sheypoor') return true;
   const hasPpm = seed.pricePerSqmToman !== null && seed.pricePerSqmToman > 0;
   const hasTotal = seed.totalPriceToman !== null && seed.totalPriceToman > 0;
   const hasArea = seed.areaSqm !== null && seed.areaSqm > 0;
@@ -144,21 +131,15 @@ export async function collectChunk(opts: CollectChunkOptions): Promise<CollectCh
 
   // ۱) resolve شهر (یک‌بار در هر نشست)
   if (!cursor.cityId) {
-    if (source === 'divar') {
-      const cities = await fetchCities(fetcher);
-      const hit = matchCity(cities, cityDef.divarSlugHints);
-      if (!hit) throw new Error(`city not found on divar: ${cityDef.name}`);
-      cursor.cityId = String(hit.id);
-    } else {
-      cursor.cityId = cityDef.sheypoorSlug;
-    }
+    const cities = await fetchCities(fetcher);
+    const hit = matchCity(cities, cityDef.divarSlugHints);
+    if (!hit) throw new Error(`city not found on divar: ${cityDef.name}`);
+    cursor.cityId = String(hit.id);
   }
 
   // ۲) صفحه فهرست — فقط وقتی صف جزئیات خالی است (صف بی‌نهایت رشد نمی‌کند)
   if (cursor.pendingSeeds.length === 0 && cursor.hasNextPage) {
-    const fresh = source === 'divar'
-      ? await readDivarPage(cursor, fetcher)
-      : await readSheypoorPage(cursor, cityDef.name, fetcher, opts.sheypoorBase);
+    const fresh = await readDivarPage(cursor, fetcher);
     for (const seed of fresh) {
       if (cursor.seenTokens.includes(seed.token)) continue;
       if (cursor.seenTokens.length >= maxListings) break;
@@ -175,13 +156,7 @@ export async function collectChunk(opts: CollectChunkOptions): Promise<CollectCh
     const seed = cursor.pendingSeeds.shift()!;
     budget -= 1;
     try {
-      if (source === 'divar') {
-        parseIntoSeed(seed, await fetchDetail(seed.token, fetcher));
-      } else {
-        const id = sheypoorIdFromToken(seed.token);
-        if (!id) throw new Error('bad sheypoor token');
-        parseSheypoorDetail(seed, await fetchSheypoorDetail(id, { fetcher, base: opts.sheypoorBase }), cityDef.name);
-      }
+      parseIntoSeed(seed, await fetchDetail(seed.token, fetcher));
       fetchedDetails += 1;
     } catch {
       failedDetails += 1;
@@ -214,21 +189,5 @@ async function readDivarPage(cursor: CollectCursor, fetcher?: Fetcher): Promise<
   cursor.pagesRead += 1;
   cursor.hasNextPage = parsed.pagination.hasNext && parsed.seeds.size > 0;
   cursor.paginationData = parsed.pagination.data;
-  return [...parsed.seeds.values()];
-}
-
-async function readSheypoorPage(
-  cursor: CollectCursor,
-  cityFa: string,
-  fetcher?: Fetcher,
-  base?: string
-): Promise<ParsedListingSeed[]> {
-  const prev = typeof cursor.paginationData === 'string' ? cursor.paginationData : null;
-  const page = await fetchSheypoorList({ citySlug: cursor.cityId!, cursor: prev, base, fetcher });
-  const parsed = parseSheypoorList(page, cityFa);
-  cursor.pagesRead += 1;
-  // کرسر تکراری/خالی = انتهای نتایج (محافظ حلقه بی‌پایان)
-  cursor.hasNextPage = parsed.nextCursor !== null && parsed.nextCursor !== prev;
-  cursor.paginationData = parsed.nextCursor;
   return [...parsed.seeds.values()];
 }

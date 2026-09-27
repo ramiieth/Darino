@@ -1,23 +1,21 @@
 /**
  * شیت تنظیمات و سناریوی سفارشی — React Hook Form + Zod
- * + مدیریت نرخ ارز (fx_rates) با تاریخچه ۲۴ ساعت و نمودار
+ * + نمایش نرخ زنده تتر (تنها مبنای دلار؛ نرخ دستی وجود ندارد)
  * + پاک‌سازی کش با تأیید دومرحله‌ای
  */
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, KeyRound, Check, Save, RotateCcw } from 'lucide-react';
-import { Chart as ChartJS, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Trash2, KeyRound, Check } from 'lucide-react';
 import { Sheet } from '@/shared/components/ui/Sheet';
-import { Button, IconButton } from '@/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { KeyValueList } from '@/shared/components/ui/FinancialValue';
-import { baseChartOptions, cssColor } from '@/shared/design/chartTheme';
 import { useSettingsStore, effectiveApiKeys } from '@/shared/store/settingsStore';
 import { useMarketStore } from '@/shared/store/marketStore';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
+import { UsdtRateField } from '@/shared/components/ui/UsdtRateField';
 import { useWatchlistStore } from '@/shared/store/watchlistStore';
 import { useAvBudgetStore } from '@/shared/store/avBudgetStore';
 import { avBudgetInfo } from '@/shared/lib/alphavantage';
@@ -26,9 +24,6 @@ import { toast } from '@/shared/store/toastStore';
 import { t } from '@/shared/i18n/fa';
 import { storage } from '@/shared/lib/storage';
 import { cn } from '@/shared/lib/cn';
-import { fmtIntLatin, fmtTime, DEFAULT_IRR_RATE } from '@/shared/utils/formatters';
-
-ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler);
 
 const scenarioSchema = z.object({
   ethAmount: z.coerce.number().min(0.000001, '≥ 0'),
@@ -45,11 +40,10 @@ type ScenarioForm = z.infer<typeof scenarioSchema>;
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { scenario, hydrate, saveScenario, apiKeys, saveApiKeys } = useSettingsStore();
-  const fx = useFxStore();
+  const usdRate = useUsdRate();
   const avBudget = useAvBudgetStore();
   const [saved, setSaved] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [fxInput, setFxInput] = useState('');
   const [keysInput, setKeysInput] = useState('');
 
   const {
@@ -69,19 +63,12 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         reset({ ...useSettingsStore.getState().scenario, apiKey: keys.join(', ') });
         setKeysInput(keys.join(', '));
       });
-      void fx.hydrate();
       void avBudget.hydrate();
       setSaved(false);
       setConfirmClear(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, hydrate, fx.hydrate, avBudget.hydrate, reset]);
-
-  // همگام‌سازی ورودی نرخ ارز
-  useEffect(() => {
-    if (open) setFxInput(String(fx.rate ?? DEFAULT_IRR_RATE));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, fx.rate]);
+  }, [open, hydrate, avBudget.hydrate, reset]);
 
   const onSubmit = async (values: ScenarioForm) => {
     await saveScenario({
@@ -105,16 +92,6 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const saveFx = async () => {
-    const rate = Number(fxInput.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/,/g, ''));
-    if (!Number.isFinite(rate) || rate <= 0) {
-      toast('error', 'نرخ معتبر وارد کنید');
-      return;
-    }
-    await fx.setRate(rate);
-    toast('success', t('fxRateSaved'));
-  };
-
   const clearCache = async () => {
     await cacheClearPrices();
     useMarketStore.setState({ quotes: {}, lastCycleAt: null });
@@ -127,8 +104,6 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
       <Input type="number" step="any" inputMode="decimal" dir="ltr" placeholder="0.00" suffix={suffix} {...register(key)} />
     </Field>
   );
-
-  const fxOptions = baseChartOptions({ formatTooltip: (v) => `${fmtIntLatin(v)} ریال`, formatY: (v) => fmtIntLatin(v) });
 
   return (
     <Sheet
@@ -143,62 +118,13 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
       }
     >
       <form id="settings-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8 pb-2">
-        {/* FX rate */}
+        {/* نرخ دلار — فقط تتر زنده (والکس/بیت‌پین)؛ نرخ دستی وجود ندارد */}
         <section className="space-y-3" aria-labelledby="fx-title">
           <div>
-            <h3 id="fx-title" className="text-sm font-bold text-ink">{t('fxRateTitle')}</h3>
-            <p className="text-xs text-muted">{t('fxRateHint')}</p>
+            <h3 id="fx-title" className="text-sm font-bold text-ink">نرخ دلار (تتر زنده)</h3>
+            <p className="text-xs text-muted">ارزش‌گذاری دلار در کل اپ با نرخ لحظه‌ای تتر از والکس یا بیت‌پین — هر دقیقه به‌روز می‌شود.</p>
           </div>
-          <div className="flex items-end gap-2">
-            <Field label={t('fxRateInput')} className="flex-1">
-              <Input dir="ltr" inputMode="numeric" value={fxInput} onChange={(e) => setFxInput(e.target.value)} />
-            </Field>
-            <Button onClick={saveFx} type="button" variant="secondary" icon={<Save />}>
-              {t('fxRateSave')}
-            </Button>
-            <IconButton
-              variant="outline"
-              type="button"
-              onClick={() => {
-                setFxInput(String(DEFAULT_IRR_RATE));
-                void fx.setRate(DEFAULT_IRR_RATE);
-                toast('info', t('fxRateSaved'));
-              }}
-              aria-label={t('fxRateReset')}
-            >
-              <RotateCcw />
-            </IconButton>
-          </div>
-          {fx.updatedAt && (
-            <p className="text-xs text-muted">
-              {t('fxLastUpdate')}: {fmtTime(fx.updatedAt)}
-            </p>
-          )}
-          {fx.history.length > 1 && (
-            <div className="rounded-field border border-divider p-3">
-              <p className="mb-2 text-xs font-semibold text-muted">{t('fxHistoryTitle')}</p>
-              <div className="h-28" dir="ltr">
-                <Line
-                  data={{
-                    labels: fx.history.map((h) => fmtTime(h.t)),
-                    datasets: [
-                      {
-                        label: 'نرخ',
-                        data: fx.history.map((h) => h.rate),
-                        borderColor: cssColor('chart-1'),
-                        backgroundColor: cssColor('chart-1', 0.08),
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        tension: 0.25,
-                        fill: true
-                      }
-                    ]
-                  }}
-                  options={fxOptions as never}
-                />
-              </div>
-            </div>
-          )}
+          <UsdtRateField effective={usdRate} />
         </section>
 
         {/* ETH position */}

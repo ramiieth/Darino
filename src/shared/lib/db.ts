@@ -358,30 +358,6 @@ export async function settingSet(key: string, value: unknown): Promise<void> {
   }
 }
 
-/* ---------------- نرخ ارز (fx_rates) ---------------- */
-
-let memoryFx: FxRateRecord | null = null;
-
-export async function fxGet(): Promise<FxRateRecord | null> {
-  try {
-    const db = await getDb();
-    if (db) return (await db.fxRates.get('usd-irr')) ?? null;
-  } catch {
-    /* فالبک */
-  }
-  return memoryFx;
-}
-
-export async function fxPut(rec: FxRateRecord): Promise<void> {
-  memoryFx = rec;
-  try {
-    const db = await getDb();
-    if (db) await db.fxRates.put(rec);
-  } catch {
-    /* فقط حافظه */
-  }
-}
-
 /* ---------------- Watchlist ---------------- */
 
 let memoryWatch = new Map<string, WatchItemRecord>();

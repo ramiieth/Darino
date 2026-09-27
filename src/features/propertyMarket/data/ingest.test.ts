@@ -1,16 +1,16 @@
 /**
- * ورود داده و Snapshot — مسیر مشترک سرور/پل مرورگر/فایل
+ * ورود داده و Snapshot — مسیر سرور (دیوار) + پاک‌سازی داده قبلی
  */
 import { describe, it, expect } from 'vitest';
-import { buildSnapshot, ingestSeeds, listingsInWindow, MARKET_WINDOW_DAYS } from './ingest';
+import { buildSnapshot, ingestSeeds, listingsInWindow, purgeStoredListings, MARKET_WINDOW_DAYS } from './ingest';
 import { emptySeed, type ParsedListingSeed } from '../collector/parse';
-import type { ListingSource } from '../domain/types';
+import type { PropertyMarketListing } from '../domain/types';
 
 const NOW = Date.parse('2026-09-26T12:00:00Z');
 const DAY = 86_400_000;
 
-function seed(token: string, nb: string, area: number, ppm: number, source: ListingSource = 'divar'): ParsedListingSeed {
-  const s = emptySeed(token, source);
+function seed(token: string, nb: string, area: number, ppm: number, source: string = 'divar'): ParsedListingSeed {
+  const s = emptySeed(token, source as 'divar');
   s.neighborhood = nb;
   s.areaSqm = area;
   s.totalPriceToman = area * ppm;
@@ -19,21 +19,25 @@ function seed(token: string, nb: string, area: number, ppm: number, source: List
 }
 
 describe('ingestSeeds', () => {
-  it('نرمال/اعتبارسنجی + منبع + شمارش جدید', () => {
+  it('نرمال/اعتبارسنجی + شمارش جدید؛ شیپور و زیر ۹۰ متر رد', () => {
     const r = ingestSeeds({
       existing: [],
-      seeds: [seed('a', 'کیانپارس', 100, 150e6), seed('sh-1', 'گلستان', 80, 90e6, 'sheypoor'), emptySeed('bad')],
+      seeds: [
+        seed('a', 'کیانپارس', 100, 150e6),
+        seed('sh-1', 'گلستان', 100, 90e6, 'sheypoor'),
+        seed('s', 'گلستان', 80, 90e6),
+        emptySeed('bad')
+      ],
       city: 'ahvaz',
       cityId: '7',
       now: NOW
     });
-    expect(r.added).toBe(2);
-    expect(r.listings.length).toBe(2);
+    expect(r.added).toBe(1);
+    expect(r.listings.map((l) => l.token)).toEqual(['a']);
+    expect(r.listings[0].cityId).toBe('7');
     expect(r.report.rejectReasons['missing-price']).toBe(1);
-    const sh = r.listings.find((l) => l.token === 'sh-1')!;
-    expect(sh.source).toBe('sheypoor');
-    expect(sh.cityId).toBeNull(); // cityId دیوار به آگهی شیپور نسبت داده نمی‌شود
-    expect(r.listings.find((l) => l.token === 'a')!.cityId).toBe('7');
+    expect(r.report.rejectReasons['not-divar']).toBe(1);
+    expect(r.report.rejectReasons['area-too-small']).toBe(1);
   });
 
   it('آگهی دوباره‌دیده‌شده → تازه (scrapedAt جدید) و جزو changed؛ جدید شمرده نمی‌شود', () => {
@@ -45,13 +49,11 @@ describe('ingestSeeds', () => {
     expect(second.changed.length).toBe(1);
   });
 
-  it('حذف تکراری بین منابع با اثرانگشت (همان ملک در دیوار و شیپور)', () => {
-    const r = ingestSeeds({
-      existing: [],
-      seeds: [seed('d1', 'گلستان', 100, 90e6), seed('sh-9', 'گلستان', 100, 90e6, 'sheypoor')],
-      city: 'ahvaz',
-      now: NOW
-    });
+  it('آگهی دوباره ثبت‌شده با توکن دیگر (همان طبقه و مشخصات) → یکی', () => {
+    const a = seed('d1', 'گلستان', 100, 90e6);
+    const b = seed('d2', 'گلستان', 100, 90e6);
+    a.floor = b.floor = 3;
+    const r = ingestSeeds({ existing: [], seeds: [a, b], city: 'ahvaz', now: NOW });
     expect(r.listings.length).toBe(1);
     expect(r.report.deduplicated).toBe(1);
   });
@@ -59,9 +61,9 @@ describe('ingestSeeds', () => {
   it('رد: ملک شهر دیگر و ویلایی', () => {
     const tehran = seed('t', 'گلستان', 100, 90e6);
     tehran.title = '۱۲۰ متر / منطقه ۵ / پونک';
-    const villa = seed('v', 'گلستان', 200, 50e6, 'sheypoor');
+    const villa = seed('v', 'گلستان', 200, 50e6);
     villa.propertyKind = 'villa-house';
-    const flagged = seed('f', 'گلستان', 90, 80e6, 'sheypoor');
+    const flagged = seed('f', 'گلستان', 90, 80e6);
     flagged.otherCity = 'جنت آباد';
     const r = ingestSeeds({ existing: [], seeds: [tehran, villa, flagged], city: 'ahvaz', now: NOW });
     expect(r.listings.length).toBe(0);
@@ -82,17 +84,17 @@ describe('buildSnapshot', () => {
       seed('k1', 'کیانپارس', 100, 150e6),
       seed('k2', 'کیانپارس', 100, 160e6),
       seed('g1', 'گلستان', 100, 90e6),
-      seed('sh-1', 'گلستان', 90, 95e6, 'sheypoor')
+      seed('g2', 'گلستان', 90, 95e6)
     ],
     city: 'ahvaz',
     now: NOW
   }).listings;
 
-  it('آمار شهر/محله + سهم منابع + منبع mixed', () => {
+  it('آمار شهر/محله/منطقه + منبع دیوار', () => {
     const snap = buildSnapshot({ listings: base, now: NOW })!;
     expect(snap.id).toBe(`pmsnap-${NOW}`);
-    expect(snap.source).toBe('mixed');
-    expect(snap.sourceCounts).toEqual({ divar: 3, sheypoor: 1 });
+    expect(snap.source).toBe('divar');
+    expect(snap.sourceCounts).toEqual({ divar: 4 });
     expect(snap.cityStats.listingCount).toBe(4);
     expect(snap.neighborhoodStats.map((n) => n.neighborhoodKey).sort()).toEqual(['golestan', 'kianpars-other']);
     // منطقه کیانپارس (گروه) با همه آگهی‌های عضو
@@ -100,11 +102,6 @@ describe('buildSnapshot', () => {
     expect(snap.groupStats?.[0].stats.listingCount).toBe(2);
     expect(snap.cityStats.meanTotalToman).toBeGreaterThan(0);
     expect(snap.cleaning.market).toBe(4);
-  });
-
-  it('فقط یک منبع → source همان منبع', () => {
-    const snap = buildSnapshot({ listings: base.filter((l) => l.source === 'divar'), now: NOW })!;
-    expect(snap.source).toBe('divar');
   });
 
   it('آگهی‌های خارج از پنجره بازار حساب نمی‌شوند؛ داده خالی → null', () => {
@@ -147,5 +144,20 @@ describe('rekeyListings — مهاجرت خودکار کلید محله', () => 
     expect(g.stats.listingCount).toBe(2);
     expect(g.stats.medianTomanPerM2).toBe(90e6);
     expect(g.stats.meanTomanPerM2).toBe(90e6);
+  });
+});
+
+describe('purgeStoredListings — داده قبلی با قواعد فعلی', () => {
+  it('شیپور، زیر ۹۰ متر و محله متناقض حذف؛ بقیه می‌ماند', () => {
+    const ok = ingestSeeds({ existing: [], seeds: [seed('ok', 'کیانپارس', 120, 150e6)], city: 'ahvaz', now: NOW }).listings[0];
+    const stored: PropertyMarketListing[] = [
+      ok,
+      { ...ok, token: 'sh', source: 'sheypoor' as never },
+      { ...ok, token: 'small', areaSqm: 75 },
+      { ...ok, token: 'andisheh', title: 'آپارتمان کیانپارس اندیشه' }
+    ];
+    const r = purgeStoredListings(stored);
+    expect(r.listings.map((l) => l.token)).toEqual(['ok']);
+    expect(r.removed.sort()).toEqual(['andisheh', 'sh', 'small']);
   });
 });

@@ -134,43 +134,6 @@ function localServerlessApi(): Plugin {
   };
 }
 
-/**
- * پل مرورگر بازار املاک: باندل کلکشنر (همان کد تست‌شده collector/*) به یک
- * IIFE برای Bookmarklet — در دسترس به‌صورت `virtual:pm-bookmarklet` (رشته کد).
- * origin دارینو هنگام ساخت لینک در صفحه جایگزین `%%DARINO_ORIGIN%%` می‌شود.
- */
-function propertyMarketBookmarklet(): Plugin {
-  const id = 'virtual:pm-bookmarklet';
-  const resolved = '\0' + id;
-  const entry = path.resolve(__dirname, 'src/features/propertyMarket/bridge/bookmarklet.ts');
-  return {
-    name: 'pm-bookmarklet',
-    resolveId(source) {
-      return source === id ? resolved : null;
-    },
-    async load(loadId) {
-      if (loadId !== resolved) return null;
-      const { build } = await import('esbuild');
-      const result = await build({
-        entryPoints: [entry],
-        bundle: true,
-        write: false,
-        format: 'iife',
-        platform: 'browser',
-        target: 'es2019',
-        minify: true,
-        legalComments: 'none',
-        metafile: true,
-        define: { __DARINO_ORIGIN__: JSON.stringify('%%DARINO_ORIGIN%%') }
-      });
-      for (const input of Object.keys(result.metafile?.inputs ?? {})) {
-        this.addWatchFile(path.resolve(__dirname, input));
-      }
-      return `export default ${JSON.stringify(result.outputFiles[0].text)};`;
-    }
-  };
-}
-
 /** پیکربندی مشترک پروکسی (dev + preview) */
 function marketProxies(): Record<string, ProxyOptions> {
   // درخواست‌ها از دید Provider باید «سرور-به-سرور» باشند؛
@@ -244,7 +207,6 @@ export default defineConfig({
     react(),
     alphaVantageServer(),
     localServerlessApi(),
-    propertyMarketBookmarklet(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon.svg', 'icons/favicon.png', 'icons/apple-touch-icon.png'],

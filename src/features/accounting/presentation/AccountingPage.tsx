@@ -15,7 +15,7 @@ import { Metric, MetricGrid, MoneyValue } from '@/shared/components/ui/Financial
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { AccountingProvider, useAccountingData } from './AccountingContext';
 import { usePortfolioOverview } from '@/features/eth-summary/presentation/usePortfolioOverview';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
 import { fmtToman } from '@/shared/utils/formatters';
 import { JournalPanel, CashEntryForm } from './JournalPanel';
 import { TradePanel } from './TradePanel';
@@ -59,7 +59,7 @@ function AccountingScreen() {
   const acc = useAccountingData();
   const { loading } = acc;
   const o = usePortfolioOverview(acc);
-  const fxRate = useFxStore((s) => s.rate);
+  const fxRate = useUsdRate().rate;
 
   // ?tab= accepts a section or a record kind (legacy deep links)
   const raw = params.get('tab') ?? 'trade';

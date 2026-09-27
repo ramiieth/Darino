@@ -97,7 +97,7 @@ describe('formatters (سیاست نمایش مالی)', () => {
     expect(fmtPct(-1.2)).toBe('-1.20%');
   });
   it('تومان با ارقام فارسی', () => {
-    expect(fmtToman(36_900, 1_480_000)).toBe('≈ ۵٫۴۶ میلیارد تومان');
+    expect(fmtToman(36_900, 148_000)).toBe('≈ ۵٫۴۶ میلیارد تومان');
     expect(fmtNum(1234.5)).toContain('۱');
   });
 });

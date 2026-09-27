@@ -21,7 +21,7 @@ import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
 import { KeyValueList, Metric, MetricGrid, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { fmtTomanAmount, fmtUsdAmount, toFaDigits } from '@/shared/utils/formatters';
 import { useVehicleStore, useVehicles } from '../data/useVehicles';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
 import {
   vehicleReturn,
   rankVehicles,
@@ -50,17 +50,12 @@ function ReturnBadge({ pct }: { pct: number | null }) {
 
 export function VehiclePage() {
   const { vehicles, snapshots, loading } = useVehicles();
-  const fxRate = useFxStore((s) => s.rate);
-  const fxHydrated = useFxStore((s) => s.hydrated);
+  const fxRate = useUsdRate().rate;
   const [startIdx, setStartIdx] = useState(0);
   const [endIdx, setEndIdx] = useState(0);
   const [sortKey, setSortKey] = useState<VehicleSortKey>('toman-pct');
   const [selected, setSelected] = useState<Vehicle | null>(null);
   const [showNewSnapshot, setShowNewSnapshot] = useState(false);
-
-  useEffect(() => {
-    void useFxStore.getState().hydrate();
-  }, []);
 
   // default range: first → latest snapshot (all time)
   useEffect(() => {
@@ -290,7 +285,7 @@ export function VehiclePage() {
         size="lg"
       >
         {selected && startSnap && endSnap && (
-          <VehicleDetail vehicle={selected} snapshots={snapshots} fxRate={fxRate} fxHydrated={fxHydrated} />
+          <VehicleDetail vehicle={selected} snapshots={snapshots} fxRate={fxRate} />
         )}
       </Sheet>
 
@@ -314,13 +309,12 @@ function Toman({ v }: { v: number | null | undefined }) {
 function VehicleDetail({
   vehicle,
   snapshots,
-  fxRate,
-  fxHydrated
+  fxRate
 }: {
   vehicle: Vehicle;
   snapshots: VehicleSnapshot[];
-  fxRate: number;
-  fxHydrated: boolean;
+  /** نرخ زنده تتر (تومان) */
+  fxRate: number | null;
 }) {
   const [endIdx, setEndIdx] = useState(snapshots.length - 1);
   const [benchmarks, setBenchmarks] = useState<Awaited<ReturnType<typeof compareWithBenchmarks>> | null>(null);
@@ -482,10 +476,10 @@ function VehicleDetail({
         </p>
       </div>
 
-      {fxHydrated && (
+      {fxRate !== null && (
         <p className="text-xs text-subtle">
-          نرخ دلار فعلی اپ: <span className="num-ltr">{toFaDigits(fxRate.toLocaleString('en-US'))}</span> — صرفاً برای اطلاع؛ Snapshotها با نرخ خودشان
-          محاسبه می‌شوند.
+          نرخ زنده تتر: <span className="num-ltr">{toFaDigits(fxRate.toLocaleString('en-US'))}</span> تومان — صرفاً برای اطلاع؛ Snapshotها با
+          نرخ خودشان محاسبه می‌شوند.
         </p>
       )}
     </div>

@@ -1,8 +1,7 @@
 /** ============================================================
  * Property Market — ورود داده و ساخت Snapshot (خالص، سمت کلاینت)
  *
- * همه مسیرهای جمع‌آوری به همین‌جا می‌رسند:
- *   سرور (/api/propertyMarket) · پل مرورگر (divar.ir / sheypoor.com) · فایل JSON
+ * مسیر جمع‌آوری: سرور (/api/propertyMarket) → دیوار
  *
  *   seedها → Normalize/Validate → ادغام با موجودی (حذف تکراری) → IndexedDB
  *   آگهی‌های «پنجره بازار» → پرت‌گیری → آمار → Snapshot الحاقی
@@ -25,7 +24,8 @@ import {
   filterOutliers,
   isStaleAd,
   newCleaningReport,
-  normalizeAndValidate
+  normalizeAndValidate,
+  storedListingRejectReason
 } from '../collector/pipeline';
 import { detectFirstKey } from '../collector/dates';
 import { PRICE_TYPES, jalaliYearOf, matchesPriceType } from '../domain/segments';
@@ -59,7 +59,7 @@ export function ingestSeeds(opts: {
   const valid: PropertyMarketListing[] = [];
   for (const seed of opts.seeds) {
     if (!seed || typeof seed !== 'object' || typeof seed.token !== 'string' || !seed.token) continue;
-    const l = normalizeAndValidate(seed, opts.city, seed.source === 'divar' ? opts.cityId ?? null : null, now, report);
+    const l = normalizeAndValidate(seed, opts.city, opts.cityId ?? null, now, report);
     if (l) valid.push(l);
   }
   const before = new Map(opts.existing.map((l) => [l.token, l]));
@@ -144,7 +144,7 @@ export function buildSnapshot(opts: {
 
   const sourceCounts: Partial<Record<ListingSource, number>> = {};
   for (const l of market) {
-    if (l.source === 'divar' || l.source === 'sheypoor') sourceCounts[l.source] = (sourceCounts[l.source] ?? 0) + 1;
+    if (l.source === 'divar') sourceCounts.divar = (sourceCounts.divar ?? 0) + 1;
   }
   const used = Object.keys(sourceCounts) as ListingSource[];
 
@@ -186,6 +186,23 @@ export function rekeyListings(listings: PropertyMarketListing[]): {
     return next;
   });
   return { listings: out, changed };
+}
+
+/**
+ * پاک‌سازی آگهی‌های ذخیره‌شده با قواعد فعلی (شیپور، زیر ۹۰ متر، تناقض محله با متن).
+ * خروجی: آگهی‌های ماندنی + توکن‌های حذفی (برای حذف از IndexedDB).
+ */
+export function purgeStoredListings(listings: PropertyMarketListing[]): {
+  listings: PropertyMarketListing[];
+  removed: string[];
+} {
+  const kept: PropertyMarketListing[] = [];
+  const removed: string[] = [];
+  for (const l of listings) {
+    if (l.source !== 'manual-legacy' && storedListingRejectReason(l)) removed.push(l.token);
+    else kept.push(l);
+  }
+  return { listings: kept, removed };
 }
 
 /** آمار انواع قیمت (کلید اول، ۱ تا ۷ سال) برای یک گروه آگهی — نوع خالی ذخیره نمی‌شود */

@@ -3,19 +3,17 @@
  *
  * ⚠️ داده فقط از کلکشنر دیوار (یا داده تاریخی ماژول قبلی) می‌آید —
  *    هرگز داده جعلی تولید نمی‌شود.
- * ⚠️ سناریوی دلار آینده «فرض صریح سناریو» است — پیش‌بینی قیمت ملک نیست.
  * ============================================================ */
 
 /** شهر پشتیبانی‌شده (نسخه فعلی: اهواز — قابل توسعه) */
 export type PropertyCity = 'ahvaz';
 
-/** منبع آنلاین آگهی (هر دو از API عمومی وب — بدون لاگین) */
-export type ListingSource = 'divar' | 'sheypoor';
+/** منبع آنلاین آگهی — فقط دیوار (از مسیر سرور). آگهی‌های قدیمی شیپور هنگام بارگذاری حذف می‌شوند. */
+export type ListingSource = 'divar';
 
 /** برچسب فارسی منابع */
 export const LISTING_SOURCE_FA: Record<ListingSource, string> = {
-  divar: 'دیوار',
-  sheypoor: 'شیپور'
+  divar: 'دیوار'
 };
 
 /** نوع ملک در آگهی‌های دیوار */
@@ -149,51 +147,4 @@ export interface PropertyMarketSnapshot {
   groupStats?: NeighborhoodStatsRecord[];
   cleaning: CleaningReport;
   createdAt: number;
-}
-
-/**
- * سناریوی دلار آینده — «فرض صریح»، نه داده جدید ارزی.
- * نرخ فعلی همیشه از منبع موجود (fx_rates) خوانده می‌شود؛ نرخ آینده
- * از همان منبع مقداردهی اولیه می‌شود و کاربر می‌تواند آن را به‌عنوان
- * سناریو تنظیم کند (هیچ جدول/سرویس/یوآی‌پی جدیدی برای دلار ساخته نمی‌شود).
- */
-export interface PropertyMarketScenario {
-  /** نرخ دلار آینده (تومان بر دلار) — اگر null باشد = نرخ فعلی */
-  futureUsdRateToman: number | null;
-  /**
-   * فرض اختیاری رشد قیمت تومانی ملک (درصد) — برای سناریو B.
-   * null/0 = سناریو A (قیمت تومانی ثابت — صریحاً برچسب می‌خورد).
-   * ⚠️ این مقدار یک فرض کاربر است، نه پیش‌بینی سیستم.
-   */
-  propertyTomanGrowthPct: number | null;
-  updatedAt: number;
-}
-
-/** موقعیت نسبی محله نسبت به میانه بازار */
-export type MarketPosition = 'above' | 'near' | 'below';
-
-/** ورودی موتور سناریو (§۲۷ مأموریت) */
-export interface UsdScenarioInput {
-  /** قیمت فعلی ملک (تومان بر مترمربع) */
-  currentPropertyPriceTomanPerM2: number;
-  /** نرخ دلار فعلی (تومان بر دلار) — از منبع موجود دارینو */
-  currentUsdRate: number;
-  /** نرخ دلار آینده (تومان بر دلار) — فرض سناریو */
-  futureUsdRate: number;
-  /** قیمت آینده ملک (تومان بر مترمربع) — اختیاری؛ اگر نبود = سناریو قیمت ثابت */
-  futurePropertyPriceTomanPerM2?: number | null;
-}
-
-/** خروجی موتور سناریو */
-export interface UsdScenarioResult {
-  currentUsdPrice: number;
-  futureUsdPrice: number;
-  /** تغییر قیمت دلاری (درصد) */
-  usdChangePercent: number;
-  /** قیمت تومانی آینده که عملاً استفاده شد */
-  effectiveFuturePropertyPriceTomanPerM2: number;
-  /** رشد تومانی قیمت ملک در این سناریو (درصد) — ۰ در سناریو ثابت */
-  propertyTomanChangePercent: number;
-  /** مبنای سناریو: قیمت ثابت یا قیمت صریح آینده */
-  scenarioBasis: 'constant-property' | 'explicit-property';
 }

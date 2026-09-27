@@ -20,7 +20,7 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { useAccountingData } from './AccountingContext';
 import { COINS, COIN_NAMES_FA } from '@/features/simulation/domain/constants';
 import { useMergedCryptoPrices } from '@/shared/hooks/useMergedCryptoPrices';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
 import { fmtToman, fmtInt } from '@/shared/utils/formatters';
 import { formatDualDate } from '@/shared/utils/jalali';
 import { cn } from '@/shared/lib/cn';
@@ -51,7 +51,7 @@ const ASSETS: AssetOption[] = [
 export function AssetDepositPanel() {
   const { depositAsset } = useAccountingData();
   const merged = useMergedCryptoPrices();
-  const fxRate = useFxStore((s) => s.rate);
+  const fxRate = useUsdRate().rate;
 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<AssetOption | null>(null);
@@ -228,7 +228,7 @@ export function AssetDepositPanel() {
                 { label: 'قیمت لحظه‌ای', value: <MoneyValue value={price} /> },
                 { label: 'ارزش دلاری', emphasis: true, value: <MoneyValue value={valueUsd} /> },
                 { label: 'ارزش تومانی', value: fmtToman(valueUsd, fxRate) },
-                { label: 'نرخ دلار', value: `${fmtInt(fxRate)} تومان / دلار` },
+                { label: 'نرخ دلار', value: fxRate ? `${fmtInt(fxRate)} تومان / دلار (تتر زنده)` : 'نرخ تتر در دسترس نیست' },
                 { label: 'تاریخ', value: formatDualDate(date ?? Date.now()) },
                 ...(memo.trim() ? [{ label: 'توضیحات', value: memo.trim() }] : [])
               ]}

@@ -12,7 +12,7 @@ const CommandPalette = lazy(() => import('@/shared/components/layout/CommandPale
 import { useSidebarStore } from '@/shared/store/sidebarStore';
 import { useShellStore } from '@/shared/store/shellStore';
 import { useSettingsStore } from '@/shared/store/settingsStore';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdtPolling } from '@/shared/store/usdtStore';
 import { useWatchlistStore } from '@/shared/store/watchlistStore';
 import { cn } from '@/shared/lib/cn';
 
@@ -40,7 +40,6 @@ export function AppShell({
   const paletteOpen = useShellStore((s) => s.paletteOpen);
   const setPaletteOpen = useShellStore((s) => s.setPaletteOpen);
   const hydrate = useSettingsStore((s) => s.hydrate);
-  const fxHydrate = useFxStore((s) => s.hydrate);
   const watchHydrate = useWatchlistStore((s) => s.hydrate);
   const { pathname } = useLocation();
   const firstRoute = useRef(true);
@@ -48,12 +47,14 @@ export function AppShell({
 
   useInstallPrompt();
 
-  // hydrate settings / FX / watchlist from IndexedDB
+  // نرخ زنده تتر (والکس/بیت‌پین) — تنها مبنای دلار در کل اپ، هر دقیقه
+  useUsdtPolling();
+
+  // hydrate settings / watchlist from IndexedDB
   useEffect(() => {
     void hydrate();
-    void fxHydrate();
     void watchHydrate();
-  }, [hydrate, fxHydrate, watchHydrate]);
+  }, [hydrate, watchHydrate]);
 
   // Command palette: Ctrl/⌘K
   useEffect(() => {

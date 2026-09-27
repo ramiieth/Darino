@@ -1,13 +1,13 @@
 /** ============================================================
  * Property Market — دسته‌بندی آگهی‌ها (سن بنا / متراژ) — خالص
  *
- *  سن بنا = سال شمسی جاری − سال ساخت (دیوار: «ساخت»؛ شیپور: از «سن بنا»)
+ *  سن بنا = سال شمسی جاری − سال ساخت («ساخت» در آگهی دیوار)
  *  آگهی بدون سال ساخت/متراژ → دسته «نامشخص» (هرگز حدس زده نمی‌شود)
  * ============================================================ */
 
 export type AgeBand =
   | 'y0-1' | 'y2' | 'y3' | 'y4' | 'y5' | 'y6' | 'y7' | 'y8-10' | 'y11-20' | 'y21+' | 'unknown';
-export type AreaBand = 'a0-60' | 'a60-80' | 'a80-100' | 'a100-120' | 'a120-150' | 'a150-200' | 'a200+' | 'unknown';
+export type AreaBand = 'a90-100' | 'a100-120' | 'a120-150' | 'a150-200' | 'a200+' | 'unknown';
 
 export interface BandDef<T extends string> {
   key: T;
@@ -32,9 +32,7 @@ export const AGE_BANDS: BandDef<Exclude<AgeBand, 'unknown'>>[] = [
 ];
 
 export const AREA_BANDS: BandDef<Exclude<AreaBand, 'unknown'>>[] = [
-  { key: 'a0-60', label: 'کمتر از ۶۰ متر', min: 0, max: 59.999 },
-  { key: 'a60-80', label: '۶۰ تا ۸۰ متر', min: 60, max: 79.999 },
-  { key: 'a80-100', label: '۸۰ تا ۱۰۰ متر', min: 80, max: 99.999 },
+  { key: 'a90-100', label: '۹۰ تا ۱۰۰ متر', min: 90, max: 99.999 },
   { key: 'a100-120', label: '۱۰۰ تا ۱۲۰ متر', min: 100, max: 119.999 },
   { key: 'a120-150', label: '۱۲۰ تا ۱۵۰ متر', min: 120, max: 149.999 },
   { key: 'a150-200', label: '۱۵۰ تا ۲۰۰ متر', min: 150, max: 199.999 },
@@ -85,7 +83,8 @@ export function jalaliYearOf(ts: number): number {
 
 /**
  * first-key = «کلید اول» (متن صریح)؛ ageN = N سال ساخت (age1 = نوساز تا ۱ سال).
- * دسته‌ها افراز نیستند: آگهی کلید اولِ ۱ ساله در هر دو است.
+ * دسته‌ها جدا از هم‌اند: آگهی «کلید اول» فقط در ستون کلید اول می‌آید، نه در ۱ سال —
+ * وگرنه میانگین «۱ سال» ترکیبی از کلید اول و دست‌دوم می‌شود و دو ستون قابل مقایسه نیستند.
  */
 export type PriceType = 'first-key' | 'age1' | 'age2' | 'age3' | 'age4' | 'age5' | 'age6' | 'age7';
 
@@ -107,6 +106,7 @@ export function matchesPriceType(
   currentJalaliYear: number
 ): boolean {
   if (type === 'first-key') return l.firstKey === true;
+  if (l.firstKey === true) return false;
   const age = buildingAgeYears(l.yearBuilt, currentJalaliYear);
   if (age === null) return false;
   const n = Number(type.slice(3));

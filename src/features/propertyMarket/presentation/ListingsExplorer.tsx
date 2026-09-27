@@ -1,24 +1,19 @@
 /** ============================================================
  * Property Market — مرور آگهی‌ها (داده پشت آمار)
  *
- *  فیلتر منبع/منطقه/نوع/متراژ + مرتب‌سازی؛ هر ردیف به آگهی اصلی لینک است.
+ *  فیلتر منطقه/سال ساخت/متراژ + مرتب‌سازی؛ هر ردیف به آگهی دیوار لینک است.
  *  ⚠️ فقط نمایش — آمار از لایه سرویس/Snapshot می‌آید.
  * ============================================================ */
 import { useMemo, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
 import { Select } from '@/shared/components/ui/Input';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
-import { MoneyValue } from '@/shared/components/ui/FinancialValue';
-import { LISTING_SOURCE_FA, type ListingSource } from '../domain/types';
-import { neighborhoodDisplayName } from '../data/catalog';
+import { areaKeyOf, neighborhoodDisplayName } from '../data/catalog';
 import { AGE_BANDS, AREA_BANDS, type AgeBand, type AreaBand } from '../domain/segments';
-import { areaKeyOf, type ListingView } from '../service/propertyMarketService';
-import { fmtMillionToman, fmtTotalToman } from './format';
+import type { ListingView } from '../service/propertyMarketService';
+import { fmtMillionToman, fmtTotalToman, fmtUsdFa } from './format';
 
-type SourceFilter = 'all' | ListingSource;
 type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
 export type AgeFilter = 'all' | AgeBand | 'first-key';
 export type AreaFilter = 'all' | AreaBand;
@@ -41,7 +36,7 @@ export function ListingsExplorer({
   place = 'all',
   onPlace
 }: {
-  /** فیلتر منطقه یا محله (کلید محله یا کلید منطقه) */
+  /** فیلتر منطقه (کلید منطقه) */
   place?: string;
   onPlace?: (v: string) => void;
   /** فیلتر متراژ دقیق (از جدول «متراژ دقیق») */
@@ -53,7 +48,6 @@ export function ListingsExplorer({
   onAge?: (v: AgeFilter) => void;
   onArea?: (v: AreaFilter) => void;
 }) {
-  const [source, setSource] = useState<SourceFilter>('all');
   const [localAge, setLocalAge] = useState<AgeFilter>(age);
   const [localArea, setLocalArea] = useState<AreaFilter>(area);
   const ageF = onAge ? age : localAge;
@@ -66,25 +60,21 @@ export function ListingsExplorer({
   const [sort, setSort] = useState<SortKey>('recent');
   const [limit, setLimit] = useState(PAGE);
 
-  const neighborhoods = useMemo(() => {
+  const areas = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const l of listings) if (l.neighborhoodKey) counts.set(l.neighborhoodKey, (counts.get(l.neighborhoodKey) ?? 0) + 1);
+    for (const l of listings) {
+      const k = areaKeyOf(l.neighborhoodKey);
+      if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
     return [...counts.entries()]
       .map(([key, n]) => ({ key, n, name: neighborhoodDisplayName(key) }))
       .sort((a, b) => b.n - a.n);
   }, [listings]);
 
-  const bySource = useMemo(() => {
-    const c: Record<ListingSource, number> = { divar: 0, sheypoor: 0 };
-    for (const l of listings) if (l.source === 'divar' || l.source === 'sheypoor') c[l.source] += 1;
-    return c;
-  }, [listings]);
-
   const rows = useMemo(() => {
     const f = listings.filter(
       (l) =>
-        (source === 'all' || l.source === source) &&
-        (nb === 'all' || l.neighborhoodKey === nb || areaKeyOf(l.neighborhoodKey) === nb) &&
+        (nb === 'all' || areaKeyOf(l.neighborhoodKey) === nb) &&
         (ageF === 'all' || (ageF === 'first-key' ? l.firstKey === true : l.ageBand === ageF)) &&
         (areaF === 'all' || l.areaBand === areaF) &&
         (exactArea === null || (l.areaSqm !== null && Math.round(l.areaSqm) === exactArea))
@@ -100,7 +90,7 @@ export function ListingsExplorer({
         case 'total-desc': return tot(b) - tot(a);
       }
     });
-  }, [listings, source, nb, sort, ageF, areaF, exactArea]);
+  }, [listings, nb, sort, ageF, areaF, exactArea]);
 
   if (listings.length === 0) {
     return <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">هنوز آگهی‌ای ثبت نشده است</p>;
@@ -109,19 +99,7 @@ export function ListingsExplorer({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 border-b border-divider px-4 py-3">
-        <ChipGroup<SourceFilter>
-          label="منبع"
-          value={source}
-          onChange={(v) => {
-            setSource(v);
-            setLimit(PAGE);
-          }}
-          options={[
-            { value: 'all', label: 'همه', badge: listings.length },
-            { value: 'divar', label: LISTING_SOURCE_FA.divar, badge: bySource.divar },
-            { value: 'sheypoor', label: LISTING_SOURCE_FA.sheypoor, badge: bySource.sheypoor }
-          ]}
-        />
+        <span className="text-xs text-muted">{toFaDigits(rows.length)} آگهی</span>
         {exactArea !== null && (
           <button
             type="button"
@@ -135,18 +113,16 @@ export function ListingsExplorer({
         <div className="flex flex-wrap gap-2 md:ms-auto">
           <div className="w-40">
             <Select
-              aria-label="محله"
+              aria-label="منطقه"
               value={nb}
               onChange={(e) => {
                 setNb(e.target.value);
                 setLimit(PAGE);
               }}
             >
-              <option value="all">همه محله‌ها</option>
-              {nb !== 'all' && !neighborhoods.some((n) => n.key === nb) && (
-                <option value={nb}>{neighborhoodDisplayName(nb)}</option>
-              )}
-              {neighborhoods.map((n) => (
+              <option value="all">همه مناطق</option>
+              {nb !== 'all' && !areas.some((n) => n.key === nb) && <option value={nb}>{neighborhoodDisplayName(nb)}</option>}
+              {areas.map((n) => (
                 <option key={n.key} value={n.key}>
                   {n.name} ({toFaDigits(n.n)})
                 </option>
@@ -230,15 +206,12 @@ export function ListingsExplorer({
               <div className="shrink-0 text-end">
                 <p className="text-sm font-bold text-ink">
                   {fmtMillionToman(l.pricePerSqmToman)}
-                  <span className="text-2xs font-normal text-muted"> /متر · </span>
-                  <span className="text-xs font-semibold"><MoneyValue value={l.pricePerSqmUsd} /></span>
+                  <span className="text-2xs font-normal text-muted"> هر متر</span>
                 </p>
+                <p className="text-xs font-semibold text-ink">{fmtUsdFa(l.pricePerSqmUsd)}</p>
                 <p className="text-xs text-muted">
-                  کل {fmtTotalToman(l.totalPriceToman)} · <MoneyValue value={l.totalPriceUsd} />
+                  کل {fmtTotalToman(l.totalPriceToman)} · {fmtUsdFa(l.totalPriceUsd)}
                 </p>
-                {(l.source === 'divar' || l.source === 'sheypoor') && (
-                  <Badge tone={l.source === 'divar' ? 'brand' : 'info'} className="mt-1">{LISTING_SOURCE_FA[l.source]}</Badge>
-                )}
               </div>
             </li>
           ))}
