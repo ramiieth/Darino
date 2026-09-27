@@ -25,7 +25,7 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** آیا در مرورگر اجرا می‌شویم؟ (پل مرورگر روی divar.ir / sheypoor.com) */
+/** آیا در مرورگر اجرا می‌شویم؟ (تست‌ها / محیط jsdom) */
 function inBrowser(): boolean {
   const g = globalThis as { window?: unknown; document?: unknown };
   return g.window !== undefined && g.document !== undefined;

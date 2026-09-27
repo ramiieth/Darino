@@ -23,7 +23,7 @@ import {
   CASH_STABLECOIN_SYMBOL,
   type CashDestination
 } from '@/features/accounting/domain/types';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
 import { fmtToman, fmtInt } from '@/shared/utils/formatters';
 import { formatDualDate } from '@/shared/utils/jalali';
 import { cn } from '@/shared/lib/cn';
@@ -35,7 +35,7 @@ const DESTINATIONS: { value: CashDestination; icon: React.ReactNode }[] = [
 
 export function CashWithdrawalPanel() {
   const { cashBalance, withdrawCashTo } = useAccountingData();
-  const fxRate = useFxStore((s) => s.rate);
+  const fxRate = useUsdRate().rate;
 
   const [dest, setDest] = useState<CashDestination>('expense');
   const [amount, setAmount] = useState('');
@@ -172,7 +172,7 @@ export function CashWithdrawalPanel() {
             { label: 'موجودی بعد', value: <MoneyValue value={balanceAfter} /> },
             { label: 'تاریخ', value: formatDualDate(date ?? Date.now()) },
             { label: 'معادل تومانی', value: fmtToman(amountNum, fxRate) },
-            { label: 'نرخ تبدیل', value: `${fmtInt(fxRate)} تومان / دلار` }
+            { label: 'نرخ تبدیل', value: fxRate ? `${fmtInt(fxRate)} تومان / دلار (تتر زنده)` : 'نرخ تتر در دسترس نیست' }
           ]}
         />
       </Dialog>

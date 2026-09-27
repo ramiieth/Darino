@@ -7,7 +7,7 @@
  *    با فیلدهای خالی نگه داشته می‌شود (بسته به مرحله).
  * ============================================================ */
 import type { CleaningReport, PropertyCity, PropertyMarketListing } from '../domain/types.js';
-import { otherCityMarker, resolveNeighborhood } from '../data/catalog.js';
+import { areaKeyOf, conflictingPlace, otherCityMarker, resolveNeighborhood } from '../data/catalog.js';
 import { detectFirstKey } from './dates.js';
 import type { ParsedListingSeed } from './parse.js';
 import { derivePricePerSqm } from './parse.js';
@@ -21,13 +21,13 @@ export const MAX_TOTAL_PRICE_TOMAN = 2_000_000_000_000;
 /** قیمت هر مترمربع: بازه معقول آپارتمان شهری */
 export const MIN_PPM_TOMAN = 1_000_000;
 export const MAX_PPM_TOMAN = 2_000_000_000;
-/** متراژ آپارتمان */
-export const MIN_AREA_SQM = 15;
+/** متراژ آپارتمان — زیر ۹۰ متر در تحلیل نمی‌آید (خواسته کاربر) */
+export const MIN_AREA_SQM = 90;
 export const MAX_AREA_SQM = 1_000;
 /** سال ساخت شمسی معقول */
 export const MIN_YEAR = 1330;
 export const MAX_YEAR = 1410;
-/** حداقل تعداد نمونه محله برای فیلتر پرت آماری (کمتر → بدون فیلتر) */
+/** حداقل تعداد نمونه منطقه برای فیلتر پرت آماری (کمتر → فقط حصار سراسری) */
 export const MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR = 6;
 /** آگهی که آخرین به‌روزرسانی‌اش قدیمی‌تر از این باشد «کهنه» است و در تحلیل نمی‌آید */
 export const STALE_AD_DAYS = 45;
@@ -97,9 +97,15 @@ export function normalizeAndValidate(
     sourceUpdatedAt: seed.sourceUpdatedAt ?? null,
     firstKey: seed.firstKey ?? detectFirstKey(seed.title),
     scrapedAt,
-    source: seed.source === 'sheypoor' ? 'sheypoor' : 'divar'
+    source: 'divar'
   };
   report.normalized += 1;
+
+  // فقط دیوار (seedهای قدیمی شیپور در کرسر ذخیره‌شده پذیرفته نمی‌شوند)
+  if ((seed.source as string) !== 'divar') {
+    reject(report, 'not-divar');
+    return null;
+  }
 
   // آگهی کهنه: آخرین به‌روزرسانی در منبع قدیمی‌تر از ۴۵ روز
   if (isStaleAd(listing.sourceUpdatedAt, scrapedAt)) {
@@ -113,7 +119,7 @@ export function normalizeAndValidate(
     return null;
   }
 
-  // شیپور دسته «خانه و آپارتمان» را با هم دارد — فقط آپارتمان با دیوار قابل مقایسه است
+  // فقط آپارتمان (ویلایی/خانه با آپارتمان قابل مقایسه نیست)
   if (listing.propertyKind === 'villa-house') {
     reject(report, 'not-apartment');
     return null;
@@ -133,8 +139,9 @@ export function normalizeAndValidate(
     reject(report, 'total-price-spam');
     return null;
   }
-  if (listing.areaSqm !== null && (listing.areaSqm < MIN_AREA_SQM || listing.areaSqm > MAX_AREA_SQM)) {
-    reject(report, 'area-out-of-range');
+  const areaReason = areaRejectReason(listing.areaSqm);
+  if (areaReason) {
+    reject(report, areaReason);
     return null;
   }
   if (listing.yearBuilt !== null && (listing.yearBuilt < MIN_YEAR || listing.yearBuilt > MAX_YEAR)) {
@@ -145,21 +152,57 @@ export function normalizeAndValidate(
     reject(report, 'missing-neighborhood');
     return null;
   }
+  // محله آگهی با متن آن نمی‌خواند (مثلاً «کیانپارس» + «اندیشه»)
+  if (conflictingPlace(listing.neighborhoodKey, listing.title)) {
+    reject(report, 'neighborhood-conflict');
+    return null;
+  }
   report.valid += 1;
   return listing;
 }
 
-/* ---------------- ۳) حذف تکراری ---------------- */
-
-/** اثرانگشت قیمت+متراژ برای تشخیص آگهی‌های دوباره ثبت‌شده با توکن متفاوت */
-export function listingFingerprint(l: PropertyMarketListing): string {
-  // بدون هیچ عدد مشخصه‌ای → اثرانگشت تهی (هرگز حذف تکراری جعلی انجام نمی‌شود)
-  if (!l.totalPriceToman && !l.areaSqm && !l.pricePerSqmToman) return '';
-  return [l.neighborhoodKey ?? '', l.totalPriceToman ?? '', l.areaSqm ?? '', l.pricePerSqmToman ?? ''].join('|');
+/** دلیل رد بر اساس متراژ (یا null) — متراژ نامشخص هم رد می‌شود چون زیر ۹۰ بودنش معلوم نیست */
+export function areaRejectReason(areaSqm: number | null): string | null {
+  if (areaSqm === null || !Number.isFinite(areaSqm)) return 'missing-area';
+  if (areaSqm < MIN_AREA_SQM) return 'area-too-small';
+  if (areaSqm > MAX_AREA_SQM) return 'area-out-of-range';
+  return null;
 }
 
 /**
- * حذف تکراری: توکن یکسان یا اثرانگشت (قیمت کل+متراژ+محله) یکسان.
+ * قواعد رد روی آگهی ذخیره‌شده (پاک‌سازی داده قبلی با قواعد فعلی):
+ * منبع غیر دیوار، متراژ، تناقض محله با متن.
+ */
+export function storedListingRejectReason(l: PropertyMarketListing): string | null {
+  if (l.source !== 'divar') return 'not-divar';
+  return areaRejectReason(l.areaSqm) ?? (conflictingPlace(l.neighborhoodKey, l.title) ? 'neighborhood-conflict' : null);
+}
+
+/* ---------------- ۳) حذف تکراری ---------------- */
+
+/**
+ * اثرانگشت آگهی دوباره ثبت‌شده با توکن متفاوت.
+ * واحدهای هم‌شکل یک ساختمان (متراژ و قیمت یکسان، طبقه متفاوت) آگهی‌های
+ * جدا هستند — پس طبقه، سال ساخت و تعداد خواب هم جزو اثرانگشت‌اند، و
+ * بدون طبقه عنوان آگهی هم لازم است.
+ */
+export function listingFingerprint(l: PropertyMarketListing): string {
+  // بدون عدد مشخصه → اثرانگشت تهی (هرگز حذف تکراری جعلی انجام نمی‌شود)
+  if (!l.totalPriceToman || !l.areaSqm) return '';
+  if (l.floor === null && !l.title) return '';
+  return [
+    l.neighborhoodKey ?? '',
+    l.totalPriceToman,
+    l.areaSqm,
+    l.floor ?? '',
+    l.yearBuilt ?? '',
+    l.rooms ?? '',
+    l.floor === null ? (l.title ?? '').trim() : ''
+  ].join('|');
+}
+
+/**
+ * حذف تکراری: توکن یکسان یا اثرانگشت یکسان (همان واحد با آگهی دوباره).
  * رکورد جدیدتر (scrapedAt بالاتر) نگه داشته می‌شود.
  */
 export function deduplicateListings(
@@ -202,7 +245,7 @@ export function deduplicateListings(
 /**
  * فیلتر پرت آماری روی قیمت هر مترمربع:
  *  - بازه جهانی [P5, P95]×ضریب اطمینان نیست؛ به‌جای آن حصار IQR
- *    (Q1 − 1.5·IQR .. Q3 + 1.5·IQR) به‌صورت «محله‌به‌محله» وقتی
+ *    (Q1 − 1.5·IQR .. Q3 + 1.5·IQR) به‌صورت «منطقه‌به‌منطقه» وقتی
  *    نمونه کافی باشد، و یک حصار سراسری روی همه داده‌ها.
  */
 export function filterOutliers(
@@ -221,10 +264,10 @@ export function filterOutliers(
       ? [gq1 - GLOBAL_IQR_K * (gq3 - gq1), gq3 + GLOBAL_IQR_K * (gq3 - gq1)]
       : null;
 
-  // گروه‌بندی محله‌ها
+  // گروه‌بندی منطقه‌ها (همان سطح نمایش)
   const byNb = new Map<string, PropertyMarketListing[]>();
   for (const l of listings) {
-    const k = l.neighborhoodKey ?? '';
+    const k = areaKeyOf(l.neighborhoodKey) ?? '';
     const arr = byNb.get(k) ?? [];
     arr.push(l);
     byNb.set(k, arr);

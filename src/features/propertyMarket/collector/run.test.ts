@@ -1,12 +1,10 @@
 /**
- * کلکشنر — اجرای تکه‌ای با دیوار/شیپور شبیه‌سازی‌شده (بدون شبکه)
+ * کلکشنر — اجرای تکه‌ای با دیوار شبیه‌سازی‌شده (بدون شبکه)
  */
 import { describe, it, expect } from 'vitest';
 import { collectChunk, newCursor, sanitizeCursor, needsDetail, type CollectCursor } from './run';
 import type { Fetcher } from './client';
 import { emptySeed } from './parse';
-import sheypoorList from './__fixtures__/sheypoor-list.json';
-import sheypoorDetail from './__fixtures__/sheypoor-detail.json';
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
@@ -135,47 +133,11 @@ describe('collectChunk — دیوار', () => {
   });
 });
 
-describe('collectChunk — شیپور', () => {
-  it('فهرست واقعی + جزئیات واقعی → seed کامل، تبلیغ تهران حذف', async () => {
-    const urls: string[] = [];
-    const fetcher: Fetcher = async (url) => {
-      urls.push(url);
-      if (url.includes('/search/')) return jsonResponse(sheypoorList);
-      return jsonResponse(sheypoorDetail);
-    };
-    const r = await collectChunk({ city: 'ahvaz', source: 'sheypoor', pauseMs: 0, fetcher });
-    expect(r.cityId).toBe('ahvaz');
-    expect(r.seeds.length).toBe(5);
-    expect(r.seeds.every((s) => s.source === 'sheypoor' && s.areaSqm === 78)).toBe(true);
-    expect(urls.some((u) => u.includes('/listings/467196001'))).toBe(false); // تبلیغ تهران
-    expect(r.cursor.hasNextPage).toBe(true);
-  });
-
-  it('کرسر تکراری → پایان (محافظ حلقه)', async () => {
-    const fetcher: Fetcher = async (url) => (url.includes('/search/') ? jsonResponse(sheypoorList) : jsonResponse(sheypoorDetail));
-    const r1 = await collectChunk({ city: 'ahvaz', source: 'sheypoor', pauseMs: 0, fetcher });
-    const r2 = await collectChunk({ city: 'ahvaz', source: 'sheypoor', pauseMs: 0, fetcher, cursor: r1.cursor });
-    expect(r2.seeds.length).toBe(0); // همه تکراری
-    expect(r2.cursor.hasNextPage).toBe(false);
-    expect(r2.done).toBe(true);
-  });
-
-  it('پایه URL سفارشی (پل مرورگر روی sheypoor.com)', async () => {
-    const urls: string[] = [];
-    const fetcher: Fetcher = async (url) => {
-      urls.push(url);
-      return url.includes('/search/') ? jsonResponse(sheypoorList) : jsonResponse(sheypoorDetail);
-    };
-    await collectChunk({ city: 'ahvaz', source: 'sheypoor', pauseMs: 0, fetcher, sheypoorBase: 'https://sheypoor.com' });
-    expect(urls.every((u) => u.startsWith('https://sheypoor.com/api/'))).toBe(true);
-  });
-});
-
 describe('کرسر', () => {
   it('sanitizeCursor: ورودی خراب/منبع دیگر → کرسر تازه', () => {
     expect(sanitizeCursor(null, 'divar')).toEqual(newCursor('divar'));
     expect(sanitizeCursor('x', 'divar')).toEqual(newCursor('divar'));
-    const other: CollectCursor = { ...newCursor('sheypoor'), cityId: 'ahvaz', pagesRead: 3 };
+    const other = { ...newCursor('divar'), source: 'sheypoor', cityId: 'ahvaz', pagesRead: 3 } as unknown as CollectCursor;
     expect(sanitizeCursor(other, 'divar')).toEqual(newCursor('divar'));
   });
 
@@ -188,8 +150,7 @@ describe('کرسر', () => {
     expect(c.pagesRead).toBe(2);
   });
 
-  it('needsDetail: شیپور همیشه؛ دیوار فقط بدون قیمت/متر', () => {
-    expect(needsDetail(emptySeed('sh-1', 'sheypoor'))).toBe(true);
+  it('needsDetail: فقط وقتی قیمت/متر محاسبه‌پذیر نیست', () => {
     const d = emptySeed('d1');
     d.totalPriceToman = 1e9;
     expect(needsDetail(d)).toBe(true);

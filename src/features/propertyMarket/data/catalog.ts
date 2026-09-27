@@ -12,11 +12,7 @@ export const PROPERTY_CITIES: {
   id: PropertyCity;
   name: string;
   divarSlugHints: string[];
-  /** اسلاگ شهر در شیپور (/s/{slug}/…) */
-  sheypoorSlug: string;
-}[] = [
-  { id: 'ahvaz', name: 'اهواز', divarSlugHints: ['ahvaz', 'اهواز'], sheypoorSlug: 'ahvaz' }
-];
+}[] = [{ id: 'ahvaz', name: 'اهواز', divarSlugHints: ['ahvaz', 'اهواز'] }];
 
 /** محله‌های مرجع اهواز — کلید پایدار + نام نمایشی + نام‌های مستعار دیوار */
 export interface AhvazNeighborhoodDef {
@@ -93,6 +89,12 @@ export const AHVAZ_AREA_GROUPS: AhvazAreaGroupDef[] = [
   { key: 'farhangian', name: 'کوی فرهنگیان', members: [], rawPattern: /^raw:کوی فرهنگیان ?[۱۲12]?$/ },
   { key: 'serah-khorramshahr', name: 'سه‌راه خرمشهر', members: [], rawPattern: /^raw:.+\(سه ?راه خرمشهر\)$/ }
 ];
+
+/** کلید منطقه یک محله: گروه اگر عضو است، وگرنه خود محله (تنها سطح تحلیل) */
+export function areaKeyOf(neighborhoodKey: string | null): string | null {
+  if (!neighborhoodKey) return null;
+  return areaGroupOf(neighborhoodKey) ?? neighborhoodKey;
+}
 
 /** کلید «منطقه» یک محله (یا null اگر عضو هیچ منطقه‌ای نیست) */
 export function areaGroupOf(neighborhoodKey: string | null): string | null {
@@ -171,7 +173,7 @@ function resolveNeighborhoodBase(
   rawName: string | null | undefined
 ): { key: string | null; displayName: string | null } {
   if (!rawName) return { key: null, displayName: null };
-  // شیپور گاهی نام شهر را به محله می‌چسباند («شهرک رزمندگان اهواز») — حذف مکانیکی
+  // گاهی نام شهر به محله چسبیده است («شهرک رزمندگان اهواز») — حذف مکانیکی
   const stripped = norm(rawName).replace(/\s+اهواز$/, '');
   const n = stripped;
   if (!n) return { key: null, displayName: null };
@@ -219,6 +221,211 @@ export function otherCityMarker(text: string | null | undefined): string | null 
   const t = normalizeFaText(text);
   for (const m of OTHER_CITY_MARKERS) {
     if (t.includes(m)) return m;
+  }
+  return null;
+}
+
+/* ---------------- تناقض محله آگهی با متن آن ---------------- */
+
+/** محله‌های رسمی اهواز در دیوار (۱۴۵ district) — مبنای تشخیص نام منطقه دیگر در متن آگهی */
+export const AHVAZ_DISTRICTS: readonly string[] = [
+  'آریاشهر',
+  'آسیاباد',
+  'اسلام آباد شرقی',
+  'اسلام آباد غربی',
+  'اسماعیلیه',
+  'الصافی',
+  'الهائی',
+  'امانیه',
+  'اهواز',
+  'بازار آهن',
+  'باغ شیخ',
+  'بعثت',
+  'بنکداری',
+  'بهارستان',
+  'بهزاد شهر',
+  'بهشت آباد',
+  'بیست متری شهدا',
+  'بیست متری شهرداری',
+  'جانبازان',
+  'حصیرآباد',
+  'دانشگاه چمران',
+  'دغاغله',
+  'رسالت',
+  'زردشت',
+  'زرگان',
+  'زندوکیلی',
+  'زوویه ۲',
+  'زیباشهر',
+  'زیتون کارمندی',
+  'زیتون کارگری',
+  'سخیریه',
+  'سلطانمنش',
+  'سلیم آباد(سه راه خرمشهر)',
+  'سپیدار',
+  'سیاحی(سه راه خرمشهر)',
+  'سید خلف',
+  'سیصد دستگاه',
+  'شریعتی جنوبی',
+  'شهدای انتظامی',
+  'شهرک الهیه',
+  'شهرک اندیشه',
+  'شهرک اکباتان',
+  'شهرک برق',
+  'شهرک توسعه نیشکر',
+  'شهرک حفاری',
+  'شهرک دانشگاه',
+  'شهرک رزمندگان',
+  'شهرک شهید عباس پور',
+  'شهرک شهید میثمی',
+  'شهرک صنعتی شماره 4',
+  'شهرک صنعتی شماره ۳',
+  'شهرک محلاتی',
+  'شهرک نفت',
+  'شهرک پیام',
+  'طالقانی',
+  'عامری',
+  'علی آباد',
+  'عین ۲',
+  'غیزانیه',
+  'فاز ۱ پادادشهر',
+  'فاز ۲ پادادشهر',
+  'فاز ۵ پاداد',
+  'فتح',
+  'فدک',
+  'فرهنگ شهر',
+  'فرودگاه',
+  'فولاد',
+  'فولادشهر',
+  'لشکرآباد',
+  'مجاهد',
+  'مستغلات',
+  'معین زاده',
+  'ملاشیه',
+  'منازل سپاه',
+  'منازل کارون',
+  'منبع اب',
+  'مهرشهر',
+  'ناحیه صنعتی کارون',
+  'نادری',
+  'نبوت',
+  'نیوسایت',
+  'نیوساید',
+  'ویلاشهر',
+  'پادادشهر',
+  'پاستوریزه',
+  'پدافند',
+  'پردیس',
+  'پردیس دو',
+  'چنیبه علیا',
+  'چنیبه پایین',
+  'چهارصد دستگاه',
+  'کارون',
+  'کانتکس',
+  'کمپلو جنوبی',
+  'کمپلو شمالی',
+  'کوت عبدالله',
+  'کوروش',
+  'کوی آزادی',
+  'کوی آغاجاری',
+  'کوی ابوالفضل',
+  'کوی ایثار',
+  'کوی باهنر',
+  'کوی بشارت',
+  'کوی ترابری',
+  'کوی جانبازان(دانش)',
+  'کوی جواهری',
+  'کوی راه کربلا',
+  'کوی رمضان',
+  'کوی سعدی',
+  'کوی سپاه',
+  'کوی شاهد',
+  'کوی شایسته',
+  'کوی شهروند',
+  'کوی صادقیه',
+  'کوی صنایع',
+  'کوی طالقانی',
+  'کوی طلاب',
+  'کوی عابدی',
+  'کوی علوی',
+  'کوی فاطمیه',
+  'کوی فرهنگیان ۱',
+  'کوی فرهنگیان ۲',
+  'کوی قائم',
+  'کوی ملی راه',
+  'کوی منابع طبیعی',
+  'کوی مندلی(سه راه خرمشهر)',
+  'کوی مهدیس',
+  'کوی مهندسان',
+  'کوی نفت',
+  'کوی نیرو',
+  'کوی پلیس',
+  'کوی پیروزی',
+  'کوی کربن',
+  'کیان اباد',
+  'کیانشهر',
+  'کیانپارس',
+  'گلدشت',
+  'گلستان',
+  'گیت بوستان',
+  'یوسفی',
+  '۲۰۰دستگاه',
+  '۲۰۰۰واحدی',
+  '۲۴ متری',
+  '۲۵۴دستگاه',
+  '۳۰ متری'
+];
+
+/**
+ * نام‌هایی که حتی بدون «شهرک/کوی/منطقه…» جلویشان، نشانه قطعی منطقه دیگرند
+ * (گزارش کاربر: «کیانپارس … اندیشه» — اندیشه در کیانپارس نیست).
+ */
+const BARE_PLACE_NAMES = ['اندیشه'];
+
+/** واژه‌های نزدیکی — «نزدیک شهرک نفت» یعنی ملک کنار آن است، نه تناقض */
+const NEAR_WORDS = /(نزدیک|جنب|روبرو|روبروی|مقابل|حوالی|بعد از|قبل از|پشت|نبش|سمت|تا)\s*$/;
+
+interface PlaceCore {
+  core: string;
+  area: string | null;
+}
+
+let placeCores: PlaceCore[] | null = null;
+
+/** هسته نام هر district («شهرک اندیشه» → «اندیشه»، «کوی فرهنگیان ۱» → «فرهنگیان») + منطقه آن */
+function allPlaceCores(): PlaceCore[] {
+  if (placeCores) return placeCores;
+  const out: PlaceCore[] = [];
+  for (const d of AHVAZ_DISTRICTS) {
+    const core = norm(d)
+      .replace(/\(.*\)/, '')
+      .replace(/^(شهرک|کوی|ناحیه)\s+/, '')
+      .replace(/\s*[0-9۰-۹]+$/, '')
+      .trim();
+    if (core.length < 3 || core === 'اهواز') continue;
+    out.push({ core, area: areaKeyOf(resolveNeighborhood(d).key) });
+  }
+  placeCores = out;
+  return out;
+}
+
+/**
+ * نام منطقه دیگری که متن آگهی صریحاً به آن اشاره می‌کند (یا null).
+ * صریح = «شهرک/کوی/منطقه/محله/ناحیه» + نام رسمی، یا نام‌های قطعی (اندیشه).
+ * «نزدیک/جنب/روبروی …» تناقض نیست؛ نام منطقه خود آگهی نادیده گرفته می‌شود.
+ */
+export function conflictingPlace(neighborhoodKey: string | null, text: string | null | undefined): string | null {
+  if (!neighborhoodKey || !text) return null;
+  const own = areaKeyOf(neighborhoodKey);
+  const ownName = norm(neighborhoodDisplayName(own));
+  const t = norm(text);
+  for (const p of allPlaceCores()) {
+    if (p.area === own || ownName.includes(p.core)) continue;
+    const prefix = `((?:شهرک|کوی|منطقه|محله|ناحیه)\\s*)${BARE_PLACE_NAMES.includes(p.core) ? '?' : ''}`;
+    const re = new RegExp(`(^|[^آ-ی])${prefix}${p.core}(?![آ-ی])`, 'g');
+    for (const m of t.matchAll(re)) {
+      if (!NEAR_WORDS.test(t.slice(0, (m.index ?? 0) + m[1].length))) return p.core;
+    }
   }
   return null;
 }

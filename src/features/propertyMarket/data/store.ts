@@ -1,15 +1,12 @@
 /** ============================================================
  * Property Market — استور داده (IndexedDB = منبع حقیقت، تک‌کاربره)
  *
- * سه مسیر جمع‌آوری — همه به `ingestSeeds` → IndexedDB → Snapshot می‌رسند:
- *   ۱) خودکار (سرور): /api/propertyMarket فقط واکشی می‌کند (بدون دیتابیس)
- *   ۲) پل مرورگر: کلکشنر روی divar.ir / sheypoor.com → postMessage
- *   ۳) ورود فایل JSON (خروجی پل یا اسکریپت محلی)
+ * تنها مسیر جمع‌آوری: سرور (/api/propertyMarket) از دیوار واکشی می‌کند →
+ *   `ingestSeeds` → IndexedDB → Snapshot
  *
  *  - پیشرفت هر تکه بلافاصله ذخیره می‌شود (قطع شبکه = از دست رفتن داده نیست)
  *  - خطای یک منبع، منبع دیگر را متوقف نمی‌کند
  *  - Neon فقط پشتیبان اختیاری است (best-effort؛ هرگز مانع کار نیست)
- *  - سناریوی دلار آینده در جدول settings (هیچ جدول ارزی جدیدی نیست)
  * ============================================================ */
 import { useEffect } from 'react';
 import { create } from 'zustand';
@@ -19,16 +16,13 @@ import type {
   CleaningReport,
   ListingSource,
   PropertyMarketListing,
-  PropertyMarketScenario,
   PropertyMarketSnapshot
 } from '../domain/types';
-import { LISTING_SOURCE_FA } from '../domain/types';
 import { migrateLegacySnapshot, LEGACY_MIGRATION_FLAG } from './legacyMigration';
 import type { CollectCursor } from '../collector/run';
 import type { ParsedListingSeed } from '../collector/parse';
 import { newCleaningReport } from '../collector/pipeline';
-import { buildSnapshot, ingestSeeds, rekeyListings } from './ingest';
-import { parseSeedPayload, type SeedPayload } from '../bridge/protocol';
+import { buildSnapshot, ingestSeeds, purgeStoredListings, rekeyListings } from './ingest';
 import { useUsdtStore, usdtIsStale } from '@/shared/store/usdtStore';
 
 /* ---------------- رابط داینامیک جداول (الگوی سایر ماژول‌ها) ---------------- */
@@ -67,6 +61,7 @@ interface PropertyMarketDb {
     toArray(): Promise<PropertyMarketListing[]>;
     put(v: PropertyMarketListing): Promise<unknown>;
     bulkPut(v: PropertyMarketListing[]): Promise<unknown>;
+    bulkDelete(keys: string[]): Promise<unknown>;
   };
   pmSnapshots: {
     toArray(): Promise<PropertyMarketSnapshot[]>;
@@ -100,34 +95,9 @@ export interface CollectState {
   sources: Record<ListingSource, SourceProgress>;
   /** آگهی جدید (توکن ناشناخته) در این اجرا */
   added: number;
-  /** سرور کلکشن در دسترس نبود → پیشنهاد پل مرورگر */
-  serverUnavailable: boolean;
 }
 
-export interface SourceProbe {
-  ok: boolean;
-  ms: number;
-  listings: number;
-  error?: string;
-}
-
-export interface DiagnosticsState {
-  status: 'idle' | 'running' | 'done';
-  /** null = هنوز بررسی نشده */
-  server: boolean | null;
-  results: Partial<Record<ListingSource, SourceProbe>>;
-  checkedAt: number | null;
-}
-
-export interface ImportState {
-  status: 'idle' | 'done' | 'error';
-  message: string | null;
-  at: number | null;
-}
-
-const SCENARIO_KEY = 'pmScenarioV1';
-const SOURCES_KEY = 'pmSourcesV1';
-const ALL_SOURCES: ListingSource[] = ['divar', 'sheypoor'];
+const ALL_SOURCES: ListingSource[] = ['divar'];
 /** محافظ حلقه: حداکثر تکه برای هر منبع در یک اجرا */
 const MAX_CHUNKS_PER_SOURCE = 120;
 const CHUNK_TIMEOUT_MS = 75_000;
@@ -147,9 +117,8 @@ function idleCollect(): CollectState {
     status: 'idle',
     message: null,
     startedAt: null,
-    sources: { divar: { ...EMPTY_PROGRESS }, sheypoor: { ...EMPTY_PROGRESS } },
-    added: 0,
-    serverUnavailable: false
+    sources: { divar: { ...EMPTY_PROGRESS } },
+    added: 0
   };
 }
 
@@ -170,33 +139,15 @@ interface CollectChunkResponse {
 interface PropertyMarketState {
   listings: PropertyMarketListing[];
   snapshots: PropertyMarketSnapshot[];
-  scenario: PropertyMarketScenario;
   legacyAssets: LegacyRealAssetRow[];
-  enabledSources: Record<ListingSource, boolean>;
   loading: boolean;
   hydrated: boolean;
   remoteConnected: boolean;
   collect: CollectState;
-  diagnostics: DiagnosticsState;
-  importState: ImportState;
   hydrate: () => Promise<void>;
-  setScenario: (patch: Partial<Omit<PropertyMarketScenario, 'updatedAt'>>) => Promise<void>;
-  resetScenario: () => Promise<void>;
-  setSourceEnabled: (source: ListingSource, enabled: boolean) => Promise<void>;
   startCollection: () => Promise<void>;
   cancelCollection: () => void;
-  runDiagnostics: () => Promise<void>;
-  /** ورود payload (پل مرورگر/فایل) — خروجی: تعداد آگهی جدید یا خطا */
-  importPayloads: (payloads: SeedPayload[], label: string) => Promise<{ ok: boolean; added: number; error?: string }>;
-  /** ورود محتوای فایل JSON */
-  importFileText: (text: string) => Promise<{ ok: boolean; added: number; error?: string }>;
 }
-
-const DEFAULT_SCENARIO: PropertyMarketScenario = {
-  futureUsdRateToman: null,
-  propertyTomanGrowthPct: null,
-  updatedAt: 0
-};
 
 let hydratePromise: Promise<void> | null = null;
 let cancelRequested = false;
@@ -219,6 +170,17 @@ async function localPutListings(listings: PropertyMarketListing[]): Promise<void
     await db.pmListings.bulkPut(listings);
   } catch {
     /* خاموش — داده در حافظه باقی است */
+  }
+}
+
+async function localDeleteListings(tokens: string[]): Promise<void> {
+  if (tokens.length === 0) return;
+  const db = await localDb();
+  if (!db) return;
+  try {
+    await db.pmListings.bulkDelete(tokens);
+  } catch {
+    /* خاموش — در بارگذاری بعد دوباره حذف می‌شوند */
   }
 }
 
@@ -429,15 +391,11 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
   return {
     listings: [],
     snapshots: [],
-    scenario: DEFAULT_SCENARIO,
     legacyAssets: [],
-    enabledSources: { divar: true, sheypoor: true },
     loading: false,
     hydrated: false,
     remoteConnected: false,
     collect: idleCollect(),
-    diagnostics: { status: 'idle', server: null, results: {}, checkedAt: null },
-    importState: { status: 'idle', message: null, at: null },
 
     hydrate: async () => {
       if (get().hydrated) return;
@@ -461,8 +419,6 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
           }
         }
 
-        const scenario = await settingGet<PropertyMarketScenario>(SCENARIO_KEY, DEFAULT_SCENARIO);
-        const enabled = await settingGet<Record<ListingSource, boolean>>(SOURCES_KEY, { divar: true, sheypoor: true });
 
         // پشتیبان Neon (اختیاری) → ادغام (نه جایگزینی) با داده محلی
         if (isRemoteAllowed()) {
@@ -497,13 +453,17 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
           listings = rk.listings;
           await localPutListings(rk.changed);
         }
+        // قواعد فعلی روی داده قبلی: شیپور، زیر ۹۰ متر، محله متناقض با متن → حذف
+        const purged = purgeStoredListings(listings);
+        if (purged.removed.length > 0) {
+          listings = purged.listings;
+          await localDeleteListings(purged.removed);
+        }
 
         set({
           listings,
           snapshots,
-          scenario,
           legacyAssets,
-          enabledSources: { divar: enabled?.divar !== false, sheypoor: enabled?.sheypoor !== false },
           loading: false,
           hydrated: true,
           remoteConnected
@@ -511,23 +471,6 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
         hydratePromise = null;
       })();
       return hydratePromise;
-    },
-
-    setScenario: async (patch) => {
-      const next: PropertyMarketScenario = { ...get().scenario, ...patch, updatedAt: Date.now() };
-      set({ scenario: next });
-      await settingSet(SCENARIO_KEY, next);
-    },
-
-    resetScenario: async () => {
-      set({ scenario: DEFAULT_SCENARIO });
-      await settingSet(SCENARIO_KEY, DEFAULT_SCENARIO);
-    },
-
-    setSourceEnabled: async (source, enabled) => {
-      const next = { ...get().enabledSources, [source]: enabled };
-      set({ enabledSources: next });
-      await settingSet(SOURCES_KEY, next);
     },
 
     cancelCollection: () => {
@@ -543,22 +486,15 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
         collect: { ...idleCollect(), status: 'checking', message: 'بررسی سرور کلکشن…', startedAt: Date.now() }
       });
       await get().hydrate();
-      const sources = ALL_SOURCES.filter((s) => get().enabledSources[s]);
-      if (sources.length === 0) {
-        set({ collect: { ...idleCollect(), status: 'error', message: 'هیچ منبعی فعال نیست — حداقل یک منبع را روشن کنید.' } });
-        return;
-      }
+      const sources = ALL_SOURCES;
 
       if (!(await pingServer())) {
         set({
           collect: {
             ...idleCollect(),
             status: 'unavailable',
-            serverUnavailable: true,
-            message:
-              'سرور کلکشن در دسترس نیست. از «پل مرورگر» استفاده کنید — جمع‌آوری مستقیم روی دیوار/شیپور در مرورگر خودتان و بدون نیاز به سرور.'
-          },
-          diagnostics: { ...get().diagnostics, server: false }
+            message: 'سرور جمع‌آوری در دسترس نیست — کمی بعد دوباره «به‌روزرسانی داده» را بزنید.'
+          }
         });
         return;
       }
@@ -567,8 +503,7 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
       const waiting = { ...c0.sources };
       for (const s of ALL_SOURCES) waiting[s] = { ...EMPTY_PROGRESS, status: sources.includes(s) ? 'waiting' : 'skipped' };
       set({
-        collect: { ...c0, status: 'running', message: 'در حال جمع‌آوری…', sources: waiting },
-        diagnostics: { ...get().diagnostics, server: true }
+        collect: { ...c0, status: 'running', message: 'در حال جمع‌آوری…', sources: waiting }
       });
 
       const report = newCleaningReport();
@@ -582,107 +517,32 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
 
       const c = get().collect;
       const anyData = sources.some((s) => c.sources[s].valid > 0);
-      const allFailed = sources.every((s) => c.sources[s].status === 'error');
       const snap = anyData ? await finalizeSnapshot(report) : null;
 
       if (snap) {
-        const failed = sources.filter((s) => c.sources[s].status === 'error').map((s) => LISTING_SOURCE_FA[s]);
         set({
           collect: {
             ...get().collect,
             status: 'done',
             message:
-              `Snapshot بازار ثبت شد — ${snap.cleaning.market.toLocaleString('fa-IR')} آگهی در تحلیل` +
-              (cancelRequested ? ' (متوقف‌شده توسط شما)' : '') +
-              (failed.length > 0 ? ` · ${failed.join('، ')} در دسترس نبود` : '')
+              `${snap.cleaning.market.toLocaleString('fa-IR')} آگهی در تحلیل` + (cancelRequested ? ' (متوقف‌شده توسط شما)' : '')
           }
         });
       } else {
+        const err = c.sources.divar.error;
         set({
           collect: {
             ...get().collect,
             status: 'error',
-            serverUnavailable: allFailed,
-            message: allFailed
-              ? 'سرور به هیچ‌کدام از منابع دسترسی نداشت (احتمالاً IP سرور مسدود است). از «پل مرورگر» استفاده کنید.'
-              : cancelRequested
-                ? 'جمع‌آوری متوقف شد و هنوز آگهی معتبری ثبت نشده بود.'
-                : 'آگهی معتبری دریافت نشد — «تست اتصال» را بزنید یا از پل مرورگر استفاده کنید.'
+            message: cancelRequested
+              ? 'جمع‌آوری متوقف شد و هنوز آگهی معتبری ثبت نشده بود.'
+              : err
+                ? `دیوار در دسترس نبود: ${err}`
+                : 'آگهی معتبری از دیوار دریافت نشد — کمی بعد دوباره امتحان کنید.'
           }
         });
       }
       cancelRequested = false;
-    },
-
-    runDiagnostics: async () => {
-      if (get().diagnostics.status === 'running') return;
-      set({ diagnostics: { status: 'running', server: null, results: {}, checkedAt: null } });
-      const server = await pingServer();
-      if (!server) {
-        set({ diagnostics: { status: 'done', server: false, results: {}, checkedAt: Date.now() } });
-        return;
-      }
-      try {
-        const r = await fetchJson<{ ok?: boolean; results?: Partial<Record<ListingSource, SourceProbe>> }>(
-          '/api/propertyMarket',
-          { method: 'POST', body: { action: 'diagnose' }, timeoutMs: 70_000 }
-        );
-        set({ diagnostics: { status: 'done', server: true, results: r.results ?? {}, checkedAt: Date.now() } });
-      } catch {
-        set({ diagnostics: { status: 'done', server: true, results: {}, checkedAt: Date.now() } });
-      }
-    },
-
-    importPayloads: async (payloads, label) => {
-      await get().hydrate();
-      const report = newCleaningReport();
-      let added = 0;
-      let valid = 0;
-      for (const p of payloads) {
-        const r = await applySeeds(p.seeds, p.cityId);
-        added += r.added;
-        valid += r.valid;
-        addReports(report, r.report);
-      }
-      if (valid === 0) {
-        const msg = 'هیچ آگهی معتبری (با قیمت و متراژ) در داده دریافتی نبود.';
-        set({ importState: { status: 'error', message: msg, at: Date.now() } });
-        return { ok: false, added: 0, error: msg };
-      }
-      const snap = await finalizeSnapshot(report);
-      const sources = [...new Set(payloads.map((p) => LISTING_SOURCE_FA[p.source]))].join(' و ');
-      set({
-        importState: {
-          status: 'done',
-          message: `${label} (${sources}): ${valid.toLocaleString('fa-IR')} آگهی معتبر، ${added.toLocaleString('fa-IR')} جدید${snap ? ' — Snapshot بازار به‌روز شد' : ''}`,
-          at: Date.now()
-        }
-      });
-      return { ok: true, added };
-    },
-
-    importFileText: async (text) => {
-      let raw: unknown;
-      try {
-        raw = JSON.parse(text);
-      } catch {
-        const msg = 'فایل JSON معتبر نیست.';
-        set({ importState: { status: 'error', message: msg, at: Date.now() } });
-        return { ok: false, added: 0, error: msg };
-      }
-      const items = Array.isArray(raw) ? raw : [raw];
-      const payloads: SeedPayload[] = [];
-      let lastError = '';
-      for (const it of items) {
-        const r = parseSeedPayload(it);
-        if (r.ok) payloads.push(r.payload);
-        else lastError = r.error;
-      }
-      if (payloads.length === 0) {
-        set({ importState: { status: 'error', message: lastError || 'داده‌ای در فایل نیست.', at: Date.now() } });
-        return { ok: false, added: 0, error: lastError };
-      }
-      return get().importPayloads(payloads, 'ورود فایل');
     }
   };
 });

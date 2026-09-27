@@ -107,25 +107,20 @@ export function fmtPctFa(v: number | null | undefined): string {
 
 /* ---------- معادل تومانی (ارقام فارسی طبق دستور کارفرما) ---------- */
 
-const FA_RATE_KEY = 'app:fxRate';
-
-/** نرخ پیش‌فرض دلار به تومان (قابل تغییر توسط ادمین در تنظیمات) */
-export const DEFAULT_IRR_RATE = 1_480_000;
-
 /**
- * معادل تومانی یک مبلغ دلاری با ارقام فارسی:
- *  $36,900 × 1.48M → «≈ ۵٫۴۶ میلیارد تومان»
+ * معادل تومانی یک مبلغ دلاری با نرخ زنده تتر (تومان بر دلار):
+ *  $36,900 × 148,000 → «≈ ۵٫۴۶ میلیارد تومان»
+ * نرخ نامشخص (تتر هنوز دریافت نشده) → «—» (هرگز نرخ فرضی)
  */
-export function fmtToman(usd: number | null | undefined, rate: number): string {
-  if (usd === null || usd === undefined || Number.isNaN(usd) || rate <= 0) return 'N/A';
-  const toman = (usd * rate) / 10; // IRR → تومان
+export function fmtToman(usd: number | null | undefined, rateToman: number | null | undefined): string {
+  if (usd === null || usd === undefined || Number.isNaN(usd)) return 'N/A';
+  if (!rateToman || !(rateToman > 0)) return '—';
+  const toman = usd * rateToman;
   if (toman >= 1e9) return `≈ ${faDecimal.format(toman / 1e9)} میلیارد تومان`;
   if (toman >= 1e6) return `≈ ${faDecimal.format(toman / 1e6)} میلیون تومان`;
   if (toman >= 1e3) return `≈ ${faInt.format(toman / 1e3)} هزار تومان`;
   return `≈ ${faDecimal.format(toman)} تومان`;
 }
-
-export { FA_RATE_KEY };
 
 /** تبدیل ارقام فارسی/عربی به لاتین — برای جستجو */
 export function toEnDigits(input: string): string {

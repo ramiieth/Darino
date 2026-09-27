@@ -129,3 +129,28 @@ describe('محله رسمی / منطقه (گروه)', () => {
     for (const n of districts as string[]) expect(otherCityMarker(n)).toBeNull();
   });
 });
+
+import { AHVAZ_DISTRICTS, conflictingPlace } from './catalog';
+
+describe('تناقض محله آگهی با متن', () => {
+  it('۱۴۵ district رسمی دیوار', () => {
+    expect(AHVAZ_DISTRICTS.length).toBe(145);
+  });
+  it('کیانپارس + اندیشه (با یا بدون «منطقه/شهرک») → تناقض', () => {
+    expect(conflictingPlace('kianpars-other', 'آپارتمان کیانپارس اندیشه')).toBe('اندیشه');
+    expect(conflictingPlace('kianpars-east', 'کیانپارس منطقه اندیشه کلید اول')).toBe('اندیشه');
+    expect(conflictingPlace('golestan', 'فروش آپارتمان شهرک اندیشه')).toBe('اندیشه');
+  });
+  it('نام منطقه دیگر با «کوی/شهرک/منطقه» → تناقض؛ نام خالی رایج → نه', () => {
+    expect(conflictingPlace('kianpars-other', 'کیانپارس کوی ملی راه')).toBe('ملی راه');
+    expect(conflictingPlace('golestan', 'گلستان خیابان سعدی')).toBeNull();
+    expect(conflictingPlace('padad-f1', 'فاز یک پاداد برق کشی کامل')).toBeNull();
+  });
+  it('خود منطقه، نزدیکی یا واژه مشابه → تناقض نیست', () => {
+    expect(conflictingPlace('raw:شهرک اندیشه', 'شهرک اندیشه ۹۰ متری')).toBeNull();
+    expect(conflictingPlace('kianpars-other', 'کیانپارس نزدیک شهرک نفت')).toBeNull();
+    expect(conflictingPlace('kianpars-other', 'کیانپارس جنب کوی ملی راه')).toBeNull();
+    expect(conflictingPlace('kianpars-other', 'طراحی اندیشه‌ای نو در کیانپارس')).toBeNull();
+    expect(conflictingPlace('kianpars-other', 'کیانپارس خیابان ۱۲ غربی')).toBeNull();
+  });
+});

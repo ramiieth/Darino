@@ -4,7 +4,7 @@
  *  هر Snapshot با نرخ تتر «همان تاریخ» به دلار تبدیل می‌شود:
  *    ۱) نرخ زنده ثبت‌شده در لحظه ساخت Snapshot (والکس/بیت‌پین)
  *    ۲) نبود → نرخ روزانه تاریخچه تتر همان روز
- *    ۳) نبود → نرخ دستی ماژول قدیمی (برچسب‌دار)
+ *    (نرخ دستی هرگز استفاده نمی‌شود)
  *  مقایسه: آخرین Snapshot در برابر Snapshot نزدیک به «N ماه پیش»
  *  (با حد تحمل)؛ نبود داده کافی → «در انتظار» + تاریخ در دسترس شدن.
  * ⚠️ هیچ داده گذشته‌ای ساخته/حدس زده نمی‌شود.
@@ -16,9 +16,6 @@ import type { PriceType } from './segments';
 
 export const CHANGE_PERIODS_MONTHS = [1, 3, 6, 9, 12, 16, 24, 32, 36, 48, 60] as const;
 export type ChangePeriod = (typeof CHANGE_PERIODS_MONTHS)[number];
-
-/** کلید «کل اهواز» */
-export const CITY_KEY = '__city__';
 
 const DAY_MS = 86_400_000;
 
@@ -42,7 +39,7 @@ export function toleranceMs(months: number): number {
   return Math.min(45, Math.max(7, months * 30 * 0.2)) * DAY_MS;
 }
 
-export type RateSource = 'snapshot' | 'history' | 'legacy';
+export type RateSource = 'snapshot' | 'history';
 
 export interface SnapshotRate {
   rate: number;
@@ -54,18 +51,14 @@ export function snapshotRate(s: PropertyMarketSnapshot, daily: DailyRates): Snap
   const stored = s.fxRateAtSnapshotToman;
   if (stored && stored > 0 && s.fxSource !== 'manual-legacy') return { rate: stored, source: 'snapshot' };
   const hist = rateOnDate(daily, s.dateTs);
-  if (hist) return { rate: hist, source: 'history' };
-  if (stored && stored > 0) return { rate: stored, source: 'legacy' };
-  return null;
+  return hist ? { rate: hist, source: 'history' } : null;
 }
 
-/** آمار یک ناحیه در Snapshot (کل اهواز یا یک محله) */
+/** آمار یک منطقه در Snapshot — گروه، یا محله مستقل (Snapshotهای قدیمی کلید ادغامی را در neighborhoodStats داشتند) */
 export function areaStatsOf(s: PropertyMarketSnapshot, key: string): AreaPriceStats | null {
-  if (key === CITY_KEY) return s.cityStats;
-  // محله → سپس منطقه (Snapshotهای قدیمی کلید ادغامی را در neighborhoodStats داشتند)
   return (
-    s.neighborhoodStats.find((n) => n.neighborhoodKey === key)?.stats ??
     s.groupStats?.find((n) => n.neighborhoodKey === key)?.stats ??
+    s.neighborhoodStats.find((n) => n.neighborhoodKey === key)?.stats ??
     null
   );
 }
@@ -227,39 +220,30 @@ export function changeTable(
   return CHANGE_PERIODS_MONTHS.map((m) => computeChange(snaps, key, m, daily, type));
 }
 
-export interface NeighborhoodChangeRow {
+export interface AreaChangeRow {
   key: string;
   displayName: string;
   change: ChangeRow;
-  /** اختلاف رشد دلاری هر متر محله با کل اهواز (واحد درصد) */
-  vsCityPp: number | null;
 }
 
-/** رتبه‌بندی همه محله‌ها در یک دوره (+ مقایسه با کل اهواز) */
-export function neighborhoodChanges(
+/** رتبه‌بندی همه مناطق در یک دوره (رشد دلاری هر متر، نزولی) */
+export function areaChanges(
   snapsIn: PropertyMarketSnapshot[],
   months: number,
   daily: DailyRates,
-  type: PriceType,
-  level: 'neighborhood' | 'group' = 'group'
-): { city: ChangeRow; rows: NeighborhoodChangeRow[] } {
+  type: PriceType
+): AreaChangeRow[] {
   const snaps = ordered(snapsIn);
-  const city = computeChange(snaps, CITY_KEY, months, daily, type);
   const current = snaps[snaps.length - 1];
-  if (!current) return { city, rows: [] };
-  // منطقه = گروه‌ها + محله‌های مستقل (مثل گلستان) — کل اهواز پوشش داده می‌شود
-  const list =
-    level === 'group'
-      ? [...(current.groupStats ?? []), ...current.neighborhoodStats.filter((n) => !areaGroupOf(n.neighborhoodKey))]
-      : current.neighborhoodStats;
-  const rows = list.map((n) => {
-    const change = computeChange(snaps, n.neighborhoodKey, months, daily, type);
-    const vsCityPp =
-      change.ppmUsdPct !== null && city.ppmUsdPct !== null ? change.ppmUsdPct - city.ppmUsdPct : null;
-    return { key: n.neighborhoodKey, displayName: n.displayName, change, vsCityPp };
-  });
+  if (!current) return [];
+  const list = [...(current.groupStats ?? []), ...current.neighborhoodStats.filter((n) => !areaGroupOf(n.neighborhoodKey))];
+  const rows = list.map((n) => ({
+    key: n.neighborhoodKey,
+    displayName: n.displayName,
+    change: computeChange(snaps, n.neighborhoodKey, months, daily, type)
+  }));
   rows.sort((a, b) => (b.change.ppmUsdPct ?? -Infinity) - (a.change.ppmUsdPct ?? -Infinity));
-  return { city, rows };
+  return rows;
 }
 
 /** سری زمانی دلاری یک ناحیه (برای نمودار) */

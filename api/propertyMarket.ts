@@ -2,8 +2,8 @@
  * /api/propertyMarket — کلکشنر سرور-سمت بازار املاک (بدون حالت)
  *
  * POST ping           → سلامت خودِ این فانکشن (بدون دیتابیس، بدون شبکه بیرونی)
- * POST diagnose       → تست زنده دسترسی سرور به دیوار و شیپور (زمان پاسخ/خطا)
- * POST collectChunk   → یک تکه کلکشن از منبع (divar | sheypoor) → seedهای پارس‌شده
+ * POST diagnose       → تست زنده دسترسی سرور به دیوار (زمان پاسخ/خطا)
+ * POST collectChunk   → یک تکه کلکشن از دیوار → seedهای پارس‌شده
  * POST persist        → پشتیبان اختیاری در Neon (آگهی‌ها + Snapshot) — best-effort
  * GET                 → آگهی/Snapshotهای پشتیبان Neon (اگر تنظیم شده باشد)
  *
@@ -11,8 +11,7 @@
  *  - اپ تک‌کاربره است؛ پاک‌سازی، حذف تکراری و Snapshot سمت کلاینت (IndexedDB)
  *    انجام می‌شود. این فانکشن فقط «پراکسی واکشی» است و هیچ وابستگی‌ای به
  *    دیتابیس در مسیر کلکشن ندارد (قبلاً خطای Neon/health کلکشن را متوقف می‌کرد).
- *  - مرورگر به‌دلیل CORS مستقیم به دیوار/شیپور نمی‌زند؛ مسیر جایگزین بدون
- *    سرور «پل مرورگر» است (src/features/propertyMarket/bridge).
+ *  - مرورگر به‌دلیل CORS مستقیم به دیوار نمی‌زند؛ تنها مسیر جمع‌آوری همین سرور است.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
 import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
@@ -20,7 +19,6 @@ import { ensureSchema } from './_schema.js';
 import { collectChunk, sanitizeCursor, COLLECT_SOURCES } from '../src/features/propertyMarket/collector/run.js';
 import { fetchCities, fetchListPage, matchCity } from '../src/features/propertyMarket/collector/client.js';
 import { parseListPage } from '../src/features/propertyMarket/collector/parse.js';
-import { fetchSheypoorList, parseSheypoorList } from '../src/features/propertyMarket/collector/sheypoor.js';
 import { PROPERTY_CITIES } from '../src/features/propertyMarket/data/catalog.js';
 import type {
   ListingSource,
@@ -56,21 +54,16 @@ async function isDbUsable(): Promise<boolean> {
   }
 }
 
-/** تست زنده یک منبع: یک درخواست فهرست بدون تلاش مجدد */
-async function probeSource(source: ListingSource): Promise<{ ok: boolean; ms: number; listings: number; error?: string }> {
+/** تست زنده دیوار: یک درخواست فهرست بدون تلاش مجدد */
+async function probeDivar(): Promise<{ ok: boolean; ms: number; listings: number; error?: string }> {
   const started = Date.now();
   const city = PROPERTY_CITIES[0];
   try {
-    if (source === 'divar') {
-      const cities = await fetchCities();
-      const hit = matchCity(cities, city.divarSlugHints);
-      if (!hit) return { ok: false, ms: Date.now() - started, listings: 0, error: 'city not found' };
-      const page = await fetchListPage({ cityId: String(hit.id) });
-      const n = parseListPage(page).seeds.size;
-      return { ok: n > 0, ms: Date.now() - started, listings: n, error: n > 0 ? undefined : 'empty response' };
-    }
-    const page = await fetchSheypoorList({ citySlug: city.sheypoorSlug });
-    const n = parseSheypoorList(page, city.name).seeds.size;
+    const cities = await fetchCities();
+    const hit = matchCity(cities, city.divarSlugHints);
+    if (!hit) return { ok: false, ms: Date.now() - started, listings: 0, error: 'city not found' };
+    const page = await fetchListPage({ cityId: String(hit.id) });
+    const n = parseListPage(page).seeds.size;
     return { ok: n > 0, ms: Date.now() - started, listings: n, error: n > 0 ? undefined : 'empty response' };
   } catch (e) {
     return { ok: false, ms: Date.now() - started, listings: 0, error: netError(e) };
@@ -120,8 +113,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     /* ---------- diagnose: دسترسی سرور به منابع ---------- */
     if (action === 'diagnose') {
-      const [divar, sheypoor] = await Promise.all([probeSource('divar'), probeSource('sheypoor')]);
-      json(res, 200, { ok: true, results: { divar, sheypoor } });
+      json(res, 200, { ok: true, results: { divar: await probeDivar() } });
       return;
     }
 

@@ -1,5 +1,6 @@
 /** ============================================================
- * نرخ زنده تتر (USDT/تومان) — مبنای معادل دلاری بازار املاک
+ * نرخ زنده تتر (USDT/تومان) — تنها مبنای ارزش‌گذاری دلار در کل اپ
+ * (نرخ دستی وجود ندارد)
  *
  * ترتیب تلاش: منبع ترجیحی کاربر (پیش‌فرض والکس) → منبع دیگر.
  *   والکس:   از مسیر سرور /api/usdt (CORS والکس فقط wallex.ir است)
@@ -7,7 +8,7 @@
  *            اگر نشد، از مسیر سرور.
  * همه ناموفق → آخرین نرخ ذخیره‌شده با برچسب «قدیمی» (هرگز عدد جعلی).
  * ============================================================ */
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import { settingGet, settingSet } from '@/shared/lib/db';
 import { fetchJson, isRemoteAllowed } from '@/repositories/remoteClient';
@@ -118,9 +119,34 @@ export function usdtIsStale(q: UsdtQuote | null, now = Date.now()): boolean {
   return !q || now - q.fetchedAt > USDT_STALE_MS;
 }
 
-/** هوک: بارگذاری + به‌روزرسانی خودکار هر دقیقه (فقط وقتی صفحه دیده می‌شود) */
-export function useLiveUsdt(): UsdtState {
-  const st = useUsdtStore();
+/** نرخ مؤثر دلار: تتر زنده → آخرین تتر ذخیره‌شده (قدیمی) → هیچ (هرگز عدد دستی/جعلی) */
+export interface EffectiveRate {
+  /** تومان بر دلار */
+  rate: number | null;
+  kind: 'live' | 'stale' | 'none';
+  source: UsdtSource | null;
+  fetchedAt: number | null;
+}
+
+export function resolveEffectiveRate(
+  usdt: { quote: UsdtQuote | null; status: string },
+  now = Date.now()
+): EffectiveRate {
+  const q = usdt.quote;
+  if (!q) return { rate: null, kind: 'none', source: null, fetchedAt: null };
+  const stale = usdt.status !== 'live' || usdtIsStale(q, now);
+  return { rate: q.priceToman, kind: stale ? 'stale' : 'live', source: q.source, fetchedAt: q.fetchedAt };
+}
+
+/** هوک مصرفی نرخ دلار (بدون راه‌اندازی polling — آن یک‌بار در AppProviders است) */
+export function useUsdRate(): EffectiveRate {
+  const quote = useUsdtStore((s) => s.quote);
+  const status = useUsdtStore((s) => s.status);
+  return useMemo(() => resolveEffectiveRate({ quote, status }), [quote, status]);
+}
+
+/** بارگذاری + به‌روزرسانی خودکار هر دقیقه (فقط وقتی صفحه دیده می‌شود) — فقط effect */
+export function useUsdtPolling(): void {
   useEffect(() => {
     let alive = true;
     void useUsdtStore
@@ -141,7 +167,12 @@ export function useLiveUsdt(): UsdtState {
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
-  return st;
+}
+
+/** هوک: polling + کل وضعیت استور */
+export function useLiveUsdt(): UsdtState {
+  useUsdtPolling();
+  return useUsdtStore();
 }
 
 /* ============================================================

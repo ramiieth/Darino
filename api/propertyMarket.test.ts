@@ -12,7 +12,6 @@ const h = vi.hoisted(() => ({
   collectChunk: vi.fn(),
   fetchCities: vi.fn(),
   fetchListPage: vi.fn(),
-  fetchSheypoorList: vi.fn(),
   dbCalled: vi.fn()
 }));
 
@@ -23,10 +22,6 @@ vi.mock('../src/features/propertyMarket/collector/run.js', async (orig) => {
 vi.mock('../src/features/propertyMarket/collector/client.js', async (orig) => {
   const actual = await orig<typeof import('../src/features/propertyMarket/collector/client.js')>();
   return { ...actual, fetchCities: h.fetchCities, fetchListPage: h.fetchListPage };
-});
-vi.mock('../src/features/propertyMarket/collector/sheypoor.js', async (orig) => {
-  const actual = await orig<typeof import('../src/features/propertyMarket/collector/sheypoor.js')>();
-  return { ...actual, fetchSheypoorList: h.fetchSheypoorList };
 });
 // دیتابیس تنظیم نشده — هر فراخوانی db() باید رخ ندهد
 vi.mock('./_neon.js', async (orig) => {
@@ -89,7 +84,6 @@ beforeEach(() => {
   h.collectChunk.mockReset();
   h.fetchCities.mockReset();
   h.fetchListPage.mockReset();
-  h.fetchSheypoorList.mockReset();
   h.dbCalled.mockReset();
 });
 
@@ -120,13 +114,14 @@ describe('/api/propertyMarket', () => {
     expect(h.collectChunk.mock.calls[0][0]).toMatchObject({ city: 'ahvaz', source: 'divar' });
   });
 
-  it('collectChunk: منبع شیپور و کرسر پاس داده می‌شود؛ منبع نامعتبر → دیوار', async () => {
-    h.collectChunk.mockResolvedValue({ source: 'sheypoor', cursor: {}, seeds: [], cityId: 'ahvaz', done: true, fetchedDetails: 0, failedDetails: 0, pending: 0 });
-    await call('POST', { action: 'collectChunk', source: 'sheypoor', cursor: { source: 'sheypoor', cityId: 'ahvaz', pagesRead: 2 } });
-    expect(h.collectChunk.mock.calls[0][0].source).toBe('sheypoor');
+  it('collectChunk: کرسر پاس داده می‌شود؛ شیپور (حذف‌شده) یا منبع نامعتبر → دیوار', async () => {
+    h.collectChunk.mockResolvedValue({ source: 'divar', cursor: {}, seeds: [], cityId: '7', done: true, fetchedDetails: 0, failedDetails: 0, pending: 0 });
+    await call('POST', { action: 'collectChunk', source: 'divar', cursor: { source: 'divar', cityId: '7', pagesRead: 2 } });
     expect(h.collectChunk.mock.calls[0][0].cursor.pagesRead).toBe(2);
-    await call('POST', { action: 'collectChunk', source: 'evil' });
+    await call('POST', { action: 'collectChunk', source: 'sheypoor' });
     expect(h.collectChunk.mock.calls[1][0].source).toBe('divar');
+    await call('POST', { action: 'collectChunk', source: 'evil' });
+    expect(h.collectChunk.mock.calls[2][0].source).toBe('divar');
   });
 
   it('collectChunk: خطای شبکه منبع → ok:false صریح (نه ۵۰۰)', async () => {
@@ -136,16 +131,15 @@ describe('/api/propertyMarket', () => {
     expect(r.body).toMatchObject({ ok: false, source: 'divar', error: 'source unreachable' });
   });
 
-  it('diagnose: وضعیت هر منبع جداگانه', async () => {
+  it('diagnose: وضعیت دیوار', async () => {
     h.fetchCities.mockResolvedValue([{ id: 7, slug: 'ahvaz', name: 'اهواز' }]);
     h.fetchListPage.mockResolvedValue({
       list_widgets: [{ widget_type: 'POST_ROW', data: { action: { payload: { token: 'a', web_info: {} } } } }]
     });
-    h.fetchSheypoorList.mockRejectedValue(new TypeError('fetch failed'));
     const r = await call('POST', { action: 'diagnose' });
     const results = r.body.results as Record<string, { ok: boolean; listings: number; error?: string }>;
     expect(results.divar).toMatchObject({ ok: true, listings: 1 });
-    expect(results.sheypoor).toMatchObject({ ok: false, error: 'source unreachable' });
+    expect(results.sheypoor).toBeUndefined();
   });
 
   it('persist بدون دیتابیس → ok با persisted:false', async () => {

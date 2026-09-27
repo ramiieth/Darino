@@ -7,7 +7,7 @@ import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { DeltaValue, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { StatusDot } from '@/shared/components/ui/Badge';
-import { useFxStore } from '@/shared/store/fxStore';
+import { useUsdRate } from '@/shared/store/usdtStore';
 import { useNow } from '@/shared/hooks/useNow';
 import { fmtRelativeAge, fmtToman } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
@@ -20,7 +20,7 @@ function sliceColor(key: string, i: number): string {
 }
 
 export function NetWorthHero({ o }: { o: PortfolioOverview }) {
-  const fxRate = useFxStore((s) => s.rate);
+  const fxRate = useUsdRate().rate;
   const now = useNow(30_000);
   const loading = o.state === 'loading';
   const partial = o.unpriced.length > 0;

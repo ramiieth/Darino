@@ -68,8 +68,8 @@ describe('fmtPct — درصد لاتین', () => {
 
 describe('fmtToman — معادل تومانی با ارقام فارسی', () => {
   it('میلیارد تومان', () => {
-    expect(fmtToman(36_900, 1_480_000)).toContain('میلیارد تومان');
-    expect(fmtToman(36_900, 1_480_000)).toMatch(/[۰-۹]/);
+    expect(fmtToman(36_900, 148_000)).toContain('میلیارد تومان');
+    expect(fmtToman(36_900, 148_000)).toMatch(/[۰-۹]/);
   });
 });
 

@@ -1,25 +1,19 @@
 /** ============================================================
- * Property Market — نمایش نرخ زنده تتر (مبنای معادل دلاری)
+ * نمایش نرخ زنده تتر (تنها مبنای دلار در اپ) + انتخاب منبع والکس/بیت‌پین
  * ============================================================ */
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import { StatusDot } from '@/shared/components/ui/Badge';
-import { fmtIntLatin, fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
-import { USDT_SOURCE_FA, type UsdtSource } from '@/shared/fx/usdtRate';
-import { usdtIsStale, useUsdtStore } from '@/shared/store/usdtStore';
+import { fmtRelativeAge } from '@/shared/utils/formatters';
 
-/** منبع مؤثر نرخ دلار در صفحه */
-export interface EffectiveRate {
-  rate: number | null;
-  kind: 'live' | 'stale' | 'manual' | 'none';
-  source: UsdtSource | null;
-  fetchedAt: number | null;
-}
+/** «۲۵۰٬۰۰۰» — ارقام و جداکننده فارسی */
+const faInt = (v: number) => new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 }).format(v);
+import { USDT_SOURCE_FA, type UsdtSource } from '@/shared/fx/usdtRate';
+import { useUsdtStore, type EffectiveRate } from '@/shared/store/usdtStore';
 
 export function describeRate(r: EffectiveRate): string {
   if (r.kind === 'none' || r.rate === null) return 'نرخ تتر در دسترس نیست';
-  const price = `${toFaDigits(fmtIntLatin(r.rate))} تومان`;
-  if (r.kind === 'manual') return `${price} · نرخ دستی تنظیمات (تتر در دسترس نبود)`;
+  const price = `${faInt(r.rate)} تومان`;
   const src = r.source ? USDT_SOURCE_FA[r.source] : '';
   return `تتر ${price} · ${src}${r.fetchedAt ? ` · ${fmtRelativeAge(r.fetchedAt)}` : ''}${r.kind === 'stale' ? ' (قدیمی)' : ''}`;
 }
@@ -28,7 +22,7 @@ export function UsdtRateField({ effective }: { effective: EffectiveRate }) {
   const st = useUsdtStore();
   const loading = st.status === 'loading';
   const tone = effective.kind === 'live' ? 'gain' : effective.kind === 'none' ? 'loss' : 'warn';
-  const statusLabel = effective.kind === 'live' ? 'زنده' : effective.kind === 'stale' ? 'قدیمی' : effective.kind === 'manual' ? 'دستی' : 'نامشخص';
+  const statusLabel = effective.kind === 'live' ? 'زنده' : effective.kind === 'stale' ? 'قدیمی' : 'نامشخص';
 
   return (
     <div className="rounded-field bg-surface-2 px-3.5 py-2.5">
@@ -36,7 +30,7 @@ export function UsdtRateField({ effective }: { effective: EffectiveRate }) {
         <span className="text-sm font-semibold text-ink">
           {effective.rate !== null ? (
             <>
-              <span className="num-ltr">{toFaDigits(fmtIntLatin(effective.rate))}</span> تومان
+              <span>{faInt(effective.rate)}</span> تومان
             </>
           ) : (
             '—'
@@ -72,7 +66,7 @@ export function UsdtRateField({ effective }: { effective: EffectiveRate }) {
             {USDT_SOURCE_FA[s]}
           </button>
         ))}
-        {effective.fetchedAt && effective.kind !== 'manual' && (
+        {effective.fetchedAt && (
           <span>
             · از {effective.source ? USDT_SOURCE_FA[effective.source] : ''} {fmtRelativeAge(effective.fetchedAt)}
           </span>
@@ -80,19 +74,4 @@ export function UsdtRateField({ effective }: { effective: EffectiveRate }) {
       </div>
     </div>
   );
-}
-
-/** نرخ مؤثر: تتر زنده → تتر ذخیره‌شده (قدیمی) → نرخ دستی تنظیمات */
-export function resolveEffectiveRate(
-  usdt: { quote: { priceToman: number; source: UsdtSource; fetchedAt: number } | null; status: string },
-  manualRate: number | null,
-  now = Date.now()
-): EffectiveRate {
-  const q = usdt.quote;
-  if (q) {
-    const stale = usdt.status !== 'live' || usdtIsStale(q as never, now);
-    return { rate: q.priceToman, kind: stale ? 'stale' : 'live', source: q.source, fetchedAt: q.fetchedAt };
-  }
-  if (manualRate !== null && manualRate > 0) return { rate: manualRate, kind: 'manual', source: null, fetchedAt: null };
-  return { rate: null, kind: 'none', source: null, fetchedAt: null };
 }
