@@ -1,9 +1,8 @@
 /** ============================================================
- * Property Market — تغییر قیمت دلاری در طول زمان
+ * Property Market — تغییر قیمت دلاری در طول زمان (هم‌نوع)
  *
- *  ۱) یک ناحیه (کل اهواز یا یک محله): ۱، ۳، ۶، ۹، ۱۲، ۱۶، ۲۴، ۳۲، ۳۶ ماه
- *     → هر متر و قیمت کل به دلار (قبل/حالا/٪) + مقایسه با کل اهواز
- *  ۲) رتبه‌بندی همه محله‌ها در یک دوره انتخابی
+ *  نوع قیمت (کلید اول / N سال ساخت) + ناحیه → تغییر در دوره‌های ۱ تا ۶۰ ماه
+ *  و رتبه‌بندی همه مناطق/محله‌ها در یک دوره
  *  ⚠️ فقط نمایش — محاسبه در domain/history.ts
  * ============================================================ */
 import { useEffect, useMemo, useState } from 'react';
@@ -11,8 +10,7 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import { Select } from '@/shared/components/ui/Input';
 import { ChipGroup, SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Notice } from '@/shared/components/ui/StateViews';
-import { fmtIntLatin, fmtPct, fmtUSD, toFaDigits } from '@/shared/utils/formatters';
+import { fmtPct, fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { formatJalali } from '@/shared/utils/jalali';
 import { useUsdtHistoryStore } from '@/shared/store/usdtStore';
 import type { PropertyMarketSnapshot } from '../domain/types';
@@ -23,8 +21,7 @@ import {
   earliestSnapshotTs,
   neighborhoodChanges,
   usdSeries,
-  type ChangeRow,
-  type PriceMetric
+  type ChangeRow
 } from '../domain/history';
 import { snapshotAreaRecords } from '../service/propertyMarketService';
 import { PRICE_TYPES, priceTypeLabel, type PriceType } from '../domain/segments';
@@ -58,13 +55,15 @@ const usd = (v: number | null) => (v === null ? '—' : fmtUSD(v));
 function statusText(r: ChangeRow): string {
   switch (r.status) {
     case 'pending':
-      return r.availableFrom ? `از ${formatJalali(r.availableFrom)} قابل نمایش` : 'هنوز داده کافی نیست';
+      return r.availableFrom ? `از ${formatJalali(r.availableFrom)}` : 'هنوز داده کافی نیست';
     case 'no-area':
-      return 'در آن تاریخ آگهیِ این نوع/محله ثبت نشده (یا Snapshot قدیمی تفکیک نوع ندارد)';
+      return 'در آن تاریخ آگهی‌ای از این ناحیه ثبت نشده';
+    case 'no-type':
+      return 'در آن تاریخ آگهی‌ای از این نوع ثبت نشده';
     case 'no-rate':
       return 'نرخ تتر آن تاریخ در دسترس نیست';
     case 'no-data':
-      return 'Snapshot نزدیک به این تاریخ ثبت نشده';
+      return 'Snapshot نزدیک به این تاریخ نیست';
     default:
       return '';
   }
@@ -74,8 +73,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
   const history = useUsdtHistoryStore();
   const [area, setArea] = useState<string>(CITY_KEY);
   const [period, setPeriod] = useState<string>('3');
-  const [metric, setMetric] = useState<PriceMetric>('median');
-  const [ptype, setPtype] = useState<PriceType>('all');
+  const [ptype, setPtype] = useState<PriceType>('first-key');
   const [rankLevel, setRankLevel] = useState<'group' | 'neighborhood'>('group');
 
   // نرخ روزانه تتر از قدیمی‌ترین Snapshot تا امروز
@@ -89,97 +87,73 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
     b.stats.listingCount - a.stats.listingCount;
   const areaOptions = useMemo(() => (latest ? [...snapshotAreaRecords(latest, 'area')].sort(byCount) : []), [latest]);
   const nbOptions = useMemo(() => (latest ? [...latest.neighborhoodStats].sort(byCount) : []), [latest]);
-  const rows = useMemo(() => changeTable(snapshots, area, history.rates, metric, ptype), [snapshots, area, history.rates, metric, ptype]);
+  const rows = useMemo(() => changeTable(snapshots, area, history.rates, ptype), [snapshots, area, history.rates, ptype]);
   const cityRows = useMemo(
-    () => (area === CITY_KEY ? rows : changeTable(snapshots, CITY_KEY, history.rates, metric, ptype)),
-    [area, rows, snapshots, history.rates, metric, ptype]
+    () => (area === CITY_KEY ? rows : changeTable(snapshots, CITY_KEY, history.rates, ptype)),
+    [area, rows, snapshots, history.rates, ptype]
   );
   const ranking = useMemo(
-    () => neighborhoodChanges(snapshots, Number(period), history.rates, { level: rankLevel, metric, type: ptype }),
-    [snapshots, period, history.rates, rankLevel, metric, ptype]
+    () => neighborhoodChanges(snapshots, Number(period), history.rates, ptype, rankLevel),
+    [snapshots, period, history.rates, rankLevel, ptype]
   );
-  const series = useMemo(() => usdSeries(snapshots, area, history.rates, metric, ptype), [snapshots, area, history.rates, metric, ptype]);
-  const anyOk = rows.some((r) => r.status === 'ok');
-  const first = earliest !== null ? formatJalali(earliest) : null;
+  const series = useMemo(() => usdSeries(snapshots, area, history.rates, ptype), [snapshots, area, history.rates, ptype]);
+
+  const shown = rows.filter((r) => r.status !== 'pending');
+  const pending = rows.filter((r) => r.status === 'pending');
+  const nextPending = pending[0] ?? null;
   const areaName =
     area === CITY_KEY
       ? 'کل اهواز'
       : [...areaOptions, ...nbOptions].find((a) => a.neighborhoodKey === area)?.displayName ?? '';
-  const metricFa = `${metric === 'median' ? 'میانه' : 'میانگین'}${ptype === 'all' ? '' : ` (${priceTypeLabel(ptype)})`}`;
+  const typeName = priceTypeLabel(ptype);
+  const cols = area !== CITY_KEY ? 6 : 5;
 
   return (
     <div className="space-y-5">
-      {!anyOk && (
-        <Notice tone="info" title="تاریخچه از حالا ساخته می‌شود">
-          هر بار «به‌روزرسانی داده» یک Snapshot با تاریخ و نرخ تتر همان روز ثبت می‌کند
-          {first ? ` (اولین Snapshot: ${first})` : ''}. مقایسه‌ها به‌محض رسیدن به هر دوره خودکار فعال می‌شوند —
-          برای دقت، دست‌کم ماهی یک‌بار به‌روزرسانی کنید.
-        </Notice>
-      )}
-
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-64">
+        <ChipGroup<PriceType>
+          label="نوع قیمت"
+          value={ptype}
+          onChange={setPtype}
+          options={PRICE_TYPES.map((t) => ({ value: t.key, label: t.label }))}
+        />
+        <div className="w-60">
           <Select aria-label="منطقه یا محله" value={area} onChange={(e) => setArea(e.target.value)}>
             <option value={CITY_KEY}>کل اهواز</option>
             <optgroup label="مناطق">
               {areaOptions.map((a) => (
                 <option key={`a-${a.neighborhoodKey}`} value={a.neighborhoodKey}>
-                  {a.displayName} ({toFaDigits(a.stats.listingCount)} آگهی)
+                  {a.displayName} ({toFaDigits(a.stats.listingCount)})
                 </option>
               ))}
             </optgroup>
-            <optgroup label="محله‌ها (جزئی)">
+            <optgroup label="محله‌ها">
               {nbOptions.map((a) => (
                 <option key={`n-${a.neighborhoodKey}`} value={a.neighborhoodKey}>
-                  {a.displayName} ({toFaDigits(a.stats.listingCount)} آگهی)
+                  {a.displayName} ({toFaDigits(a.stats.listingCount)})
                 </option>
               ))}
             </optgroup>
           </Select>
         </div>
-        <div className="w-48">
-          <Select aria-label="نوع قیمت" value={ptype} onChange={(e) => setPtype(e.target.value as PriceType)}>
-            {PRICE_TYPES.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.key === 'all' ? 'همه آگهی‌ها' : t.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <SegmentedControl<PriceMetric>
-          size="sm"
-          label="شاخص قیمت"
-          value={metric}
-          onChange={setMetric}
-          options={[
-            { value: 'median', label: 'میانه' },
-            { value: 'mean', label: 'میانگین' }
-          ]}
-        />
-        <p className="text-xs text-muted">
-          هر Snapshot با نرخ تتر همان تاریخ به دلار تبدیل می‌شود
-          {history.source ? ` (تاریخچه: ${history.source === 'wallex' ? 'والکس' : 'بیت‌پین'})` : ''}.
-        </p>
       </div>
 
       <div className="overflow-x-auto rounded-card border border-divider">
-        <table className="data-table min-w-[860px]">
-          <caption className="sr-only">تغییر قیمت دلاری {areaName}</caption>
+        <table className="data-table min-w-[720px]">
+          <caption className="sr-only">تغییر قیمت دلاری {typeName} · {areaName}</caption>
           <thead>
             <tr>
               <th scope="col" className="!ps-5">نسبت به</th>
-              <th scope="col" className="col-num">{metricFa} هر متر (دلار) قبل ← حالا</th>
-              <th scope="col" className="col-num">تغییر هر متر</th>
-              <th scope="col" className="col-num">{metricFa} قیمت کل (دلار) قبل ← حالا</th>
-              <th scope="col" className="col-num">تغییر قیمت کل</th>
+              <th scope="col" className="col-num">هر متر (دلار) قبل ← حالا</th>
+              <th scope="col" className="col-num">تغییر دلاری</th>
               <th scope="col" className="col-num">تغییر تومانی</th>
-              {area !== CITY_KEY && <th scope="col" className="col-num">کل اهواز (هر متر)</th>}
-              <th scope="col" className="col-num !pe-5">تتر قبل ← حالا</th>
+              <th scope="col" className={cn('col-num', area === CITY_KEY && '!pe-5')}>تغییر قیمت کل (دلار)</th>
+              {area !== CITY_KEY && <th scope="col" className="col-num !pe-5">کل اهواز</th>}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
-              const city = cityRows[i];
+            {shown.map((r) => {
+              const i = rows.indexOf(r);
               return (
                 <tr key={r.months}>
                   <td className="!ps-5">
@@ -190,43 +164,46 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
                     <>
                       <td className="col-num">
                         <span className="text-muted">{usd(r.base.ppmUsd)}</span> ← <span className="font-semibold">{usd(r.now.ppmUsd)}</span>
+                        {(r.base.rateSource === 'legacy' || r.now.rateSource === 'legacy') && (
+                          <span className="block text-2xs text-warn">نرخ دستی قدیمی</span>
+                        )}
                       </td>
                       <td className="col-num">
                         <PctCell v={r.ppmUsdPct} strong />
                         {r.lowSample && <span className="block text-2xs text-warn">نمونه کم</span>}
                       </td>
-                      <td className="col-num">
-                        <span className="text-muted">{usd(r.base.totalUsd)}</span> ← <span className="font-semibold">{usd(r.now.totalUsd)}</span>
-                      </td>
-                      <td className="col-num"><PctCell v={r.totalUsdPct} strong /></td>
                       <td className="col-num"><PctCell v={r.ppmTomanPct} /></td>
-                      {area !== CITY_KEY && <td className="col-num"><PctCell v={city?.ppmUsdPct ?? null} /></td>}
-                      <td className="col-num !pe-5 text-xs text-muted">
-                        {toFaDigits(fmtIntLatin(r.base.rate))} ← {toFaDigits(fmtIntLatin(r.now.rate))}
-                        {(r.base.rateSource === 'legacy' || r.now.rateSource === 'legacy') && <span className="block text-warn">نرخ دستی قدیمی</span>}
-                      </td>
+                      <td className={cn('col-num', area === CITY_KEY && '!pe-5')}><PctCell v={r.totalUsdPct} /></td>
+                      {area !== CITY_KEY && <td className="col-num !pe-5"><PctCell v={cityRows[i]?.ppmUsdPct ?? null} /></td>}
                     </>
                   ) : (
-                    <td colSpan={area !== CITY_KEY ? 7 : 6} className="text-xs text-muted">
-                      {statusText(r)}
-                    </td>
+                    <td colSpan={cols - 1} className="text-xs text-muted">{statusText(r)}</td>
                   )}
                 </tr>
               );
             })}
+            {nextPending && (
+              <tr>
+                <td colSpan={cols} className="!ps-5 text-xs text-muted">
+                  {shown.length === 0 ? 'تاریخچه با هر «به‌روزرسانی داده» ساخته می‌شود · ' : ''}
+                  دوره‌های {pending.map((r) => toFaDigits(r.months)).join('، ')} ماه هنوز داده ندارند
+                  {nextPending.availableFrom && ` — اولی از ${formatJalali(nextPending.availableFrom)} قابل نمایش است`}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       <div className="rounded-card border border-divider p-4">
-        <h3 className="mb-3 text-sm font-bold text-ink">روند {metricFa} قیمت هر متر {areaName} (دلار)</h3>
+        <h3 className="mb-3 text-sm font-bold text-ink">روند قیمت هر متر · {typeName} · {areaName} (دلار)</h3>
         <TrendChart points={series.map((p) => ({ ts: p.dateTs, label: formatJalali(p.dateTs), value: p.ppmUsd as number }))} format={(v) => fmtUSD(v)} />
       </div>
 
       <div className="rounded-card border border-divider">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-sm font-bold text-ink">رشد/کاهش دلاری همه {rankLevel === 'group' ? 'مناطق' : 'محله‌ها'}</h3>
+            <h3 className="text-sm font-bold text-ink">رشد دلاری {rankLevel === 'group' ? 'مناطق' : 'محله‌ها'} · {typeName}</h3>
             <SegmentedControl<'group' | 'neighborhood'>
               size="sm"
               label="سطح رتبه‌بندی"
@@ -251,7 +228,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[640px]">
+            <table className="data-table min-w-[560px]">
               <thead>
                 <tr>
                   <th scope="col" className="!ps-5">{rankLevel === 'group' ? 'منطقه' : 'محله'}</th>
@@ -267,34 +244,34 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
                   <td className="col-num"><PctCell v={ranking.city.totalUsdPct} strong /></td>
                   <td className="col-num !pe-5">—</td>
                 </tr>
-                {ranking.rows.map((r) => (
-                  <tr key={r.key}>
-                    <td className="!ps-5">
-                      <span className="font-semibold text-ink">{r.displayName}</span>
-                      {r.change.lowSample && <span className="ms-1 text-2xs text-warn">نمونه کم</span>}
-                    </td>
-                    {r.change.status === 'ok' ? (
-                      <>
-                        <td className="col-num"><PctCell v={r.change.ppmUsdPct} /></td>
-                        <td className="col-num"><PctCell v={r.change.totalUsdPct} /></td>
-                        <td className="col-num !pe-5">
-                          {r.vsCityPp === null ? '—' : (
-                            <span dir="ltr" className="tnum text-xs text-muted">
-                              {r.vsCityPp > 0 ? '+' : ''}{r.vsCityPp.toFixed(1)} واحد درصد
-                            </span>
-                          )}
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={3} className="text-xs text-muted">{statusText(r.change)}</td>
-                    )}
-                  </tr>
-                ))}
+                {ranking.rows
+                  .filter((r) => r.change.status === 'ok')
+                  .map((r) => (
+                    <tr key={r.key}>
+                      <td className="!ps-5">
+                        <span className="font-semibold text-ink">{r.displayName}</span>
+                        {r.change.lowSample && <span className="ms-1 text-2xs text-warn">نمونه کم</span>}
+                      </td>
+                      <td className="col-num"><PctCell v={r.change.ppmUsdPct} /></td>
+                      <td className="col-num"><PctCell v={r.change.totalUsdPct} /></td>
+                      <td className="col-num !pe-5">
+                        {r.vsCityPp === null ? '—' : (
+                          <span dir="ltr" className="tnum text-xs text-muted">
+                            {r.vsCityPp > 0 ? '+' : ''}{r.vsCityPp.toFixed(1)} واحد درصد
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
+      <p className="text-2xs text-muted">
+        مقایسه فقط بین آگهی‌های هم‌نوع (میانگین) · هر Snapshot با نرخ تتر همان تاریخ به دلار تبدیل می‌شود
+        {history.source ? ` (${history.source === 'wallex' ? 'والکس' : 'بیت‌پین'})` : ''}
+      </p>
     </div>
   );
 }

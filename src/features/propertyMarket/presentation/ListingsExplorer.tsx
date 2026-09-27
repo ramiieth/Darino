@@ -1,7 +1,7 @@
 /** ============================================================
  * Property Market — مرور آگهی‌ها (داده پشت آمار)
  *
- *  فیلتر منبع/محله + مرتب‌سازی؛ هر ردیف به آگهی اصلی لینک است.
+ *  فیلتر منبع/منطقه/نوع/متراژ + مرتب‌سازی؛ هر ردیف به آگهی اصلی لینک است.
  *  ⚠️ فقط نمایش — آمار از لایه سرویس/Snapshot می‌آید.
  * ============================================================ */
 import { useMemo, useState } from 'react';
@@ -15,8 +15,8 @@ import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { LISTING_SOURCE_FA, type ListingSource } from '../domain/types';
 import { neighborhoodDisplayName } from '../data/catalog';
 import { AGE_BANDS, AREA_BANDS, type AgeBand, type AreaBand } from '../domain/segments';
-import type { ListingView } from '../service/propertyMarketService';
-import { fmtMillionToman } from './NeighborhoodTable';
+import { areaKeyOf, type ListingView } from '../service/propertyMarketService';
+import { fmtMillionToman, fmtTotalToman } from './format';
 
 type SourceFilter = 'all' | ListingSource;
 type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
@@ -24,13 +24,6 @@ export type AgeFilter = 'all' | AgeBand | 'first-key';
 export type AreaFilter = 'all' | AreaBand;
 
 const PAGE = 25;
-
-/** «۳٫۱ میلیارد» / «۸۵۰ میلیون» — قیمت کل فشرده */
-export function fmtTotalToman(v: number | null): string {
-  if (v === null || !Number.isFinite(v)) return '—';
-  const fa = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 2 });
-  return v >= 1_000_000_000 ? `${fa.format(v / 1_000_000_000)} میلیارد` : `${fa.format(Math.round(v / 1_000_000))} میلیون`;
-}
 
 /** مبنای «جدیدترین»: آخرین به‌روزرسانی آگهی در منبع */
 function updatedOf(l: ListingView): number {
@@ -44,8 +37,13 @@ export function ListingsExplorer({
   onAge,
   onArea,
   exactArea = null,
-  onExactArea
+  onExactArea,
+  place = 'all',
+  onPlace
 }: {
+  /** فیلتر منطقه یا محله (کلید محله یا کلید منطقه) */
+  place?: string;
+  onPlace?: (v: string) => void;
   /** فیلتر متراژ دقیق (از جدول «متراژ دقیق») */
   exactArea?: number | null;
   onExactArea?: (v: number | null) => void;
@@ -62,7 +60,9 @@ export function ListingsExplorer({
   const areaF = onArea ? area : localArea;
   const setAge = onAge ?? setLocalAge;
   const setArea = onArea ?? setLocalArea;
-  const [nb, setNb] = useState<string>('all');
+  const [localPlace, setLocalPlace] = useState<string>(place);
+  const nb = onPlace ? place : localPlace;
+  const setNb = onPlace ?? setLocalPlace;
   const [sort, setSort] = useState<SortKey>('recent');
   const [limit, setLimit] = useState(PAGE);
 
@@ -84,7 +84,7 @@ export function ListingsExplorer({
     const f = listings.filter(
       (l) =>
         (source === 'all' || l.source === source) &&
-        (nb === 'all' || l.neighborhoodKey === nb) &&
+        (nb === 'all' || l.neighborhoodKey === nb || areaKeyOf(l.neighborhoodKey) === nb) &&
         (ageF === 'all' || (ageF === 'first-key' ? l.firstKey === true : l.ageBand === ageF)) &&
         (areaF === 'all' || l.areaBand === areaF) &&
         (exactArea === null || (l.areaSqm !== null && Math.round(l.areaSqm) === exactArea))
@@ -143,6 +143,9 @@ export function ListingsExplorer({
               }}
             >
               <option value="all">همه محله‌ها</option>
+              {nb !== 'all' && !neighborhoods.some((n) => n.key === nb) && (
+                <option value={nb}>{neighborhoodDisplayName(nb)}</option>
+              )}
               {neighborhoods.map((n) => (
                 <option key={n.key} value={n.key}>
                   {n.name} ({toFaDigits(n.n)})
@@ -152,19 +155,19 @@ export function ListingsExplorer({
           </div>
           <div className="w-36">
             <Select
-              aria-label="سن بنا"
+              aria-label="سال ساخت"
               value={ageF}
               onChange={(e) => {
                 setAge(e.target.value as AgeFilter);
                 setLimit(PAGE);
               }}
             >
-              <option value="all">هر سن بنا</option>
+              <option value="all">هر سال ساخت</option>
               <option value="first-key">کلید اول</option>
               {AGE_BANDS.map((b) => (
                 <option key={b.key} value={b.key}>{b.label}</option>
               ))}
-              <option value="unknown">سن نامشخص</option>
+              <option value="unknown">سال ساخت نامشخص</option>
             </Select>
           </div>
           <div className="w-36">

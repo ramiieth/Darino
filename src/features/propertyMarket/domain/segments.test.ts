@@ -1,9 +1,9 @@
 /**
- * دسته‌بندی سن بنا / متراژ + معادل دلاری
+ * سن بنا / متراژ / انواع قیمت + معادل دلاری
  */
 import { describe, it, expect } from 'vitest';
 import { ageBandOf, areaBandOf, buildingAgeYears, jalaliYearOf } from './segments';
-import { buildSegmentRows, toListingViews } from '../service/propertyMarketService';
+import { buildSizeTypeMatrix, toListingViews, type FxInput } from '../service/propertyMarketService';
 import { resolveEffectiveRate } from '../presentation/UsdtRateField';
 import type { PropertyMarketListing } from './types';
 
@@ -46,7 +46,13 @@ describe('متراژ', () => {
   });
 });
 
-describe('toListingViews / buildSegmentRows', () => {
+const fxAt = (rate: number | null, future: number | null = rate, growth: number | null = null): FxInput => ({
+  currentUsdRateToman: rate,
+  futureUsdRateToman: future,
+  propertyTomanGrowthPct: growth
+});
+
+describe('toListingViews / متراژ × نوع', () => {
   const RATE = 233_000;
   const views = toListingViews(
     [l('a', 90, 1404, 100_000_000), l('b', 90, 1404, 120_000_000), l('c', 150, 1390, 60_000_000), l('d', null, null, 80_000_000)],
@@ -70,21 +76,17 @@ describe('toListingViews / buildSegmentRows', () => {
     expect(v.totalPriceUsd).toBeNull();
   });
 
-  it('ردیف‌های سن بنا: ترتیب ثابت، نامشخص آخر، میانه‌ها و سهم', () => {
-    const rows = buildSegmentRows(views, 'age', RATE);
-    expect(rows.map((r) => r.key)).toEqual(['y0-1', 'y11-20', 'unknown']);
-    const r0 = rows[0];
-    expect(r0.count).toBe(2);
-    expect(r0.medianPpmToman).toBe(110_000_000);
-    expect(r0.medianPpmUsd).toBeCloseTo(110_000_000 / RATE, 6);
-    expect(r0.medianTotalToman).toBe(9_900_000_000);
-    expect(r0.medianTotalUsd).toBeCloseTo(9_900_000_000 / RATE, 6);
-    expect(r0.sharePct).toBe(50);
-  });
-
-  it('ردیف‌های متراژ', () => {
-    const rows = buildSegmentRows(views, 'area', RATE);
-    expect(rows.map((r) => r.key)).toEqual(['a80-100', 'a150-200', 'unknown']);
+  it('بازه‌های متراژ: ترتیب ثابت، بازه خالی/نامشخص حذف، میانگین هر نوع', () => {
+    const rows = buildSizeTypeMatrix(views, fxAt(RATE), 1405);
+    expect(rows.map((r) => r.key)).toEqual(['a80-100', 'a150-200']);
+    const age1 = rows[0].cells.age1!;
+    expect(age1.count).toBe(2);
+    expect(age1.ppmToman).toBe(110_000_000);
+    expect(age1.ppmUsd).toBeCloseTo(110_000_000 / RATE, 6);
+    expect(age1.totalToman).toBe(9_900_000_000);
+    // ۱۵۰ متری ۱۵ ساله در هیچ نوعی نیست
+    expect(rows[1].count).toBe(1);
+    expect(Object.keys(rows[1].cells)).toEqual([]);
   });
 });
 
@@ -104,12 +106,14 @@ describe('resolveEffectiveRate', () => {
   });
 });
 
-import { matchesPriceType, PRICE_TYPES } from './segments';
-import { buildTypeMatrix } from '../service/propertyMarketService';
+import { ageFilterOfType, matchesPriceType, PRICE_TYPES } from './segments';
+import { buildAreaTypeMatrix, scenarioActive } from '../service/propertyMarketService';
 
 describe('انواع قیمت: کلید اول و ۱ تا ۷ سال ساخت', () => {
   it('ترتیب و برچسب ستون‌ها', () => {
-    expect(PRICE_TYPES.map((t) => t.key)).toEqual(['all', 'first-key', 'age1', 'age2', 'age3', 'age4', 'age5', 'age6', 'age7']);
+    expect(PRICE_TYPES.map((t) => t.key)).toEqual(['first-key', 'age1', 'age2', 'age3', 'age4', 'age5', 'age6', 'age7']);
+    expect(PRICE_TYPES.map((t) => t.label)).toEqual(['کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال']);
+    expect(['first-key', 'age1', 'age4'].map((t) => ageFilterOfType(t as never))).toEqual(['first-key', 'y0-1', 'y4']);
   });
   it('matchesPriceType', () => {
     const y = 1405;
@@ -121,28 +125,38 @@ describe('انواع قیمت: کلید اول و ۱ تا ۷ سال ساخت', (
     expect(matchesPriceType({ yearBuilt: null }, 'age3', y)).toBe(false);
     expect(matchesPriceType({ yearBuilt: 1404, firstKey: true }, 'first-key', y)).toBe(true);
     expect(matchesPriceType({ yearBuilt: 1404, firstKey: null }, 'first-key', y)).toBe(false);
-    expect(matchesPriceType({ yearBuilt: null }, 'all', y)).toBe(true);
   });
-  it('ماتریس: کل اهواز اول، خانه‌های هر نوع با تومان/دلار/تعداد', () => {
+  it('ماتریس مناطق: کل اهواز اول، خانه‌های هر نوع با میانگین تومان/دلار/تعداد', () => {
     const mk = (t: string, key: string, year: number | null, ppm: number, fk = false) => ({ ...l(t, 100, year, ppm), neighborhoodKey: key, firstKey: fk });
     const views = toListingViews(
       [mk('a', 'golestan', 1404, 100e6, true), mk('b', 'golestan', 1403, 90e6), mk('c', 'kianpars-east', 1398, 150e6), mk('d', 'kianpars-west', null, 140e6)],
       250_000,
       1405
     );
-    const rows = buildTypeMatrix(views, 'area', 250_000, 1405);
+    const rows = buildAreaTypeMatrix(views, 'area', fxAt(250_000), 1405);
     expect(rows[0].key).toBe('__city__');
     expect(rows[0].count).toBe(4);
     expect(rows[0].cells['first-key']!.count).toBe(1);
-    expect(rows[0].cells.age1!.medianPpmToman).toBe(100e6);
-    expect(rows[0].cells.age1!.medianPpmUsd).toBe(400);
-    expect(rows[0].cells.age2!.medianTotalUsd).toBe(36000);
+    expect(rows[0].cells.age1!.ppmToman).toBe(100e6);
+    expect(rows[0].cells.age1!.ppmUsd).toBe(400);
+    expect(rows[0].cells.age2!.totalUsd).toBe(36000);
     expect(rows[0].cells.age7!.count).toBe(1);
     // سطح منطقه: شرقی/غربی کیانپارس در یک ردیف
     const kp = rows.find((r) => r.key === 'kianpars')!;
     expect(kp.count).toBe(2);
-    expect(kp.cells.all!.medianPpmToman).toBe(145e6);
+    expect(kp.cells.age7!.ppmToman).toBe(150e6);
     expect(kp.cells.age3).toBeUndefined();
+    // سناریو غیرفعال → دلار آینده = دلار فعلی
+    expect(scenarioActive(fxAt(250_000))).toBe(false);
+    expect(rows[0].cells.age1!.futurePpmUsd).toBeCloseTo(400, 6);
+  });
+
+  it('سناریو: دلار آینده ۳۲۰ هزار و رشد تومانی ۱۰٪', () => {
+    const views = toListingViews([{ ...l('a', 100, 1404, 100e6) }], 250_000, 1405);
+    const fx = fxAt(250_000, 320_000, 10);
+    expect(scenarioActive(fx)).toBe(true);
+    // 110M / 320k = $343.75
+    expect(buildAreaTypeMatrix(views, 'area', fx, 1405)[0].cells.age1!.futurePpmUsd).toBeCloseTo(343.75, 6);
   });
 });
 
@@ -152,14 +166,14 @@ describe('متراژ دقیق', () => {
   it('بازه‌ها: ۹۰ تا ۱۷۰ (شامل ۱۷۰) و ۱۷۱ تا ۳۳۰', () => {
     expect([89, 90, 170, 171, 330, 331].map(exactAreaRangeOf)).toEqual(['lt90', '90-170', '90-170', '171-330', '171-330', 'gt330']);
   });
-  it('هر متراژ یک ردیف (گرد به متر)، صعودی، با میانه تومان/دلار', () => {
+  it('هر متراژ یک ردیف (گرد به متر)، صعودی، با میانگین تومان/دلار', () => {
     const views = toListingViews([l('a', 120, 1400, 100e6), l('b', 120.4, 1400, 80e6), l('c', 95, 1400, 90e6), l('d', null, 1400, 70e6)], 250_000, 1405);
     const rows = buildExactAreaRows(views, 250_000);
     expect(rows.map((r) => r.areaSqm)).toEqual([95, 120]);
     const r120 = rows[1];
     expect(r120.count).toBe(2);
-    expect(r120.medianPpmToman).toBe(90e6);
-    expect(r120.medianPpmUsd).toBe(360);
+    expect(r120.ppmToman).toBe(90e6);
+    expect(r120.ppmUsd).toBe(360);
     expect(r120.range).toBe('90-170');
   });
 });

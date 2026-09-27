@@ -1,5 +1,5 @@
 /**
- * تغییر قیمت دلاری در طول زمان — ۱ تا ۳۶ ماه
+ * تغییر قیمت دلاری در طول زمان — ۱ تا ۶۰ ماه، فقط بین آگهی‌های هم‌نوع (میانگین)
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -16,8 +16,21 @@ import {
 import type { AreaPriceStats, PropertyMarketSnapshot } from './types';
 import { tehranDayKey } from '@/shared/fx/usdtHistory';
 
+/** نوع پیش‌فرض تست‌ها */
+const T = 'age1' as const;
+
+/** آمار ناحیه با یک نوع «۱ سال ساخت» (میانگین = ppm/total) */
 function stats(ppm: number, total: number, count = 10): AreaPriceStats {
-  return { medianTomanPerM2: ppm, meanTomanPerM2: ppm, p25TomanPerM2: ppm, p75TomanPerM2: ppm, listingCount: count, medianTotalToman: total, medianAreaSqm: 100 };
+  return {
+    medianTomanPerM2: ppm,
+    meanTomanPerM2: ppm,
+    p25TomanPerM2: ppm,
+    p75TomanPerM2: ppm,
+    listingCount: count,
+    medianTotalToman: total,
+    medianAreaSqm: 100,
+    byType: { [T]: { count, medianPpm: ppm, meanPpm: ppm, medianTotal: total || null, meanTotal: total || null } }
+  };
 }
 
 function snap(
@@ -74,7 +87,7 @@ describe('computeChange', () => {
   ];
 
   it('کل اهواز — هر متر و قیمت کل به دلار + تومانی + تتر', () => {
-    const r = computeChange(S, CITY_KEY, 3, {});
+    const r = computeChange(S, CITY_KEY, 3, {}, T);
     expect(r.status).toBe('ok');
     expect(r.base!.ppmUsd).toBe(300);
     expect(r.now!.ppmUsd).toBe(320);
@@ -87,14 +100,14 @@ describe('computeChange', () => {
   });
 
   it('محله با کاهش دلاری (رشد تومانی کمتر از رشد تتر)', () => {
-    const r = computeChange(S, 'golestan', 3, {});
+    const r = computeChange(S, 'golestan', 3, {}, T);
     // 60M/200k=$300 → 70M/250k=$280 → −6.67٪
     expect(r.ppmUsdPct).toBeCloseTo(-6.6667, 3);
     expect(r.ppmTomanPct).toBeCloseTo(16.667, 2);
   });
 
   it('دوره بلندتر از تاریخچه → pending با تاریخ در دسترس شدن', () => {
-    const r = computeChange(S, CITY_KEY, 12, {});
+    const r = computeChange(S, CITY_KEY, 12, {}, T);
     expect(r.status).toBe('pending');
     expect(new Date(r.availableFrom!).toISOString().slice(0, 10)).toBe('2027-06-25');
     expect(r.now!.ppmUsd).toBe(320); // مقدار فعلی همچنان در دسترس
@@ -102,14 +115,14 @@ describe('computeChange', () => {
 
   it('محله‌ای که در Snapshot مبنا نبود → no-area', () => {
     const S2 = [S[0], snap('2026-09-26T10:00:00Z', [80e6, 8e9], { newarea: [50e6, 5e9] }, 250000)];
-    expect(computeChange(S2, 'newarea', 3, {}).status).toBe('no-area');
+    expect(computeChange(S2, 'newarea', 3, {}, T).status).toBe('no-area');
   });
 
   it('Snapshot بدون نرخ → از تاریخچه روزانه همان تاریخ', () => {
     const S3 = [snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, null), S[1]];
     const daily = { [tehranDayKey(Date.parse('2026-06-25T10:00:00Z'))]: 200000 };
-    expect(computeChange(S3, CITY_KEY, 3, {}).status).toBe('no-rate');
-    const r = computeChange(S3, CITY_KEY, 3, daily);
+    expect(computeChange(S3, CITY_KEY, 3, {}, T).status).toBe('no-rate');
+    const r = computeChange(S3, CITY_KEY, 3, daily, T);
     expect(r.status).toBe('ok');
     expect(r.base!.rateSource).toBe('history');
   });
@@ -119,13 +132,12 @@ describe('computeChange', () => {
       snap('2026-06-25T10:00:00Z', [60e6, 6e9], { x: [60e6, 6e9, 2] }, 200000),
       snap('2026-09-26T10:00:00Z', [80e6, 8e9], { x: [70e6, 7e9, 5] }, 250000)
     ];
-    expect(computeChange(S4, 'x', 3, {}).lowSample).toBe(true);
+    expect(computeChange(S4, 'x', 3, {}, T).lowSample).toBe(true);
   });
 
-  it('Snapshot قدیمی بدون قیمت کل (نسخه قبلی) → فقط هر متر', () => {
+  it('بدون قیمت کل → فقط هر متر', () => {
     const old = snap('2026-06-25T10:00:00Z', [60e6, 0], {}, 200000);
-    delete old.cityStats.medianTotalToman;
-    const r = computeChange([old, S[1]], CITY_KEY, 3, {});
+    const r = computeChange([old, S[1]], CITY_KEY, 3, {}, T);
     expect(r.ppmUsdPct).not.toBeNull();
     expect(r.totalUsdPct).toBeNull();
   });
@@ -156,7 +168,7 @@ describe('جدول و رتبه‌بندی', () => {
     series.push(snap(new Date(ts).toISOString(), [50e6 + (36 - i) * 1e6, 5e9], { a: [40e6 + (36 - i) * 2e6, 4e9], b: [60e6, 6e9] }, 100000 + (36 - i) * 3000));
   }
   it('۳۶ ماه داده → ۹ دوره اول ok؛ ۴۸ و ۶۰ ماه «در انتظار» با تاریخ', () => {
-    const rows = changeTable(series, CITY_KEY, {});
+    const rows = changeTable(series, CITY_KEY, {}, T);
     expect(rows.map((r) => r.months)).toEqual([1, 3, 6, 9, 12, 16, 24, 32, 36, 48, 60]);
     expect(rows.slice(0, 9).every((r) => r.status === 'ok')).toBe(true);
     expect(rows[9].status).toBe('pending');
@@ -170,33 +182,33 @@ describe('جدول و رتبه‌بندی', () => {
       const ts = monthsBefore(Date.parse('2026-09-26T10:00:00Z'), i);
       long.push(snap(new Date(ts).toISOString(), [50e6 + (60 - i) * 1e6, 5e9], {}, 50000 + (60 - i) * 3000));
     }
-    const r = computeChange(long, CITY_KEY, 60, {});
+    const r = computeChange(long, CITY_KEY, 60, {}, T);
     expect(r.status).toBe('ok');
-    expect(computeChange(long, CITY_KEY, 48, {}).status).toBe('ok');
+    expect(computeChange(long, CITY_KEY, 48, {}, T).status).toBe('ok');
   });
   it('رتبه‌بندی محله‌ها + اختلاف با کل اهواز', () => {
-    const { city, rows } = neighborhoodChanges(series, 12, {});
+    const { city, rows } = neighborhoodChanges(series, 12, {}, T);
     expect(city.status).toBe('ok');
     expect(rows[0].key).toBe('a'); // رشد تومانی بیشتر → بالاتر
     expect(rows[0].vsCityPp).toBeCloseTo(rows[0].change.ppmUsdPct! - city.ppmUsdPct!, 6);
     expect(rows[1].change.ppmUsdPct!).toBeLessThan(0); // b ثابت تومانی، تتر رشد → کاهش دلاری
   });
   it('سری دلاری برای نمودار', () => {
-    expect(usdSeries(series, 'a', {}).length).toBe(37);
+    expect(usdSeries(series, 'a', {}, T).length).toBe(37);
   });
 });
 
-describe('منطقه/میانگین در مقایسه زمانی', () => {
+describe('منطقه در مقایسه زمانی', () => {
   it('Snapshot قدیمی با کلید ادغامی «kianpars» با منطقه «kianpars» جدید مقایسه می‌شود', () => {
     const old = snap('2026-06-25T10:00:00Z', [60e6, 6e9], { kianpars: [100e6, 10e9] }, 200000);
     const cur = snap('2026-09-26T10:00:00Z', [80e6, 8e9], { 'kianpars-east': [150e6, 15e9] }, 250000);
     cur.groupStats = [{ neighborhoodKey: 'kianpars', displayName: 'کیانپارس', stats: stats(140e6, 14e9) }];
-    const r = computeChange([old, cur], 'kianpars', 3, {});
+    const r = computeChange([old, cur], 'kianpars', 3, {}, T);
     expect(r.status).toBe('ok');
     expect(r.base!.ppmUsd).toBe(500);
     expect(r.now!.ppmUsd).toBe(560);
     // محله جزئی که قبلاً وجود نداشت → no-area (نه عدد جعلی)
-    expect(computeChange([old, cur], 'kianpars-east', 3, {}).status).toBe('no-area');
+    expect(computeChange([old, cur], 'kianpars-east', 3, {}, T).status).toBe('no-area');
   });
 
   it('رتبه‌بندی سطح منطقه = گروه‌ها + محله‌های مستقل', () => {
@@ -204,38 +216,27 @@ describe('منطقه/میانگین در مقایسه زمانی', () => {
     a.groupStats = [{ neighborhoodKey: 'kianabad', displayName: 'کیان‌آباد', stats: stats(90e6, 9e9) }];
     const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], { golestan: [70e6, 7e9], 'kianabad-east': [110e6, 11e9] }, 250000);
     b.groupStats = [{ neighborhoodKey: 'kianabad', displayName: 'کیان‌آباد', stats: stats(110e6, 11e9) }];
-    const g = neighborhoodChanges([a, b], 3, {}, { level: 'group' });
+    const g = neighborhoodChanges([a, b], 3, {}, T, 'group');
     expect(g.rows.map((r) => r.key).sort()).toEqual(['golestan', 'kianabad']);
-    const n = neighborhoodChanges([a, b], 3, {}, { level: 'neighborhood' });
+    const n = neighborhoodChanges([a, b], 3, {}, T, 'neighborhood');
     expect(n.rows.map((r) => r.key).sort()).toEqual(['golestan', 'kianabad-east']);
   });
 
-  it('شاخص میانگین به‌جای میانه', () => {
-    const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, 200000);
-    a.cityStats = { ...a.cityStats, meanTomanPerM2: 70e6, meanTotalToman: 7e9 };
-    const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], {}, 250000);
-    b.cityStats = { ...b.cityStats, meanTomanPerM2: 100e6, meanTotalToman: 10e9 };
-    const r = computeChange([a, b], CITY_KEY, 3, {}, 'mean');
-    expect(r.base!.ppmUsd).toBe(350);
-    expect(r.now!.ppmUsd).toBe(400);
-    expect(r.base!.totalUsd).toBe(35000);
-    expect(r.totalUsdPct).toBeCloseTo(14.2857, 3);
-  });
 });
 
 describe('مقایسه هم‌نوع (کلید اول / N سال ساخت)', () => {
   it('byType در Snapshot → تغییر دلاری فقط بین آگهی‌های هم‌نوع', () => {
     const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, 200000);
-    a.cityStats.byType = { 'first-key': { count: 5, medianPpm: 100e6, meanPpm: 100e6, medianTotal: 10e9, meanTotal: 10e9 } };
+    a.cityStats.byType = { 'first-key': { count: 5, medianPpm: 90e6, meanPpm: 100e6, medianTotal: 9e9, meanTotal: 10e9 } };
     const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], {}, 250000);
-    b.cityStats.byType = { 'first-key': { count: 6, medianPpm: 130e6, meanPpm: 130e6, medianTotal: 13e9, meanTotal: 13e9 } };
-    const r = computeChange([a, b], CITY_KEY, 3, {}, 'median', 'first-key');
-    // $500 → $520
+    b.cityStats.byType = { 'first-key': { count: 6, medianPpm: 150e6, meanPpm: 130e6, medianTotal: 15e9, meanTotal: 13e9 } };
+    const r = computeChange([a, b], CITY_KEY, 3, {}, 'first-key');
+    // میانگین (نه میانه): $500 → $520
     expect(r.base!.ppmUsd).toBe(500);
     expect(r.now!.ppmUsd).toBe(520);
     expect(r.ppmUsdPct).toBeCloseTo(4, 6);
     expect(r.totalUsdPct).toBeCloseTo(4, 6);
-    // نوعی که در Snapshot مبنا نیست → no-area (نه عدد ساختگی)
-    expect(computeChange([a, b], CITY_KEY, 3, {}, 'median', 'age3').status).toBe('no-area');
+    // نوعی که در Snapshot نیست → no-type (نه عدد ساختگی)
+    expect(computeChange([a, b], CITY_KEY, 3, {}, 'age3').status).toBe('no-type');
   });
 });

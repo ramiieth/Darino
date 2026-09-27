@@ -192,7 +192,6 @@ export function rekeyListings(listings: PropertyMarketListing[]): {
 export function typeStatsOf(group: PropertyMarketListing[], currentJalaliYear: number): Partial<Record<string, TypeStats>> {
   const out: Partial<Record<string, TypeStats>> = {};
   for (const t of PRICE_TYPES) {
-    if (t.key === 'all') continue;
     const g = group.filter((l) => matchesPriceType(l, t.key, currentJalaliYear));
     if (g.length === 0) continue;
     const ppm = g.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0);
