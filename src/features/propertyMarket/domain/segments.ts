@@ -19,7 +19,7 @@ export interface BandDef<T extends string> {
 }
 
 export const AGE_BANDS: BandDef<Exclude<AgeBand, 'unknown'>>[] = [
-  { key: 'y0-1', label: 'نوساز تا ۱ سال', min: 0, max: 1 },
+  { key: 'y0-1', label: '۱ سال (نوساز)', min: 0, max: 1 },
   { key: 'y2', label: '۲ سال', min: 2, max: 2 },
   { key: 'y3', label: '۳ سال', min: 3, max: 3 },
   { key: 'y4', label: '۴ سال', min: 4, max: 4 },
@@ -81,33 +81,31 @@ export function jalaliYearOf(ts: number): number {
   return d.getUTCFullYear() - (afterNowruz ? 621 : 622);
 }
 
-/* ---------------- «نوع قیمت» (برای جدول مناطق و تاریخچه) ---------------- */
+/* ---------------- «نوع قیمت» — محور اصلی ماژول ---------------- */
 
 /**
- * all = همه آگهی‌ها؛ first-key = «کلید اول» (متن صریح)؛ ageN = N سال ساخت
- * (age1 = نوساز تا ۱ سال). دسته‌ها افراز نیستند: آگهی کلید اولِ ۱ ساله در هر دو است.
+ * first-key = «کلید اول» (متن صریح)؛ ageN = N سال ساخت (age1 = نوساز تا ۱ سال).
+ * دسته‌ها افراز نیستند: آگهی کلید اولِ ۱ ساله در هر دو است.
  */
-export type PriceType = 'all' | 'first-key' | 'age1' | 'age2' | 'age3' | 'age4' | 'age5' | 'age6' | 'age7';
+export type PriceType = 'first-key' | 'age1' | 'age2' | 'age3' | 'age4' | 'age5' | 'age6' | 'age7';
 
-export const PRICE_TYPES: { key: PriceType; label: string; short: string }[] = [
-  { key: 'all', label: 'میانه همه آگهی‌ها', short: 'همه' },
-  { key: 'first-key', label: 'کلید اول', short: 'کلید اول' },
-  { key: 'age1', label: '۱ سال ساخت (نوساز)', short: '۱ سال' },
-  { key: 'age2', label: '۲ سال ساخت', short: '۲ سال' },
-  { key: 'age3', label: '۳ سال ساخت', short: '۳ سال' },
-  { key: 'age4', label: '۴ سال ساخت', short: '۴ سال' },
-  { key: 'age5', label: '۵ سال ساخت', short: '۵ سال' },
-  { key: 'age6', label: '۶ سال ساخت', short: '۶ سال' },
-  { key: 'age7', label: '۷ سال ساخت', short: '۷ سال' }
+export const PRICE_TYPES: { key: PriceType; label: string }[] = [
+  { key: 'first-key', label: 'کلید اول' },
+  { key: 'age1', label: '۱ سال' },
+  { key: 'age2', label: '۲ سال' },
+  { key: 'age3', label: '۳ سال' },
+  { key: 'age4', label: '۴ سال' },
+  { key: 'age5', label: '۵ سال' },
+  { key: 'age6', label: '۶ سال' },
+  { key: 'age7', label: '۷ سال' }
 ];
 
-/** آیا آگهی (با سن محاسبه‌شده) در این نوع قیمت می‌گنجد؟ */
+/** آیا آگهی در این نوع قیمت می‌گنجد؟ */
 export function matchesPriceType(
   l: { firstKey?: boolean | null; yearBuilt: number | null },
   type: PriceType,
   currentJalaliYear: number
 ): boolean {
-  if (type === 'all') return true;
   if (type === 'first-key') return l.firstKey === true;
   const age = buildingAgeYears(l.yearBuilt, currentJalaliYear);
   if (age === null) return false;
@@ -116,5 +114,12 @@ export function matchesPriceType(
 }
 
 export function priceTypeLabel(t: PriceType): string {
-  return PRICE_TYPES.find((p) => p.key === t)?.label ?? t;
+  const label = PRICE_TYPES.find((p) => p.key === t)?.label ?? t;
+  return t === 'first-key' ? label : `${label} ساخت`;
+}
+
+/** نوع قیمت → فیلتر سن بنای فهرست آگهی‌ها (age1 = «y0-1»، ageN = «yN») */
+export function ageFilterOfType(t: PriceType): AgeBand | 'first-key' {
+  if (t === 'first-key') return 'first-key';
+  return t === 'age1' ? 'y0-1' : (`y${t.slice(3)}` as AgeBand);
 }

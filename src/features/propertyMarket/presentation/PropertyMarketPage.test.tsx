@@ -118,19 +118,22 @@ describe('PropertyMarketPage', () => {
     expect(b.code).not.toContain('%%DARINO_ORIGIN%%');
   });
 
-  it('با داده — KPI، جدول مناطق (فقط پرنمونه) و نمایش همه', async () => {
+  it('با داده — خلاصه انواع قیمت، جدول مناطق (فقط پرنمونه) و نمایش همه؛ بدون «میانه»', async () => {
     usePropertyMarketStore.setState({ listings: MANY });
     render(<PropertyMarketPage />);
     expect((await screen.findAllByText('کیانپارس')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('گلستان').length).toBeGreaterThan(0);
-    expect(screen.getByText(/میانه قیمت اهواز/)).toBeTruthy();
+    expect(screen.getByText('قیمت هر متر در اهواز')).toBeTruthy();
+    expect(screen.getByText('کلید اول', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText('۵ سال ساخت')).toBeTruthy();
+    expect(screen.queryAllByText(/میانه/).length).toBe(0);
     // محله کم‌نمونه پیش‌فرض پنهان
     expect(screen.queryAllByText('زرگان').length).toBe(0);
     fireEvent.click(screen.getAllByRole('button', { name: /نمایش همه/ })[0]);
     expect((await screen.findAllByText('زرگان')).length).toBeGreaterThan(0);
   });
 
-  it('تب آگهی‌ها و نمودارها', async () => {
+  it('تب آگهی‌ها — فیلتر منبع', async () => {
     usePropertyMarketStore.setState({ listings: MANY });
     render(<PropertyMarketPage />);
     fireEvent.click(await screen.findByRole('tab', { name: /آگهی‌ها/ }));
@@ -138,8 +141,16 @@ describe('PropertyMarketPage', () => {
     fireEvent.click(screen.getByRole('radio', { name: /شیپور/ }));
     expect(screen.queryByText('آگهی k1')).toBeNull();
     expect(screen.getByText('آگهی k3')).toBeTruthy();
-    fireEvent.click(screen.getByRole('tab', { name: /نمودارها/ }));
-    expect(await screen.findByText(/حداقل دو Snapshot/)).toBeTruthy();
+  });
+
+  it('کلیک روی خانه جدول مناطق → آگهی‌های همان منطقه و نوع', async () => {
+    usePropertyMarketStore.setState({ listings: MANY });
+    render(<PropertyMarketPage />);
+    // سال ساخت ۱۴۰۰ → ۵ سال
+    fireEvent.click(await screen.findByRole('button', { name: 'آگهی‌های گلستان · ۵ سال' }));
+    expect(await screen.findByText('آگهی g1')).toBeTruthy();
+    expect(screen.queryByText('آگهی k1')).toBeNull();
+    expect((screen.getByRole('combobox', { name: 'سال ساخت' }) as HTMLSelectElement).value).toBe('y5');
   });
 
   it('پل مرورگر: پیام از divar.ir وارد می‌شود؛ origin غیرمجاز نادیده گرفته می‌شود', async () => {
@@ -181,18 +192,14 @@ describe('PropertyMarketPage', () => {
     expect(useUsdtStore.getState().quote?.priceToman).toBe(250000);
   });
 
-  it('تب دسته‌بندی: سن بنا و متراژ؛ کلیک روی دسته → آگهی‌های همان دسته با معادل دلاری', async () => {
+  it('کارت نوع قیمت و تب متراژ؛ کلیک روی کارت → آگهی‌های همان نوع با معادل دلاری', async () => {
     const withAge = MANY.map((l, i) => ({ ...l, yearBuilt: i < 3 ? 1404 : 1390 }));
     usePropertyMarketStore.setState({ listings: withAge });
     render(<PropertyMarketPage />);
     await waitFor(() => expect(useUsdtStore.getState().quote).not.toBeNull());
-    fireEvent.click(await screen.findByRole('tab', { name: /دسته‌بندی/ }));
-    expect(await screen.findByText('نوساز تا ۱ سال')).toBeTruthy();
-    expect(screen.getByText('۱۱ تا ۲۰ سال')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'بازه متراژ' }));
+    fireEvent.click(await screen.findByRole('tab', { name: /متراژ/ }));
     expect(await screen.findByText('۱۰۰ تا ۱۲۰ متر')).toBeTruthy();
-    fireEvent.click(screen.getByRole('radio', { name: 'سن بنا' }));
-    fireEvent.click(await screen.findByText('نوساز تا ۱ سال'));
+    fireEvent.click(screen.getByRole('button', { name: '۱ سال: آگهی‌ها' }));
     // به تب آگهی‌ها رفت و فقط نوسازها
     expect(await screen.findByText('آگهی k1')).toBeTruthy();
     expect(screen.queryByText('آگهی g1')).toBeNull();
@@ -204,7 +211,10 @@ describe('PropertyMarketPage', () => {
     const mk = (id: string, dateTs: number, ppm: number, rate: number) => ({
       id, dateTs, dateLabel: '', city: 'ahvaz' as const, source: 'divar' as const,
       fxRateAtSnapshotToman: rate, fxSource: 'wallex' as const,
-      cityStats: { medianTomanPerM2: ppm, meanTomanPerM2: ppm, p25TomanPerM2: ppm, p75TomanPerM2: ppm, listingCount: 20, medianTotalToman: ppm * 100 },
+      cityStats: {
+        medianTomanPerM2: ppm, meanTomanPerM2: ppm, p25TomanPerM2: ppm, p75TomanPerM2: ppm, listingCount: 20, medianTotalToman: ppm * 100,
+        byType: { 'first-key': { count: 20, medianPpm: ppm, meanPpm: ppm, medianTotal: ppm * 100, meanTotal: ppm * 100 } }
+      },
       neighborhoodStats: [{ neighborhoodKey: 'golestan', displayName: 'گلستان', stats: { medianTomanPerM2: ppm, meanTomanPerM2: ppm, p25TomanPerM2: ppm, p75TomanPerM2: ppm, listingCount: 8, medianTotalToman: ppm * 90 } }],
       cleaning: { raw: 0, normalized: 0, valid: 0, deduplicated: 0, outliersRemoved: 0, market: 20, rejectReasons: {} },
       createdAt: dateTs
@@ -213,8 +223,8 @@ describe('PropertyMarketPage', () => {
     usePropertyMarketStore.setState({ listings: MANY, snapshots: [mk('s-now', now, 80e6, 250000)] });
     render(<PropertyMarketPage />);
     fireEvent.click(await screen.findByRole('tab', { name: /تغییرات قیمت/ }));
-    expect(await screen.findByText(/تاریخچه از حالا ساخته می‌شود/)).toBeTruthy();
-    expect(screen.getAllByText(/قابل نمایش/).length).toBeGreaterThanOrEqual(9);
+    expect(await screen.findByText(/تاریخچه با هر «به‌روزرسانی داده» ساخته می‌شود/)).toBeTruthy();
+    expect(screen.getByText(/دوره‌های ۱، ۳، ۶، ۹، ۱۲، ۱۶، ۲۴، ۳۲، ۳۶، ۴۸، ۶۰ ماه هنوز داده ندارند/)).toBeTruthy();
     cleanup();
 
     const threeMonthsAgo = new Date(now);
@@ -248,11 +258,14 @@ describe('PropertyMarketPage', () => {
     expect(screen.getAllByText('کیانپارس غربی').length).toBeGreaterThan(0);
   });
 
-  it('جدول انواع قیمت: ستون‌های کلید اول و ۱ تا ۷ سال', async () => {
+  it('جدول مناطق: فقط ستون‌های کلید اول و ۱ تا ۷ سال', async () => {
     const withTypes = MANY.map((l, i) => ({ ...l, yearBuilt: 1405 - (i % 4), firstKey: i === 0 }));
     usePropertyMarketStore.setState({ listings: withTypes });
     render(<PropertyMarketPage />);
-    expect((await screen.findAllByText('قیمت به تفکیک کلید اول و سال ساخت')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByRole('columnheader', { name: 'کلید اول' })).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+      'منطقه', 'کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال'
+    ]);
     for (const h of ['کلید اول', '۱ سال', '۲ سال', '۳ سال', '۴ سال', '۵ سال', '۶ سال', '۷ سال']) {
       expect(screen.getAllByRole('columnheader', { name: h }).length).toBeGreaterThan(0);
     }
@@ -264,10 +277,10 @@ describe('PropertyMarketPage', () => {
     const sized = MANY.map((l, i) => ({ ...l, areaSqm: [95, 120, 120, 175, 300, 60, 400][i], totalPriceToman: (l.pricePerSqmToman ?? 0) * [95, 120, 120, 175, 300, 60, 400][i] }));
     usePropertyMarketStore.setState({ listings: sized });
     render(<PropertyMarketPage />);
-    fireEvent.click(await screen.findByRole('tab', { name: /دسته‌بندی/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: /متراژ/ }));
     fireEvent.click(screen.getByRole('radio', { name: 'متراژ دقیق' }));
-    expect(await screen.findByText(/۹۰ تا ۱۷۰ متر · ۲ متراژ متفاوت · ۳ آگهی/)).toBeTruthy();
-    expect(screen.getByText(/۱۷۱ تا ۳۳۰ متر · ۲ متراژ متفاوت/)).toBeTruthy();
+    expect(await screen.findByText(/۹۰ تا ۱۷۰ متر · ۳ آگهی/)).toBeTruthy();
+    expect(screen.getByText(/۱۷۱ تا ۳۳۰ متر · ۲ آگهی/)).toBeTruthy();
     expect(screen.getByText(/کمتر از ۹۰ متر/)).toBeTruthy();
     expect(screen.getByText(/بیش از ۳۳۰ متر/)).toBeTruthy();
     fireEvent.click(screen.getByText('۱۲۰ متر'));

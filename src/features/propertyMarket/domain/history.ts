@@ -70,9 +70,6 @@ export function areaStatsOf(s: PropertyMarketSnapshot, key: string): AreaPriceSt
   );
 }
 
-/** شاخص قیمت: میانه (مقاوم در برابر آگهی‌های استثنایی) یا میانگین */
-export type PriceMetric = 'median' | 'mean';
-
 export interface PointValues {
   snapshotId: string;
   dateTs: number;
@@ -85,42 +82,26 @@ export interface PointValues {
   totalUsd: number | null;
 }
 
+/** میانگین قیمت یک نوع (کلید اول / N سال ساخت) در یک ناحیه — مقایسه فقط هم‌نوع */
 export function pointOf(
   s: PropertyMarketSnapshot,
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median',
-  type: PriceType = 'all'
+  type: PriceType
 ): PointValues | null {
-  const st = areaStatsOf(s, key);
+  const ts = areaStatsOf(s, key)?.byType?.[type];
   const r = snapshotRate(s, daily);
-  if (!st || !r) return null;
-  let ppm: number | null;
-  let total: number | null;
-  let count: number;
-  if (type === 'all') {
-    ppm = metric === 'mean' ? st.meanTomanPerM2 : st.medianTomanPerM2;
-    total = (metric === 'mean' ? st.meanTotalToman : st.medianTotalToman) ?? null;
-    count = st.listingCount;
-  } else {
-    // نوع قیمت (کلید اول / N سال ساخت) — مقایسه هم‌سن
-    const ts = st.byType?.[type];
-    if (!ts) return null;
-    ppm = metric === 'mean' ? ts.meanPpm : ts.medianPpm;
-    total = metric === 'mean' ? ts.meanTotal : ts.medianTotal;
-    count = ts.count;
-  }
-  if (ppm === null) return null;
+  if (!ts || !r || ts.meanPpm === null) return null;
   return {
     snapshotId: s.id,
     dateTs: s.dateTs,
     rate: r.rate,
     rateSource: r.source,
-    count,
-    ppmToman: ppm,
-    ppmUsd: ppm / r.rate,
-    totalToman: total,
-    totalUsd: total !== null ? total / r.rate : null
+    count: ts.count,
+    ppmToman: ts.meanPpm,
+    ppmUsd: ts.meanPpm / r.rate,
+    totalToman: ts.meanTotal,
+    totalUsd: ts.meanTotal !== null ? ts.meanTotal / r.rate : null
   };
 }
 
@@ -129,7 +110,7 @@ function pct(from: number | null, to: number | null): number | null {
   return ((to - from) / Math.abs(from)) * 100;
 }
 
-export type ChangeStatus = 'ok' | 'pending' | 'no-area' | 'no-rate' | 'no-data';
+export type ChangeStatus = 'ok' | 'pending' | 'no-area' | 'no-type' | 'no-rate' | 'no-data';
 
 export interface ChangeRow {
   months: number;
@@ -153,7 +134,7 @@ export const MIN_SAMPLE_FOR_CHANGE = 3;
 function missingReason(s: PropertyMarketSnapshot, key: string, daily: DailyRates): ChangeStatus {
   if (!areaStatsOf(s, key)) return 'no-area';
   if (!snapshotRate(s, daily)) return 'no-rate';
-  return 'no-area'; // ناحیه هست ولی این نوع قیمت (مثلاً ۳ سال ساخت) آگهی نداشت
+  return 'no-type'; // ناحیه هست ولی این نوع قیمت آگهی نداشت (یا Snapshot قدیمی تفکیک نوع ندارد)
 }
 
 /** Snapshotهای قابل مقایسه (مرتب قدیم→جدید) */
@@ -187,8 +168,7 @@ export function computeChange(
   key: string,
   months: number,
   daily: DailyRates,
-  metric: PriceMetric = 'median',
-  type: PriceType = 'all'
+  type: PriceType
 ): ChangeRow {
   const snaps = ordered(snapsIn);
   const empty: ChangeRow = {
@@ -206,7 +186,7 @@ export function computeChange(
   };
   const current = snaps[snaps.length - 1];
   if (!current) return empty;
-  const now = pointOf(current, key, daily, metric, type);
+  const now = pointOf(current, key, daily, type);
   if (!now) {
     return { ...empty, status: missingReason(current, key, daily) };
   }
@@ -218,7 +198,7 @@ export function computeChange(
     const tooEarly = monthsBefore(current.dateTs, months) < first.dateTs - toleranceMs(months);
     return { ...empty, now, status: tooEarly ? 'pending' : 'no-data', availableFrom: tooEarly ? availableFrom : null };
   }
-  const base = pointOf(baseSnap, key, daily, metric, type);
+  const base = pointOf(baseSnap, key, daily, type);
   if (!base) {
     return { ...empty, now, status: missingReason(baseSnap, key, daily) };
   }
@@ -242,10 +222,9 @@ export function changeTable(
   snaps: PropertyMarketSnapshot[],
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median',
-  type: PriceType = 'all'
+  type: PriceType
 ): ChangeRow[] {
-  return CHANGE_PERIODS_MONTHS.map((m) => computeChange(snaps, key, m, daily, metric, type));
+  return CHANGE_PERIODS_MONTHS.map((m) => computeChange(snaps, key, m, daily, type));
 }
 
 export interface NeighborhoodChangeRow {
@@ -261,21 +240,20 @@ export function neighborhoodChanges(
   snapsIn: PropertyMarketSnapshot[],
   months: number,
   daily: DailyRates,
-  opts: { level?: 'neighborhood' | 'group'; metric?: PriceMetric; type?: PriceType } = {}
+  type: PriceType,
+  level: 'neighborhood' | 'group' = 'group'
 ): { city: ChangeRow; rows: NeighborhoodChangeRow[] } {
-  const metric = opts.metric ?? 'median';
   const snaps = ordered(snapsIn);
-  const type = opts.type ?? 'all';
-  const city = computeChange(snaps, CITY_KEY, months, daily, metric, type);
+  const city = computeChange(snaps, CITY_KEY, months, daily, type);
   const current = snaps[snaps.length - 1];
   if (!current) return { city, rows: [] };
   // منطقه = گروه‌ها + محله‌های مستقل (مثل گلستان) — کل اهواز پوشش داده می‌شود
   const list =
-    opts.level === 'group'
+    level === 'group'
       ? [...(current.groupStats ?? []), ...current.neighborhoodStats.filter((n) => !areaGroupOf(n.neighborhoodKey))]
       : current.neighborhoodStats;
   const rows = list.map((n) => {
-    const change = computeChange(snaps, n.neighborhoodKey, months, daily, metric, type);
+    const change = computeChange(snaps, n.neighborhoodKey, months, daily, type);
     const vsCityPp =
       change.ppmUsdPct !== null && city.ppmUsdPct !== null ? change.ppmUsdPct - city.ppmUsdPct : null;
     return { key: n.neighborhoodKey, displayName: n.displayName, change, vsCityPp };
@@ -289,11 +267,10 @@ export function usdSeries(
   snapsIn: PropertyMarketSnapshot[],
   key: string,
   daily: DailyRates,
-  metric: PriceMetric = 'median',
-  type: PriceType = 'all'
+  type: PriceType
 ): PointValues[] {
   return ordered(snapsIn)
-    .map((s) => pointOf(s, key, daily, metric, type))
+    .map((s) => pointOf(s, key, daily, type))
     .filter((p): p is PointValues => p !== null);
 }
 
