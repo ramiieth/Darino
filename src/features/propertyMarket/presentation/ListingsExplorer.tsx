@@ -10,12 +10,12 @@ import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Input';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 import { areaKeyOf, neighborhoodDisplayName } from '../data/catalog';
-import { AGE_BANDS, AREA_BANDS, type AgeBand, type AreaBand } from '../domain/segments';
+import { AGE_BANDS, AREA_BANDS, ageBandLabel, ageBandSub, type AgeBand, type AreaBand } from '../domain/segments';
 import type { ListingView } from '../service/propertyMarketService';
 import { fmtMillionToman, fmtTotalToman, fmtUsdFa } from './format';
 
 type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
-export type AgeFilter = 'all' | AgeBand | 'first-key';
+export type AgeFilter = 'all' | AgeBand;
 export type AreaFilter = 'all' | AreaBand;
 
 const PAGE = 25;
@@ -34,8 +34,11 @@ export function ListingsExplorer({
   exactArea = null,
   onExactArea,
   place = 'all',
-  onPlace
+  onPlace,
+  jalaliYear
 }: {
+  /** سال شمسی جاری — برچسب فیلتر سال ساخت */
+  jalaliYear: number;
   /** فیلتر منطقه (کلید منطقه) */
   place?: string;
   onPlace?: (v: string) => void;
@@ -75,7 +78,7 @@ export function ListingsExplorer({
     const f = listings.filter(
       (l) =>
         (nb === 'all' || areaKeyOf(l.neighborhoodKey) === nb) &&
-        (ageF === 'all' || (ageF === 'first-key' ? l.firstKey === true : l.ageBand === ageF)) &&
+        (ageF === 'all' || l.ageBand === ageF) &&
         (areaF === 'all' || l.areaBand === areaF) &&
         (exactArea === null || (l.areaSqm !== null && Math.round(l.areaSqm) === exactArea))
     );
@@ -139,9 +142,10 @@ export function ListingsExplorer({
               }}
             >
               <option value="all">هر سال ساخت</option>
-              <option value="first-key">کلید اول</option>
               {AGE_BANDS.map((b) => (
-                <option key={b.key} value={b.key}>{b.label}</option>
+                <option key={b.key} value={b.key}>
+                  {ageBandLabel(b.key, jalaliYear)} ({ageBandSub(b.key)})
+                </option>
               ))}
               <option value="unknown">سال ساخت نامشخص</option>
             </Select>
@@ -193,8 +197,7 @@ export function ListingsExplorer({
                   {neighborhoodDisplayName(l.neighborhoodKey)}
                   {l.areaSqm !== null && <> · {toFaDigits(l.areaSqm)} متر</>}
                   {l.rooms !== null && <> · {l.rooms === 0 ? 'بدون اتاق' : `${toFaDigits(l.rooms)} خواب`}</>}
-                  {l.ageYears !== null && <> · {l.ageYears === 0 ? 'نوساز' : `${toFaDigits(l.ageYears)} ساله`}</>}
-                  {l.firstKey && <> · <span className="font-semibold text-accent">کلید اول</span></>}
+                  {l.yearBuilt !== null && <> · ساخت {toFaDigits(l.yearBuilt)}</>}
                 </p>
                 <p className="mt-0.5 text-2xs text-subtle">
                   {l.sourceUpdatedAt ? <>به‌روزرسانی آگهی: {fmtRelativeAge(l.sourceUpdatedAt)}</> : <>دیده‌شده: {fmtRelativeAge(l.scrapedAt)}</>}

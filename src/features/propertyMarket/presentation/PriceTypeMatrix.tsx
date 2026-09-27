@@ -1,17 +1,16 @@
 /** ============================================================
  * Property Market — جدول «ردیف × نوع قیمت»
  *
- *  ستون‌ها: کلید اول | ۱ تا ۷ سال ساخت (جدا از هم)
- *  ردیف‌ها: مناطق یا بازه‌های متراژ (از سرویس)
+ *  ستون‌ها: سال ساخت — ۱۴۰۵ (نوساز) | ۱۴۰۴ (۱ سال) … ۱۳۹۸ (۷ سال) | قبل‌تر
+ *  ردیف‌ها: همه مناطق یا بازه‌های متراژ (هیچ ردیفی پنهان نمی‌شود)
  *  هر خانه: میانگین تومان + معادل دلاری تتر + تعداد آگهی (ارقام فارسی)
  *  ⚠️ فقط نمایش — اعداد از سرویس
  * ============================================================ */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits } from '@/shared/utils/formatters';
-import { PRICE_TYPES, type PriceType } from '../domain/segments';
+import { PRICE_TYPES, priceTypeSub, priceTypeYear, type PriceType } from '../domain/segments';
 import { MIN_SAMPLE_FOR_CHANGE } from '../domain/history';
 import type { TypeMatrixRow } from '../service/propertyMarketService';
 import { fmtMillionToman, fmtTotalToman, fmtUsdFa } from './format';
@@ -20,6 +19,7 @@ type Measure = 'ppm' | 'total';
 
 export function PriceTypeMatrix({
   rows,
+  jalaliYear,
   rowHeader,
   caption,
   toolbar,
@@ -27,6 +27,8 @@ export function PriceTypeMatrix({
   onPickRow
 }: {
   rows: TypeMatrixRow[];
+  /** سال شمسی جاری — سرستون‌ها از آن ساخته می‌شوند */
+  jalaliYear: number;
   /** عنوان ستون ردیف‌ها — «منطقه» / «متراژ» */
   rowHeader: string;
   caption: string;
@@ -38,11 +40,6 @@ export function PriceTypeMatrix({
   onPickRow?: (rowKey: string) => void;
 }) {
   const [measure, setMeasure] = useState<Measure>('ppm');
-  const [showAll, setShowAll] = useState(false);
-
-  // ردیف کم‌نمونه = کمتر از ۳ آگهی داخل ستون‌ها
-  const visible = useMemo(() => (showAll ? rows : rows.filter((r) => r.count >= MIN_SAMPLE_FOR_CHANGE)), [rows, showAll]);
-  const hidden = rows.length - visible.length;
 
   return (
     <div>
@@ -58,15 +55,10 @@ export function PriceTypeMatrix({
           ]}
         />
         {toolbar}
-        {(hidden > 0 || showAll) && (
-          <Button variant="ghost" size="sm" className="ms-auto" onClick={() => setShowAll((v) => !v)}>
-            {showAll ? 'فقط با نمونه کافی' : `نمایش همه (${toFaDigits(hidden)} ردیف کم‌نمونه)`}
-          </Button>
-        )}
       </div>
 
-      {rows.every((r) => r.count === 0) ? (
-        <p className="py-8 text-center text-sm text-muted">هیچ آگهی‌ای «کلید اول» یا سال ساخت ۱ تا ۷ ندارد</p>
+      {rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted">آگهی‌ای نیست</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="data-table min-w-[960px]">
@@ -75,14 +67,15 @@ export function PriceTypeMatrix({
               <tr>
                 <th scope="col" className="sticky start-0 z-10 bg-card !ps-5">{rowHeader}</th>
                 {PRICE_TYPES.map((t) => (
-                  <th key={t.key} scope="col" className={cn('col-num whitespace-nowrap', t.key === 'first-key' && 'text-accent')}>
-                    {t.label}
+                  <th key={t.key} scope="col" className="col-num whitespace-nowrap">
+                    {priceTypeYear(t.key, jalaliYear)}
+                    <span className="block text-2xs font-normal text-muted">{priceTypeSub(t.key)}</span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {visible.map((r) => (
+              {rows.map((r) => (
                 <tr key={r.key}>
                   <th scope="row" className="sticky start-0 z-10 bg-card !ps-5 text-start font-semibold text-ink">
                     {onPickRow ? (
@@ -93,9 +86,8 @@ export function PriceTypeMatrix({
                       r.displayName
                     )}
                     <span className="block text-2xs font-normal text-muted">
-                      {r.total > r.count
-                        ? `${toFaDigits(r.count)} از ${toFaDigits(r.total)} آگهی`
-                        : `${toFaDigits(r.count)} آگهی`}
+                      {toFaDigits(r.total)} آگهی
+                      {r.total > r.count && ` · ${toFaDigits(r.total - r.count)} بدون سال ساخت`}
                     </span>
                   </th>
                   {PRICE_TYPES.map((t) => {
@@ -121,7 +113,7 @@ export function PriceTypeMatrix({
                             type="button"
                             onClick={() => onPick(r.key, t.key)}
                             className="-m-1 rounded-control p-1 text-end hover:bg-surface-2"
-                            aria-label={`آگهی‌های ${r.displayName} · ${t.label}`}
+                            aria-label={`آگهی‌های ${r.displayName} · ساخت ${priceTypeYear(t.key, jalaliYear)}`}
                           >
                             {body}
                           </button>
@@ -138,8 +130,8 @@ export function PriceTypeMatrix({
         </div>
       )}
       <p className="border-t border-divider px-4 py-2.5 text-2xs text-muted">
-        میانگین آگهی‌های هر نوع · زیر هر قیمت: معادل دلاری تتر و تعداد آگهی · کم‌رنگ = کمتر از ۳ آگهی ·
-        «۲ از ۱۰» یعنی ۸ آگهی بیش از ۷ سال ساخت دارند یا سال ساخت ندارند
+        ستون‌ها بر اساس «سال ساخت» آگهی · میانگین قیمت · زیر هر قیمت: معادل دلاری تتر و تعداد آگهی · کم‌رنگ = کمتر
+        از ۳ آگهی
       </p>
     </div>
   );

@@ -99,7 +99,7 @@ export interface CollectState {
 
 const ALL_SOURCES: ListingSource[] = ['divar'];
 /** محافظ حلقه: حداکثر تکه برای هر منبع در یک اجرا */
-const MAX_CHUNKS_PER_SOURCE = 120;
+const MAX_CHUNKS_PER_SOURCE = 400;
 const CHUNK_TIMEOUT_MS = 75_000;
 
 export const EMPTY_PROGRESS: SourceProgress = {
@@ -338,6 +338,10 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
     patchSource(source, { status: 'running', error: null });
     let cursor: CollectCursor | null = null;
     let retried = false;
+    // آگهی‌هایی که متراژ و سال ساختشان ذخیره است → سرور جزئیاتشان را دوباره نمی‌گیرد
+    const known = get()
+      .listings.filter((l) => l.areaSqm !== null && l.yearBuilt !== null)
+      .map((l) => l.token);
     for (let i = 0; i < MAX_CHUNKS_PER_SOURCE; i++) {
       if (cancelRequested) {
         patchSource(source, { status: 'cancelled' });
@@ -347,7 +351,7 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
       try {
         res = await fetchJson<CollectChunkResponse>('/api/propertyMarket', {
           method: 'POST',
-          body: { action: 'collectChunk', source, city: 'ahvaz', cursor },
+          body: { action: 'collectChunk', source, city: 'ahvaz', cursor, known },
           timeoutMs: CHUNK_TIMEOUT_MS
         });
       } catch (e) {

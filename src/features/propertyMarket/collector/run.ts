@@ -78,6 +78,11 @@ export interface CollectChunkOptions {
   fetcher?: Fetcher;
   /** سقف صفحات فهرست (محافظ حلقه) */
   maxPages?: number;
+  /**
+   * توکن آگهی‌هایی که جزئیاتشان (متراژ، سال ساخت…) قبلاً ذخیره شده — دوباره
+   * واکشی نمی‌شوند؛ قیمت تازه از فهرست می‌آید و بقیه در کلاینت از نسخه ذخیره‌شده پر می‌شود.
+   */
+  knownTokens?: string[];
 }
 
 export interface CollectChunkResult {
@@ -93,10 +98,12 @@ export interface CollectChunkResult {
   pending: number;
 }
 
-export const DEFAULT_MAX_LISTINGS = 360;
-export const DEFAULT_DETAIL_BUDGET = 30;
+/** کل آگهی‌های آپارتمان فروشی اهواز (نه فقط جدیدترین‌ها) — تا همه مناطق پوشش داده شوند */
+export const DEFAULT_MAX_LISTINGS = 3000;
+/** سقف تعداد؛ سقف واقعی را بودجه زمان هر تکه تعیین می‌کند */
+export const DEFAULT_DETAIL_BUDGET = 60;
 export const DEFAULT_TIME_BUDGET_MS = 40_000;
-export const DEFAULT_MAX_PAGES = 40;
+export const DEFAULT_MAX_PAGES = 150;
 
 /** نیاز به جزئیات دارد؟ وقتی قیمت/متر از فهرست محاسبه‌پذیر نیست */
 export function needsDetail(seed: ParsedListingSeed): boolean {
@@ -122,6 +129,7 @@ export async function collectChunk(opts: CollectChunkOptions): Promise<CollectCh
   const maxListings = opts.maxListings ?? DEFAULT_MAX_LISTINGS;
   const maxPages = opts.maxPages ?? DEFAULT_MAX_PAGES;
   const cursor = opts.cursor ? sanitizeCursor(opts.cursor, source) : newCursor(source);
+  const known = new Set(opts.knownTokens ?? []);
   const startedAt = Date.now();
   const timeLeft = () => timeBudgetMs - (Date.now() - startedAt);
 
@@ -144,7 +152,7 @@ export async function collectChunk(opts: CollectChunkOptions): Promise<CollectCh
       if (cursor.seenTokens.includes(seed.token)) continue;
       if (cursor.seenTokens.length >= maxListings) break;
       cursor.seenTokens.push(seed.token);
-      if (needsDetail(seed)) cursor.pendingSeeds.push(seed);
+      if (needsDetail(seed) && !known.has(seed.token)) cursor.pendingSeeds.push(seed);
       else out.push(seed);
     }
     if (cursor.seenTokens.length >= maxListings || cursor.pagesRead >= maxPages) cursor.hasNextPage = false;

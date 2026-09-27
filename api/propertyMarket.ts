@@ -121,11 +121,16 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (action === 'collectChunk') {
       const source: ListingSource = isSource(body.source) ? body.source : 'divar';
       const cursor = sanitizeCursor(body.cursor, source);
+      // آگهی‌هایی که کلاینت جزئیاتشان را دارد (سقف برای محافظت از حجم درخواست)
+      const knownTokens = Array.isArray(body.known)
+        ? body.known.filter((t): t is string => typeof t === 'string').slice(0, 20_000)
+        : [];
       try {
         const r = await collectChunk({
           city: 'ahvaz',
           source,
           cursor,
+          knownTokens,
           pauseMs: 350,
           timeBudgetMs: CHUNK_TIME_BUDGET_MS
         });

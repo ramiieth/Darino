@@ -11,7 +11,7 @@
 import type { ListingSource, PropertyKind } from '../domain/types.js';
 import { DIVAR_POST_PAGE_URL } from './endpoints.js';
 import { otherCityMarker } from '../data/catalog.js';
-import { detectFirstKey, findDivarDates } from './dates.js';
+import { findDivarDates } from './dates.js';
 
 /* ---------------- ابزار اعداد/متن ---------------- */
 
@@ -111,8 +111,6 @@ export interface ParsedListingSeed {
   otherCity?: string | null;
   /** آخرین به‌روزرسانی آگهی در منبع (دیوار: به‌روزرسانی/نردبان؛ شیپور: برچسب نسبی) */
   sourceUpdatedAt?: number | null;
-  /** «کلید اول» — فقط متن صریح عنوان/توضیحات */
-  firstKey?: boolean | null;
 }
 
 export function emptySeed(token: string, source: ListingSource = 'divar'): ParsedListingSeed {
@@ -346,14 +344,6 @@ export function parseIntoSeed(seed: ParsedListingSeed, detail: Record<string, un
     const upd = dates.updatedAt ?? dates.bumpedAt ?? dates.publishedAt;
     if (upd !== null) seed.sourceUpdatedAt = upd;
   }
-
-  // کلید اول (عنوان + توضیحات)
-  const desc = collectDetailWidgets(detail)
-    .filter((w) => w.widget_type === 'DESCRIPTION_ROW' && isObj(w.data))
-    .map((w) => (w.data as Record<string, unknown>).text)
-    .filter((t): t is string => typeof t === 'string')
-    .join('\n');
-  seed.firstKey = detectFirstKey(seed.title, desc);
 
   // زمان ثبت در ریشه پاسخ (برخی نسخه‌ها)
   if (seed.listedAt === null) {

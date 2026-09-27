@@ -2,7 +2,7 @@
  * Property Market Service — تنها مسیر محاسبات بازار → UI
  *
  *  تنها سطح تحلیل «منطقه» است (محله‌های هم‌نام با هم: کیانپارس، پادادشهر…).
- *  محور جدول‌ها «نوع قیمت» است: کلید اول و ۱ تا ۷ سال ساخت (جدا از هم).
+ *  ستون‌های جدول‌ها «سال ساخت» است: ۱۴۰۵ (نوساز) … ۱۳۹۸ و «قبل‌تر» — هر آگهی در یک ستون.
  *  شاخص هر خانه = میانگین آگهی‌های همان نوع (بعد از حذف پرت‌ها).
  *  دلار = نرخ زنده تتر (والکس/بیت‌پین).
  *
@@ -78,9 +78,9 @@ export type TypeCells = Partial<Record<PriceType, TypeCell>>;
 export interface TypeMatrixRow {
   key: string;
   displayName: string;
-  /** آگهی‌هایی که در یکی از ستون‌ها (کلید اول / ۱ تا ۷ سال) هستند */
+  /** آگهی‌هایی که سال ساخت معتبر دارند (در یکی از ستون‌ها) */
   count: number;
-  /** همه آگهی‌های این ردیف (شامل بیش از ۷ سال و بدون سال ساخت) */
+  /** همه آگهی‌های این ردیف (شامل بدون سال ساخت) */
   total: number;
   cells: TypeCells;
 }
@@ -115,7 +115,7 @@ function rowOf(key: string, displayName: string, group: ListingView[], rate: num
   return { key, displayName, count: cellsCount(cells), total: group.length, cells };
 }
 
-/** ماتریس «منطقه × نوع قیمت» — به ترتیب تعداد آگهی داخل ستون‌ها */
+/** ماتریس «منطقه × سال ساخت» — همه مناطق، به ترتیب تعداد آگهی */
 export function buildAreaTypeMatrix(views: ListingView[], rate: number | null, currentJalaliYear: number): TypeMatrixRow[] {
   const groups = new Map<string, ListingView[]>();
   for (const v of views) {
@@ -127,10 +127,10 @@ export function buildAreaTypeMatrix(views: ListingView[], rate: number | null, c
   }
   return [...groups.entries()]
     .map(([k, g]) => rowOf(k, neighborhoodDisplayName(k), g, rate, currentJalaliYear))
-    .sort((a, b) => b.count - a.count || b.total - a.total);
+    .sort((a, b) => b.total - a.total);
 }
 
-/** ماتریس «بازه متراژ × نوع قیمت» — ترتیب بازه‌ها ثابت، بازه خالی حذف */
+/** ماتریس «بازه متراژ × سال ساخت» — ترتیب بازه‌ها ثابت، بازه خالی حذف */
 export function buildSizeTypeMatrix(views: ListingView[], rate: number | null, currentJalaliYear: number): TypeMatrixRow[] {
   return AREA_BANDS.map((b) => rowOf(b.key, b.label, views.filter((v) => v.areaBand === b.key), rate, currentJalaliYear)).filter(
     (r) => r.total > 0
@@ -152,7 +152,7 @@ export function areaTypeMatrixFromSnapshot(snapshot: PropertyMarketSnapshot, rat
       const cells = cellsOf(r.stats.byType);
       return { key: r.neighborhoodKey, displayName: r.displayName, count: cellsCount(cells), total: r.stats.listingCount, cells };
     })
-    .sort((a, b) => b.count - a.count || b.total - a.total);
+    .sort((a, b) => b.total - a.total);
 }
 
 /* ---------------- متراژ دقیق (هر متراژی که در آگهی آمده، جداگانه) ---------------- */

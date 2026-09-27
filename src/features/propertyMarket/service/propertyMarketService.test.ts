@@ -21,16 +21,16 @@ const snap: PropertyMarketSnapshot = {
   city: 'ahvaz',
   source: 'divar',
   fxRateAtSnapshotToman: 250_000,
-  cityStats: st(10, { 'first-key': { count: 3, medianPpm: 90e6, meanPpm: 100e6, medianTotal: null, meanTotal: 10e9 } }),
+  cityStats: st(10, { 'b0': { count: 3, medianPpm: 90e6, meanPpm: 100e6, medianTotal: null, meanTotal: 10e9 } }),
   neighborhoodStats: [
-    { neighborhoodKey: 'golestan', displayName: 'گلستان', stats: st(4, { age2: { count: 4, medianPpm: 70e6, meanPpm: 75e6, medianTotal: null, meanTotal: null } }) },
+    { neighborhoodKey: 'golestan', displayName: 'گلستان', stats: st(4, { b2: { count: 4, medianPpm: 70e6, meanPpm: 75e6, medianTotal: null, meanTotal: null } }) },
     { neighborhoodKey: 'kianpars-east', displayName: 'کیانپارس شرقی', stats: st(6, {}) }
   ],
   groupStats: [
     {
       neighborhoodKey: 'kianpars',
       displayName: 'کیانپارس',
-      stats: st(6, { 'first-key': { count: 2, medianPpm: 180e6, meanPpm: 200e6, medianTotal: null, meanTotal: 24e9 } })
+      stats: st(6, { 'b0': { count: 2, medianPpm: 180e6, meanPpm: 200e6, medianTotal: null, meanTotal: 24e9 } })
     }
   ],
   cleaning: { raw: 0, normalized: 0, valid: 0, deduplicated: 0, outliersRemoved: 0, market: 10, rejectReasons: {} },
@@ -46,19 +46,20 @@ describe('snapshotAreaRecords', () => {
 describe('areaTypeMatrixFromSnapshot', () => {
   it('بدون ردیف «کل اهواز»؛ میانگین ذخیره‌شده (نه میانه) با نرخ فعلی تتر', () => {
     const rows = areaTypeMatrixFromSnapshot(snap, 250_000);
-    expect(rows.map((r) => r.key)).toEqual(['golestan', 'kianpars']);
-    const kp = rows[1];
+    // همه مناطق به ترتیب تعداد کل آگهی
+    expect(rows.map((r) => r.key)).toEqual(['kianpars', 'golestan']);
+    const kp = rows[0];
     expect(kp.total).toBe(6);
     expect(kp.count).toBe(2);
-    expect(kp.cells['first-key']!.ppmToman).toBe(200e6);
-    expect(kp.cells['first-key']!.ppmUsd).toBe(800);
-    expect(kp.cells['first-key']!.totalUsd).toBe(96_000);
-    expect(rows[0].cells.age2!.ppmToman).toBe(75e6);
+    expect(kp.cells['b0']!.ppmToman).toBe(200e6);
+    expect(kp.cells['b0']!.ppmUsd).toBe(800);
+    expect(kp.cells['b0']!.totalUsd).toBe(96_000);
+    expect(rows[1].cells.b2!.ppmToman).toBe(75e6);
   });
 
   it('نرخ تتر نامشخص → دلار null (هرگز نرخ دستی/فرضی)', () => {
     const rows = areaTypeMatrixFromSnapshot(snap, null);
-    expect(rows[1].cells['first-key']!.ppmUsd).toBeNull();
-    expect(rows[1].cells['first-key']!.ppmToman).toBe(200e6);
+    expect(rows[0].cells['b0']!.ppmUsd).toBeNull();
+    expect(rows[0].cells['b0']!.ppmToman).toBe(200e6);
   });
 });

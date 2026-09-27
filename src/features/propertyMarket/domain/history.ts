@@ -75,7 +75,7 @@ export interface PointValues {
   totalUsd: number | null;
 }
 
-/** میانگین قیمت یک نوع (کلید اول / N سال ساخت) در یک ناحیه — مقایسه فقط هم‌نوع */
+/** میانگین قیمت یک سال ساخت در یک منطقه — مقایسه فقط هم‌سال ساخت */
 export function pointOf(
   s: PropertyMarketSnapshot,
   key: string,

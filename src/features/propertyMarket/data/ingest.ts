@@ -27,7 +27,6 @@ import {
   normalizeAndValidate,
   storedListingRejectReason
 } from '../collector/pipeline';
-import { detectFirstKey } from '../collector/dates';
 import { PRICE_TYPES, jalaliYearOf, matchesPriceType } from '../domain/segments';
 import { buildAreaStats, buildCityStats, buildNeighborhoodStats, mean, median } from '../domain/stats';
 import { areaGroupName, areaGroupOf, neighborhoodDisplayName, resolveNeighborhood } from './catalog';
@@ -57,9 +56,10 @@ export function ingestSeeds(opts: {
   const now = opts.now ?? Date.now();
   const report = newCleaningReport();
   const valid: PropertyMarketListing[] = [];
+  const prevByToken = new Map(opts.existing.map((l) => [l.token, l]));
   for (const seed of opts.seeds) {
     if (!seed || typeof seed !== 'object' || typeof seed.token !== 'string' || !seed.token) continue;
-    const l = normalizeAndValidate(seed, opts.city, opts.cityId ?? null, now, report);
+    const l = normalizeAndValidate(fillFromStored(seed, prevByToken.get(seed.token)), opts.city, opts.cityId ?? null, now, report);
     if (l) valid.push(l);
   }
   const before = new Map(opts.existing.map((l) => [l.token, l]));
@@ -68,6 +68,24 @@ export function ingestSeeds(opts: {
   const added = merged.filter((l) => !before.has(l.token)).length;
   report.market = valid.length;
   return { listings: merged, changed, added, report };
+}
+
+/**
+ * آگهی شناخته‌شده که سرور جزئیاتش را دوباره نگرفت: فیلدهای خالی (متراژ، سال ساخت،
+ * طبقه، تاریخ‌ها…) از نسخه ذخیره‌شده پر می‌شوند؛ قیمت و عنوان تازه فهرست مقدم‌اند.
+ */
+function fillFromStored(seed: ParsedListingSeed, prev: PropertyMarketListing | undefined): ParsedListingSeed {
+  if (!prev) return seed;
+  const out = { ...seed };
+  const fill = <K extends keyof ParsedListingSeed & keyof PropertyMarketListing>(k: K) => {
+    if (out[k] === null || out[k] === undefined) (out as Record<string, unknown>)[k] = prev[k] ?? null;
+  };
+  for (const k of ['areaSqm', 'rooms', 'yearBuilt', 'floor', 'parking', 'elevator', 'storage', 'balcony', 'listedAt', 'sourceUpdatedAt'] as const) {
+    fill(k);
+  }
+  // قیمت هر متر قدیمی فقط وقتی قیمت کل تازه نیامده (وگرنه از قیمت کل تازه ÷ متراژ)
+  if (out.totalPriceToman === null && out.pricePerSqmToman === null) out.pricePerSqmToman = prev.pricePerSqmToman;
+  return out;
 }
 
 /** آگهی‌های آنلاین داخل پنجره بازار */
@@ -178,10 +196,8 @@ export function rekeyListings(listings: PropertyMarketListing[]): {
   const out = listings.map((l) => {
     if (l.source === 'manual-legacy' || !l.neighborhood) return l;
     const key = resolveNeighborhood(l.neighborhood, l.title).key ?? l.neighborhoodKey;
-    // نسخه‌های قبلی فیلد «کلید اول» نداشتند → از عنوان (تنها متن ذخیره‌شده)
-    const firstKey = l.firstKey === undefined ? detectFirstKey(l.title) : l.firstKey;
-    if (key === l.neighborhoodKey && firstKey === l.firstKey) return l;
-    const next = { ...l, neighborhoodKey: key, firstKey };
+    if (key === l.neighborhoodKey) return l;
+    const next = { ...l, neighborhoodKey: key };
     changed.push(next);
     return next;
   });
@@ -205,7 +221,7 @@ export function purgeStoredListings(listings: PropertyMarketListing[]): {
   return { listings: kept, removed };
 }
 
-/** آمار انواع قیمت (کلید اول، ۱ تا ۷ سال) برای یک گروه آگهی — نوع خالی ذخیره نمی‌شود */
+/** آمار هر سال ساخت (۱۴۰۵ … ۱۳۹۸، قبل‌تر) برای یک گروه آگهی — ستون خالی ذخیره نمی‌شود */
 export function typeStatsOf(group: PropertyMarketListing[], currentJalaliYear: number): Partial<Record<string, TypeStats>> {
   const out: Partial<Record<string, TypeStats>> = {};
   for (const t of PRICE_TYPES) {

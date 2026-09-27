@@ -1,7 +1,8 @@
 /** ============================================================
  * بازار املاک (Property Market) — اهواز
  *
- *  هر منطقه به تفکیک «نوع قیمت»: کلید اول و ۱ تا ۷ سال ساخت (جدا از هم).
+ *  هر منطقه به تفکیک «سال ساخت»: ۱۴۰۵ (نوساز)، ۱۴۰۴ (۱ سال) … ۱۳۹۸ و قبل‌تر.
+ *  «کلید اول» نوشته‌شده در آگهی مبنا نیست — فقط سال ساخت.
  *  داده: فقط دیوار، از مسیر سرور (دکمه «به‌روزرسانی داده») · آپارتمان ۹۰ متر به بالا
  *  دلار: نرخ زنده تتر (والکس/بیت‌پین) · همه اعداد فارسی
  * ============================================================ */
@@ -13,13 +14,14 @@ import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { UsdtRateField, describeRate } from '@/shared/components/ui/UsdtRateField';
 import { useUsdRate } from '@/shared/store/usdtStore';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 import { formatJalali } from '@/shared/utils/jalali';
 import { usePropertyMarket, usePropertyMarketStore } from '../data/store';
 import { listingsInWindow } from '../data/ingest';
-import { ageFilterOfType, jalaliYearOf, type AreaBand } from '../domain/segments';
+import { bandOfType, jalaliYearOf, type AreaBand } from '../domain/segments';
 import { areaTypeMatrixFromSnapshot, buildAreaTypeMatrix, toListingViews } from '../service/propertyMarketService';
 import { filterOutliers, newCleaningReport } from '../collector/pipeline';
 import { PriceTypeMatrix } from './PriceTypeMatrix';
@@ -32,6 +34,23 @@ import { LegacyPanel } from './LegacyPanel';
 const STALE_DAYS = 14;
 
 type ViewTab = 'areas' | 'sizes' | 'changes' | 'listings';
+
+/** دلایل کنار گذاشتن آگهی در آخرین به‌روزرسانی (فارسی) */
+const REJECT_FA: Record<string, string> = {
+  'area-too-small': 'زیر ۹۰ متر',
+  'missing-area': 'بدون متراژ',
+  'missing-price': 'بدون قیمت',
+  'neighborhood-conflict': 'محله آگهی با متنش نمی‌خواند',
+  'missing-neighborhood': 'بدون محله',
+  'stale-ad': 'به‌روز نشده بیش از ۴۵ روز',
+  'other-city': 'ملک شهر دیگر',
+  'not-apartment': 'غیرآپارتمان',
+  'ppm-out-of-range': 'قیمت هر متر نامعقول',
+  'total-price-spam': 'قیمت کل نامعقول',
+  'area-out-of-range': 'متراژ نامعقول',
+  outlier: 'قیمت پرت',
+  'not-divar': 'غیر دیوار'
+};
 
 export function PropertyMarketPage() {
   const st = usePropertyMarket();
@@ -101,7 +120,7 @@ export function PropertyMarketPage() {
     <Page>
       <PageHeader
         title="بازار املاک اهواز"
-        subtitle="قیمت آپارتمان‌های فروشی دیوار (۹۰ متر به بالا) — به تفکیک کلید اول و سال ساخت"
+        subtitle="قیمت آپارتمان‌های فروشی دیوار (۹۰ متر به بالا) — به تفکیک منطقه و سال ساخت"
         actions={
           <Button icon={busy ? <Square /> : <RefreshCw />} variant={busy ? 'outline' : 'primary'} onClick={refresh}>
             {busy ? 'توقف جمع‌آوری' : 'به‌روزرسانی داده'}
@@ -159,9 +178,10 @@ export function PropertyMarketPage() {
                 <Surface className="overflow-hidden">
                   <PriceTypeMatrix
                     rows={areaMatrix}
+                    jalaliYear={jy}
                     rowHeader="منطقه"
-                    caption="قیمت مناطق به تفکیک کلید اول و سال ساخت"
-                    onPick={canPick ? (rowKey, t) => showListings({ place: rowKey, age: ageFilterOfType(t) }) : undefined}
+                    caption="قیمت مناطق به تفکیک سال ساخت"
+                    onPick={canPick ? (rowKey, t) => showListings({ place: rowKey, age: bandOfType(t) }) : undefined}
                     onPickRow={canPick ? (rowKey) => showListings({ place: rowKey }) : undefined}
                   />
                 </Surface>
@@ -173,7 +193,7 @@ export function PropertyMarketPage() {
                     views={listingViews}
                     usdRate={rate}
                     jalaliYear={jy}
-                    onPickBand={(band, t) => showListings({ area: band as AreaBand, age: t ? ageFilterOfType(t) : 'all' })}
+                    onPickBand={(band, t) => showListings({ area: band as AreaBand, age: t ? bandOfType(t) : 'all' })}
                     onPickExact={(a) => showListings({ exact: a })}
                   />
                 </Surface>
@@ -193,11 +213,32 @@ export function PropertyMarketPage() {
                     onExactArea={setExactArea}
                     place={place}
                     onPlace={setPlace}
+                    jalaliYear={jy}
                   />
                 </Surface>
               )}
             </div>
           </div>
+
+          {lastSnap && Object.keys(lastSnap.cleaning.rejectReasons).length > 0 && (
+            <Surface className="px-4 md:px-5">
+              <Disclosure
+                summary={`آگهی‌های کنار گذاشته‌شده در آخرین به‌روزرسانی (${toFaDigits(
+                  Object.values(lastSnap.cleaning.rejectReasons).reduce((a, b) => a + b, 0)
+                )})`}
+              >
+                <ul className="flex flex-wrap gap-x-4 gap-y-1 pb-3 text-xs text-muted">
+                  {Object.entries(lastSnap.cleaning.rejectReasons)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([k, n]) => (
+                      <li key={k}>
+                        {REJECT_FA[k] ?? k}: <span className="font-semibold text-ink">{toFaDigits(n)}</span>
+                      </li>
+                    ))}
+                </ul>
+              </Disclosure>
+            </Surface>
+          )}
 
           <Surface className="p-4 md:p-5">
             <h2 className="mb-3 text-sm font-bold text-ink">نرخ دلار (تتر)</h2>

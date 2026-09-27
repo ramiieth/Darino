@@ -19,7 +19,7 @@ import type { AreaPriceStats, PropertyMarketSnapshot } from './types';
 import { tehranDayKey } from '@/shared/fx/usdtHistory';
 
 /** نوع پیش‌فرض تست‌ها */
-const T = 'age1' as const;
+const T = 'b1' as const;
 
 /** آمار ناحیه با یک نوع «۱ سال ساخت» (میانگین = ppm/total) */
 function stats(ppm: number, total: number, count = 10): AreaPriceStats {
@@ -226,19 +226,19 @@ describe('منطقه در مقایسه زمانی', () => {
 
 });
 
-describe('مقایسه هم‌نوع (کلید اول / N سال ساخت)', () => {
+describe('مقایسه هم‌سال ساخت', () => {
   it('byType در Snapshot → تغییر دلاری فقط بین آگهی‌های هم‌نوع', () => {
     const a = snap('2026-06-25T10:00:00Z', [60e6, 6e9], {}, 200000);
-    a.neighborhoodStats[0].stats.byType = { 'first-key': { count: 5, medianPpm: 90e6, meanPpm: 100e6, medianTotal: 9e9, meanTotal: 10e9 } };
+    a.neighborhoodStats[0].stats.byType = { 'b0': { count: 5, medianPpm: 90e6, meanPpm: 100e6, medianTotal: 9e9, meanTotal: 10e9 } };
     const b = snap('2026-09-26T10:00:00Z', [80e6, 8e9], {}, 250000);
-    b.neighborhoodStats[0].stats.byType = { 'first-key': { count: 6, medianPpm: 150e6, meanPpm: 130e6, medianTotal: 15e9, meanTotal: 13e9 } };
-    const r = computeChange([a, b], CITY_KEY, 3, {}, 'first-key');
+    b.neighborhoodStats[0].stats.byType = { 'b0': { count: 6, medianPpm: 150e6, meanPpm: 130e6, medianTotal: 15e9, meanTotal: 13e9 } };
+    const r = computeChange([a, b], CITY_KEY, 3, {}, 'b0');
     // میانگین (نه میانه): $500 → $520
     expect(r.base!.ppmUsd).toBe(500);
     expect(r.now!.ppmUsd).toBe(520);
     expect(r.ppmUsdPct).toBeCloseTo(4, 6);
     expect(r.totalUsdPct).toBeCloseTo(4, 6);
     // نوعی که در Snapshot نیست → no-type (نه عدد ساختگی)
-    expect(computeChange([a, b], CITY_KEY, 3, {}, 'age3').status).toBe('no-type');
+    expect(computeChange([a, b], CITY_KEY, 3, {}, 'b3').status).toBe('no-type');
   });
 });
