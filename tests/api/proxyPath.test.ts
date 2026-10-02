@@ -7,7 +7,7 @@
  * بازار کریپتو همیشه روی «اسنپ‌شات آفلاین» می‌ماند.
  */
 import { describe, expect, it } from 'vitest';
-import { resolveProxyTarget, PATH_PARAM } from './_proxyPath.js';
+import { resolveProxyTarget, PATH_PARAM } from '../../api/_proxyPath.js';
 
 describe('resolveProxyTarget — حفظ زیرمسیر پروکسی', () => {
   it('حالت Vercel: زیرمسیر از __p بازسازی می‌شود', () => {

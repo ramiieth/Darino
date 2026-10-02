@@ -15,17 +15,17 @@ const h = vi.hoisted(() => ({
   dbCalled: vi.fn()
 }));
 
-vi.mock('../src/features/propertyMarket/collector/run.js', async (orig) => {
-  const actual = await orig<typeof import('../src/features/propertyMarket/collector/run.js')>();
+vi.mock('../../src/features/propertyMarket/collector/run.js', async (orig) => {
+  const actual = await orig<typeof import('../../src/features/propertyMarket/collector/run.js')>();
   return { ...actual, collectChunk: h.collectChunk };
 });
-vi.mock('../src/features/propertyMarket/collector/client.js', async (orig) => {
-  const actual = await orig<typeof import('../src/features/propertyMarket/collector/client.js')>();
+vi.mock('../../src/features/propertyMarket/collector/client.js', async (orig) => {
+  const actual = await orig<typeof import('../../src/features/propertyMarket/collector/client.js')>();
   return { ...actual, fetchCities: h.fetchCities, fetchListPage: h.fetchListPage };
 });
 // دیتابیس تنظیم نشده — هر فراخوانی db() باید رخ ندهد
-vi.mock('./_neon.js', async (orig) => {
-  const actual = await orig<typeof import('./_neon.js')>();
+vi.mock('../../api/_neon.js', async (orig) => {
+  const actual = await orig<typeof import('../../api/_neon.js')>();
   return {
     ...actual,
     isDbConfigured: () => false,
@@ -36,7 +36,7 @@ vi.mock('./_neon.js', async (orig) => {
   };
 });
 
-import handler from './propertyMarket';
+import handler from '../../api/propertyMarket';
 
 function call(method: string, body?: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve) => {
