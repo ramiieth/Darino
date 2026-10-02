@@ -30,16 +30,16 @@ vi.mock('@simplewebauthn/server', () => ({
   verifyAuthenticationResponse: vi.fn(async () => ({ verified: wa.authOk, authenticationInfo: { newCounter: wa.counter++ } }))
 }));
 
-vi.mock('./_neon.js', async (orig) => {
-  const actual = await orig<typeof import('./_neon.js')>();
+vi.mock('../../api/_neon.js', async (orig) => {
+  const actual = await orig<typeof import('../../api/_neon.js')>();
   return { ...actual, isDbConfigured: () => true, db: () => { throw new Error('db must not be called in tests'); } };
 });
 
-import handler from './auth';
-import accountingHandler from './accounting';
-import custodyHandler, { __setCustodyStoreForTests, memoryCustodyStore } from './custody';
-import { __setAuthStoreForTests } from './_authCore';
-import { memoryAuthStore } from './_authStore';
+import handler from '../../api/auth';
+import accountingHandler from '../../api/accounting';
+import custodyHandler, { __setCustodyStoreForTests, memoryCustodyStore } from '../../api/custody';
+import { __setAuthStoreForTests } from '../../api/_authCore';
+import { memoryAuthStore } from '../../api/_authStore';
 
 const ORIGIN = 'https://dariiino.vercel.app';
 const TOKEN = 'test-setup-token-0123456789abcdef';
