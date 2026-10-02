@@ -68,3 +68,16 @@ export async function getTransactions(address: string, next?: string): Promise<T
   return { rows: arr(r.data).map(normalizeTransaction), next: link ? checkedNext(link, address, 'transactions') : null, fetchedAt: Date.now() };
 }
 export async function getPnl(address: string): Promise<unknown> { return await get(`/v1/wallets/${address}/pnl?currency=usd`); }
+
+const chartCache = new Map<string,{at:number;value:import('../src/features/connected/domain/chart.js').WalletChart}>();
+export async function getBalanceChart(address:string,userId:string,period:string,ids:string[],chain:string):Promise<import('../src/features/connected/domain/chart.js').WalletChart> {
+ const {CHART_PERIODS,normalizeChart}=await import('../src/features/connected/domain/chart.js');
+ if(!CHART_PERIODS.includes(period as never)||!ids.length||ids.length>25||ids.some(id=>!/^[-a-zA-Z0-9_:]{1,44}$/.test(id))||(chain&&!/^[-a-z0-9]{1,60}$/.test(chain)))throw new ProviderError(400,'پارامتر نمودار معتبر نیست');
+ const params=new URLSearchParams({currency:'usd','filter[fungible_ids]':[...new Set(ids)].sort().join(',')});
+ if(chain)params.set('filter[chain_ids]',chain);
+ const path=`/v1/wallets/${address}/charts/${period}?${params}`,key=userId+':'+path,hit=chartCache.get(key);
+ if(hit&&Date.now()-hit.at<300000)return hit.value;
+ const value=normalizeChart(await get(path));
+ if(chartCache.size>=200)chartCache.delete(chartCache.keys().next().value!);
+ chartCache.set(key,{at:Date.now(),value});return value;
+}

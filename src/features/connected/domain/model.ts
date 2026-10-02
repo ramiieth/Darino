@@ -4,14 +4,14 @@ export interface LivePosition {
   id: string; tokenId: string; chain: string; contract: string | null; name: string; symbol: string;
   icon: string | null; quantity: string | null; value: number | null; price: number | null;
   type: string; protocol: string | null; protocolIcon: string | null; group: string | null;
-  receipt: string | null; displayable: boolean; spam: boolean;
+  receipt: string | null; displayable: boolean; spam: boolean; verified?: boolean;
 }
 export interface WalletSnapshot { address: string; fetchedAt: number; total: number | null; change: number | null; positions: LivePosition[]; chains: ChainInfo[]; complete: boolean; unpriced: number; detailsError?: string }
 export interface TransactionTransfer {
   direction: string; symbol: string; quantity: string | null; value: number | null; address: string | null; icon: string | null;
-  chain?:string; tokenId?: string; name?: string; contract?: string | null; price?: number | null; sender?: string; recipient?: string; actId?: string;
+  verified?:boolean; spam?:boolean; chain?:string; tokenId?: string; name?: string; contract?: string | null; price?: number | null; sender?: string; recipient?: string; actId?: string;
 }
-export interface WalletTransaction { id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: TransactionTransfer[]; from?: string; to?: string; protocol?: string; protocolIcon?: string | null; method?: string; acts?: {id:string;type:string;protocol:string;contract:string}[]; feeToken?: TransactionTransfer }
+export interface WalletTransaction { spam?:boolean; id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: TransactionTransfer[]; from?: string; to?: string; protocol?: string; protocolIcon?: string | null; method?: string; acts?: {id:string;type:string;protocol:string;contract:string}[]; feeToken?: TransactionTransfer; approvals?:TransactionTransfer[] }
 export interface TransactionPage { rows: WalletTransaction[]; next: string | null; fetchedAt: number }
 export const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export const arr = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
@@ -37,7 +37,7 @@ export function normalizePosition(v: unknown): LivePosition {
     quantity: str(q.numeric) || (str(q.int) && typeof q.decimals === 'number' ? decimalQuantity(str(q.int), q.decimals) : null),
     value: finite(a.value), price: finite(a.price), type: str(a.position_type), protocol: str(a.protocol) || null,
     protocolIcon: str(obj(obj(a.application_metadata).icon).url) || null, group: str(a.group_id) || null,
-    receipt: str(receipt.id) || null, displayable: obj(a.flags).displayable !== false, spam: obj(a.flags).is_trash === true };
+    receipt: str(receipt.id) || null, displayable: obj(a.flags).displayable !== false, verified: obj(f.flags).verified === true, spam: obj(a.flags).is_trash === true || obj(f.flags).is_trash === true || obj(f.flags).is_spam === true };
 }
 function decimalQuantity(raw: string, decimals: number): string | null {
   if (!/^\d+$/.test(raw) || !Number.isInteger(decimals) || decimals < 0 || decimals > 80) return null;
@@ -56,15 +56,15 @@ export function normalizeTransaction(v: unknown): WalletTransaction {
   const transfer = (value: unknown): TransactionTransfer => {
     const t = obj(value), f = obj(t.fungible_info), q = obj(t.quantity);
     const implementation = arr(f.implementations).map(obj).find(i => i.chain_id === chain);
-    return { chain, direction:str(t.direction), symbol:str(f.symbol), name:str(f.name), tokenId:str(f.id),
+    return { verified:obj(f.flags).verified===true, spam:obj(t.flags).is_trash===true||obj(f.flags).is_trash===true||obj(f.flags).is_spam===true, chain, direction:str(t.direction), symbol:str(f.symbol), name:str(f.name), tokenId:str(f.id),
       contract:str(implementation?.address) || null, price:finite(t.price),
       quantity:str(q.numeric) || (str(q.int) && typeof q.decimals === 'number' ? decimalQuantity(str(q.int),q.decimals) : null),
       value:finite(t.value), sender:str(t.sender), recipient:str(t.recipient), actId:str(t.act_id),
-      address:(t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null,
+      address:str(t.spender)||(t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null,
       icon:str(obj(f.icon).url) || null };
   };
-  return {id:str(r.id),hash:str(a.hash),chain,type:str(a.operation_type),status:str(a.status),minedAt:str(a.mined_at),fee:finite(fee.value),
+  return {spam:obj(a.flags).is_trash===true,id:str(r.id),hash:str(a.hash),chain,type:str(a.operation_type),status:str(a.status),minedAt:str(a.mined_at),fee:finite(fee.value),
     from:str(a.sent_from),to:str(a.sent_to),protocol:str(app.name),protocolIcon:str(obj(app.icon).url) || null,method:str(obj(app.method).name),
     acts:arr(a.acts).map(v => {const x=obj(v),m=obj(x.application_metadata);return {id:str(x.id),type:str(x.type),protocol:str(m.name),contract:str(m.contract_address)};}),
-    feeToken:Object.keys(fee).length ? transfer(fee) : undefined, transfers:arr(a.transfers).map(transfer)};
+    feeToken:Object.keys(fee).length ? transfer(fee) : undefined, approvals:arr(a.approvals).map(transfer), transfers:arr(a.transfers).map(transfer)};
 }

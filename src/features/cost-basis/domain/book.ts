@@ -6,7 +6,8 @@ import { transactionKey } from '@/features/connected/domain/activity';
 export const COST_PREF='cost-basis-v1';
 export interface CostAsset { key:string;tokenId:string;symbol:string;name:string;chain:string;contract:string|null;icon:string|null }
 export interface CostLot { id:string;asset:CostAsset;quantity:string;unitCost:string;fee:string|null;at:number;source:string }
-export interface CostBook {version:1;asOf:number;lots:CostLot[];migrationConfirmed:boolean;legacyRetired:boolean}
+export interface ArchivedPurchase {id:string;symbol:string;quantity:string;unitCost:string;fee:string|null;at:number}
+export interface CostBook {archivedPurchases?:ArchivedPurchase[];version:1;asOf:number;lots:CostLot[];migrationConfirmed:boolean;legacyRetired:boolean}
 export function verifiedCash(chain:string,contract:string|null|undefined) {return !!contract && ASSETS.some(a=>a.networkId===chain&&a.contract?.toLowerCase()===contract.toLowerCase()&&['USDT','USDC','DAI','USDG','USD₮0'].includes(a.symbol));}
 export interface CostResult {lots:CostLot[];realized:string;issues:{key:string;reason:string}[];processed:string[]}
 export const assetKey=(p:Pick<LivePosition,'chain'|'contract'|'tokenId'>)=>p.tokenId ? `fungible:${p.tokenId}` : `${p.chain}:${p.contract?.toLowerCase() ?? 'native'}`;
@@ -29,7 +30,7 @@ export function replayCost(book:CostBook, transactions:WalletTransaction[],links
  }
 
  for(const [key,tx] of [...unique].sort((a,b)=>Date.parse(a[1].minedAt)-Date.parse(b[1].minedAt))) {
-  if(tx.status!=='confirmed'||!Number.isFinite(Date.parse(tx.minedAt))||Date.parse(tx.minedAt)<=book.asOf) continue;
+  if(tx.spam||tx.status!=='confirmed'||!Number.isFinite(Date.parse(tx.minedAt))||Date.parse(tx.minedAt)<=book.asOf) continue;
   // Transfers, bridge and protocol deposits never create purchases or realized PnL.
   if(tx.type==='bridge') {
    const sell=tx.transfers[0],buy=tx.transfers[1];
@@ -60,9 +61,9 @@ export function replayCost(book:CostBook, transactions:WalletTransaction[],links
  }
  return {lots,realized:realized.toString(),issues,processed};
 }
-export function valueCost(lots:CostLot[],quantity:string,price:number|null) {
+export function valueCost(lots:CostLot[],quantity:string,price:number|null,totalQuantity=quantity) {
  const open=lots.filter(l=>decimalPositive(l.quantity)).sort((a,b)=>a.at-b.at||a.id.localeCompare(b.id));
  let left=new Decimal(quantity),basis=new Decimal(0),covered=new Decimal(0);
  for(const l of open) {if(left.lte(0))break;const take=Decimal.min(left,l.quantity);basis=basis.plus(take.times(l.unitCost));covered=covered.plus(take);left=left.minus(take);}
- return {basis:basis.toNumber(),covered:covered.toString(),unknown:Decimal.max(left,0).toString(),excess:Decimal.max(open.reduce((s,l)=>s.plus(l.quantity),new Decimal(0)).minus(quantity),0).toString(),pnl:covered.isZero()||price===null||open.reduce((s,l)=>s.plus(l.quantity),new Decimal(0)).gt(quantity)?null:covered.times(price).minus(basis).toNumber()};
+ return {basis:basis.toNumber(),covered:covered.toString(),unknown:Decimal.max(left,0).toString(),excess:Decimal.max(open.reduce((s,l)=>s.plus(l.quantity),new Decimal(0)).minus(totalQuantity),0).toString(),pnl:covered.isZero()||price===null||open.reduce((s,l)=>s.plus(l.quantity),new Decimal(0)).gt(totalQuantity)?null:covered.times(price).minus(basis).toNumber()};
 }
