@@ -1,3 +1,4 @@
+import { SmartDateField } from '@/shared/components/ui/SmartDateField';
 /**
  * اجزای مشترک رابط دارایی چندشبکه‌ای
  *  AssetChip · HoldingChip · ProviderChip · EntityPicker (جست‌وجو + لوگو) · DateTimeField
@@ -290,21 +291,8 @@ export function DateTimeField({
   onChange: (ms: number | null, tz: string | null) => void;
   id?: string;
 }) {
-  return (
-    <input
-      id={id}
-      type="datetime-local"
-      dir="ltr"
-      className={cn(controlBase, 'text-right')}
-      value={toLocalInput(value)}
-      onChange={(e) => {
-        const v = e.target.value;
-        if (!v) return onChange(null, null);
-        const ms = new Date(v).getTime();
-        onChange(Number.isFinite(ms) ? ms : null, localTimeZone());
-      }}
-    />
-  );
+  const time = value===null?'':toLocalInput(value).slice(11);
+  return <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_100px] gap-2"><SmartDateField id={id} value={value} compact onChange={ts=>{if(ts===null)return onChange(null,null);const d=new Date(ts);if(time){const [h,m]=time.split(':').map(Number);d.setHours(h,m,0,0);}onChange(d.getTime(),localTimeZone());}}/><input type="time" aria-label="ساعت" className={cn(controlBase,'min-w-0')} dir="ltr" value={time} onChange={e=>{if(!e.target.value)return;const d=new Date(value??Date.now());const [h,m]=e.target.value.split(':').map(Number);d.setHours(h,m,0,0);onChange(d.getTime(),localTimeZone());}}/></div>;
 }
 
 export function fmtOpTime(ms: number | null, tz: string | null): string {

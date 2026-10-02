@@ -1,133 +1,23 @@
-/**
- * فیلد تاریخ هوشمند مشترک — پیش‌نمایش دوگانه شمسی/میلادی
- *
- * ⚠️ همه فرم‌های دارای فیلد تاریخ باید از همین کامپوننت استفاده کنند.
- * - ورودی شمسی (متن، ارقام فارسی یا لاتین) + ورودی میلادی (تقویم مرورگر)
- * - هر تغییر در یکی → دیگری خودکار محاسبه و نمایش داده می‌شود (موتور مشترک jalali.ts)
- * - خروجی همیشه timestamp (میلی‌ثانیه، ساعت ۱۲ محلی)
- */
-import { useEffect, useState } from 'react';
-import { Input } from '@/shared/components/ui/Input';
-import {
-  formatJalali,
-  formatGregorianIso,
-  parseJalaliToTs,
-  parseIsoToTs,
-  tsToJalaali,
-  tsToGregorian
-} from '@/shared/utils/jalali';
+import { useCallback,useState } from 'react';
+import { CalendarDays,ChevronLeft,ChevronRight } from 'lucide-react';
+import { Sheet } from './Sheet';
+import { Button } from './Button';
+import { Input } from './Input';
 import { cn } from '@/shared/lib/cn';
-
-export function SmartDateField({
-  value,
-  onChange,
-  label,
-  className,
-  compact = false
-}: {
-  /** timestamp (میلی‌ثانیه) یا null */
-  value: number | null;
-  onChange: (ts: number | null) => void;
-  label?: string;
-  className?: string;
-  /** حالت فشرده: بدون پیش‌نمایش و راهنما (برای ردیف‌های جدولی) */
-  compact?: boolean;
-}) {
-  const [jText, setJText] = useState('');
-  const [gIso, setGIso] = useState('');
-  const [invalid, setInvalid] = useState(false);
-
-  // همگام‌سازی از بیرون (تغییر value)
-  useEffect(() => {
-    if (value === null) {
-      setJText('');
-      setGIso('');
-      setInvalid(false);
-      return;
-    }
-    const j = tsToJalaali(value);
-    setJText(`${j.year}/${String(j.month).padStart(2, '0')}/${String(j.day).padStart(2, '0')}`);
-    setGIso(formatGregorianIso(value));
-    setInvalid(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  /** تغییر ورودی شمسی → محاسبه میلادی + خروجی */
-  const onJChange = (text: string) => {
-    setJText(text);
-    setInvalid(false);
-    if (!text.trim()) {
-      setGIso('');
-      onChange(null);
-      return;
-    }
-    const ts = parseJalaliToTs(text);
-    if (ts === null) {
-      setInvalid(true);
-      setGIso('');
-      return;
-    }
-    setGIso(formatGregorianIso(ts));
-    onChange(ts);
-  };
-
-  /** تغییر تقویم میلادی → محاسبه شمسی + خروجی */
-  const onGChange = (iso: string) => {
-    setGIso(iso);
-    setInvalid(false);
-    if (!iso) {
-      setJText('');
-      onChange(null);
-      return;
-    }
-    const ts = parseIsoToTs(iso);
-    if (ts === null) return;
-    const j = tsToJalaali(ts);
-    setJText(`${j.year}/${String(j.month).padStart(2, '0')}/${String(j.day).padStart(2, '0')}`);
-    onChange(ts);
-  };
-
-  return (
-    <div className={cn('space-y-1.5', className)}>
-      {label && <span className="block text-xs font-semibold text-muted">{label}</span>}
-      <div className="grid grid-cols-2 gap-2">
-        {/* شمسی */}
-        <div>
-          <Input
-            dir="ltr"
-            inputMode="numeric"
-            value={jText}
-            onChange={(e) => onJChange(e.target.value)}
-            placeholder="1404/05/17"
-            aria-label="تاریخ شمسی"
-            invalid={invalid}
-          />
-        </div>
-        {/* میلادی */}
-        <div className="relative">
-          <Input
-            type="date"
-            dir="ltr"
-            value={gIso}
-            onChange={(e) => onGChange(e.target.value)}
-            aria-label="تاریخ میلادی"
-            className="px-3"
-          />
-        </div>
-      </div>
-      {!compact && value !== null && !invalid && (
-        <p className="text-2xs font-normal text-muted">
-          {formatJalali(value)} شمسی · {formatGregorianIso(value)} میلادی
-        </p>
-      )}
-      {!compact && invalid && (
-        <p className="text-2xs font-semibold text-negative">تاریخ شمسی نامعتبر است — مثال: 1404/05/17</p>
-      )}
-      {!compact && (
-        <p className="text-2xs font-normal text-subtle">
-          ورودی شمسی یا میلادی — دیگری خودکار محاسبه می‌شود
-        </p>
-      )}
-    </div>
-  );
+import { formatJalali,formatGregorianIso,parseJalaliToTs,tsToJalaali } from '@/shared/utils/jalali';
+import { toFaDigits,toEnDigits } from '@/shared/utils/formatters';
+import { MONTHS,monthGrid,shiftMonth } from '../calendar/monthGrid';
+/** Local date picker adapted from Taghvim's MIT month grid; no remote runtime. */
+export function SmartDateField({value,onChange,label,className,compact=false,max,min,id}:{value:number|null;onChange:(ts:number|null)=>void;label?:string;className?:string;compact?:boolean;max?:number;min?:number;id?:string}) {
+ const [open,setOpen]=useState(false),[view,setView]=useState(()=>tsToJalaali(value??Date.now())),[jump,setJump]=useState(false),[text,setText]=useState('');
+ const close=useCallback(()=>setOpen(false),[]);
+ const selected=value===null?'':formatGregorianIso(value),today=formatGregorianIso(Date.now());
+ const allowed=(ts:number)=>{const day=formatGregorianIso(ts);return (!max||day<=formatGregorianIso(max))&&(!min||day>=formatGregorianIso(min));};
+ function navigate(delta:number){const next=shiftMonth(view.year,view.month,delta);if(next.year>=1200&&next.year<=1500)setView({...next,day:1});}
+ function choose(ts:number|null){if(ts!==null&&!allowed(ts))return;onChange(ts);setOpen(false);}
+ return <div className={cn('min-w-0 space-y-1.5',className)}>{label&&<span className="block text-xs font-semibold text-muted">{label}</span>}<button id={id} type="button" aria-label={label??'انتخاب تاریخ'} aria-haspopup="dialog" onClick={()=>{setView(tsToJalaali(value??Date.now()));setJump(false);setText('');setOpen(true);}} className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-field border border-divider bg-card px-3 py-2 text-start text-sm"><CalendarDays className="h-4 w-4 shrink-0 text-accent"/><span className="min-w-0 flex-1 truncate">{value===null?'انتخاب تاریخ':formatJalali(value)}</span><ChevronDownIcon/></button>{!compact&&value!==null&&<p className="text-[10px] text-subtle">{toFaDigits(formatGregorianIso(value))} میلادی</p>}
+ <Sheet open={open} onClose={close} title={label??'انتخاب تاریخ'} size="sm"><div className="min-w-0 space-y-4" dir="rtl"><div className="flex items-center justify-between gap-2"><Button variant="ghost" aria-label="ماه قبل" disabled={view.year===1200&&view.month===1} onClick={()=>navigate(-1)}><ChevronRight/></Button><button type="button" onClick={()=>setJump(v=>!v)} aria-label="انتخاب ماه و سال" className="min-h-11 rounded-field px-3 text-base font-bold">{MONTHS[view.month-1]} {toFaDigits(String(view.year))}</button><Button variant="ghost" aria-label="ماه بعد" disabled={view.year===1500&&view.month===12} onClick={()=>navigate(1)}><ChevronLeft/></Button></div>
+ {jump?<div className="space-y-3"><div className="flex items-center gap-2"><Button variant="ghost" aria-label="سال قبل" disabled={view.year<=1200} onClick={()=>setView(v=>({...v,year:v.year-1}))}><ChevronRight/></Button><Input aria-label="سال شمسی" inputMode="numeric" key={view.year} defaultValue={toFaDigits(String(view.year))} onBlur={e=>{const year=Number(toEnDigits(e.target.value));if(year>=1200&&year<=1500)setView(v=>({...v,year}));else e.target.value=toFaDigits(String(view.year));}}/><Button variant="ghost" aria-label="سال بعد" disabled={view.year>=1500} onClick={()=>setView(v=>({...v,year:v.year+1}))}><ChevronLeft/></Button></div><div className="grid grid-cols-3 gap-2">{MONTHS.map((m,i)=><button key={m} type="button" className={cn('min-h-11 rounded-field text-sm',i+1===view.month?'bg-accent text-white':'bg-surface-2')} onClick={()=>{setView(v=>({...v,month:i+1}));setJump(false);}}>{m}</button>)}</div></div>:<><div className="grid grid-cols-7 text-center text-xs text-muted">{['ش','ی','د','س','چ','پ','ج'].map((d,i)=><span key={i} className="py-2">{d}</span>)}</div><div className="grid grid-cols-7 gap-1" aria-label="روزهای ماه">{monthGrid(view.year,view.month).map(d=>{const key=formatGregorianIso(d.ts);return <button key={key} type="button" data-calendar-day={key} disabled={!allowed(d.ts)||d.year<1200||d.year>1500} aria-label={formatJalali(d.ts)} aria-pressed={key===selected} aria-current={key===today?'date':undefined} onClick={()=>choose(d.ts)} onKeyDown={e=>{const delta=({ArrowLeft:1,ArrowRight:-1,ArrowDown:7,ArrowUp:-7} as Record<string,number>)[e.key];if(!delta)return;e.preventDefault();const next=new Date(d.ts);next.setDate(next.getDate()+delta);const j=tsToJalaali(next.getTime());if(j.year<1200||j.year>1500)return;setView(j);requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>(`[data-calendar-day="${formatGregorianIso(next.getTime())}"]`)?.focus());}} className={cn('aspect-square min-h-9 rounded-xl text-sm transition-colors disabled:opacity-25',key===selected?'bg-accent font-bold text-white':d.inMonth?'text-ink hover:bg-accent-soft':'text-subtle',key===today&&key!==selected&&'ring-1 ring-accent')}>{toFaDigits(String(d.day))}</button>;})}</div></>}
+ <div className="flex gap-2 border-t border-divider pt-3"><Button variant="outline" className="flex-1" disabled={!allowed(Date.now())} onClick={()=>{const n=new Date();n.setHours(12,0,0,0);choose(n.getTime());}}>امروز</Button><Button variant="ghost" className="flex-1" onClick={()=>choose(null)}>پاک‌کردن</Button></div><details className="text-xs text-muted"><summary className="cursor-pointer py-2">ورود تاریخ شمسی</summary><Input aria-label="تاریخ شمسی" dir="ltr" inputMode="numeric" placeholder="۱۴۰۵/۰۷/۱۱" value={text} onChange={e=>setText(e.target.value)}/><Button className="mt-2 w-full" disabled={parseJalaliToTs(text)===null||!allowed(parseJalaliToTs(text)!)} onClick={()=>choose(parseJalaliToTs(text))}>انتخاب تاریخ</Button></details></div></Sheet></div>;
 }
+function ChevronDownIcon(){return <ChevronLeft className="h-3.5 w-3.5 shrink-0 rotate-[-90deg] text-subtle"/>;}

@@ -131,11 +131,24 @@ try {
  await picker.getByRole('button',{name:'انتخاب اتریوم · ETH',exact:true}).click();
  await costSection.locator('input').nth(0).fill('0.300000000000000001');
  await costSection.locator('input').nth(1).fill('2000');
+ await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
+ const calendar=page.getByRole('dialog',{name:'تاریخ خرید',exact:true});
+ await page.waitForTimeout(350);await fits();await page.screenshot({path:'/tmp/darino-jalali-calendar.png'});
+ await calendar.getByRole('button',{name:'پاک‌کردن',exact:true}).click();
+ await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
+ await page.getByRole('dialog',{name:'تاریخ خرید',exact:true}).getByRole('button',{name:'امروز',exact:true}).click();
  await page.getByRole('button',{name:'ثبت بهای خرید',exact:true}).click();
  await page.getByText('دسته‌های خرید',{exact:true}).waitFor();
  await fits();await page.screenshot({path:'/tmp/darino-cost-mobile.png',fullPage:true});
  await page.evaluate(()=>location.hash='#/holdings');
  await page.getByRole('heading',{name:'دارایی‌ها و فعالیت شبکه‌ای',exact:true}).waitFor();await fits();
+ await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
+ const networkPicker=page.getByRole('dialog',{name:'انتخاب شبکه',exact:true});
+ await page.waitForTimeout(350);await fits();await page.screenshot({path:'/tmp/darino-network-picker.png'});
+ await networkPicker.getByRole('option',{name:/رابین‌هود/}).click();
+ await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
+ await page.getByRole('dialog',{name:'انتخاب شبکه',exact:true}).getByRole('option',{name:'همهٔ شبکه‌ها',exact:true}).click();
+
  await page.screenshot({path:'/tmp/darino-network-mobile.png',fullPage:true});
  await page.evaluate(()=>location.hash='#/arcus');
  await page.getByRole('button',{name:'افزودن زیرحساب آرکوس',exact:true}).click();
@@ -144,8 +157,11 @@ try {
  await arcusForm.getByLabel('آدرس عمومی کیف پول',{exact:true}).fill(address);
  await arcusForm.getByLabel('شمارهٔ زیرحساب',{exact:true}).fill('0');
  await arcusForm.getByRole('button',{name:'ذخیره',exact:true}).click();
+ await page.getByText('اعتبار تسویهٔ پرپچوال · USDG',{exact:true}).waitFor();
+ await fits();await page.screenshot({path:'/tmp/darino-arcus-perp-native.png',fullPage:true});
  await page.getByRole('tab',{name:'اسپات',exact:true}).click();
- await page.getByText('منبع موجودی: زریون · فهرست توکن: آرکوس').waitFor();
+ await page.getByText('مبنای موجودی',{exact:true}).waitFor();
+ await page.waitForFunction(()=>document.querySelector('main')?.innerText.includes('WETH'));
  assert((await page.locator('main').innerText()).includes('WETH'));await fits();
  await page.screenshot({path:'/tmp/darino-spot-mobile.png',fullPage:true});
  const routes=['/','/dashboard','/wallets','/assistant','/simulation','/defi','/boros','/accounting','/holdings','/arcus','/calculators','/vehicle','/realestate','/security'];

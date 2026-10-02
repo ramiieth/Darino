@@ -250,3 +250,11 @@ CREATE TABLE IF NOT EXISTS "schemaMeta" (
 --   4) یا:    psql "$DATABASE_URL" -f db/schema.sql
 -- اجرای مجدد بی‌خطر است (IF NOT EXISTS).
 -- ============================================================
+
+-- Shared read-only provider cache; only server Functions can query this table.
+CREATE TABLE IF NOT EXISTS "providerCache" (
+  "key" TEXT PRIMARY KEY,
+  "payload" JSONB NOT NULL,
+  "expiresAt" BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "providerCache_expiry" ON "providerCache" ("expiresAt");
