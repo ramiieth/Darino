@@ -74,7 +74,7 @@ export function XirrCalculator() {
                 value={r.amount}
                 onChange={(e) => update(r.id, { amount: e.target.value })}
                 aria-label={`مبلغ جریان ${i + 1}`}
-                suffix="$"
+                suffix="دلار"
               />
             </div>
           </li>
@@ -98,7 +98,7 @@ export function XirrCalculator() {
             </Notice>
           )}
           <ResultHero
-            label="XIRR — بازده واقعی سالانه"
+            label="بازده واقعی سالانه — بازده واقعی سالانه"
             value={<PercentValue value={result.xirr === null ? null : result.xirr * 100} tone="auto" />}
           >
             <MetricGrid cols={3}>
@@ -141,10 +141,10 @@ export function XirrCalculator() {
             filename="xirr.csv"
             headers={['تاریخ', 'مبلغ']}
             rows={nonZero.map((f) => [new Date(f.date).toISOString().slice(0, 10), f.amount])}
-            pdfTitle="گزارش XIRR"
+            pdfTitle="گزارش بازده واقعی سالانه"
             pdfSections={[
               {
-                heading: 'نرخ بازده واقعی (XIRR)',
+                heading: 'نرخ بازده واقعی',
                 table: {
                   headers: ['موارد', 'مقدار'],
                   rows: [

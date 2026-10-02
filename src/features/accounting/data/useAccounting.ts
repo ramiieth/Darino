@@ -7,8 +7,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // همگام‌سازی پس‌زمینه با Neon (فقط وقتی سرور متصل است؛ در تست/آفلاین بی‌اثر)
 import {
   pushAccountingToRemote,
+  remoteLedgerState,
   syncAccountingWithRemote
 } from '@/repositories/accountingRepository';
+import { replayLedger, type LotBaseline, type PendingOp } from '@/features/accounting/domain/lotReplay';
+import { ensureBaseline, mayAutoSeed, readBaseline } from '@/features/accounting/data/lotBaseline';
+import { useCustody } from '@/features/custody/data/useCustody';
+import { useCustodyStore } from '@/features/custody/data/repository';
 import {
   accountEnsure,
   accountLoadAll,
@@ -17,9 +22,7 @@ import {
   entryLoadAll,
   eventAppend,
   eventLoadAll,
-  lotAppend,
-  lotLoadAll,
-  lotReplaceAll
+  lotLoadAll
 } from '@/features/accounting/data/db';
 import { settingGet, settingSet } from '@/shared/lib/db';
 import {
@@ -34,7 +37,6 @@ import {
   makeExpenseEntry,
   makeSellEntry,
   makeWithdrawEntry,
-  applyFifoConsumption,
   repairPartiallyClosedLots,
   validateEntry,
   type BuyInput
@@ -58,6 +60,7 @@ import {
 } from '@/features/accounting/domain/types';
 import { ETH_POSITION } from '@/features/simulation/domain/constants';
 import { toast } from '@/shared/store/toastStore';
+import { faNumber, fmtUSD } from '@/shared/utils/formatters';
 
 /** seed سینگلتون — همه نمونه‌ها منتظر همان عملیات واقعی می‌مانند
  *  (رفع race در StrictMode: قبلاً نمونه دوم قبل از اتمام seed، خالی reload می‌کرد)
@@ -77,34 +80,32 @@ function seedOpening(): Promise<void> {
         // خودترمیمی: اگر سندها موجودند، seed لازم نیست (حتی اگر پرچم باشد)
         const existing = await entryLoadAll();
         if (existing.length > 0) return;
+        // دستگاه تازه (مثلاً اپ آیفون) نباید قبل از دریافت دفتر سرور افتتاحیهٔ خودش را بسازد —
+        // فقط اگر سرور خالی است یا اپ در حالت محلی (بدون سرور) کار می‌کند.
+        if (!mayAutoSeed(existing.length, await remoteLedgerState())) return;
         // پرچم هست ولی سندها نیستند → از دست رفتن داده → بازسازی افتتاحیه
         const now = Date.now();
         // ۱) نقد (تخصیص USDC کاربر)
-        const cashEntry = makeDepositEntry(ETH_POSITION.USDC_ALLOCATION_2026, now, 'افتتاحیه — موجودی نقد (USDC)');
+        const cashEntry = makeDepositEntry(ETH_POSITION.USDC_ALLOCATION_2026, now, 'موجودی اولیه — نقد (یو‌اس‌دی‌سی)');
         cashEntry.source = 'opening';
         // ۲) لات اولیه ETH با قیمت خرید
         const ethEntry: JournalEntry = {
           id: -1,
           date: now,
-          memo: 'افتتاحیه — پوزیشن اولیه ETH',
+          memo: 'موجودی اولیه — اتریوم',
           lines: [
             { account: cryptoAccountKey('ETH'), debit: ETH_POSITION.INITIAL_INVESTMENT, credit: 0 },
             { account: 'equity:capital', debit: 0, credit: ETH_POSITION.INITIAL_INVESTMENT }
           ],
           createdAt: now,
-          source: 'opening'
+          source: 'opening',
+          // لات اولیه از روی همین سند ساخته می‌شود (نه جدول لات جداگانه)
+          trade: { kind: 'deposit_asset', symbol: 'ETH', qty: ETH_POSITION.AMOUNT, unitPrice: ETH_POSITION.BUY_PRICE }
         };
         const saved = await entryAppendMany([cashEntry, ethEntry]);
-        await lotAppend({
-          id: -1,
-          asset: 'ETH',
-          qty: ETH_POSITION.AMOUNT,
-          unitCost: ETH_POSITION.BUY_PRICE,
-          openedAt: now
-        });
         await accountEnsure({ key: cryptoAccountKey('ETH'), nameFa: cryptoAccountName('ETH'), type: 'asset' });
         for (const e of saved) {
-          await eventAppend('opening', e.id, `${e.memo} — $${e.lines[0].debit.toFixed(2)}`);
+          await eventAppend('opening', e.id, `${e.memo} — ${fmtUSD(e.lines[0].debit)}`);
         }
         await settingSet(SEED_KEY, true);
       } catch {
@@ -118,7 +119,15 @@ function seedOpening(): Promise<void> {
 }
 
 export interface AccountingState {
+  /** سندهای ذخیره‌شده + سندهای مشتق از عملیات دارایی چندشبکه‌ای (مرتب بر اساس تاریخ) */
   entries: JournalEntry[];
+  /** فقط سندهای ذخیره‌شده (برای همگام‌سازی) */
+  storedEntries: JournalEntry[];
+  /** لات‌های ذخیره‌شدهٔ قدیمی همین دستگاه (برای تطبیق مبنا) */
+  storedLots: FifoLot[];
+  baseline: LotBaseline | null;
+  /** عملیات دارایی چندشبکه‌ای که هنوز در دفتر کل ثبت نشده‌اند + دلیل */
+  pendingCustody: PendingOp[];
   accounts: Account[];
   lots: FifoLot[];
   events: LedgerEvent[];
@@ -158,11 +167,15 @@ export interface AccountingActions {
 }
 
 export function useAccounting(): AccountingState & AccountingActions {
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [storedEntries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(DEFAULT_ACCOUNTS);
-  const [lots, setLots] = useState<FifoLot[]>([]);
+  const [storedLots, setStoredLots] = useState<FifoLot[]>([]);
   const [events, setEvents] = useState<LedgerEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const custody = useCustody();
+  // مبنا از «تنظیمات همگام» خوانده می‌شود (با هر همگام‌سازی به‌روز)
+  const prefs = useCustodyStore().prefs;
+  const baseline = useMemo(() => readBaseline(), [prefs]);
 
   const reload = useCallback(async () => {
     const [es, as, ls, evs] = await Promise.all([
@@ -174,7 +187,7 @@ export function useAccounting(): AccountingState & AccountingActions {
     setEntries(es);
     setAccounts(as);
     // ترمیم لات‌های بخشی‌مصرف‌شده‌ای که نسخه قبلی به‌اشتباه بسته بود
-    setLots(repairPartiallyClosedLots(ls));
+    setStoredLots(repairPartiallyClosedLots(ls));
     setEvents(evs);
     setLoading(false);
   }, []);
@@ -193,6 +206,21 @@ export function useAccounting(): AccountingState & AccountingActions {
         const report = await syncAccountingWithRemote();
         const pulledAny = (report?.pulled.entries ?? 0) + (report?.pulled.lots ?? 0) + (report?.pulled.events ?? 0) > 0;
         if (pulledAny && !cancelled) await reload();
+        // مبنای لات‌ها: اول تنظیمات همگام را از سرور بگیر (شاید دستگاه دیگر زودتر ساخته)، بعد اگر نبود بساز
+        if (cancelled || readBaseline()) return;
+        try {
+          const { syncCustodyNow } = await import('@/features/custody/data/sync');
+          const { useAuth } = await import('@/features/auth/authClient');
+          const st = useAuth.getState().status;
+          if (st === 'authenticated') await syncCustodyNow();
+          // سرور هست ولی وضعیت ورود هنوز معلوم نیست/خارج → مبنا ساخته نمی‌شود تا با سرور تداخل نکند
+          if (st === 'unknown' || st === 'unauthenticated') return;
+        } catch {
+          /* حالت محلی */
+        }
+        if (cancelled || readBaseline()) return;
+        const [es, ls] = await Promise.all([entryLoadAll(), lotLoadAll()]);
+        await ensureBaseline(ls, es, typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 60) : 'device');
       })();
     })();
     return () => {
@@ -208,12 +236,30 @@ export function useAccounting(): AccountingState & AccountingActions {
       return;
     }
     if (loading) return;
-    if (entries.length === 0 && lots.length === 0 && events.length === 0) return;
+    if (storedEntries.length === 0 && events.length === 0) return;
     const t = setTimeout(() => {
       void pushAccountingToRemote();
     }, 3000);
     return () => clearTimeout(t);
-  }, [entries, lots, events, loading]);
+  }, [storedEntries, events, loading]);
+
+  // بازسازی لات‌ها + سندهای مشتق از عملیات دارایی چندشبکه‌ای (همهٔ دستگاه‌ها یک نتیجه)
+  const replay = useMemo(
+    () =>
+      replayLedger({
+        // تا وقتی مبنا ساخته نشده، لات‌های ذخیره‌شدهٔ همین دستگاه مبنای موقت‌اند
+        baseline: baseline ?? { lots: storedLots, asOfEntryId: storedEntries.filter((e) => !e.trade).reduce((m, e) => Math.max(m, e.id), 0), createdAt: 0, source: 'local' },
+        entries: storedEntries,
+        ops: custody.operations,
+        assets: custody.assetById
+      }),
+    [baseline, storedLots, storedEntries, custody.operations, custody.assetById]
+  );
+  const lots = replay.lots;
+  const entries = useMemo(
+    () => [...storedEntries, ...replay.derived].sort((a, b) => a.date - b.date || a.createdAt - b.createdAt),
+    [storedEntries, replay.derived]
+  );
 
   const cashBalance = useMemo(
     () => accountBalanceOf(entries, accounts, 'cash:usd'),
@@ -260,7 +306,7 @@ export function useAccounting(): AccountingState & AccountingActions {
       }
       const e = makeDepositEntry(usd, date, memo);
       const saved = await entryAppend(e);
-      await eventAppend('deposit', saved.id, `${saved.memo} — $${usd.toFixed(2)}`);
+      await eventAppend('deposit', saved.id, `${saved.memo} — ${fmtUSD(usd)}`);
       await reload();
       toast('success', 'واریز ثبت شد');
       return true;
@@ -275,12 +321,12 @@ export function useAccounting(): AccountingState & AccountingActions {
         return false;
       }
       if (usd > cashBalance + 1e-6) {
-        toast('error', `موجودی نقد کافی نیست (موجودی: $${cashBalance.toFixed(2)})`);
+        toast('error', `موجودی نقد کافی نیست (موجودی: ${fmtUSD(cashBalance)})`);
         return false;
       }
       const e = makeWithdrawEntry(usd, date, memo);
       const saved = await entryAppend(e);
-      await eventAppend('withdraw', saved.id, `${saved.memo} — $${usd.toFixed(2)}`);
+      await eventAppend('withdraw', saved.id, `${saved.memo} — ${fmtUSD(usd)}`);
       await reload();
       toast('success', 'برداشت ثبت شد');
       return true;
@@ -295,12 +341,12 @@ export function useAccounting(): AccountingState & AccountingActions {
         return false;
       }
       if (usd > cashBalance + 1e-6) {
-        toast('error', `موجودی نقد کافی نیست (موجودی: $${cashBalance.toFixed(2)})`);
+        toast('error', `موجودی نقد کافی نیست (موجودی: ${fmtUSD(cashBalance)})`);
         return false;
       }
       const e = makeExpenseEntry(usd, date, account, memo);
       const saved = await entryAppend(e);
-      await eventAppend('expense', saved.id, `${saved.memo} — $${usd.toFixed(2)}`);
+      await eventAppend('expense', saved.id, `${saved.memo} — ${fmtUSD(usd)}`);
       await reload();
       toast('success', 'هزینه ثبت شد');
       return true;
@@ -321,21 +367,15 @@ export function useAccounting(): AccountingState & AccountingActions {
       }
       const total = input.qty * input.unitPrice + (input.fee ?? 0);
       if (total > cashBalance + 1e-6) {
-        toast('error', `موجودی نقد کافی نیست (موجودی: $${cashBalance.toFixed(2)})`);
+        toast('error', `موجودی نقد کافی نیست (موجودی: ${fmtUSD(cashBalance)})`);
         return false;
       }
       const e = makeBuyEntry(input);
       const sym = input.symbol.toUpperCase();
       await accountEnsure({ key: cryptoAccountKey(sym), nameFa: cryptoAccountName(sym), type: 'asset' });
+      // لات از روی trade همین سند ساخته می‌شود
       const saved = await entryAppend(e);
-      await lotAppend({
-        id: -1,
-        asset: sym,
-        qty: input.qty,
-        unitCost: input.unitPrice,
-        openedAt: input.date
-      });
-      await eventAppend('buy', saved.id, `خرید ${sym} — ${input.qty} @ $${input.unitPrice}`);
+      await eventAppend('buy', saved.id, `خرید ${cryptoAccountName(sym)} — ${faNumber(input.qty, { maximumFractionDigits: 8 })} واحد به قیمت ${fmtUSD(input.unitPrice)}`);
       await reload();
       toast('success', `خرید ${sym} ثبت شد`);
       return true;
@@ -360,18 +400,16 @@ export function useAccounting(): AccountingState & AccountingActions {
         toast('error', `موجودی ${input.symbol.toUpperCase()} کافی نیست`);
         return false;
       }
-      const { entry, fifo, realized } = makeSellEntry(input);
+      const { entry, realized } = makeSellEntry(input);
+      // مصرف FIFO از روی trade همین سند بازپخش می‌شود (لات‌ها دیگر بازنویسی نمی‌شوند)
       const saved = await entryAppend(entry);
-      // اعمال مصرف FIFO: فقط لات‌های کاملاً مصرف‌شده بسته می‌شوند
-      const nextLots = applyFifoConsumption(input.lots, fifo.consumed, Date.now());
-      await lotReplaceAll(nextLots);
       await eventAppend(
         'sell',
         saved.id,
-        `فروش ${input.symbol.toUpperCase()} — ${input.qty} @ $${input.unitPrice} (سود/زیان: $${realized.toFixed(2)})`
+        `فروش ${cryptoAccountName(input.symbol)} — ${faNumber(input.qty, { maximumFractionDigits: 8 })} واحد به قیمت ${fmtUSD(input.unitPrice)} (سود و زیان: ${fmtUSD(realized)})`
       );
       await reload();
-      toast('success', `فروش ثبت شد — سود/زیان تحقق‌یافته: $${realized.toFixed(2)}`);
+      toast('success', `فروش ثبت شد — سود و زیان این فروش: ${fmtUSD(realized)}`);
       return true;
     },
     [reload]
@@ -381,7 +419,7 @@ export function useAccounting(): AccountingState & AccountingActions {
     async (lines: JournalLine[], date: number, memo: string) => {
       const v = validateEntry(lines);
       if (!v.ok) {
-        toast('error', v.error ?? 'سند نامعتبر است');
+        toast('error', v.error ?? 'تراکنش نامعتبر است');
         return false;
       }
       const e: JournalEntry = {
@@ -393,9 +431,9 @@ export function useAccounting(): AccountingState & AccountingActions {
         source: 'manual'
       };
       const saved = await entryAppend(e);
-      await eventAppend('manual', saved.id, `${memo} — ${lines.length} طرف`);
+      await eventAppend('manual', saved.id, `${memo} — ${faNumber(lines.length)} حساب`);
       await reload();
-      toast('success', 'سند دستی ثبت شد');
+      toast('success', 'ثبت دستی انجام شد');
       return true;
     },
     [reload]
@@ -405,9 +443,9 @@ export function useAccounting(): AccountingState & AccountingActions {
     async (entry: JournalEntry, date?: number) => {
       const r = buildReversal(entry, date ?? Date.now());
       const saved = await entryAppend(r);
-      await eventAppend('reversal', saved.id, `معکوس سند #${entry.id} — ${entry.memo}`);
+      await eventAppend('reversal', saved.id, `لغو: ${entry.memo}`);
       await reload();
-      toast('success', 'سند معکوس ثبت شد (سند اصلی دست‌نخورده ماند)');
+      toast('success', 'تراکنش لغو شد (تراکنش اصلی در تاریخچه می‌ماند)');
       return true;
     },
     [reload]
@@ -422,7 +460,7 @@ export function useAccounting(): AccountingState & AccountingActions {
         return false;
       }
       if (usd > cashBalance + 1e-6) {
-        toast('error', `موجودی نقد کافی نیست (موجودی: $${cashBalance.toFixed(2)})`);
+        toast('error', `موجودی نقد کافی نیست (موجودی: ${fmtUSD(cashBalance)})`);
         return false;
       }
       const destKey = DESTINATION_ACCOUNT[dest];
@@ -436,7 +474,7 @@ export function useAccounting(): AccountingState & AccountingActions {
       await eventAppend(
         'cash-out',
         saved.id,
-        `${saved.memo} — $${usd.toFixed(2)} (خروج سرمایه از پرتفوی)`
+        `${saved.memo} — ${fmtUSD(usd)} (خروج سرمایه از پرتفوی)`
       );
       await reload();
       toast('success', `برداشت به ${DESTINATION_NAME_FA[dest]} ثبت شد`);
@@ -463,12 +501,12 @@ export function useAccounting(): AccountingState & AccountingActions {
       try {
         if (isCashStablecoin(sym)) {
           // استیبل‌کوین = نقد → واریز نقدی استاندارد
-          const entry = makeDepositEntry(value, input.date, input.memo ?? `واریز ${sym}`);
+          const entry = makeDepositEntry(value, input.date, input.memo ?? `واریز ${cryptoAccountName(sym)}`);
           const saved = await entryAppend(entry);
           await eventAppend(
             'deposit',
             saved.id,
-            `واریز ${sym} — ${input.qty} @ $${input.unitPrice.toFixed(4)} = $${value.toFixed(2)}`
+            `واریز ${cryptoAccountName(sym)} — ${faNumber(input.qty, { maximumFractionDigits: 8 })} واحد به ارزش ${fmtUSD(value)}`
           );
         } else {
           // رمزارز → سند استاندارد واریز دارایی + لات بهای تمام‌شده (منطق موجود پروژه)
@@ -477,23 +515,16 @@ export function useAccounting(): AccountingState & AccountingActions {
             nameFa: cryptoAccountName(sym),
             type: 'asset'
           });
-          const entry = makeDepositAssetEntry(sym, value, input.date, input.memo ?? `واریز ${sym}`);
+          const entry = makeDepositAssetEntry(sym, value, input.date, input.memo ?? `واریز ${cryptoAccountName(sym)}`, input.qty);
           const saved = await entryAppend(entry);
-          await lotAppend({
-            id: -1,
-            asset: sym,
-            qty: input.qty,
-            unitCost: input.unitPrice,
-            openedAt: input.date
-          });
           await eventAppend(
             'deposit',
             saved.id,
-            `واریز ${sym} — ${input.qty} @ $${input.unitPrice.toFixed(4)} = $${value.toFixed(2)}`
+            `واریز ${cryptoAccountName(sym)} — ${faNumber(input.qty, { maximumFractionDigits: 8 })} واحد به ارزش ${fmtUSD(value)}`
           );
         }
         await reload();
-        toast('success', `واریز ${sym} ثبت شد`);
+        toast('success', `واریز ${cryptoAccountName(sym)} ثبت شد`);
         return true;
       } catch {
         toast('error', 'خطا در ثبت واریز');
@@ -505,6 +536,10 @@ export function useAccounting(): AccountingState & AccountingActions {
 
   return {
     entries,
+    storedEntries,
+    storedLots,
+    baseline,
+    pendingCustody: replay.pending,
     accounts,
     lots,
     events,

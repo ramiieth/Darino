@@ -45,7 +45,7 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
           label={<span className="inline-flex items-center gap-1">سود خالص <ProvenanceBadge kind="simulated" /></span>}
           value={<MoneyValue value={o.netPnl} signed tone="auto" />}
         />
-        <Metric size="md" label="ROI روی مارجین" value={<PercentValue value={o.roiOnMargin} />} />
+        <Metric size="md" label="بازده روی مارجین" value={<PercentValue value={o.roiOnMargin} />} />
         <Metric size="md" label="لبه نرخ" value={<PercentValue value={o.rateEdge * 100} />} />
       </div>
 
@@ -53,11 +53,11 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
         <KeyValueList
           dense
           rows={[
-            { label: 'Collateral شبیه‌سازی', value: <span className="num-ltr">{o.simulationCollateral.toFixed(3)} ETH</span> },
-            { label: 'حداکثر Notional', value: <MoneyValue value={o.notional} compact /> },
+            { label: 'وثیقه شبیه‌سازی', value: <span className="num-ltr">{o.simulationCollateral.toFixed(3)} ETH</span> },
+            { label: 'حداکثر ارزش اسمی', value: <MoneyValue value={o.notional} compact /> },
             { label: 'مارجین', value: <span><MoneyValue value={o.marginUsd} compact /> <span className="text-muted">({toFaDigits(o.marginUtilizationPct.toFixed(0))}٪ collateral)</span></span> },
-            { label: 'نرخ ثابت (API)', value: <PercentValue value={o.fixedApr * 100} signed={false} tone="none" /> },
-            { label: 'نرخ شناور (API)', value: <PercentValue value={o.underlyingApr * 100} signed={false} tone="none" /> },
+            { label: 'نرخ ثابت (سرویس)', value: <PercentValue value={o.fixedApr * 100} signed={false} tone="none" /> },
+            { label: 'نرخ شناور (سرویس)', value: <PercentValue value={o.underlyingApr * 100} signed={false} tone="none" /> },
             { label: 'تسویه (محاسبه‌شده)', value: <MoneyValue value={o.settlementPnl} signed tone="auto" /> },
             { label: 'کارمزدها', value: <MoneyValue value={o.feesUsd} /> },
             { label: 'لغزش', value: <MoneyValue value={o.slippageUsd} /> },
@@ -68,8 +68,8 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
             },
             { label: 'ریسک / اطمینان', value: `${o.riskLevel} · ${toFaDigits(o.confidence)}٪` },
             {
-              label: 'Liquidation Implied APR',
-              hint: liqAvail ? 'مقدار رسمی Boros' : 'فقط با Position و Collateral واقعی قابل محاسبه است',
+              label: 'نرخ لیکوئید ضمنی',
+              hint: liqAvail ? 'مقدار رسمی بوروس' : 'فقط با پوزیشن و وثیقه واقعی قابل محاسبه است',
               value: liqAvail ? <span className="num-ltr">{o.liquidationApr.value!.toFixed(2)}%</span> : <span className="text-subtle">N/A</span>
             }
           ]}

@@ -23,6 +23,7 @@ import type {
   TradFiKind
 } from '@/shared/types';
 import { computeChangePct, computeEthBenchmark, computeProfitLoss, computeValue, computeVsEth } from '@/shared/utils/math';
+import { fmtUSD } from '@/shared/utils/formatters';
 import {
   BASE_CAPITAL_2025,
   BASE_CAPITAL_2026,
@@ -196,17 +197,17 @@ export function renderRow(
 ): RenderedRow {
   const formatVal = (v: number | null): string =>
     v !== null && !Number.isNaN(v)
-      ? `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : 'N/A';
+      ? fmtUSD(v)
+      : '—';
 
   if (livePrice === null || livePrice === undefined) {
     return {
       asset: assetSymbol,
       buyPrice: formatVal(buyPrice),
-      currentPrice: 'N/A',
-      value: 'N/A',
-      profitLoss: 'N/A',
-      vsEth: 'N/A'
+      currentPrice: '—',
+      value: '—',
+      profitLoss: '—',
+      vsEth: '—'
     };
   }
 

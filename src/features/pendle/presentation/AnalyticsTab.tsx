@@ -61,9 +61,9 @@ export function AnalyticsTab() {
       <Surface className="p-4 md:p-5">
         <div className="grid gap-4 md:grid-cols-12">
           <Field label="سرمایه" className="md:col-span-3">
-            <Input dir="ltr" inputMode="decimal" value={investment} onChange={(e) => setInvestment(e.target.value)} suffix="$" />
+            <Input dir="ltr" inputMode="decimal" value={investment} onChange={(e) => setInvestment(e.target.value)} suffix="دلار" />
           </Field>
-          <Field label="بازار Pendle" hint="قیمت‌ها و نرخ‌ها خودکار از Pendle Core API" className="md:col-span-9">
+          <Field label="بازار پندل" hint="قیمت‌ها و نرخ‌ها خودکار از سرویس رسمی پندل" className="md:col-span-9">
             <Select value={marketId} onChange={(e) => setMarketId(e.target.value)}>
               <option value="">انتخاب بازار…</option>
               {markets.slice(0, 80).map((m) => (
@@ -80,7 +80,7 @@ export function AnalyticsTab() {
       </Surface>
 
       {sub !== 'compare' && !market && (
-        <EmptyState message="یک بازار انتخاب کنید" hint="همه قیمت‌ها و نرخ‌ها پس از انتخاب بازار از API دریافت و محاسبه می‌شوند." />
+        <EmptyState message="یک بازار انتخاب کنید" hint="همه قیمت‌ها و نرخ‌ها پس از انتخاب بازار از سرویس دریافت و محاسبه می‌شوند." />
       )}
       {sub === 'pt' && market && <PtSection investment={invest} market={market} prices={prices} />}
       {sub === 'yt' && market && <YtSection investment={invest} market={market} prices={prices} />}
@@ -198,7 +198,7 @@ function PtSection({ investment, market, prices }: { investment: number; market:
     });
   }, [investment, ptPrice, redemption, market.expiry, market.name, market.underlyingAsset]);
 
-  if (r === null) return <Insufficient text="قیمت زنده PT یا دارایی پایه از API در دسترس نیست؛" />;
+  if (r === null) return <Insufficient text="قیمت زنده توکن اصل یا دارایی پایه از سرویس در دسترس نیست؛" />;
 
   return (
     <ResultLayout
@@ -211,15 +211,15 @@ function PtSection({ investment, market, prices }: { investment: number; market:
       }
       secondary={[
         { label: 'سود ناخالص', value: <MoneyValue value={r.grossProfit} signed tone="auto" />, emphasis: true },
-        { label: 'بازده کل دوره (ROI)', value: <PercentValue value={r.roiPct} /> },
+        { label: 'بازده کل دوره', value: <PercentValue value={r.roiPct} /> },
         { label: 'بازده ثابت', value: <PercentValue value={r.fixedYieldPct} signed={false} tone="none" /> },
-        { label: 'APY مؤثر', value: <PercentValue value={r.effectiveApyPct} signed={false} tone="none" /> },
+        { label: 'بازده سالانه مؤثر', value: <PercentValue value={r.effectiveApyPct} signed={false} tone="none" /> },
         { label: 'بازده سالانه‌شده', value: <PercentValue value={r.annualizedPct} signed={false} tone="none" /> },
-        { label: 'تعداد PT', value: <span className="num-ltr">{fmtInt(r.ptAmount)} PT</span> },
+        { label: 'تعداد توکن اصل', value: <span className="num-ltr">{fmtInt(r.ptAmount)} PT</span> },
         { label: 'روز نگهداری', value: <span className="num-ltr">{fmtInt(r.holdingDays)}</span> }
       ]}
       assumptions={[
-        { label: 'قیمت PT (زنده)', value: <MoneyValue value={ptPrice} /> },
+        { label: 'قیمت توکن اصل (زنده)', value: <MoneyValue value={ptPrice} /> },
         { label: 'قیمت بازخرید', value: redemption !== null ? <MoneyValue value={redemption} /> : <span className="text-muted">۱ دلار (استیبل)</span> },
         ...baseAssumptions(market, days)
       ]}
@@ -237,7 +237,7 @@ function YtSection({ investment, market, prices }: { investment: number; market:
   const r = ytPrice !== null ? calcYt(investment, ytPrice, underlying, reward, days) : null;
   const ytAmount = ytPrice !== null ? investment / ytPrice : null;
 
-  if (r === null || ytAmount === null) return <Insufficient text="قیمت زنده YT از API در دسترس نیست؛" />;
+  if (r === null || ytAmount === null) return <Insufficient text="قیمت زنده توکن بازده از سرویس در دسترس نیست؛" />;
 
   return (
     <ResultLayout
@@ -245,21 +245,21 @@ function YtSection({ investment, market, prices }: { investment: number; market:
       primary={
         <PrimaryPair
           a={{ label: 'سود کل تا سررسید', value: <MoneyValue value={r.totalIncome} signed tone="auto" /> }}
-          b={{ label: 'APY', value: <PercentValue value={r.totalApyPct} tone="auto" /> }}
+          b={{ label: 'بازده سالانه', value: <PercentValue value={r.totalApyPct} tone="auto" /> }}
         />
       }
       secondary={[
         { label: 'درآمد بازده پایه', value: <MoneyValue value={r.yieldIncome} signed tone="auto" /> },
         { label: 'پاداش', value: <MoneyValue value={r.rewardIncomeUsd} signed tone="auto" /> },
-        { label: 'بازده کل دوره (ROI)', value: <PercentValue value={r.totalReturnPct} /> },
-        { label: 'APY سر‌به‌سر', value: <PercentValue value={r.breakEvenApyPct} signed={false} tone="none" />, emphasis: true },
+        { label: 'بازده کل دوره', value: <PercentValue value={r.totalReturnPct} /> },
+        { label: 'بازده سالانه سر‌به‌سر', value: <PercentValue value={r.breakEvenApyPct} signed={false} tone="none" />, emphasis: true },
         { label: 'حداکثر زیان', value: <MoneyValue value={-Math.abs(r.maxLoss)} tone="loss" /> },
-        { label: 'تعداد YT', value: <span className="num-ltr">{fmtInt(ytAmount)} YT</span> }
+        { label: 'تعداد توکن بازده', value: <span className="num-ltr">{fmtInt(ytAmount)} YT</span> }
       ]}
       assumptions={[
-        { label: 'قیمت YT (زنده)', value: <MoneyValue value={ytPrice} /> },
-        { label: 'APY پایه', value: <PercentValue value={underlying} signed={false} tone="none" /> },
-        { label: 'Reward APR', value: <PercentValue value={reward} signed={false} tone="none" /> },
+        { label: 'قیمت توکن بازده (زنده)', value: <MoneyValue value={ytPrice} /> },
+        { label: 'بازده سالانه پایه', value: <PercentValue value={underlying} signed={false} tone="none" /> },
+        { label: 'نرخ پاداش سالانه', value: <PercentValue value={reward} signed={false} tone="none" /> },
         ...baseAssumptions(market, days).slice(0, 2)
       ]}
       details={
@@ -286,21 +286,21 @@ function LpSection({ investment, market }: { investment: number; market: PendleM
       primary={
         <PrimaryPair
           a={{ label: 'سود کل تا سررسید', value: <MoneyValue value={r.totalUsd} signed tone="auto" /> }}
-          b={{ label: 'APY', value: <PercentValue value={r.totalApyPct} tone="auto" /> }}
+          b={{ label: 'بازده سالانه', value: <PercentValue value={r.totalApyPct} tone="auto" /> }}
         />
       }
       secondary={[
         { label: 'درآمد بازده پایه', value: <MoneyValue value={r.underlyingYieldUsd} signed tone="auto" /> },
         { label: 'پاداش', value: <MoneyValue value={r.rewardUsd} signed tone="auto" /> },
         { label: 'کارمزد معاملات', value: <MoneyValue value={r.tradingFeesUsd} signed tone="auto" /> },
-        { label: 'بازده کل دوره (ROI)', value: <PercentValue value={(r.totalUsd / Math.max(investment, 1)) * 100} /> },
-        { label: 'تعداد LP', value: <span className="num-ltr">{fmtInt(r.lpTokens)} LP</span> }
+        { label: 'بازده کل دوره', value: <PercentValue value={(r.totalUsd / Math.max(investment, 1)) * 100} /> },
+        { label: 'تعداد نقدینگی', value: <span className="num-ltr">{fmtInt(r.lpTokens)} LP</span> }
       ]}
       assumptions={[
-        { label: 'APY پایه', value: <PercentValue value={underlying} signed={false} tone="none" /> },
-        { label: 'APY ثابت PT', value: <PercentValue value={ptFixed} signed={false} tone="none" /> },
-        { label: 'APY کارمزد سواپ', value: <PercentValue value={swapFee} signed={false} tone="none" /> },
-        { label: 'Reward APR', value: <PercentValue value={reward} signed={false} tone="none" /> },
+        { label: 'بازده سالانه پایه', value: <PercentValue value={underlying} signed={false} tone="none" /> },
+        { label: 'بازده سالانه ثابت توکن اصل', value: <PercentValue value={ptFixed} signed={false} tone="none" /> },
+        { label: 'بازده سالانه کارمزد سواپ', value: <PercentValue value={swapFee} signed={false} tone="none" /> },
+        { label: 'نرخ پاداش سالانه', value: <PercentValue value={reward} signed={false} tone="none" /> },
         { label: 'زیان ناپایدار', value: 'لحاظ نشده' },
         ...baseAssumptions(market, days).slice(0, 2)
       ]}
@@ -327,8 +327,8 @@ function RealApySection({ investment, market }: { investment: number; market: Pe
       market={market}
       primary={
         <div className="grid grid-cols-2 gap-6">
-          <Metric size="hero" label="APY پس از هزینه" value={<PercentValue value={realApyPct} tone="auto" />} />
-          <Metric size="lg" label="APY اعلام‌شده" value={<PercentValue value={apy} signed={false} tone="none" />} sub="تئوری، پیش از هزینه" />
+          <Metric size="hero" label="بازده سالانه پس از هزینه" value={<PercentValue value={realApyPct} tone="auto" />} />
+          <Metric size="lg" label="بازده سالانه اعلام‌شده" value={<PercentValue value={apy} signed={false} tone="none" />} sub="تئوری، پیش از هزینه" />
         </div>
       }
       secondary={[
@@ -339,7 +339,7 @@ function RealApySection({ investment, market }: { investment: number; market: Pe
         { label: 'اثر قیمتی', value: <MoneyValue value={-impact} /> },
         { label: 'جمع هزینه‌ها', value: <MoneyValue value={-totalFees} tone="loss" /> },
         { label: 'سود خالص', value: <MoneyValue value={net} signed tone="auto" />, emphasis: true },
-        { label: 'بازده خالص دوره (ROI)', value: <PercentValue value={realRoiPct} /> }
+        { label: 'بازده خالص دوره', value: <PercentValue value={realRoiPct} /> }
       ]}
       assumptions={[
         { label: 'اثر قیمتی', value: <span className="num-ltr">{ASSUME.priceImpactPct}%</span> },
@@ -366,8 +366,8 @@ function BreakevenSection({ investment, market, prices }: { investment: number; 
       market={market}
       primary={
         <PrimaryPair
-          a={{ label: 'APY سر‌به‌سر', value: <PercentValue value={beApy} signed={false} tone="none" /> }}
-          b={{ label: 'قیمت سر‌به‌سر PT', value: <MoneyValue value={bePrice} /> }}
+          a={{ label: 'بازده سالانه سر‌به‌سر', value: <PercentValue value={beApy} signed={false} tone="none" /> }}
+          b={{ label: 'قیمت سر‌به‌سر توکن اصل', value: <MoneyValue value={bePrice} /> }}
         />
       }
       secondary={[
@@ -376,8 +376,8 @@ function BreakevenSection({ investment, market, prices }: { investment: number; 
         { label: 'خالص', value: <MoneyValue value={gross - fees} signed tone="auto" />, emphasis: true }
       ]}
       assumptions={[
-        { label: 'APY ثابت بازار', value: <PercentValue value={apy} signed={false} tone="none" /> },
-        { label: 'قیمت PT (زنده)', value: <MoneyValue value={ptPrice} /> },
+        { label: 'بازده سالانه ثابت بازار', value: <PercentValue value={apy} signed={false} tone="none" /> },
+        { label: 'قیمت توکن اصل (زنده)', value: <MoneyValue value={ptPrice} /> },
         ...baseAssumptions(market, days)
       ]}
       details={<p className="text-xs text-muted">از نقطه سر‌به‌سر به بعد، بازده دوره هزینه‌های ورود و خروج را پوشش می‌دهد.</p>}
@@ -424,7 +424,7 @@ function CompareSection({ markets, investment }: { markets: PendleMarketView[]; 
 
       {best && (
         <Notice tone="success" icon={<Crown />} title={`بیشترین بازده پس از هزینه: ${best.market.name}`}>
-          APY پس از هزینه <PercentValue value={best.realApyPct} className="font-semibold" /> · امتیاز فرصت{' '}
+          بازده سالانه پس از هزینه <PercentValue value={best.realApyPct} className="font-semibold" /> · امتیاز فرصت{' '}
           <span className="num-ltr font-semibold">{fmtInt(best.opportunityScore)}</span>
         </Notice>
       )}
@@ -438,10 +438,10 @@ function CompareSection({ markets, investment }: { markets: PendleMarketView[]; 
                 <tr>
                   <th scope="col" className="sticky start-0 z-20 !ps-5">بازار</th>
                   <th scope="col" className="col-num">سود</th>
-                  <th scope="col" className="col-num">ROI</th>
-                  <th scope="col" className="col-num">APY</th>
+                  <th scope="col" className="col-num">بازده</th>
+                  <th scope="col" className="col-num">بازده سالانه</th>
                   <th scope="col" className="col-num">پس از هزینه</th>
-                  <th scope="col" className="col-num">TVL</th>
+                  <th scope="col" className="col-num">ارزش قفل‌شده</th>
                   <th scope="col" className="col-num">حجم</th>
                   <th scope="col" className="col-num">پاداش</th>
                   <th scope="col" className="col-num">روز</th>

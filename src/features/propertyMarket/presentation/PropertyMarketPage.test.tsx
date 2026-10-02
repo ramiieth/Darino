@@ -164,7 +164,7 @@ describe('PropertyMarketPage', () => {
   it('نرخ دلار = تتر زنده (بیت‌پین) در سربرگ و کارت نرخ', async () => {
     usePropertyMarketStore.setState({ listings: MANY });
     render(<PropertyMarketPage />);
-    expect((await screen.findAllByText(/تتر ۲۵۰٬۰۰۰ تومان · بیت‌پین/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/تتر ۲۵۰,۰۰۰ تومان · بیت‌پین/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText('زنده').length).toBeGreaterThan(0);
   });
 
@@ -214,8 +214,8 @@ describe('PropertyMarketPage', () => {
     usePropertyMarketStore.setState({ snapshots: [mk('s-old', threeMonthsAgo.getTime(), 60e6, 200000), mk('s-now', now, 80e6, 250000)] });
     render(<PropertyMarketPage />);
     fireEvent.click(await screen.findByRole('tab', { name: /تغییرات قیمت/ }));
-    // ۳۰۰ دلار → ۳۲۰ دلار = +۶٫۷٪
-    expect((await screen.findAllByText('+۶٫۷٪')).length).toBeGreaterThan(0);
+    // ۳۰۰ دلار → ۳۲۰ دلار = +۶.۷٪
+    expect((await screen.findAllByText('+۶.۷٪')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('۳۰۰ دلار').length).toBeGreaterThan(0);
     expect(screen.getAllByText('۳۲۰ دلار').length).toBeGreaterThan(0);
   });

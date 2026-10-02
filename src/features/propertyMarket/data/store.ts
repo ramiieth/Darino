@@ -24,6 +24,7 @@ import type { ParsedListingSeed } from '../collector/parse';
 import { newCleaningReport } from '../collector/pipeline';
 import { buildSnapshot, ingestSeeds, purgeStoredListings, rekeyListings } from './ingest';
 import { useUsdtStore, usdtIsStale } from '@/shared/store/usdtStore';
+import { toFaDigits } from '@/shared/utils/formatters';
 
 /* ---------------- رابط داینامیک جداول (الگوی سایر ماژول‌ها) ---------------- */
 
@@ -529,7 +530,7 @@ export const usePropertyMarketStore = create<PropertyMarketState>((set, get) => 
             ...get().collect,
             status: 'done',
             message:
-              `${snap.cleaning.market.toLocaleString('fa-IR')} آگهی در تحلیل` + (cancelRequested ? ' (متوقف‌شده توسط شما)' : '')
+              `${toFaDigits(snap.cleaning.market.toLocaleString('en-US'))} آگهی در تحلیل` + (cancelRequested ? ' (متوقف‌شده توسط شما)' : '')
           }
         });
       } else {

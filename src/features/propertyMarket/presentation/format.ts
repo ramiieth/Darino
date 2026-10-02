@@ -1,10 +1,11 @@
+import { toFaDigits } from '@/shared/utils/formatters';
 /** ============================================================
  * Property Market — قالب‌بندی قیمت‌ها؛ همه اعداد با ارقام فارسی
  * ============================================================ */
 
-const fa0 = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 });
-const fa1 = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 1 });
-const fa2 = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 2 });
+const fa0 = { format: (v: number) => toFaDigits(new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v)) };
+const fa1 = { format: (v: number) => toFaDigits(new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(v)) };
+const fa2 = { format: (v: number) => toFaDigits(new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(v)) };
 
 const ok = (v: number | null | undefined): v is number => v !== null && v !== undefined && Number.isFinite(v);
 

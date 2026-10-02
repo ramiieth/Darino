@@ -53,7 +53,7 @@ export function OrderPreviewPanel({
         <Field label="حجم">
           <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} suffix="YU" />
         </Field>
-        <Field label="Collateral موجود">
+        <Field label="وثیقه موجود">
           <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} suffix="ETH" />
         </Field>
         <div>
@@ -63,7 +63,7 @@ export function OrderPreviewPanel({
           </Badge>
         </div>
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-muted">Fixed APR</p>
+          <p className="mb-1.5 text-xs font-semibold text-muted">نرخ ثابت سالانه</p>
           <p className="flex h-10 items-center text-sm font-semibold text-ink">
             <PercentValue value={(fixedRate ?? market.markApr) * 100} signed={false} tone="none" />
           </p>
@@ -76,7 +76,7 @@ export function OrderPreviewPanel({
     return (
       <div className="space-y-5">
         {inputs}
-        <EmptyState message="برای پیش‌نمایش، حجم معتبر (YU) وارد کنید." />
+        <EmptyState message="برای پیش‌نمایش، حجم معتبر (واحد بازده) وارد کنید." />
       </div>
     );
   }
@@ -85,7 +85,7 @@ export function OrderPreviewPanel({
 
   return (
     <div className="space-y-5">
-      <Notice tone="info">پیش‌نمایش سفارش — هنوز Position واقعی در Boros ایجاد نشده و هیچ مقداری «Position واقعی» نیست.</Notice>
+      <Notice tone="info">پیش‌نمایش سفارش — هنوز پوزیشن واقعی در بوروس ایجاد نشده و هیچ مقداری «پوزیشن واقعی» نیست.</Notice>
       {inputs}
 
       <Surface variant="focal" className="p-5 md:p-6">
@@ -96,7 +96,7 @@ export function OrderPreviewPanel({
               <MoneyValue value={preview.expectedNetPnl} signed tone="auto" />
             </p>
             <p className="mt-1 text-sm text-muted">
-              ROI روی مارجین <PercentValue value={preview.roiOnMargin} className="font-semibold" />
+              بازده روی مارجین <PercentValue value={preview.roiOnMargin} className="font-semibold" />
             </p>
           </div>
           <ProvenanceBadge kind="simulated" />
@@ -112,7 +112,7 @@ export function OrderPreviewPanel({
             value={<MoneyValue value={preview.rateSensitivityUsd} />}
             sub={<QuantityValue value={preview.rateSensitivityAsset} unit="ETH" />}
           />
-          <Metric label="Notional / Collateral" value={<span className="num-ltr">{preview.effectiveExposure.toFixed(1)}x</span>} sub="لوریج متعارف نیست" />
+          <Metric label="ارزش اسمی / وثیقه" value={<span className="num-ltr">{preview.effectiveExposure.toFixed(1)}x</span>} sub="لوریج متعارف نیست" />
         </MetricGrid>
       </Surface>
 
@@ -123,19 +123,19 @@ export function OrderPreviewPanel({
               label: 'مارجین در دسترس',
               value: <QuantityValue value={preview.availableMarginAsset} unit="ETH" className={(preview.availableMarginAsset ?? -1) >= 0 ? '' : 'text-negative'} />
             },
-            { label: 'کارمزدها (مستندات Boros)', value: <MoneyValue value={preview.fees.total} /> },
-            { label: 'لغزش', hint: 'بدون Order Book عمومی → N/A', value: <MoneyValue value={preview.slippageUsd} /> },
+            { label: 'کارمزدها (مستندات بوروس)', value: <MoneyValue value={preview.fees.total} /> },
+            { label: 'لغزش', hint: 'بدون دفتر سفارش عمومی → نامشخص', value: <MoneyValue value={preview.slippageUsd} /> },
             { label: 'سود تسویه', value: <MoneyValue value={preview.expectedSettlementPnl} signed tone="auto" /> },
-            { label: 'MTM (Mark در برابر ورود)', value: <MoneyValue value={preview.expectedMtm} signed tone="auto" /> },
+            { label: 'ارزش روز (مارک در برابر ورود)', value: <MoneyValue value={preview.expectedMtm} signed tone="auto" /> },
             {
               label: (
                 <span className="inline-flex items-center gap-1.5">
-                  Liquidation Implied APR <ProvenanceBadge kind={liqAvail ? 'boros' : 'na'} label={liqAvail ? 'BOROS PREVIEW' : 'نیازمند Position'} />
+                  نرخ لیکوئید ضمنی <ProvenanceBadge kind={liqAvail ? 'boros' : 'na'} label={liqAvail ? 'پیش‌نمایش بوروس' : 'نیازمند پوزیشن'} />
                 </span>
               ),
               hint: liqAvail
-                ? `${LIQUIDATION_SOURCE_FA[preview.liquidationApr.source]} — مخصوص همین Position`
-                : 'فقط با Position فعال، Collateral واقعی و وضعیت Position قابل محاسبه است',
+                ? `${LIQUIDATION_SOURCE_FA[preview.liquidationApr.source]} — مخصوص همین پوزیشن`
+                : 'فقط با پوزیشن فعال، وثیقه واقعی و وضعیت پوزیشن قابل محاسبه است',
               value: liqAvail ? <span className="num-ltr">{preview.liquidationApr.value!.toFixed(2)}%</span> : <span className="text-subtle">N/A</span>
             },
             ...(preview.liquidationBufferPct !== null
@@ -146,11 +146,11 @@ export function OrderPreviewPanel({
       </Surface>
 
       {preview.collateralSufficient === null ? (
-        <Notice tone="neutral">کفایت Collateral: N/A — Collateral یا قیمت وارد نشده است.</Notice>
+        <Notice tone="neutral">کفایت وثیقه: نامشخص — وثیقه یا قیمت وارد نشده است.</Notice>
       ) : preview.collateralSufficient ? (
-        <Notice tone="success">Collateral واردشده از مارجین موردنیاز بیشتر است (بررسی ریاضی — نه تضمین).</Notice>
+        <Notice tone="success">وثیقه واردشده از مارجین موردنیاز بیشتر است (بررسی ریاضی — نه تضمین).</Notice>
       ) : (
-        <Notice tone="warn">Collateral واردشده کمتر از مارجین موردنیاز است.</Notice>
+        <Notice tone="warn">وثیقه واردشده کمتر از مارجین موردنیاز است.</Notice>
       )}
     </div>
   );

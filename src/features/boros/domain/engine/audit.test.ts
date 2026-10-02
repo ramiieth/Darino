@@ -211,17 +211,17 @@ describe('۵) Fee Model — Source هر هزینه', () => {
   it('هر خط Fee دارای Source است (api/market-data/user-input/na)', () => {
     expect(verifyFeeSources(b)).toBe(true);
     const labels = b.feeLines.map((l) => l.label);
-    expect(labels).toContain('ورود (Entry)');
-    expect(labels).toContain('خروج (Exit)');
-    expect(labels).toContain('تسویه (Settlement)');
-    expect(labels).toContain('گس (Gas)');
-    expect(labels).toContain('Slippage');
+    expect(labels).toContain('ورود');
+    expect(labels).toContain('خروج');
+    expect(labels).toContain('تسویه');
+    expect(labels).toContain('کارمزد شبکه');
+    expect(labels).toContain('لغزش قیمت');
   });
 
   it('Entry/Exit از API (takerFee × YTM)، Gas از User Input، Slippage از Market Data', () => {
     const entry = b.feeLines.find((l) => l.label.includes('ورود'))!;
-    const gas = b.feeLines.find((l) => l.label.includes('گس'))!;
-    const slip = b.feeLines.find((l) => l.label.includes('Slippage'))!;
+    const gas = b.feeLines.find((l) => l.label.includes('کارمزد شبکه'))!;
+    const slip = b.feeLines.find((l) => l.label.includes('لغزش قیمت'))!;
     expect(entry.source).toBe('api');
     // فرمول رسمی Boros: |Size| × takerFee × YTM
     const ytm = (m.maturity - NOW) / 86_400 / 365;
@@ -233,8 +233,8 @@ describe('۵) Fee Model — Source هر هزینه', () => {
 
   it('هزینه بدون داده → 0 با source=na (هرگز حدس نمی‌زنیم)', () => {
     const bNoGas = auditMarket({ m, size: SIZE, nowSec: NOW, gasUsd: 0, slippageRate: null });
-    const gas = bNoGas.feeLines.find((l) => l.label.includes('گس'))!;
-    const slip = bNoGas.feeLines.find((l) => l.label.includes('Slippage'))!;
+    const gas = bNoGas.feeLines.find((l) => l.label.includes('کارمزد شبکه'))!;
+    const slip = bNoGas.feeLines.find((l) => l.label.includes('لغزش قیمت'))!;
     expect(gas.amount).toBe(0);
     expect(gas.source).toBe('na');
     expect(slip.amount).toBe(0);
@@ -244,7 +244,7 @@ describe('۵) Fee Model — Source هر هزینه', () => {
   it('جمع خط‌ها = Total Costs (بدون دو شمارش)', () => {
     expect(verifyFeesSum(b)).toBe(true);
     // Market Entrance Fee — در API عمومی نیست → N/A
-    const entrance = b.feeLines.find((l) => l.label.includes('Entrance'))!;
+    const entrance = b.feeLines.find((l) => l.label.includes('ورود به بازار'))!;
     expect(entrance.amount).toBe(0);
     expect(entrance.source).toBe('na');
   });
@@ -597,7 +597,7 @@ describe('۱۳) Liquidation / Maximum Loss', () => {
   it('مدل لیکوییدیشن از API عمومی در دسترس نیست → N/A (هرگز حدس نمی‌زنیم)', () => {
     const p = projectCapital({ m, capitalUsd: 1000, direction: 'long', nowSec: NOW });
     expect(p?.liquidation.status).toBe('na');
-    expect(p?.liquidation.note).toContain('N/A');
+    expect(p?.liquidation.note).toContain('نامشخص');
     // فقط نسبت kMM/kIM از API در دسترس است (اطلاعات جزئی)
     expect(p?.liquidation.mmRatio).toBeCloseTo(m.kMM / m.kIM, 9);
   });
@@ -655,7 +655,7 @@ describe('۱۶) Economic Edge — معیار داخلی اپ (نه رسمی Boro
 describe('۱۷) No Fabricated Data — هرچه از API نیست → N/A', () => {
   it('Slippage بدون داده → ۰ با source=na (نه حدس)', () => {
     const b = auditMarket({ m, size: 1000, nowSec: NOW, gasUsd: 0, slippageRate: null });
-    const slip = b.feeLines.find((l) => l.label.includes('Slippage'))!;
+    const slip = b.feeLines.find((l) => l.label.includes('لغزش قیمت'))!;
     expect(slip.amount).toBe(0);
     expect(slip.source).toBe('na');
   });

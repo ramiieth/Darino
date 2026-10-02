@@ -2,6 +2,7 @@
  * حسابداری — انواع پایه (Single Source of Truth دامنه)
  * ثبت دوطرفه (Double-Entry) + دفتر کل + FIFO + ممیزی
  * ============================================================ */
+import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 
 /** نوع حساب — سمت عادی مانده را تعیین می‌کند */
 export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
@@ -37,6 +38,36 @@ export interface JournalEntry {
   source: string;
   /** اگر سند معکوس است: شناسه سند اصلی */
   reversesId?: number;
+  /**
+   * اطلاعات مقداری معامله (از نسخهٔ چنددستگاهی به بعد) — لات‌های FIFO از روی همین
+   * بازسازی می‌شوند، نه از جدول لات جداگانه؛ پس همهٔ دستگاه‌ها یک نتیجه می‌گیرند.
+   */
+  trade?: TradeInfo;
+  /** سند مشتق‌شده (ذخیره نمی‌شود) — مثلاً از عملیات سواپ/بریج دارایی چندشبکه‌ای */
+  derivedFrom?: { kind: 'custody'; operationId: string };
+}
+
+export interface TradeInfo {
+  kind: 'buy' | 'sell' | 'deposit_asset';
+  symbol: string;
+  qty: number;
+  unitPrice: number;
+}
+
+/**
+ * شناسهٔ یکتای سند/لات/رویداد بین دستگاه‌ها.
+ * قبلاً هر دستگاه شمارهٔ ترتیبی خودش (۱، ۲، ۳…) را می‌ساخت و دو دستگاه شمارهٔ یکسان
+ * برای سندهای متفاوت تولید می‌کردند → سرور دومی را بی‌صدا رد می‌کرد.
+ * حالا: میلی‌ثانیه × ۱۰۰۰ + عدد تصادفی/افزایشی ← یکتا، صعودی (ترتیب زمانی حفظ می‌شود)
+ * و در محدودهٔ عدد صحیح امن جاوااسکریپت تا سال ۲۲۵۵.
+ */
+let lastLedgerId = 0;
+export function newLedgerId(now = Date.now()): number {
+  const rand = Math.floor(Math.random() * 1000);
+  let id = now * 1000 + rand;
+  if (id <= lastLedgerId) id = lastLedgerId + 1;
+  lastLedgerId = id;
+  return id;
 }
 
 /** لات FIFO — باقیمانده هر خرید */
@@ -105,10 +136,10 @@ export const DESTINATION_NAME_FA: Record<CashDestination, string> = {
 
 /** حساب‌های پیش‌فرض نمودار حساب‌ها */
 export const DEFAULT_ACCOUNTS: Account[] = [
-  { key: 'cash:usd', nameFa: 'نقد (دلار / USDT-USDC)', type: 'asset' },
+  { key: 'cash:usd', nameFa: 'نقد (دلار / تتر/یو‌اس‌دی‌سی)', type: 'asset' },
   { key: 'bank:checking', nameFa: 'حساب بانکی', type: 'asset' },
-  { key: 'equity:capital', nameFa: 'سرمایه', type: 'equity' },
-  { key: 'income:trade', nameFa: 'سود/زیان معاملات', type: 'income' },
+  { key: 'equity:capital', nameFa: 'سرمایهٔ واریزی', type: 'equity' },
+  { key: 'income:trade', nameFa: 'سود و زیان فروش‌ها', type: 'income' },
   { key: 'expense:living', nameFa: 'صندوق مخارج (هزینه‌های زندگی)', type: 'expense' },
   { key: 'expense:fee', nameFa: 'کارمزد', type: 'expense' },
   { key: 'expense:misc', nameFa: 'سایر هزینه‌ها', type: 'expense' }
@@ -116,13 +147,14 @@ export const DEFAULT_ACCOUNTS: Account[] = [
 
 /** نام فارسی حساب رمزارز */
 export const cryptoAccountKey = (symbol: string) => `crypto:${symbol.toUpperCase()}`;
-export const cryptoAccountName = (symbol: string) => `رمزارز ${symbol.toUpperCase()}`;
+export const cryptoAccountName = (symbol: string) => assetDisplayName(symbol.toUpperCase()).name;
 
 /** نام فارسی هر حساب (از نمودار یا داینامیک) */
 export function accountNameFa(key: string, accounts: Account[]): string {
-  const a = accounts.find((x) => x.key === key);
-  if (a) return a.nameFa;
+  // نام رمزارزها همیشه از نام فارسی دارایی (نام‌های قدیمیِ ذخیره‌شده مثل «رمزارز ETH» نادیده گرفته می‌شوند)
   const m = key.match(/^crypto:(.+)$/);
   if (m) return cryptoAccountName(m[1]);
+  const a = accounts.find((x) => x.key === key);
+  if (a) return a.nameFa;
   return key;
 }

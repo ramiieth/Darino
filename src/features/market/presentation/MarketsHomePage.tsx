@@ -68,8 +68,8 @@ export function MarketsHomePage() {
               <Percent className="h-5 w-5" />
             </span>
           }
-          title="Pendle Markets"
-          subtitle="بازده ثابت PT، YT و LP — APY اعلام‌شده و تحلیل پس از هزینه"
+          title="بازارهای پندل"
+          subtitle="بازده ثابت توکن اصل، توکن بازده و نقدینگی — بازده سالانه اعلام‌شده و تحلیل پس از هزینه"
         />
       </Surface>
     </Page>

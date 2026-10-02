@@ -228,7 +228,7 @@ export function runLoopStrategy(p: LoopParams): LoopResult {
       complete: false,
       warnings: [
         ...warnings,
-        'Borrow APY / LTV / Liquidation Threshold از API عمومی در دسترس نیست — بدون اهرم محاسبه شد (کاربر می‌تواند در Calculator وارد کند)'
+        'نرخ سالانهٔ وام / نسبت وام به وثیقه / آستانهٔ لیکوئید از سرویس عمومی در دسترس نیست — بدون اهرم محاسبه شد (کاربر می‌تواند در ماشین‌حساب وارد کند)'
       ],
       stops,
       reference,
@@ -244,7 +244,7 @@ export function runLoopStrategy(p: LoopParams): LoopResult {
         recommendedLoops: 0,
         recommendedLeverage: 1,
         maxSafeLoops: 0,
-        reason: 'پارامترهای کلیدی (LTV/Borrow/LT) ناشناخته‌اند — بدون اهرم'
+        reason: 'پارامترهای کلیدی (نسبت وام به وثیقه، نرخ وام، آستانهٔ لیکوئید) ناشناخته‌اند — بدون اهرم'
       }
     };
   }
@@ -315,10 +315,10 @@ export function runLoopStrategy(p: LoopParams): LoopResult {
   };
 
   if (borrowRate > 0 && p.borrowApy !== null) {
-    warnings.push('Borrow APY متغیر است — هزینه Borrow برآوردی است (Estimated Borrow Cost)');
+    warnings.push('نرخ سالانهٔ وام متغیر است — هزینه وام برآوردی است ');
   }
   if (steps.length >= (p.protocolMaxLoops ?? 100) && p.protocolMaxLoops !== null) {
-    stops.push(`محدودیت ${p.protocolMaxLoops} Loop پروتکل اعمال شد`);
+    stops.push(`محدودیت ${p.protocolMaxLoops} حلقه پروتکل اعمال شد`);
   }
 
   const reason = stops[stops.length - 1] ?? 'تا حد ایمنی ادامه یافت';

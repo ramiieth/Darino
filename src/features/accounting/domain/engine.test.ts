@@ -44,7 +44,7 @@ describe('validateEntry — سند دوطرفه', () => {
       { account: 'equity:capital', debit: 0, credit: 90 }
     ]);
     expect(r.ok).toBe(false);
-    expect(r.error).toContain('متوازن');
+    expect(r.error).toContain('برابر نیستند');
   });
 
   it('کمتر از دو طرف → نامعتبر', () => {

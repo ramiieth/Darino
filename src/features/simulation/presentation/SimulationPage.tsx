@@ -1,3 +1,4 @@
+import { toFaDigits } from '@/shared/utils/formatters';
 import { useMemo, useState } from 'react';
 import { RefreshCw, SlidersHorizontal, Layers } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
@@ -10,6 +11,7 @@ import { useTimeline } from '@/features/simulation/data/useTimeline';
 import { SimulationTable, type SortDir } from './SimulationTable';
 import { AssetDetailSheet } from './AssetDetailSheet';
 import { AnalyticsCards } from './AnalyticsCards';
+import { ScenarioCashCard } from './ScenarioCashCard';
 import { SimContextChips } from './SimContextChips';
 import { CategoryReturnChart } from './CategoryReturnChart';
 import { FiltersBar, type CategoryFilter, type SortKey } from './FiltersBar';
@@ -189,6 +191,7 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <SimContextChips result={result} />
+          <ScenarioCashCard />
         </div>
         <div className="lg:col-span-7">
           <CategoryReturnChart result={result} />
@@ -255,9 +258,9 @@ function StockProgress({
       }
     >
       <span className="num-ltr">
-        {t('avBudgetLabel')}: {used} / {budgetTotal}
-        {keys > 1 && ` · ${keys} کلید فعال`}
-        {refreshing && ` · ${done}/${total} (${pct}%)`}
+        {t('avBudgetLabel')}: {toFaDigits(used)} از {toFaDigits(budgetTotal)}
+        {keys > 1 && ` · ${toFaDigits(keys)} کلید فعال`}
+        {refreshing && ` · ${toFaDigits(done)} از ${toFaDigits(total)} (${toFaDigits(pct)}٪)`}
       </span>
     </Notice>
   );

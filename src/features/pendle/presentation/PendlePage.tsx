@@ -38,8 +38,8 @@ export function PendlePage() {
   return (
     <Page>
       <PageHeader
-        title="Pendle"
-        subtitle="بازارهای بازده ثابت — PT، YT و LP. فقط مشاهده و تحلیل؛ اقدام‌ها در سایت رسمی Pendle انجام می‌شود."
+        title="پندل"
+        subtitle="بازارهای بازده ثابت — توکن اصل، توکن بازده و نقدینگی. فقط مشاهده و تحلیل؛ اقدام‌ها در سایت رسمی پندل انجام می‌شود."
         meta={<PendleStatus />}
         actions={
           <a
@@ -55,7 +55,7 @@ export function PendlePage() {
       />
       <div className="space-y-6">
         <Tabs<PendleTab>
-          label="بخش‌های Pendle"
+          label="بخش‌های پندل"
           value={tab}
           onChange={setTab}
           options={[
@@ -75,16 +75,16 @@ function PendleStatus() {
   const s = usePendleRateStatus();
   const pct = s.limit > 0 ? (s.remaining / s.limit) * 100 : 100;
   if (s.errors.length > 0)
-    return <StatusDot tone="warn" label={`${toFaDigits(s.errors.length)} خطای اخیر API`} className="font-normal" />;
+    return <StatusDot tone="warn" label={`${toFaDigits(s.errors.length)} خطای اخیر سرویس`} className="font-normal" />;
   if (pct < 20)
     return (
       <StatusDot
         tone="warn"
-        label={`سهمیه API رو به اتمام (${toFaDigits(s.remaining)}/${toFaDigits(s.limit)})`}
+        label={`سهمیه سرویس رو به اتمام (${toFaDigits(s.remaining)}/${toFaDigits(s.limit)})`}
         className="font-normal"
       />
     );
-  return <StatusDot tone="gain" label="Pendle API متصل" className="font-normal" />;
+  return <StatusDot tone="gain" label="سرویس پندل متصل" className="font-normal" />;
 }
 
 /* ================= shared list ================= */
@@ -136,16 +136,16 @@ function PendleMarketList({ markets, highlight }: { markets: PendleMarketView[];
       {/* desktop */}
       <div className="hidden overflow-x-auto lg:block">
         <table className="data-table">
-          <caption className="sr-only">بازارهای Pendle</caption>
+          <caption className="sr-only">بازارهای پندل</caption>
           <thead>
             <tr>
               <th scope="col" className="!ps-5">بازار</th>
               <th scope="col">سررسید</th>
-              <th scope="col" className={cn('col-num', hl('fixedApy'))}>APY ثابت</th>
-              <th scope="col" className={cn('col-num', hl('lpApy'))}>LP</th>
-              <th scope="col" className={cn('col-num', hl('ytApy'))}>YT</th>
+              <th scope="col" className={cn('col-num', hl('fixedApy'))}>بازده سالانه ثابت</th>
+              <th scope="col" className={cn('col-num', hl('lpApy'))}>نقدینگی</th>
+              <th scope="col" className={cn('col-num', hl('ytApy'))}>توکن بازده</th>
               <th scope="col" className="col-num">پایه</th>
-              <th scope="col" className={cn('col-num', hl('tvl'))}>TVL</th>
+              <th scope="col" className={cn('col-num', hl('tvl'))}>ارزش قفل‌شده</th>
               <th scope="col" className={cn('col-num', hl('volume'))}>حجم</th>
               <th scope="col" className="w-12 !pe-4"><span className="sr-only">پیگیری</span></th>
             </tr>
@@ -220,15 +220,15 @@ function PendleMarketList({ markets, highlight }: { markets: PendleMarketView[];
                   {chainName(m.chainId)} · <Maturity m={m} />
                 </p>
                 <p className="mt-1 flex flex-wrap gap-x-3 text-2xs text-muted">
-                  <span>LP <PercentValue value={m.lpApyPct} signed={false} tone="none" /></span>
-                  <span>YT <PercentValue value={m.ytApyPct} signed={false} tone="none" /></span>
+                  <span>نقدینگی <PercentValue value={m.lpApyPct} signed={false} tone="none" /></span>
+                  <span>توکن بازده <PercentValue value={m.ytApyPct} signed={false} tone="none" /></span>
                   <span>پایه <PercentValue value={m.underlyingApyPct} signed={false} tone="none" /></span>
                 </p>
               </div>
               <div className="shrink-0 text-end">
                 <p className="text-base font-bold text-ink"><PercentValue value={m.fixedApyPct} signed={false} tone="none" /></p>
-                <p className="text-2xs text-muted">APY ثابت</p>
-                <p className="mt-0.5 text-xs text-muted">TVL <MoneyValue value={m.details.totalTvl} compact /></p>
+                <p className="text-2xs text-muted">بازده سالانه ثابت</p>
+                <p className="mt-0.5 text-xs text-muted">ارزش قفل‌شده <MoneyValue value={m.details.totalTvl} compact /></p>
               </div>
             </button>
           </li>
@@ -262,7 +262,7 @@ function DataState({
 }) {
   const now = useNow(15_000);
   if (loading) return <ListSkeleton rows={8} />;
-  if (error && count === 0) return <ErrorState message="اتصال به Pendle API برقرار نشد" onRetry={refresh} />;
+  if (error && count === 0) return <ErrorState message="اتصال به سرویس پندل برقرار نشد" onRetry={refresh} />;
   if (error)
     return (
       <Notice
@@ -409,10 +409,10 @@ export function OpportunitiesExplorer() {
               ))}
             </Select>
           </Field>
-          <Field label="حداقل APY کل">
+          <Field label="حداقل بازده سالانه کل">
             <Input dir="ltr" inputMode="decimal" value={minApy} onChange={(e) => setMinApy(e.target.value)} placeholder="0" suffix="%" />
           </Field>
-          <Field label="حداقل TVL (میلیون دلار)">
+          <Field label="حداقل ارزش قفل‌شده (میلیون دلار)">
             <Input dir="ltr" inputMode="decimal" value={minTvl} onChange={(e) => setMinTvl(e.target.value)} placeholder="0" suffix="M$" />
           </Field>
           <Field label="زنجیره">

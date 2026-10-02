@@ -119,33 +119,33 @@ export function auditMarket(input: AuditInput): MarketAuditBreakdown {
   // Entry Fee — فرمول رسمی: |Size| × takerFee × YTM (docs/Mechanics/Fees)
   const entryFee = hasTaker ? FeeCalculator.openingFee(size, m.takerFee, ytm) : 0;
   lines.push(
-    feeLine('ورود (Entry)', entryFee, hasTaker ? 'api' : 'na', hasTaker ? '|Size| × takerFee × YTM (مستند رسمی Boros)' : 'در Market داده نشده → ۰')
+    feeLine('ورود', entryFee, hasTaker ? 'api' : 'na', hasTaker ? '|اندازه| × کارمزد تیکر × زمان تا سررسید (مستند رسمی بوروس)' : 'در بازار داده نشده → ۰')
   );
   // Exit Fee — همان فرمول برای خروج
   const exitFee = hasTaker ? FeeCalculator.openingFee(size, m.takerFee, ytm) : 0;
   lines.push(
-    feeLine('خروج (Exit)', exitFee, hasTaker ? 'api' : 'na', hasTaker ? '|Size| × takerFee × YTM (خروج)' : 'در Market داده نشده → ۰')
+    feeLine('خروج', exitFee, hasTaker ? 'api' : 'na', hasTaker ? '|اندازه| × کارمزد تیکر × زمان تا سررسید (خروج)' : 'در بازار داده نشده → ۰')
   );
   // Settlement Fee — فرمول رسمی: |Size| × settleFeeRate × Period × تعداد تسویه
   const settlementFee = hasSettle
     ? FeeCalculator.settlementFee(size, m.settleFeeRate, periodYears(m), nSettle)
     : 0;
   lines.push(
-    feeLine('تسویه (Settlement)', settlementFee, hasSettle ? 'api' : 'na', hasSettle ? '|Size| × settleFeeRate × Period × N (مستند رسمی Boros)' : 'در Market داده نشده → ۰')
+    feeLine('تسویه', settlementFee, hasSettle ? 'api' : 'na', hasSettle ? '|اندازه| × نرخ کارمزد تسویه × دوره × تعداد (مستند رسمی بوروس)' : 'در بازار داده نشده → ۰')
   );
   // Market Entrance Fee — در API عمومی نیست
   lines.push(
-    feeLine('ورود به بازار (Entrance)', 0, 'na', 'از API عمومی در دسترس نیست (CashFeeData) → N/A')
+    feeLine('ورود به بازار', 0, 'na', 'از سرویس عمومی در دسترس نیست → نامشخص')
   );
   // Gas — فقط User Input
   const gas = hasGas ? (input.gasUsd ?? 0) : 0;
   lines.push(
-    feeLine('گس (Gas)', gas, hasGas ? 'user-input' : 'na', hasGas ? 'ورودی کاربر' : 'داده نشده → ۰ (هرگز حدس نمی‌زنیم)')
+    feeLine('کارمزد شبکه', gas, hasGas ? 'user-input' : 'na', hasGas ? 'ورودی کاربر' : 'داده نشده → ۰ (هرگز حدس نمی‌زنیم)')
   );
   // Slippage — فقط با داده واقعی
   const slippage = hasSlippage ? FeeCalculator.slippageCost(size, input.slippageRate ?? null, m.markApr) : 0;
   lines.push(
-    feeLine('Slippage', slippage, hasSlippage ? 'market-data' : 'na', hasSlippage ? 'از Order Book/شبیه‌سازی' : 'داده Order Book عمومی نیست → ۰')
+    feeLine('لغزش قیمت', slippage, hasSlippage ? 'market-data' : 'na', hasSlippage ? 'از دفتر سفارش/شبیه‌سازی' : 'داده دفتر سفارش عمومی نیست → ۰')
   );
 
   const totalCosts = lines.reduce((s, l) => s + l.amount, 0);

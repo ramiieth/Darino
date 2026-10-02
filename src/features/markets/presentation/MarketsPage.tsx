@@ -23,7 +23,7 @@ const TABS: { value: MarketsTab; label: string }[] = [
   { value: 'all', label: 'همه' },
   { value: 'crypto', label: 'رمزارز' },
   { value: 'tokenized', label: 'دارایی توکن‌ایز' },
-  { value: 'tradfi', label: 'سنتی (TradFi)' }
+  { value: 'tradfi', label: 'سنتی' }
 ];
 
 export const TAB_UNIVERSES: Record<Exclude<MarketsTab, 'tradfi'>, MarketUniverse[]> = {

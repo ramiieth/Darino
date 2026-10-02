@@ -14,7 +14,7 @@ import { EmptyState, ErrorState, ListSkeleton } from '@/shared/components/ui/Sta
 import { useYieldPools, loadYieldPools, ensurePoolChart } from '@/features/defi-loop/data/useYieldLoops';
 import type { YieldPool } from '@/features/defi-loop/data/yieldsService';
 import { computeApyStats, computeTvlStats, opportunityScore, riskIndicators, type RiskIndicator } from '@/features/defi-loop/domain/yieldAnalytics';
-import { fmtUSD, fmtInt } from '@/shared/utils/formatters';
+import { fmtUSD, fmtInt, toFaDigits } from '@/shared/utils/formatters';
 
 export interface LoopRow {
   pool: YieldPool;
@@ -133,7 +133,7 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
 
   if (loading && pools.length === 0) return <ListSkeleton rows={6} />;
   if (error && pools.length === 0) {
-    return <ErrorState message="ارتباط با DeFiLlama Yields برقرار نشد" onRetry={() => void loadYieldPools()} />;
+    return <ErrorState message="ارتباط با بازده‌های دیفای‌لاما برقرار نشد" onRetry={() => void loadYieldPools()} />;
   }
 
   return (
@@ -159,7 +159,7 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-1 lg:grid-cols-1">
-            <Field label="حداقل TVL">
+            <Field label="حداقل ارزش قفل‌شده">
               <Select value={minTvl} onChange={(e) => setMinTvl(Number(e.target.value))}>
                 {TVL_OPTS.map((v) => (
                   <option key={v} value={v}>
@@ -168,11 +168,11 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
                 ))}
               </Select>
             </Field>
-            <Field label="حداقل APY">
+            <Field label="حداقل بازده سالانه">
               <Select value={minApy} onChange={(e) => setMinApy(Number(e.target.value))}>
                 {APY_OPTS.map((v) => (
                   <option key={v} value={v}>
-                    {v === 0 ? 'همه' : `> ${v}%`}
+                    {v === 0 ? 'همه' : `> ${toFaDigits(v)}٪`}
                   </option>
                 ))}
               </Select>
@@ -201,12 +201,12 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
               <thead>
                 <tr>
                   <th scope="col" className="!ps-5">پول</th>
-                  <th scope="col" className="col-num">APY کل</th>
+                  <th scope="col" className="col-num">بازده سالانه کل</th>
                   <th scope="col" className="col-num">پایه</th>
                   <th scope="col" className="col-num">پاداش</th>
                   <th scope="col" className="col-num">میانگین ۳۰ روز</th>
-                  <th scope="col" className="col-num">TVL</th>
-                  <th scope="col" className="col-num">تغییر TVL ۳۰ روز</th>
+                  <th scope="col" className="col-num">ارزش قفل‌شده</th>
+                  <th scope="col" className="col-num">تغییر ارزش قفل‌شده ۳۰ روز</th>
                   <th scope="col" className="col-num !pe-5">امتیاز</th>
                 </tr>
               </thead>
@@ -267,7 +267,7 @@ export function LoopExplorer({ onOpenPool }: { onOpenPool: (pool: YieldPool) => 
                         <p className="mt-1 flex flex-wrap gap-x-3 text-2xs text-muted">
                           <span>پایه <PercentValue value={p.apyBase} signed={false} tone="none" /></span>
                           <span>پاداش <PercentValue value={p.apyReward} signed={false} tone="none" /></span>
-                          <span>TVL ۳۰ر <PercentValue value={r.tvlStats.change30d} /></span>
+                          <span>ارزش قفل‌شده ۳۰ر <PercentValue value={r.tvlStats.change30d} /></span>
                         </p>
                       </div>
                       <div className="shrink-0 text-end">

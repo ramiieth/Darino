@@ -83,14 +83,14 @@ export function TradFiTable() {
                     <td className="col-num font-semibold text-ink">
                       {price ? <MoneyValue value={price} /> : <span className="text-subtle">N/A</span>}
                       <span className="block text-2xs font-normal text-muted sm:hidden">
-                        {mcap ? <MoneyValue value={mcap} compact /> : 'N/A'}
+                        {mcap ? <MoneyValue value={mcap} compact /> : '—'}
                       </span>
                     </td>
                     <td className="col-num hidden text-muted sm:table-cell">
                       {mcap ? <MoneyValue value={mcap} compact /> : <span className="text-subtle">N/A</span>}
                     </td>
                     <td className="!pe-4 text-end md:!pe-5">
-                      <Badge tone={price ? 'warn' : 'neutral'}>{price ? '≈ مرجع' : 'N/A'}</Badge>
+                      <Badge tone={price ? 'warn' : 'neutral'}>{price ? '≈ مرجع' : '—'}</Badge>
                     </td>
                   </tr>
                 );

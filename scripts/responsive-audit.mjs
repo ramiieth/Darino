@@ -33,7 +33,11 @@ const ROUTES = [
   ['boros', '/#/boros'],
   ['vehicle', '/#/vehicle'],
   ['realestate', '/#/realestate'],
-  ['defi-loop', '/#/defi-loop']
+  ['defi-loop', '/#/defi-loop'],
+  ['holdings', '/#/holdings'],
+  ['holdings-operations', '/#/holdings?tab=operations'],
+  ['holdings-places', '/#/holdings?tab=places'],
+  ['arcus', '/#/arcus']
 ];
 
 /** Viewportهای الزامی (Portrait + Landscape + Desktop) */

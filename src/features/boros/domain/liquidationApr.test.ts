@@ -268,7 +268,7 @@ describe('سازگاری LiquidationInfo (status/note/mmRatio حفظ شده)', (
     const p = projectCapital({ m: M, capitalUsd: 1000, direction: 'long', nowSec: NOW });
     const liq: LiquidationInfo = p!.liquidation;
     expect(liq.status).toBe('na');
-    expect(liq.note).toContain('N/A');
+    expect(liq.note).toContain('نامشخص');
     expect(liq.mmRatio).toBeCloseTo(M.kMM / M.kIM, 9);
     expect(liq.liquidationApr.value).toBeNull();
   });

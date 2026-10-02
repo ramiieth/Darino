@@ -26,7 +26,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'compare', label: 'مقایسه' },
   { value: 'sim', label: 'شبیه‌ساز' },
   { value: 'risk', label: 'مانیتور ریسک' },
-  { value: 'audit', label: 'ممیزی' }
+  { value: 'audit', label: 'بررسی محاسبات' }
 ];
 
 export default function BorosDashboard() {
@@ -46,7 +46,7 @@ export default function BorosDashboard() {
 
   const header = (
     <PageHeader
-      title="تحلیل Boros"
+      title="تحلیل بوروس"
       subtitle="بازارهای نرخ تأمین مالی و بازدهی — فقط تحلیل و شبیه‌سازی؛ هیچ معامله‌ای انجام نمی‌شود."
       meta={
         markets.length > 0 ? (
@@ -76,7 +76,7 @@ export default function BorosDashboard() {
     return (
       <Page>
         {header}
-        <ErrorState message="ارتباط با API بوروس برقرار نشد" onRetry={() => void loadBoros()} />
+        <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />
       </Page>
     );
   }
@@ -114,7 +114,7 @@ export default function BorosDashboard() {
       )}
 
       <div className="space-y-6">
-        <Tabs<Tab> label="بخش‌های Boros" options={TABS} value={tab} onChange={setTab} />
+        <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
         {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
         {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
         {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}

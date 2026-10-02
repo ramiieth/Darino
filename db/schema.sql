@@ -133,6 +133,103 @@ CREATE TABLE IF NOT EXISTS "pmSnapshots" (
 );
 CREATE INDEX IF NOT EXISTS idx_pmSnapshots_date ON "pmSnapshots" ("userId", "dateTs");
 
+-- ------------------------------------------------------------
+-- احراز هویت با Passkey (WebAuthn) — تک‌کاربره، چنددستگاهی
+--   * فقط کلید عمومی passkey ذخیره می‌شود (هیچ کلید خصوصی/رمز)
+--   * از توکن نشست فقط هش SHA-256 ذخیره می‌شود
+--   * بازگشت: این جدول‌ها مستقل‌اند؛ حذفشان فقط ورود را غیرفعال می‌کند (داده‌ها دست نمی‌خورند)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "authCredentials" (
+  id            TEXT PRIMARY KEY,           -- credential ID (base64url)
+  "userId"      TEXT NOT NULL,
+  "publicKey"   TEXT NOT NULL,              -- COSE public key (base64url)
+  counter       BIGINT NOT NULL DEFAULT 0,
+  transports    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  "deviceType"  TEXT,
+  "backedUp"    BOOLEAN NOT NULL DEFAULT false,
+  label         TEXT NOT NULL DEFAULT '',
+  "createdAt"   BIGINT NOT NULL,
+  "lastUsedAt"  BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_authCredentials_user ON "authCredentials" ("userId");
+
+CREATE TABLE IF NOT EXISTS "authChallenges" (
+  id            TEXT PRIMARY KEY,
+  challenge     TEXT NOT NULL,
+  purpose       TEXT NOT NULL,
+  "userId"      TEXT,
+  "expiresAt"   BIGINT NOT NULL,
+  meta          JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS "authSessions" (
+  id             TEXT PRIMARY KEY,
+  "tokenHash"    TEXT NOT NULL UNIQUE,
+  "userId"       TEXT NOT NULL,
+  "credentialId" TEXT,
+  "createdAt"    BIGINT NOT NULL,
+  "lastSeenAt"   BIGINT NOT NULL,
+  "expiresAt"    BIGINT NOT NULL,
+  "revokedAt"    BIGINT,
+  "stepUpAt"     BIGINT NOT NULL DEFAULT 0,
+  "userAgent"    TEXT NOT NULL DEFAULT '',
+  ip             TEXT NOT NULL DEFAULT '',
+  label          TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_authSessions_user ON "authSessions" ("userId", "lastSeenAt");
+
+CREATE TABLE IF NOT EXISTS "authPairCodes" (
+  "codeHash"         TEXT PRIMARY KEY,
+  "userId"           TEXT NOT NULL,
+  "expiresAt"        BIGINT NOT NULL,
+  "createdBySession" TEXT,
+  "usedAt"           BIGINT
+);
+
+CREATE TABLE IF NOT EXISTS "authEvents" (
+  id          BIGSERIAL PRIMARY KEY,
+  "userId"    TEXT NOT NULL,
+  at          BIGINT NOT NULL,
+  kind        TEXT NOT NULL,
+  ip          TEXT NOT NULL DEFAULT '',
+  "userAgent" TEXT NOT NULL DEFAULT '',
+  detail      JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_authEvents_user ON "authEvents" ("userId", at);
+CREATE INDEX IF NOT EXISTS idx_authEvents_ip ON "authEvents" (ip, at);
+
+-- ------------------------------------------------------------
+-- دارایی چندشبکه‌ای — همگام‌سازی بین دستگاه‌ها (وب + PWA آیفون)
+--   هر رکورد با (revision, updatedAt) نسخه‌گذاری می‌شود؛ نسخهٔ جدیدتر برنده است.
+--   حذف سخت ندارد (باطل‌کردن/بایگانی = نسخهٔ جدید).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "custodyRecords" (
+  "userId"     TEXT NOT NULL,
+  collection   TEXT NOT NULL,               -- holdings | operations | networks | assets
+  id           TEXT NOT NULL,
+  revision     INTEGER NOT NULL,
+  "updatedAt"  BIGINT NOT NULL,
+  payload      JSONB NOT NULL,
+  PRIMARY KEY ("userId", collection, id)
+);
+
+-- ------------------------------------------------------------
+-- نسخهٔ اسکیما — اثر انگشت (SHA-256) همین فایل پس از آخرین اعمال موفق.
+-- اگر این فایل تغییر کند (جدول/ستون/ایندکس جدید)، در اولین Deploy یا اولین درخواست
+-- همهٔ statementها دوباره (idempotent) اجرا می‌شوند؛ نیازی به db:migrate دستی نیست.
+--
+-- قانون افزودن فیچر جدید:
+--   • جدول جدید:  CREATE TABLE IF NOT EXISTS "name" (...)
+--   • ستون جدید:  ALTER TABLE "name" ADD COLUMN IF NOT EXISTS "col" TYPE [DEFAULT ...]
+--   • ایندکس:     CREATE INDEX IF NOT EXISTS ...
+--   • هرگز DROP / TRUNCATE / DELETE / تغییر نوع ستون موجود (اجرا متوقف می‌شود).
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "schemaMeta" (
+  id          INTEGER PRIMARY KEY,
+  hash        TEXT NOT NULL,
+  "appliedAt" BIGINT NOT NULL
+);
+
 -- ============================================================
 -- Migration راهنمای اجرا:
 --   1) روی Vercel: متغیر DATABASE_URL را تنظیم کنید

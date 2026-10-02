@@ -10,6 +10,7 @@
 
 import { calculateLoopLeverage } from '@/features/defi-loop/domain/reference/leverage';
 import { healthFactor } from '@/features/defi-loop/domain/risk/healthFactor';
+import { fmtUSD } from '@/shared/utils/formatters';
 
 export interface RecStep {
   loop: number;
@@ -61,7 +62,7 @@ export function simulateSafeLoops(input: SimulateSafeLoopsInput): SafeLoopSimula
     let borrow = input.ltv * stepSupply;
 
     if (borrow <= 1e-9) {
-      stops.push(`LTV صفر است — Loop ${loop} امکان‌پذیر نیست`);
+      stops.push(`نسبت وام به وثیقه صفر است — حلقه ${loop} امکان‌پذیر نیست`);
       break;
     }
 
@@ -78,7 +79,7 @@ export function simulateSafeLoops(input: SimulateSafeLoopsInput): SafeLoopSimula
     const estNetGain = borrow * input.netSpreadRate * input.timeFraction;
     if (estNetGain < input.costPerLoopUsd * 2) {
       stops.push(
-        `سود خالص احتمالی Loop ${loop} ($${estNetGain.toFixed(2)}) کمتر از ۲× هزینه آن ($${(input.costPerLoopUsd * 2).toFixed(2)}) است`
+        `سود خالص احتمالی حلقه ${loop} (${fmtUSD(estNetGain)}) کمتر از ۲× هزینه آن (${fmtUSD((input.costPerLoopUsd * 2))}) است`
       );
       break;
     }
@@ -90,7 +91,7 @@ export function simulateSafeLoops(input: SimulateSafeLoopsInput): SafeLoopSimula
     // ایمنی: HF نباید زیر حد ایمنی برود (گام اضافه نمی‌شود)
     if (hf !== null && hf < input.hfMin) {
       stops.push(
-        `بعد از Loop ${loop}، HF به ${hf.toFixed(2)} می‌رسد — کمتر از حد ایمنی ${input.hfMin.toFixed(2)}؛ Loop اضافه نمی‌شود`
+        `بعد از حلقه ${loop}، ضریب سلامت به ${hf.toFixed(2)} می‌رسد — کمتر از حد ایمنی ${input.hfMin.toFixed(2)}؛ حلقه اضافه نمی‌شود`
       );
       break;
     }
@@ -114,7 +115,7 @@ export function simulateSafeLoops(input: SimulateSafeLoopsInput): SafeLoopSimula
   }
 
   if (steps.length === 0) {
-    stops.push('حتی یک گام Loop نیز با حد ایمنی فعلی سازگار نیست — بدون اهرم توصیه می‌شود');
+    stops.push('حتی یک گام حلقه نیز با حد ایمنی فعلی سازگار نیست — بدون اهرم توصیه می‌شود');
   }
 
   const safeCount = steps.filter((s) => s.status === 'safe').length;

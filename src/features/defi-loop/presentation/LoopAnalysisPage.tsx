@@ -37,7 +37,7 @@ export default function LoopAnalysisPage() {
           title={<bdi dir="ltr">{selected.project} · {selected.symbol}</bdi>}
           subtitle={
             <>
-              Supply APY <PercentValue value={selected.apy} signed={false} tone="none" className="font-semibold text-ink" /> · TVL{' '}
+              بازده سپرده <PercentValue value={selected.apy} signed={false} tone="none" className="font-semibold text-ink" /> · TVL{' '}
               <MoneyValue value={selected.tvlUsd} compact className="font-semibold text-ink" />
             </>
           }
@@ -50,14 +50,14 @@ export default function LoopAnalysisPage() {
   return (
     <Page>
       <PageHeader
-        title="Yield Loop"
+        title="حلقهٔ بازده"
         subtitle="کشف، مقایسه و تحلیل سود واقعی استراتژی‌های اهرمی بازدهی — فقط تحلیل، بدون توصیه معاملاتی"
         meta={
           <FreshnessBar
             loadedAt={yieldData.loadedAt}
             error={yieldData.error}
             syncing={yieldData.loading}
-            sourceLabel="DeFiLlama Yields"
+            sourceLabel="بازده‌های دیفای‌لاما"
             autoMs={5 * 60_000}
             onRefresh={refresh}
           />

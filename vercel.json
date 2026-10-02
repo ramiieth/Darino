@@ -19,6 +19,12 @@
     "api/propertyMarket.ts": {
       "includeFiles": "db/schema.sql",
       "maxDuration": 60
+    },
+    "api/auth.ts": {
+      "includeFiles": "db/schema.sql"
+    },
+    "api/custody.ts": {
+      "includeFiles": "db/schema.sql"
     }
   },
   "rewrites": [

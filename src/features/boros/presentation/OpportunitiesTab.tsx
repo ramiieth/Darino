@@ -103,19 +103,19 @@ function OppCard({ rank, a, side }: { rank: number; a: MarketAnalysis; side: 'lo
       <div className="mt-4 grid grid-cols-3 gap-4 border-t border-divider pt-4">
         <Metric size="md" label="سود خالص پایه" value={<MoneyValue value={net} signed tone="auto" />} />
         <Metric size="md" label="اسپرد نرخ" value={<PercentValue value={spread * 100} />} />
-        <Metric size="md" label="ROI مارجین" value={<PercentValue value={roiMargin} />} />
+        <Metric size="md" label="بازده مارجین" value={<PercentValue value={roiMargin} />} />
       </div>
 
       <Disclosure summary="جزئیات و دلایل" className="mt-3 border-t border-divider pt-1">
         <KeyValueList
           dense
           rows={[
-            { label: 'نرخ ثابت (Fixed APR)', value: <PercentValue value={a.impliedApr * 100} signed={false} tone="none" /> },
-            { label: 'نرخ شناور (Underlying)', value: <PercentValue value={a.underlyingApr * 100} signed={false} tone="none" /> },
+            { label: 'نرخ ثابت (نرخ ثابت سالانه)', value: <PercentValue value={a.impliedApr * 100} signed={false} tone="none" /> },
+            { label: 'نرخ شناور', value: <PercentValue value={a.underlyingApr * 100} signed={false} tone="none" /> },
             { label: 'سود ناخالص پایه', value: <MoneyValue value={gross} signed tone="auto" /> },
             { label: 'هزینه‌های تخمینی', value: <MoneyValue value={a.fees?.total ?? null} /> },
             { label: 'حداقل لبه اقتصادی', value: <MoneyValue value={a.minEconomicEdge} /> },
-            { label: 'لبه اقتصادی (Net − Min Edge)', emphasis: true, value: <MoneyValue value={net - a.minEconomicEdge} signed tone="auto" /> },
+            { label: 'لبه اقتصادی (خالص − حداقل مزیت)', emphasis: true, value: <MoneyValue value={net - a.minEconomicEdge} signed tone="auto" /> },
             { label: 'نقطه سر‌به‌سر', value: <PercentValue value={be !== null ? be * 100 : null} signed={false} tone="none" /> },
             { label: 'مارجین', value: <MoneyValue value={a.marginRequired} /> },
             { label: 'ریسک / اطمینان', value: <Badge tone={riskTone(a.riskLevel)}>{a.riskLevel} · {toFaDigits(a.confidence)}٪</Badge> },
@@ -123,7 +123,7 @@ function OppCard({ rank, a, side }: { rank: number; a: MarketAnalysis; side: 'lo
               label: 'پایداری',
               value: a.robustness === 'robust' ? 'پایدار' : a.robustness === 'conditional' ? 'مشروط' : a.robustness === 'not-attractive' ? 'ناپایدار' : 'N/A'
             },
-            { label: 'Liquidation APR', hint: 'ویژگی Position است — در اسکنر بازار همیشه N/A', value: <span className="text-subtle">N/A</span> }
+            { label: 'نرخ لیکوئید', hint: 'ویژگی پوزیشن است — در اسکنر بازار همیشه نامشخص', value: <span className="text-subtle">N/A</span> }
           ]}
         />
         {a.stress.available && (
@@ -199,7 +199,7 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
       <Surface className="p-4 md:p-5">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field
-            label={<span className="inline-flex items-center gap-1.5">Collateral شبیه‌سازی <ProvenanceBadge kind="simulated" /></span>}
+            label={<span className="inline-flex items-center gap-1.5">وثیقه شبیه‌سازی <ProvenanceBadge kind="simulated" /></span>}
             hint="فقط برای شبیه‌سازی — نه واریز یا موجودی واقعی"
           >
             <Input
@@ -246,11 +246,11 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
       <Section
         id="user-capital"
         title="بهترین فرصت‌ها برای سرمایه شما"
-        description={`با ${simCollateral.toFixed(3)} ETH شبیه‌سازی — Notional، مارجین، کارمزد و PnL برای همین مقدار محاسبه می‌شود`}
+        description={`با ${simCollateral.toFixed(3)} اتریوم شبیه‌سازی — ارزش اسمی، مارجین، کارمزد و سود/زیان برای همین مقدار محاسبه می‌شود`}
       >
         {userOpps.length === 0 ? (
           <EmptyState
-            message={simCollateral <= 0 || !(ethPrice > 0) ? 'مقدار معتبر Collateral وارد کنید' : 'فرصت قابل‌اجرایی با سود خالص مثبت یافت نشد'}
+            message={simCollateral <= 0 || !(ethPrice > 0) ? 'مقدار معتبر وثیقه وارد کنید' : 'فرصت قابل‌اجرایی با سود خالص مثبت یافت نشد'}
             hint="فیلترها: بدون ناهنجاری، قابل اجرا و لبه اقتصادی مثبت"
           />
         ) : (
@@ -298,16 +298,16 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
           <Surface className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="data-table min-w-[820px]">
-                <caption className="sr-only">همه بازارهای Boros</caption>
+                <caption className="sr-only">همه بازارهای بوروس</caption>
                 <thead>
                   <tr>
                     <th scope="col" className="sticky start-0 z-20 !ps-5">بازار</th>
-                    <th scope="col" className="col-num">Fixed</th>
-                    <th scope="col" className="col-num">Underlying</th>
+                    <th scope="col" className="col-num">ثابت</th>
+                    <th scope="col" className="col-num">شناور</th>
                     <th scope="col" className="col-num">اسپرد لانگ</th>
                     <th scope="col" className="col-num">اسپرد شورت</th>
-                    <th scope="col" className="col-num">Net لانگ</th>
-                    <th scope="col" className="col-num">Net شورت</th>
+                    <th scope="col" className="col-num">خالص لانگ</th>
+                    <th scope="col" className="col-num">خالص شورت</th>
                     <th scope="col" className="col-num">امتیاز L / S</th>
                     <th scope="col">ریسک</th>
                     <th scope="col" className="!pe-5">وضعیت لانگ</th>

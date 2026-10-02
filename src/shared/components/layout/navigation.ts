@@ -22,6 +22,9 @@ import {
   Car,
   Home,
   Palette,
+  Layers,
+  Activity,
+  ShieldCheck,
   type LucideIcon
 } from 'lucide-react';
 
@@ -67,7 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'defi',
         to: '/defi',
         label: 'دیفای',
-        description: 'جریان سرمایه، TVL و استیبل‌کوین‌ها',
+        description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها',
         icon: Boxes,
         primary: true
       }
@@ -89,9 +92,33 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'accounting',
         to: '/accounting',
         label: 'حسابداری',
-        description: 'موجودی، تراکنش‌ها، دفتر کل و سود/زیان',
+        description: 'موجودی، تراکنش‌ها، خلاصهٔ حساب‌ها و سود و زیان',
         icon: BookOpenText,
         primary: true
+      },
+      {
+        id: 'holdings',
+        to: '/holdings',
+        label: 'دارایی شبکه‌ای',
+        title: 'دارایی‌های چندشبکه‌ای',
+        description: 'موجودی به تفکیک شبکه و کیف پول؛ ثبت سواپ، بریج و سپرده',
+        icon: Layers
+      },
+      {
+        id: 'arcus',
+        to: '/arcus',
+        label: 'آرکوس',
+        title: 'آرکوس — حساب قراردادهای دائمی',
+        description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
+        icon: Activity
+      },
+      {
+        id: 'security',
+        to: '/security',
+        label: 'امنیت',
+        title: 'امنیت و دستگاه‌ها',
+        description: 'کلید عبور، نشست‌های دستگاه‌ها و خروج',
+        icon: ShieldCheck
       }
     ]
   },
@@ -102,22 +129,22 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         id: 'pendle',
         to: '/pendle',
-        label: 'Pendle',
-        description: 'بازدهی ثابت PT، YT و LP',
+        label: 'پندل',
+        description: 'بازدهی ثابت و توکن‌های بازده',
         icon: Percent
       },
       {
         id: 'boros',
         to: '/boros',
-        label: 'Boros',
-        title: 'تحلیل Boros',
+        label: 'بوروس',
+        title: 'تحلیل بوروس',
         description: 'بازارهای نرخ تأمین مالی',
         icon: Radar
       },
       {
         id: 'loop',
         to: '/defi-loop',
-        label: 'Yield Loop',
+        label: 'حلقهٔ بازده',
         description: 'استراتژی‌های اهرمی بازدهی',
         icon: Repeat
       }
@@ -132,7 +159,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/calculators',
         label: 'ماشین‌حساب',
         title: 'ماشین‌حساب سرمایه‌گذاری',
-        description: 'سود/زیان، DCA، CAGR و XIRR',
+        description: 'سود و زیان، خرید دوره‌ای، رشد سالانه و بازده واقعی',
         icon: Calculator
       },
       {

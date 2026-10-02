@@ -1,6 +1,7 @@
 /**
  * Average return by category — horizontal bars (answers: which asset class did best?)
  */
+import { toFaDigits } from '@/shared/utils/formatters';
 import { useMemo } from 'react';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
@@ -43,7 +44,7 @@ export function CategoryReturnChart({ result }: { result: TimelineResult }) {
       }
     },
     scales: {
-      x: { ...scales.y, position: 'bottom', ticks: { ...(scales.y.ticks as object), callback: (v: number | string) => `${Number(v).toFixed(0)}%` } },
+      x: { ...scales.y, position: 'bottom', ticks: { ...(scales.y.ticks as object), callback: (v: number | string) => `${toFaDigits(Number(v).toFixed(0))}٪` } },
       y: { ...scales.x, position: 'right' }
     }
   };

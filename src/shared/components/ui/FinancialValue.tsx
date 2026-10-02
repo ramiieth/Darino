@@ -1,7 +1,8 @@
 /**
  * Financial value components — presentation rules for every number in Darino.
  *
- *  • LTR-isolated, tabular numerals, one sign policy (sign before currency: -$12.50).
+ *  • ارقام فارسی با «,» و «.» · بدون «$»: عدد + واژهٔ «دلار» با قلم کوچک (درخواست کارفرما).
+ *  • عدد LTR-ایزوله و tabular؛ واژهٔ «دلار» بیرون از جعبهٔ LTR تا در RTL سمت درست بنشیند.
  *  • A value is never faked: null/undefined/NaN renders "—" with an accessible
  *    "unavailable" name — never $0.00.
  *  • Explicit states: loading (skeleton), stale (muted + clock), unavailable.
@@ -12,7 +13,7 @@
 import type { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight, Clock3, Minus } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
-import { fmtNumLatin, fmtPct, fmtPctEn, fmtUSD, fmtUsdSigned } from '@/shared/utils/formatters';
+import { fmtCompactFa, fmtNumLatin, fmtPct, fmtPctEn, fmtUsdNumber, toFaDigits } from '@/shared/utils/formatters';
 
 export type ValueState = 'ready' | 'loading' | 'stale' | 'unavailable';
 
@@ -67,6 +68,24 @@ function signTone(v: number, tone: Tone): string {
   return v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '';
 }
 
+/* ---------------- واحد دلار (کوچک) ---------------- */
+
+/** «۱,۲۳۴.۲۳ دلار» — عدد LTR و واژهٔ «دلار» کوچک (در RTL پس از عدد خوانده می‌شود) */
+export function UsdText({ value, compact = false, signed = false, className }: { value: number; compact?: boolean; signed?: boolean; className?: string }) {
+  const abs = Math.abs(value);
+  const sign = value > 0 ? (signed ? '+' : '') : value < 0 ? '-' : '';
+  const body = signed ? (compact ? fmtCompactFa(abs) : toFaDigits(abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))) : fmtUsdNumber(abs, compact);
+  return (
+    <span className={cn('inline-flex items-baseline gap-1', className)}>
+      <bdi dir="ltr" className="num-ltr">
+        {sign}
+        {body}
+      </bdi>
+      <span className="text-[0.62em] font-medium opacity-70">دلار</span>
+    </span>
+  );
+}
+
 /* ---------------- CurrencyValue ---------------- */
 export function MoneyValue({
   value,
@@ -91,8 +110,8 @@ export function MoneyValue({
   }
   const v = value as number;
   return (
-    <StateShell state={state} className={cn('num-ltr', state !== 'loading' && signTone(v, tone), className)}>
-      {signed ? fmtUsdSigned(v, compact) : fmtUSD(v, compact)}
+    <StateShell state={state} className={cn(state !== 'loading' && signTone(v, tone), className)}>
+      <UsdText value={v} compact={compact} signed={signed} />
     </StateShell>
   );
 }
@@ -121,7 +140,7 @@ export function PercentValue({
   const v = value as number;
   const text =
     digits !== undefined
-      ? `${signed && v > 0 ? '+' : ''}${v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`
+      ? `${signed && v > 0 ? '+' : ''}${toFaDigits(v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }))}٪`
       : signed
         ? fmtPct(v)
         : fmtPctEn(v);
@@ -169,7 +188,11 @@ export function DeltaValue({
     >
       <Icon aria-hidden className="h-[1.05em] w-[1.05em] shrink-0" />
       <span className="num-ltr">{fmtPct(pct)}</span>
-      {isNum(usd) && <span className="num-ltr opacity-80">({fmtUsdSigned(usd, compact)})</span>}
+      {isNum(usd) && (
+        <span className="opacity-80">
+          (<UsdText value={usd} compact={compact} signed />)
+        </span>
+      )}
       {period && <span className="text-muted">{period}</span>}
       {state === 'stale' && <Clock3 aria-label="داده قدیمی" className="h-[0.9em] w-[0.9em] text-warn" />}
     </span>
@@ -192,7 +215,7 @@ export function QuantityValue({
   const text =
     digits === 2
       ? fmtNumLatin(value)
-      : value.toLocaleString('en-US', { maximumFractionDigits: digits });
+      : toFaDigits(value.toLocaleString('en-US', { maximumFractionDigits: digits }));
   return (
     <span className={cn('num-ltr', className)}>
       {text}

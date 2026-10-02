@@ -146,7 +146,7 @@ export interface CapitalProjection {
 function liquidationInfo(m: BorosMarket): LiquidationInfo {
   return {
     status: 'na',
-    note: 'مدل کامل لیکوییدیشن (قیمت/حد زیان) از API عمومی در دسترس نیست — محاسبه نشده (N/A)',
+    note: 'مدل کامل لیکوییدیشن (قیمت/حد زیان) از سرویس عمومی در دسترس نیست — محاسبه نشده (نامشخص)',
     mmRatio: m.kMM > 0 && m.kIM > 0 ? m.kMM / m.kIM : null,
     liquidationApr: NA_LIQUIDATION_APR
   };
@@ -203,7 +203,7 @@ function buildScenario(
   // MTM سناریو: Mark سناریو از API در دسترس نیست → N/A (هرگز $0 فرض نمی‌کنیم)
   const mtmPnl: number | null = null;
   const mtmReason =
-    'MTM سناریو = N/A — Mark سناریو در دسترس نیست؛ نرخ Underlying هرگز به‌جای Mark استفاده نمی‌شود';
+    'ارزش روز سناریو = نامشخص — مارک سناریو در دسترس نیست؛ نرخ شناور هرگز به‌جای مارک استفاده نمی‌شود';
   const totalCosts = fees.total;
   const netPnl: number | null = settlementPnl - totalCosts; // بدون MTM (ناشناخته)
   return {
@@ -273,7 +273,7 @@ export function projectCapital(input: CapitalProjectionInput): CapitalProjection
   // MTM پایه: ورود در Mark فعلی → Entry = Mark → MTM شروع = 0 (واقعی، نه فرض)
   const mtm = direction === 'long' ? sensitivity * ((m.markApr - fixed) / 0.01) : -sensitivity * ((m.markApr - fixed) / 0.01);
   const mtmReason =
-    'MTM پایه = ورود در Mark فعلی (Entry = Mark) → MTM شروع صفر است؛ MTM سناریوها N/A چون Mark سناریو در دسترس نیست';
+    'ارزش روز پایه = ورود در مارک فعلی (ورود = مارک) → ارزش روز شروع صفر است؛ ارزش روز سناریوها نامشخص چون مارک سناریو در دسترس نیست';
 
   // هزینه‌ها (فرمول‌های مستند رسمی Boros)
   const fees = FeeCalculator.calc({
@@ -302,12 +302,12 @@ export function projectCapital(input: CapitalProjectionInput): CapitalProjection
     return r === 'bear' ? 'favorable' : 'adverse';
   };
   const labelFor = (r: 'bear' | 'bull'): string => {
-    if (direction === 'long') return r === 'bear' ? 'بدبینانه (Adverse)' : 'خوش‌بینانه (Favorable)';
-    return r === 'bear' ? 'مطلوب (Favorable)' : 'نامطلوب (Adverse)';
+    if (direction === 'long') return r === 'bear' ? 'بدبینانه' : 'خوش‌بینانه';
+    return r === 'bear' ? 'مطلوب' : 'نامطلوب';
   };
   const mk = (r: 'bear' | 'base' | 'bull', rate: number): ScenarioProjection =>
     buildScenario(
-      r === 'base' ? 'پایه (Base)' : labelFor(r),
+      r === 'base' ? 'پایه' : labelFor(r),
       r === 'base' ? 'base' : roleFor(r),
       r,
       m,

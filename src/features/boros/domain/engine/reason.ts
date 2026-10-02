@@ -5,6 +5,7 @@
  *  - Why Not Attractive? (چرا جذاب نیست — حتی با Spread بالا)
  * ============================================================ */
 import type { MarketAnalysis } from './index';
+import { fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 
 export interface ReasonItem {
   ok: boolean;
@@ -22,7 +23,7 @@ export interface OpportunityExplanation {
 
 /** درصدهای خوانا */
 const pct = (v: number | null | undefined, digits = 2): string =>
-  v === null || v === undefined ? 'N/A' : `${(v * 100).toFixed(digits)}%`;
+  v === null || v === undefined ? '—' : `${toFaDigits((v * 100).toFixed(digits))}٪`;
 
 /**
  * تولید توضیحات کمی برای یک بازار:
@@ -42,7 +43,7 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
   if (edge > 0.005) {
     positive.push({
       ok: true,
-      text: `نرخ زیرلایه (${pct(a.underlyingApr)}) به‌طور معناداری بالاتر از نرخ ثابت (${pct(a.impliedApr)}) است. (Long Edge ${pct(edge)})`
+      text: `نرخ زیرلایه (${pct(a.underlyingApr)}) به‌طور معناداری بالاتر از نرخ ثابت (${pct(a.impliedApr)}) است. (مزیت لانگ ${pct(edge)})`
     });
   } else if (edge < -0.005) {
     negative.push({
@@ -55,12 +56,12 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
   if (a.totalLongPnl > 0) {
     positive.push({
       ok: true,
-      text: `Settlement PnL موردانتظار بعد از هزینه‌ها مثبت است ($${a.totalLongPnl.toFixed(2)}).`
+      text: `سود/زیان تسویه موردانتظار بعد از هزینه‌ها مثبت است (${fmtUSD(a.totalLongPnl)}).`
     });
   } else {
     negative.push({
       ok: false,
-      text: `Net PnL بعد از هزینه‌ها منفی است ($${a.totalLongPnl.toFixed(2)}) — هزینه‌ها ($${(a.fees?.total ?? 0).toFixed(2)}) مزیت نرخ را از بین برده‌اند.`
+      text: `سود/زیان خالص بعد از هزینه‌ها منفی است (${fmtUSD(a.totalLongPnl)}) — هزینه‌ها (${fmtUSD((a.fees?.total ?? 0))}) مزیت نرخ را از بین برده‌اند.`
     });
   }
 
@@ -68,12 +69,12 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
   if (a.totalLongPnl - a.minEconomicEdge > 0) {
     positive.push({
       ok: true,
-      text: `Economic Edge مثبت است (Net $${a.totalLongPnl.toFixed(2)} − Min Edge $${a.minEconomicEdge.toFixed(2)} = $${(a.totalLongPnl - a.minEconomicEdge).toFixed(2)}).`
+      text: `مزیت اقتصادی مثبت است (خالص ${fmtUSD(a.totalLongPnl)} − حداقل مزیت ${fmtUSD(a.minEconomicEdge)} = ${fmtUSD((a.totalLongPnl - a.minEconomicEdge))}).`
     });
   } else {
     negative.push({
       ok: false,
-      text: `Net PnL از حداقل لبه اقتصادی ($${a.minEconomicEdge.toFixed(2)}) پایین‌تر است — سود ناچیز برای رتبه‌بندی کافی نیست.`
+      text: `سود/زیان خالص از حداقل لبه اقتصادی (${fmtUSD(a.minEconomicEdge)}) پایین‌تر است — سود ناچیز برای رتبه‌بندی کافی نیست.`
     });
   }
 
@@ -82,12 +83,12 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
     if (a.liquidity.executable) {
       positive.push({
         ok: true,
-        text: `نقدشوندگی اجرا برای نotional انتخاب‌شده کافی است (ظرفیت تخمینی $${a.liquidity.estimatedMaxExecutable.toFixed(0)}).`
+        text: `نقدشوندگی اجرا برای ارزش اسمی انتخاب‌شده کافی است (ظرفیت تخمینی ${fmtUSD(a.liquidity.estimatedMaxExecutable)}).`
       });
     } else {
       negative.push({
         ok: false,
-        text: `نotional انتخابی ($${(a.marginRequired / (a.liquidity.estimatedMaxExecutable || 1)).toFixed(0)}× ظرفیت) از قابلیت اجرا بیشتر است — نقدشوندگی واقعی کافی نیست.`
+        text: `ارزش اسمی انتخابی (${fmtUSD((a.marginRequired / (a.liquidity.estimatedMaxExecutable || 1)))}× ظرفیت) از قابلیت اجرا بیشتر است — نقدشوندگی واقعی کافی نیست.`
       });
     }
   }
@@ -97,12 +98,12 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
   if (baseNet !== null && baseNet > 0) {
     positive.push({
       ok: true,
-      text: `سناریوی Base (نرخ فعلی) مثبت است ($${baseNet.toFixed(2)}).`
+      text: `سناریوی پایه (نرخ فعلی) مثبت است (${fmtUSD(baseNet)}).`
     });
   } else if (baseNet !== null) {
     negative.push({
       ok: false,
-      text: `سناریوی Base منفی است ($${baseNet.toFixed(2)}).`
+      text: `سناریوی پایه منفی است (${fmtUSD(baseNet)}).`
     });
   }
 
@@ -130,19 +131,19 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
   let summary: string;
   switch (a.statusLong) {
     case 'potential':
-      summary = 'Potential Opportunity — پس از هزینه‌ها، نقدشوندگی، سناریوها و کیفیت داده همچنان Edge اقتصادی معنادار دارد.';
+      summary = 'فرصت بالقوه — پس از هزینه‌ها، نقدشوندگی، سناریوها و کیفیت داده همچنان مزیت اقتصادی معنادار دارد.';
       break;
     case 'conditional':
-      summary = 'Conditional Opportunity — Base مثبت است ولی سناریوی Bear منفی است؛ فرصت مشروط به ادامه نرخ فعلی است.';
+      summary = 'فرصت مشروط — پایه مثبت است ولی سناریوی نزولی منفی است؛ فرصت مشروط به ادامه نرخ فعلی است.';
       break;
     case 'anomaly-detected':
-      summary = 'Rate Anomaly — انحراف شدید نرخ تشخیص داده شد؛ Spread بزرگ به‌تنهایی فرصت نیست.';
+      summary = 'ناهنجاری نرخ — انحراف شدید نرخ تشخیص داده شد؛ اختلاف نرخ بزرگ به‌تنهایی فرصت نیست.';
       break;
     case 'not-attractive':
-      summary = 'Not Attractive — بعد از هزینه‌ها یا لبه اقتصادی، جذابیت ندارد.';
+      summary = 'غیرجذاب — بعد از هزینه‌ها یا لبه اقتصادی، جذابیت ندارد.';
       break;
     default:
-      summary = 'Insufficient Data — داده کافی برای تحلیل معتبر در دسترس نیست.';
+      summary = 'دادهٔ ناکافی — داده کافی برای تحلیل معتبر در دسترس نیست.';
   }
 
   return { positive, negative, summary };

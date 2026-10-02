@@ -240,7 +240,7 @@ describe('Risk Engine — جدا از Reference (اسپک §16-17، 24)', () => 
     expect(r.recommendation.recommendedLeverage).toBe(1);
     expect(r.leverage).toBe(1);
     expect(r.recommendation.maxSafeLoops).toBe(0);
-    expect(r.stops.some((s) => s.includes('HF'))).toBe(true);
+    expect(r.stops.some((s) => s.includes('ضریب سلامت'))).toBe(true);
   });
 
   it('Reference هرگز با ضریب مخفی کاهش نمی‌یابد — حتی وقتی ریسک بالا است', () => {
@@ -443,7 +443,7 @@ describe('runLoopStrategy — اجرای کامل Loop', () => {
     expect(r.leverage).toBeCloseTo(1.75, 6);
     expect(r.totalSupply).toBeCloseTo(17500, 6);
     expect(r.totalBorrow).toBeCloseTo(7500, 6);
-    expect(r.stops.some((s) => s.includes('HF'))).toBe(true);
+    expect(r.stops.some((s) => s.includes('ضریب سلامت'))).toBe(true);
   });
 
   it('با LTV=0.55 دو گام ایمن ممکن است (HF گام ۲ = 1.738 ≥ 1.65)', () => {

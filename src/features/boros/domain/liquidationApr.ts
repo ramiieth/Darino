@@ -106,12 +106,12 @@ export function isLiquidationAPRAvailable(d: LiquidationAPRData): boolean {
 /* ---------------- برچسب‌های فارسی (UI) ---------------- */
 
 export const LIQUIDATION_SOURCE_FA: Record<LiquidationAPRSource, string> = {
-  boros_position_api: 'API رسمی Position بوروس',
-  boros_position_data: 'داده Position واقعی بوروس',
+  boros_position_api: 'سرویس رسمی پوزیشن بوروس',
+  boros_position_data: 'داده پوزیشن واقعی بوروس',
   boros_preview: 'پیش‌نمایش رسمی سفارش بوروس',
   simulation_official_api: 'شبیه‌سازی رسمی بوروس',
-  na: 'N/A'
+  na: 'نامشخص'
 };
 
 export const LIQUIDATION_NA_REASON =
-  'برای محاسبه Liquidation APR واقعی، Position و Collateral فعال در Boros لازم است — بدون Position واقعی این مقدار N/A است.';
+  'برای محاسبه نرخ لیکوئید واقعی، پوزیشن و وثیقه فعال در بوروس لازم است — بدون پوزیشن واقعی این مقدار نامشخص است.';

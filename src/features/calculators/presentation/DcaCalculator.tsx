@@ -108,10 +108,10 @@ export function DcaCalculator() {
       <AssetPicker value={asset} onChange={setAsset} />
       <div className="grid grid-cols-2 gap-4">
         <Field label="مبلغ هر خرید">
-          <Input dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} suffix="دلار" />
         </Field>
         <Field label="کارمزد هر خرید">
-          <Input dir="ltr" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} suffix="دلار" />
         </Field>
       </div>
       <div>
@@ -134,7 +134,7 @@ export function DcaCalculator() {
             <Notice tone="warn" title="قیمت خریدها تقریبی است">
               {asset.kind === 'tokenized'
                 ? 'داده تاریخی دارایی توکن‌ایز موجود نیست؛ همه خریدها با قیمت فعلی تقریب زده شده‌اند.'
-                : 'داده تاریخی فعلاً در دسترس نیست (محدودیت API)؛ همه خریدها با قیمت فعلی تقریب زده شده‌اند.'}
+                : 'داده تاریخی فعلاً در دسترس نیست (محدودیت سرویس)؛ همه خریدها با قیمت فعلی تقریب زده شده‌اند.'}
             </Notice>
           )}
           <ResultHero
@@ -221,7 +221,7 @@ export function DcaCalculator() {
             filename={`dca-${asset.symbol}.csv`}
             headers={['#', 'تاریخ', 'مبلغ', 'قیمت', 'واحد']}
             rows={result.purchases.map((p) => [p.index, new Date(p.date).toISOString().slice(0, 10), p.amount, p.price, p.units])}
-            pdfTitle={`گزارش DCA — ${asset.symbol}`}
+            pdfTitle={`گزارش خرید دوره‌ای — ${asset.symbol}`}
             pdfSections={[
               {
                 heading: `سرمایه‌گذاری دوره‌ای ${asset.nameFa} (${asset.symbol})`,

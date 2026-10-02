@@ -23,6 +23,7 @@ import {
 } from '@/features/simulation/domain/constants';
 import { t } from '@/shared/i18n/fa';
 import { toast } from '@/shared/store/toastStore';
+import { toFaDigits } from '@/shared/utils/formatters';
 
 export function WatchlistSection() {
   const items = useWatchlistStore((s) => s.items);
@@ -74,7 +75,7 @@ export function WatchlistSection() {
     <Section
       id="watchlist"
       title={t('watchlist')}
-      description={symbols.length > 0 ? `${symbols.length.toLocaleString('fa-IR')} دارایی` : undefined}
+      description={symbols.length > 0 ? `${toFaDigits(symbols.length)} دارایی` : undefined}
     >
       <Surface className="px-4">
         {symbols.length === 0 ? (

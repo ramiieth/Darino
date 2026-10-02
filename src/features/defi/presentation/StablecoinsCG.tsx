@@ -36,14 +36,14 @@ const FA_NAMES: Record<string, string> = {
   DAI: 'دای',
   FDUSD: 'اف‌دی‌یواس‌دی',
   PYUSD: 'پی‌پال یواس‌دی',
-  USDE: 'ای‌تنا یواس‌دی (USDe)',
+  USDE: 'ای‌تنا یواس‌دی',
   TUSD: 'ترو یواس‌دی',
   USDD: 'یواس‌دی‌دی',
   GUSD: 'جمینی یواس‌دی',
   LUSD: 'لیرا یواس‌دی',
   FRAX: 'فرکس',
   CRVUSD: 'کرو یواس‌دی',
-  USDS: 'یواس‌دی‌اس (Sky)',
+  USDS: 'یواس‌دی‌اس',
   USDP: 'پکس یواس‌دی',
   USD1: 'یواس‌دی‌وان',
   EURC: 'یورو کوین',
@@ -116,7 +116,7 @@ export function StablecoinsCG() {
   }, [tick]);
 
   if (loading && !coins) return <ListSkeleton rows={8} />;
-  if (error && !coins) return <ErrorState message="ارتباط با CoinGecko برقرار نشد" onRetry={() => setTick((t) => t + 1)} />;
+  if (error && !coins) return <ErrorState message="ارتباط با کوین‌گکو برقرار نشد" onRetry={() => setTick((t) => t + 1)} />;
 
   const pegDev = (p: number | null | undefined) =>
     typeof p === 'number' && Number.isFinite(p) ? Math.abs(p - 1) * 100 : null;

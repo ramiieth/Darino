@@ -54,7 +54,7 @@ function statusText(r: ChangeRow): string {
     case 'no-rate':
       return 'نرخ تتر آن تاریخ در دسترس نیست';
     case 'no-data':
-      return 'Snapshot نزدیک به این تاریخ نیست';
+      return 'اسنپ‌شات نزدیک به این تاریخ نیست';
     default:
       return '';
   }
@@ -208,7 +208,7 @@ export function PriceChangePanel({ snapshots }: { snapshots: PropertyMarketSnaps
           </div>
         )}
       </div>
-      <p className="text-2xs text-muted">مقایسه فقط بین آگهی‌های هم‌سال ساخت (میانگین) · هر Snapshot با نرخ تتر همان تاریخ به دلار تبدیل می‌شود</p>
+      <p className="text-2xs text-muted">مقایسه فقط بین آگهی‌های هم‌سال ساخت (میانگین) · هر اسنپ‌شات با نرخ تتر همان تاریخ به دلار تبدیل می‌شود</p>
     </div>
   );
 }

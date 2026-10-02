@@ -2,6 +2,7 @@
  * Profit & loss — realized (booked) vs unrealized (open lots at live prices)
  * and the FIFO lot register (cost basis).
  */
+import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 import { useMemo } from 'react';
 import { Surface, Section } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -26,7 +27,7 @@ export function PnlPanel() {
         <MetricGrid cols={4}>
           <Metric
             size="lg"
-            label="سود/زیان تحقق‌یافته"
+            label="سود و زیان فروش‌ها"
             value={<MoneyValue value={o.realizedPnl} signed tone="auto" state={o.state === 'loading' ? 'loading' : 'ready'} />}
             sub="از فروش‌های ثبت‌شده"
           />
@@ -36,7 +37,7 @@ export function PnlPanel() {
             value={<MoneyValue value={o.unrealizedTotal} signed tone="auto" state={o.state === 'loading' ? 'loading' : 'ready'} />}
             sub={<PercentValue value={unrealizedPct} />}
           />
-          <Metric size="md" label="بهای تمام‌شده دارایی‌ها" value={<MoneyValue value={o.state === 'ready' ? o.costBasisTotal : null} />} />
+          <Metric size="md" label="هزینهٔ خرید دارایی‌ها" value={<MoneyValue value={o.state === 'ready' ? o.costBasisTotal : null} />} />
           <Metric size="md" label="ارزش روز دارایی‌ها" value={<MoneyValue value={o.holdingsValue} />} />
         </MetricGrid>
         {o.unpriced.length > 0 && (
@@ -46,19 +47,19 @@ export function PnlPanel() {
         )}
       </Surface>
 
-      <Section id="lots" title="لات‌های FIFO" description="هر خرید یک لات با بهای تمام‌شده می‌سازد؛ فروش از قدیمی‌ترین لات مصرف می‌شود.">
+      <Section id="lots" title="دسته‌های خرید" description="هر خرید یک دسته با قیمت خرید خودش می‌سازد؛ هنگام فروش، اول از قدیمی‌ترین خرید کم می‌شود.">
         {lotsSorted.length === 0 ? (
-          <EmptyState message="لاتی ثبت نشده است" hint="با خرید یا واریز رمزارز، لات ایجاد می‌شود." />
+          <EmptyState message="هنوز خریدی ثبت نشده است" hint="با خرید یا واریز رمزارز، اینجا نمایش داده می‌شود." />
         ) : (
           <Surface className="overflow-hidden">
             <table className="data-table">
-              <caption className="sr-only">لات‌های FIFO</caption>
+              <caption className="sr-only">دسته‌های خرید</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="!ps-4 md:!ps-5">لات</th>
+                  <th scope="col" className="!ps-4 md:!ps-5">خرید</th>
                   <th scope="col" className="col-num">مقدار</th>
                   <th scope="col" className="col-num hidden sm:table-cell">قیمت واحد</th>
-                  <th scope="col" className="col-num">بهای تمام‌شده</th>
+                  <th scope="col" className="col-num">هزینهٔ خرید</th>
                   <th scope="col" className="!pe-4 md:!pe-5"><span className="sr-only">وضعیت</span></th>
                 </tr>
               </thead>
@@ -67,7 +68,7 @@ export function PnlPanel() {
                   <tr key={l.id} className={cn(l.closedAt && 'text-muted')}>
                     <td className="!ps-4 md:!ps-5">
                       <p className="font-semibold text-ink">
-                        <bdi dir="ltr">{l.asset}</bdi> <span className="num-ltr text-xs font-normal text-subtle">#{l.id}</span>
+                        {assetDisplayName(l.asset).name}
                       </p>
                       <p className="text-xs text-muted">{formatJalali(l.openedAt)}</p>
                     </td>

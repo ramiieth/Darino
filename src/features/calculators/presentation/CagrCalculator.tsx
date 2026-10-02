@@ -22,7 +22,7 @@ const REFERENCE = [
   { symbol: 'BTC', label: 'بیت‌کوین' },
   { symbol: 'ETH', label: 'اتریوم' },
   { symbol: 'GLD', label: 'طلا (GLD)' },
-  { symbol: 'SPY', label: 'S&P 500 (SPY)' }
+  { symbol: 'SPY', label: 'شاخص اس‌اندپی ۵۰۰' }
 ];
 
 export function CagrCalculator() {
@@ -54,10 +54,10 @@ export function CagrCalculator() {
     <>
       <div className="grid grid-cols-2 gap-4">
         <Field label="ارزش اولیه">
-          <Input dir="ltr" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} suffix="دلار" />
         </Field>
         <Field label="ارزش نهایی">
-          <Input dir="ltr" inputMode="decimal" value={final} onChange={(e) => setFinal(e.target.value)} placeholder="0.00" suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={final} onChange={(e) => setFinal(e.target.value)} placeholder="0.00" suffix="دلار" />
         </Field>
       </div>
       <SmartDateField label="تاریخ شروع" value={start ? parseIsoToTs(start) : null} onChange={(ts) => setStart(ts ? formatGregorianIso(ts) : '')} />
@@ -77,7 +77,7 @@ export function CagrCalculator() {
       ) : (
         <>
           <ResultHero
-            label="نرخ رشد سالانه مرکب (CAGR)"
+            label="نرخ رشد سالانه مرکب"
             value={<PercentValue value={result.cagr === null ? null : result.cagr * 100} tone="auto" />}
             sub={`در ${toFaDigits(Math.round(result.days))} روز`}
           >
@@ -89,7 +89,7 @@ export function CagrCalculator() {
 
           {growthCurve.length > 1 && (
             <LineChartCard
-              title="منحنی رشد با نرخ ثابت CAGR"
+              title="منحنی رشد با نرخ ثابت رشد سالانهٔ مرکب"
               description="مسیر هموار فرضی؛ مسیر واقعی دارایی نوسان داشته است"
               labels={growthCurve.map((_, i) => `${Math.round((i / (growthCurve.length - 1)) * years * 12)} ماه`)}
               datasets={[{ label: 'ارزش', data: growthCurve, color: 'chart-1', fill: true }]}
@@ -107,8 +107,8 @@ export function CagrCalculator() {
           <ExportButtons
             filename="cagr.csv"
             headers={['ارزش اولیه', 'ارزش نهایی', 'سال', 'CAGR', 'سود کل', 'رشد کل']}
-            rows={[[initial, final, years.toFixed(2), result.cagr === null ? 'N/A' : (result.cagr * 100).toFixed(2) + '%', result.totalProfit ?? 'N/A', result.totalGrowthPct ?? 'N/A']]}
-            pdfTitle="گزارش CAGR"
+            rows={[[initial, final, years.toFixed(2), result.cagr === null ? '—' : (result.cagr * 100).toFixed(2) + '%', result.totalProfit ?? 'N/A', result.totalGrowthPct ?? 'N/A']]}
+            pdfTitle="گزارش رشد سالانهٔ مرکب"
             pdfSections={[
               {
                 heading: 'نرخ رشد سالانه مرکب',

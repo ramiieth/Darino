@@ -81,6 +81,8 @@ export const ASSET_NAME_FA: Record<string, string> = {
   /* ---------- استیبل‌کوین ---------- */
   USDT: 'تتر',
   USDC: 'یو‌اس‌دی‌سی',
+  USDG: 'دلار جهانی',
+  EURC: 'یورو کوین',
   DAI: 'دای',
   USDE: 'یو‌اس‌دی‌ای',
   SUSDE: 'اس‌یو‌اس‌دی‌ای',

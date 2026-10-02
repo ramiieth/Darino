@@ -198,10 +198,10 @@ export function scenarios(i: ScenarioInput): ScenarioResult[] {
   const base = runScenario(i, 1, 1, 1, 1);
   return [
     { ...base, label: 'پایه (نگه‌داری تا سررسید)' },
-    runScenario(i, 1.25, 1, 1, 1, 'اگر APY ۲۵٪ بیشتر شود'),
-    runScenario(i, 1, 0.5, 1, 1, 'اگر Reward نصف شود'),
-    runScenario(i, 1, 1, 2, 1, 'اگر TVL دو برابر شود'),
-    runScenario(i, 1, 1, 1, 0.95, 'اگر قیمت PT ۵٪ کاهش یابد'),
+    runScenario(i, 1.25, 1, 1, 1, 'اگر بازده سالانه ۲۵٪ بیشتر شود'),
+    runScenario(i, 1, 0.5, 1, 1, 'اگر پاداش نصف شود'),
+    runScenario(i, 1, 1, 2, 1, 'اگر ارزش قفل‌شده دو برابر شود'),
+    runScenario(i, 1, 1, 1, 0.95, 'اگر قیمت توکن اصل ۵٪ کاهش یابد'),
     runScenario(i, 1, 1, 1, 1, 'خروج زودهنگام در نیمی از مدت', 0.5)
   ];
 }

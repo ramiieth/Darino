@@ -18,9 +18,9 @@ import { cn } from '@/shared/lib/cn';
 type DeFiTab = 'flow' | 'overview' | 'stablecoins';
 
 const YIELD_LINKS = [
-  { to: '/pendle', title: 'Pendle', desc: 'بازده ثابت PT، YT و LP', icon: Percent },
+  { to: '/pendle', title: 'Pendle', desc: 'بازده ثابت توکن اصل، توکن بازده و نقدینگی', icon: Percent },
   { to: '/boros', title: 'Boros', desc: 'بازارهای نرخ تأمین مالی', icon: Radar },
-  { to: '/defi-loop', title: 'Yield Loop', desc: 'استراتژی‌های اهرمی و ریسک آن‌ها', icon: Repeat }
+  { to: '/defi-loop', title: 'حلقهٔ بازده', desc: 'استراتژی‌های اهرمی و ریسک آن‌ها', icon: Repeat }
 ];
 
 export function DeFiPage() {

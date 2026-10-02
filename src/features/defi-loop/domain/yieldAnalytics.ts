@@ -2,6 +2,7 @@
  * DeFi Loop — آمار تاریخی APY/TVL + Stability + Opportunity Score
  * ============================================================ */
 import { mean, sampleStdDev } from '@/features/boros/domain/engine/stats';
+import { fmtUSD } from '@/shared/utils/formatters';
 
 /* ---------------- آمار APY از سری تاریخی ---------------- */
 
@@ -143,27 +144,27 @@ export function riskIndicators(i: RiskInput): RiskIndicator[] {
   else if (i.leverage >= 2) out.push({ type: 'high-leverage', label: 'اهرم متوسط', detail: `${i.leverage.toFixed(1)}x`, severity: 'info' });
 
   if (i.borrowApy !== null && i.borrowApy > 0.08)
-    out.push({ type: 'high-borrow-cost', label: 'هزینه Borrow بالا', detail: `${(i.borrowApy * 100).toFixed(2)}٪ — سود خالص را کاهش می‌دهد`, severity: 'warning' });
+    out.push({ type: 'high-borrow-cost', label: 'هزینه وام بالا', detail: `${(i.borrowApy * 100).toFixed(2)}٪ — سود خالص را کاهش می‌دهد`, severity: 'warning' });
 
   if (i.tvlUsd < 1_000_000)
-    out.push({ type: 'low-tvl', label: 'TVL پایین', detail: `$${i.tvlUsd.toFixed(0)} — نقدینگی کمتر، ریسک اجرا بیشتر`, severity: 'warning' });
+    out.push({ type: 'low-tvl', label: 'ارزش قفل‌شده پایین', detail: `${fmtUSD(i.tvlUsd)} — نقدینگی کمتر، ریسک اجرا بیشتر`, severity: 'warning' });
   else if (i.tvlUsd < 10_000_000)
-    out.push({ type: 'low-liquidity', label: 'نقدینگی متوسط', detail: `$${(i.tvlUsd / 1e6).toFixed(1)}M`, severity: 'info' });
+    out.push({ type: 'low-liquidity', label: 'نقدینگی متوسط', detail: fmtUSD(i.tvlUsd, true), severity: 'info' });
 
   if (i.apySpike)
-    out.push({ type: 'apy-spike', label: 'APY Spike', detail: 'APY فعلی به‌طور معناداری بالاتر از میانگین ۳۰ روزه است — احتمالاً پایدار نیست', severity: 'warning' });
+    out.push({ type: 'apy-spike', label: 'جهش بازده', detail: 'بازده سالانه فعلی به‌طور معناداری بالاتر از میانگین ۳۰ روزه است — احتمالاً پایدار نیست', severity: 'warning' });
 
   if (i.rewardApy !== null && i.totalApy !== null && i.totalApy > 0 && i.rewardApy / i.totalApy > 0.5)
-    out.push({ type: 'high-reward-dependency', label: 'وابستگی بالا به Reward', detail: `${(i.rewardApy / i.totalApy * 100).toFixed(0)}٪ از APY از Reward است — با کاهش Reward سود افت می‌کند`, severity: 'warning' });
+    out.push({ type: 'high-reward-dependency', label: 'وابستگی بالا به پاداش', detail: `${(i.rewardApy / i.totalApy * 100).toFixed(0)}٪ از بازده سالانه از پاداش است — با کاهش پاداش سود افت می‌کند`, severity: 'warning' });
 
   if (i.tvlChange30d !== null && i.tvlChange30d < -10)
-    out.push({ type: 'tvl-declining', label: 'خروج TVL', detail: `TVL در ۳۰ روز ${i.tvlChange30d.toFixed(1)}٪ کاهش یافته`, severity: 'warning' });
+    out.push({ type: 'tvl-declining', label: 'خروج ارزش قفل‌شده', detail: `ارزش قفل‌شده در ۳۰ روز ${i.tvlChange30d.toFixed(1)}٪ کاهش یافته`, severity: 'warning' });
 
   if (i.volatility !== null && i.volatility > 0.05)
-    out.push({ type: 'high-volatility', label: 'نوسان بالای APY', detail: `σ=${(i.volatility * 100).toFixed(2)}٪`, severity: 'warning' });
+    out.push({ type: 'high-volatility', label: 'نوسان بالای بازده سالانه', detail: `σ=${(i.volatility * 100).toFixed(2)}٪`, severity: 'warning' });
 
   if (i.outlier)
-    out.push({ type: 'outlier', label: 'Outlier (خروج از قاعده)', detail: 'DeFiLlama این پول را outlier علامت زده — داده غیرعادی است', severity: 'critical' });
+    out.push({ type: 'outlier', label: 'دادهٔ پرت (خروج از قاعده)', detail: 'دیفای‌لاما این پول را دادهٔ پرت علامت زده — داده غیرعادی است', severity: 'critical' });
 
   return out;
 }

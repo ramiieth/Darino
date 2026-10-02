@@ -57,13 +57,13 @@ export function detectAnomaly(input: AnomalyInput): AnomalyInfo {
   if (spread > cfg.dislocationThreshold) {
     kind = 'extreme-dislocation';
     reasons.push(
-      `انحراف شدید نرخ: |Fixed ${(m.markApr * 100).toFixed(2)}٪ − Underlying ${(m.floatingApr * 100).toFixed(2)}٪| = ${(spread * 100).toFixed(2)}٪ (آستانه ${(cfg.dislocationThreshold * 100).toFixed(0)}٪)`
+      `انحراف شدید نرخ: |ثابت ${(m.markApr * 100).toFixed(2)}٪ − شناور ${(m.floatingApr * 100).toFixed(2)}٪| = ${(spread * 100).toFixed(2)}٪ (آستانه ${(cfg.dislocationThreshold * 100).toFixed(0)}٪)`
     );
     confidencePenalty += 0.35;
     // بررسی نقدشوندگی هنگام dislocation
     const turnover = m.notionalOI > 0 ? m.volume24h / m.notionalOI : 0;
     if (turnover < cfg.minLiquidityRatio) {
-      reasons.push(`نقدشوندگی پایین: حجم ۲۴h ${m.volume24h.toFixed(0)} نسبت به OI ${m.notionalOI.toFixed(0)} (نسبت ${(turnover * 100).toFixed(2)}٪)`);
+      reasons.push(`نقدشوندگی پایین: حجم ۲۴h ${m.volume24h.toFixed(0)} نسبت به تعهدات باز ${m.notionalOI.toFixed(0)} (نسبت ${(turnover * 100).toFixed(2)}٪)`);
       confidencePenalty += 0.2;
       kind = 'thin-liquidity';
     }
@@ -79,7 +79,7 @@ export function detectAnomaly(input: AnomalyInput): AnomalyInfo {
 
   // داده کهنه: ohlcv خالی یا آخرین نقطه قدیمی
   if (m.ohlcv.length === 0) {
-    reasons.push('تاریخچه APR در دسترس نیست');
+    reasons.push('تاریخچه نرخ سالانه در دسترس نیست');
     confidencePenalty += 0.1;
     if (kind === 'none') kind = 'stale-data';
   } else {
@@ -134,7 +134,7 @@ export function assessLiquidity(m: BorosMarket, targetNotional: number): Liquidi
       score: 0,
       executable: false,
       estimatedMaxExecutable: 0,
-      reasons: ['داده OI/حجم در دسترس نیست'],
+      reasons: ['داده تعهدات باز/حجم در دسترس نیست'],
       available: false
     };
   }
@@ -150,10 +150,10 @@ export function assessLiquidity(m: BorosMarket, targetNotional: number): Liquidi
   const estimatedMaxExecutable = vol * 0.05;
   const executable = targetNotional <= estimatedMaxExecutable;
 
-  if (turnover < 0.01) reasons.push(`نسبت حجم/OI پایین (${(turnover * 100).toFixed(2)}٪)`);
-  if (spread !== null && spread > 0.02) reasons.push(`اسپرد وسیع (${(spread * 100).toFixed(2)}٪ از mid)`);
+  if (turnover < 0.01) reasons.push(`نسبت حجم/تعهدات باز پایین (${(turnover * 100).toFixed(2)}٪)`);
+  if (spread !== null && spread > 0.02) reasons.push(`اسپرد وسیع (${(spread * 100).toFixed(2)}٪ از قیمت میانی)`);
   if (!executable) {
-    reasons.push(`Notional ${targetNotional.toFixed(0)} از ظرفیت اجرای تخمینی (${estimatedMaxExecutable.toFixed(0)}) بیشتر است`);
+    reasons.push(`ارزش اسمی ${targetNotional.toFixed(0)} از ظرفیت اجرای تخمینی (${estimatedMaxExecutable.toFixed(0)}) بیشتر است`);
   }
 
   return { score, executable, estimatedMaxExecutable, reasons, available: true };

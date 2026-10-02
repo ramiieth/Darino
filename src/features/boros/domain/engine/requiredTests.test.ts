@@ -113,7 +113,7 @@ describe('verifyFeeModel', () => {
     const a = BorosCalculationEngine.analyze({ m: mHist, size: 1000, nowSec: NOW });
     expect(a.makerEntryFee.source).toBe('documentation');
     expect(a.makerEntryFee.amount).toBe(0);
-    expect(a.makerEntryFee.note).toContain('مستندات Boros');
+    expect(a.makerEntryFee.note).toContain('مستندات بوروس');
   });
 });
 
@@ -182,7 +182,7 @@ describe('verifyMeanReversionScenario', () => {
     const mr = meanReversionScenario({ direction: 'long', size: 1000, fixedRate: m.markApr, currentFloating: m.floatingApr, days: 20, totalCosts: 1, margin: 100, avg7d: null, avg30d: null, avg90d: null });
     expect(mr.available).toBe(false);
     expect(mr.netPnl).toBeNull();
-    expect(mr.note).toContain('N/A');
+    expect(mr.note).toContain('نامشخص');
   });
 });
 
@@ -234,7 +234,7 @@ describe('verifyLiquidityFilter', () => {
     // OI بزرگ ولی حجم بسیار کم → turnover = 5000/1500000 = 0.33٪ < 1٪
     const l = assessLiquidity({ ...mHist, notionalOI: 1_500_000, volume24h: 5_000 }, 1000);
     expect(l.available).toBe(true);
-    expect(l.reasons.some((r) => r.includes('نسبت حجم/OI'))).toBe(true);
+    expect(l.reasons.some((r) => r.includes('نسبت حجم/تعهدات باز'))).toBe(true);
   });
 
   it('Notional بزرگتر از ظرفیت اجرا → executable=false', () => {
@@ -268,7 +268,7 @@ describe('verifyNoFabricatedData', () => {
   });
   it('Slippage بدون داده → ۰ با منبع na', () => {
     const b = auditMarket({ m: mHist, size: 1000, nowSec: NOW, slippageRate: null });
-    const slip = b.feeLines.find((l) => l.label.includes('Slippage'))!;
+    const slip = b.feeLines.find((l) => l.label.includes('لغزش قیمت'))!;
     expect(slip.source).toBe('na');
     expect(slip.amount).toBe(0);
   });
@@ -366,7 +366,7 @@ describe('Edge Cases — Zero/Missing/Extreme', () => {
 
   it('Missing Gas → gas=0 با نمایش unknown/excluded', () => {
     const b = auditMarket({ m: mHist, size: 1000, nowSec: NOW, gasUsd: 0 });
-    const gas = b.feeLines.find((l) => l.label.includes('گس'))!;
+    const gas = b.feeLines.find((l) => l.label.includes('کارمزد شبکه'))!;
     expect(gas.amount).toBe(0);
     expect(gas.source).toBe('na');
   });
@@ -416,6 +416,6 @@ describe('Reason Engine — Why Potential / Why Not', () => {
     const neg: BorosMarket = { ...mHist, floatingApr: 0.005, markApr: 0.05 };
     const a = BorosCalculationEngine.analyze({ m: neg, size: 1000, nowSec: NOW });
     const ex = explainOpportunity(a);
-    expect(ex.negative.some((r) => r.text.includes('Net PnL'))).toBe(true);
+    expect(ex.negative.some((r) => r.text.includes('سود/زیان خالص'))).toBe(true);
   });
 });

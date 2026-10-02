@@ -33,7 +33,7 @@ import { cn } from '@/shared/lib/cn';
 const DAYS_OPTIONS = [7, 30, 90, 180, 365];
 
 /** reference leverage with one decimal (3.288 → 3.3x) */
-const fmtLev = (v: number | null): string => (v === null ? 'N/A' : `${v.toFixed(1)}x`);
+const fmtLev = (v: number | null): string => (v === null ? '—' : `${v.toFixed(1)}x`);
 
 export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void }) {
   const [capital, setCapital] = useState(10000);
@@ -95,7 +95,7 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
         <Surface className="space-y-5 p-4 md:p-5 lg:sticky lg:top-8">
           <div className="grid grid-cols-2 gap-4">
             <Field label="سرمایه اولیه" className="col-span-2">
-              <Input dir="ltr" type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} suffix="$" />
+              <Input dir="ltr" type="number" value={capital} onChange={(e) => setCapital(Number(e.target.value) || 0)} suffix="دلار" />
             </Field>
             <Field label="مدت">
               <Select value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -129,23 +129,23 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
               Borrow APY، LTV و آستانه لیکوییدیشن از API عمومی در دسترس نیستند — مقادیر زیر ورودی شما و برآوردی‌اند.
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="LTV" hint="0.75 یا 75">
+              <Field label="نسبت وام به وثیقه" hint="۰.۷۵ یا ۷۵">
                 <Input dir="ltr" value={ltv} onChange={(e) => setLtv(e.target.value)} />
               </Field>
               <Field label="آستانه لیکوییدیشن">
                 <Input dir="ltr" value={lt} onChange={(e) => setLt(e.target.value)} />
               </Field>
-              <Field label="Borrow APY" hint="درصد یا اعشار">
+              <Field label="نرخ سالانهٔ وام" hint="درصد یا اعشار">
                 <Input dir="ltr" value={borrowApy} onChange={(e) => setBorrowApy(e.target.value)} />
               </Field>
-              <Field label="پاداش Borrow">
+              <Field label="پاداش وام">
                 <Input dir="ltr" value={borrowReward} onChange={(e) => setBorrowReward(e.target.value)} />
               </Field>
               <Field label="گس هر حلقه">
-                <Input dir="ltr" value={gasPerLoop} onChange={(e) => setGasPerLoop(e.target.value)} suffix="$" />
+                <Input dir="ltr" value={gasPerLoop} onChange={(e) => setGasPerLoop(e.target.value)} suffix="دلار" />
               </Field>
               <Field label="لغزش">
-                <Input dir="ltr" value={slippage} onChange={(e) => setSlippage(e.target.value)} suffix="$" />
+                <Input dir="ltr" value={slippage} onChange={(e) => setSlippage(e.target.value)} suffix="دلار" />
               </Field>
             </div>
           </div>
@@ -162,16 +162,16 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
             <MoneyValue value={result.economics.netProfit} signed tone="auto" />
           </p>
           <p className="mt-1 text-sm text-muted">
-            APY واقعی شما <PercentValue value={result.economics.realApy * 100} className="font-semibold" /> · ROI دوره{' '}
+            بازده سالانه واقعی شما <PercentValue value={result.economics.realApy * 100} className="font-semibold" /> · ROI دوره{' '}
             <PercentValue value={result.economics.realRoiPct} className="font-semibold" />
           </p>
           <MetricGrid cols={4} className="mt-6 border-t border-divider pt-5">
             <Metric label="اهرم پیشنهادی" value={<span className="num-ltr">{fmtLev(result.recommendation.recommendedLeverage)}</span>} sub={`مرجع ${fmtLev(result.reference.leverage)}`} />
             <Metric
-              label="Health Factor"
+              label="ضریب سلامت"
               value={
                 <span className={cn('num-ltr', (result.risk.healthFactor ?? 2) < 1.5 && 'text-negative')}>
-                  {result.risk.healthFactor !== null ? result.risk.healthFactor.toFixed(2) : 'N/A'}
+                  {result.risk.healthFactor !== null ? result.risk.healthFactor.toFixed(2) : '—'}
                 </span>
               }
               sub={`حداقل ${hfMin}`}
@@ -179,7 +179,7 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
             <Metric label="سطح ریسک" value={<Badge tone={riskTone} className="text-sm">{RISK_LEVEL_FA[result.risk.riskLevel]}</Badge>} />
             <Metric
               label="فاصله تا لیکوییدیشن"
-              value={result.risk.liquidationDistancePct !== null ? <span className="num-ltr">{result.risk.liquidationDistancePct.toFixed(1)}%</span> : 'N/A'}
+              value={result.risk.liquidationDistancePct !== null ? <span className="num-ltr">{result.risk.liquidationDistancePct.toFixed(1)}%</span> : '—'}
             />
           </MetricGrid>
         </Surface>
@@ -187,32 +187,32 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
         {result.recommendation.reason && <Notice tone="warn">{result.recommendation.reason}</Notice>}
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Section id="reference" title="مرجع DeFiLlama" description={`${toFaDigits(result.reference.loops ?? 0)} حلقه، بدون هزینه‌های شما`}>
+          <Section id="reference" title="مرجع دیفای‌لاما" description={`${toFaDigits(result.reference.loops ?? 0)} حلقه، بدون هزینه‌های شما`}>
             <Surface className="px-4">
               <KeyValueList
                 rows={[
                   { label: 'LTV', value: <PercentValue value={(parseLtvInput(ltv) ?? 0) * 100} signed={false} tone="none" digits={0} /> },
                   { label: 'اهرم مرجع', value: <span className="num-ltr">{fmtLev(result.reference.leverage)}</span> },
-                  { label: 'کل Supply', value: <MoneyValue value={result.reference.totalSupply} /> },
-                  { label: 'کل Borrow', value: <MoneyValue value={result.reference.totalBorrow} /> },
-                  { label: 'Supply APY مؤثر', value: <PercentValue value={result.reference.effectiveSupplyApy * 100} signed={false} tone="none" /> },
-                  { label: 'Borrow APY خالص', value: <PercentValue value={result.reference.netBorrowApy !== null ? result.reference.netBorrowApy * 100 : null} signed={false} tone="none" /> },
-                  { label: 'Looped APY مرجع', emphasis: true, value: <PercentValue value={result.reference.loopedApy !== null ? result.reference.loopedApy * 100 : null} /> }
+                  { label: 'کل سپرده', value: <MoneyValue value={result.reference.totalSupply} /> },
+                  { label: 'کل وام', value: <MoneyValue value={result.reference.totalBorrow} /> },
+                  { label: 'بازده سپرده مؤثر', value: <PercentValue value={result.reference.effectiveSupplyApy * 100} signed={false} tone="none" /> },
+                  { label: 'نرخ سالانهٔ وام خالص', value: <PercentValue value={result.reference.netBorrowApy !== null ? result.reference.netBorrowApy * 100 : null} signed={false} tone="none" /> },
+                  { label: 'بازده حلقه مرجع', emphasis: true, value: <PercentValue value={result.reference.loopedApy !== null ? result.reference.loopedApy * 100 : null} /> }
                 ]}
               />
             </Surface>
-            <p className="mt-2 text-xs text-muted">مرجع یک عدد اقتصادی خالص است، نه تضمین ایمنی. توصیه بر اساس Health Factor و سطح ایمنی شما جدا محاسبه می‌شود.</p>
+            <p className="mt-2 text-xs text-muted">مرجع یک عدد اقتصادی خالص است، نه تضمین ایمنی. توصیه بر اساس ضریب سلامت و سطح ایمنی شما جدا محاسبه می‌شود.</p>
           </Section>
 
-          <Section id="economics" title="اقتصاد Loop" description={`${toFaDigits(days)} روز، در نقطه پیشنهادی`}>
+          <Section id="economics" title="اقتصاد حلقه" description={`${toFaDigits(days)} روز، در نقطه پیشنهادی`}>
             <Surface className="px-4">
               <KeyValueList
                 rows={[
-                  { label: 'درآمد Supply', value: <MoneyValue value={result.economics.supplyIncome} signed tone="auto" /> },
+                  { label: 'درآمد سپرده', value: <MoneyValue value={result.economics.supplyIncome} signed tone="auto" /> },
                   { label: 'درآمد پاداش', value: <MoneyValue value={result.economics.rewardIncome} signed tone="auto" /> },
-                  { label: 'هزینه Borrow', value: <MoneyValue value={-Math.abs(result.economics.borrowCost)} /> },
+                  { label: 'هزینه وام', value: <MoneyValue value={-Math.abs(result.economics.borrowCost)} /> },
                   ...(result.economics.borrowRewardIncome > 0
-                    ? [{ label: 'پاداش Borrow', value: <MoneyValue value={result.economics.borrowRewardIncome} signed tone="auto" /> }]
+                    ? [{ label: 'پاداش وام', value: <MoneyValue value={result.economics.borrowRewardIncome} signed tone="auto" /> }]
                     : []),
                   { label: 'هزینه تأمین مالی (خالص)', value: <MoneyValue value={-Math.abs(result.economics.financingCost)} /> },
                   { label: 'هزینه‌های عملیاتی', value: <MoneyValue value={-Math.abs(result.economics.operatingCosts)} /> },
@@ -225,7 +225,7 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
         </div>
 
         {stress.length > 0 && (
-          <Section id="stress" title="آزمون تنش" description="Health Factor با افت قیمت Collateral — برآورد، نه تضمین">
+          <Section id="stress" title="آزمون تنش" description="ضریب سلامت با افت قیمت وثیقه — برآورد، نه تضمین">
             <Surface className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="data-table">
@@ -234,19 +234,19 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
                     <tr>
                       <th scope="col" className="!ps-5">افت قیمت</th>
                       {stress.map((s) => (
-                        <th key={s.dd} scope="col" className="col-num">{s.dd === 0 ? 'فعلی' : `-${s.dd}%`}</th>
+                        <th key={s.dd} scope="col" className="col-num">{s.dd === 0 ? 'فعلی' : `-${toFaDigits(s.dd)}٪`}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <th scope="row" className="!ps-5 text-start font-semibold text-ink">Health Factor</th>
+                      <th scope="row" className="!ps-5 text-start font-semibold text-ink">ضریب سلامت</th>
                       {stress.map((s) => (
                         <td
                           key={s.dd}
                           className={cn('col-num num-ltr font-semibold', s.risk === 'ok' ? 'text-positive' : s.risk === 'warning' ? 'text-warn' : 'text-negative')}
                         >
-                          {s.hf !== null ? s.hf.toFixed(2) : 'N/A'}
+                          {s.hf !== null ? s.hf.toFixed(2) : '—'}
                           <span className="block text-2xs font-normal">{s.risk === 'ok' ? 'OK' : s.risk === 'warning' ? 'هشدار' : 'لیکوییدیشن'}</span>
                         </td>
                       ))}
@@ -255,7 +255,7 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
                 </table>
               </div>
             </Surface>
-            <p className="mt-2 text-xs text-muted">برای Collateral استیبل حساسیت قیمت صفر است؛ برای ETH و مشابه، افت قیمت مستقیماً روی HF اثر می‌گذارد.</p>
+            <p className="mt-2 text-xs text-muted">برای وثیقه استیبل حساسیت قیمت صفر است؛ برای اتریوم و مشابه، افت قیمت مستقیماً روی ضریب سلامت اثر می‌گذارد.</p>
           </Section>
         )}
 
@@ -267,12 +267,12 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
                 <thead>
                   <tr>
                     <th scope="col" className="!ps-5">حلقه</th>
-                    <th scope="col" className="col-num">Supply</th>
-                    <th scope="col" className="col-num">Borrow</th>
-                    <th scope="col" className="col-num">کل Supply</th>
-                    <th scope="col" className="col-num">کل Borrow</th>
+                    <th scope="col" className="col-num">سپرده</th>
+                    <th scope="col" className="col-num">وام</th>
+                    <th scope="col" className="col-num">کل سپرده</th>
+                    <th scope="col" className="col-num">کل وام</th>
                     <th scope="col" className="col-num">اهرم</th>
-                    <th scope="col" className="col-num">HF</th>
+                    <th scope="col" className="col-num">ضریب سلامت</th>
                     <th scope="col" className="!pe-5">وضعیت</th>
                   </tr>
                 </thead>
@@ -285,7 +285,7 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
                       <td className="col-num font-semibold"><MoneyValue value={s.totalSupply} /></td>
                       <td className="col-num"><MoneyValue value={s.totalBorrow} /></td>
                       <td className="col-num num-ltr">{s.leverage.toFixed(2)}x</td>
-                      <td className="col-num num-ltr">{s.healthFactor !== null ? s.healthFactor.toFixed(2) : 'N/A'}</td>
+                      <td className="col-num num-ltr">{s.healthFactor !== null ? s.healthFactor.toFixed(2) : '—'}</td>
                       <td className="!pe-5"><Badge tone={s.status === 'safe' ? 'gain' : 'warn'}>{s.status === 'safe' ? 'ایمن' : 'هشدار'}</Badge></td>
                     </tr>
                   ))}
@@ -318,19 +318,19 @@ export function LoopCalculator({ pool }: { pool: YieldPool; onClose?: () => void
               dense
               rows={[
                 {
-                  label: 'Supply',
+                  label: 'سپرده',
                   value: (
                     <span className="num-ltr">
                       {fmtPct(components.base * 100)} + {fmtPct(components.reward * 100)} ×{rewardMult} = {fmtPct(result.reference.effectiveSupplyApy * 100)}
                     </span>
                   )
                 },
-                { label: 'Borrow خالص', value: <span className="num-ltr">{borrowApy} − {borrowReward} = {result.reference.netBorrowApy !== null ? fmtPct(result.reference.netBorrowApy * 100) : 'N/A'}</span> },
+                { label: 'وام خالص', value: <span className="num-ltr">{borrowApy} − {borrowReward} = {result.reference.netBorrowApy !== null ? fmtPct(result.reference.netBorrowApy * 100) : '—'}</span> },
                 { label: 'اهرم مرجع = 1 + L + … + L⁵', value: <span className="num-ltr">{result.reference.leverage?.toFixed(4)}x</span> },
                 { label: 'Looped APY = Supply×Lev − Borrow×(Lev−1)', value: <PercentValue value={result.reference.loopedApy !== null ? result.reference.loopedApy * 100 : null} /> },
-                { label: 'APY واقعی = (1 + خالص/سرمایه)^(365/روز) − 1', value: <PercentValue value={result.economics.realApy * 100} /> },
-                { label: 'میانگین APY ۳۰ روزه', value: <PercentValue value={apyStats.avg30d} signed={false} tone="none" /> },
-                { label: 'جهش ناگهانی APY', value: apyStats.spikeDetected ? <Badge tone="warn">بله</Badge> : 'خیر' }
+                { label: 'بازده سالانه واقعی = (1 + خالص/سرمایه)^(365/روز) − 1', value: <PercentValue value={result.economics.realApy * 100} /> },
+                { label: 'میانگین بازده سالانه ۳۰ روزه', value: <PercentValue value={apyStats.avg30d} signed={false} tone="none" /> },
+                { label: 'جهش ناگهانی بازده سالانه', value: apyStats.spikeDetected ? <Badge tone="warn">بله</Badge> : 'خیر' }
               ]}
             />
           </Disclosure>

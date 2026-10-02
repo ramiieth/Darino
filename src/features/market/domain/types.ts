@@ -26,7 +26,7 @@ export type MarketGroup = 'crypto' | 'tokenized' | 'tradfi';
 export const MARKET_GROUP_FA: Record<MarketGroup, string> = {
   crypto: 'رمزارز',
   tokenized: 'دارایی توکن‌ایز',
-  tradfi: 'سنتی (TradFi)'
+  tradfi: 'سنتی'
 };
 
 /** برچسب فارسی هر دسته */
@@ -42,7 +42,7 @@ export const CATEGORY_FA: Record<MarketCategory, string> = {
 
 /** زیرگروه‌های TradFi برای نمایش */
 export const TRADFI_SUBGROUPS: { category: MarketCategory; label: string }[] = [
-  { category: 'us-stock', label: 'US Stocks' },
+  { category: 'us-stock', label: 'سهام آمریکا' },
   { category: 'etf', label: 'ETFs' },
   { category: 'index', label: 'Indices' },
   { category: 'commodity', label: 'Commodities' },

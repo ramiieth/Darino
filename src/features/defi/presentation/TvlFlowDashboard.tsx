@@ -139,7 +139,7 @@ export function TvlFlowDashboard() {
     );
   }
   if (error && chains.length === 0) {
-    return <ErrorState message="اتصال به DefiLlama برقرار نشد" onRetry={() => void loadTvlFlow()} />;
+    return <ErrorState message="اتصال به دیفای‌لاما برقرار نشد" onRetry={() => void loadTvlFlow()} />;
   }
 
   return (
@@ -148,7 +148,7 @@ export function TvlFlowDashboard() {
         loadedAt={loadedAt}
         error={error}
         syncing={syncProgress !== null}
-        sourceLabel="DefiLlama"
+        sourceLabel="دیفای‌لاما"
         autoMs={5 * 60_000}
         onRefresh={() => {
           resetTvlFlowLoad();
@@ -190,7 +190,7 @@ export function TvlFlowDashboard() {
             <table className="data-table">
               <caption className="px-4 pt-4 text-start text-sm font-bold text-ink md:px-5">
                 بیشترین ورود و خروج سرمایه در هر بازه
-                <span className="block text-xs font-normal text-muted">بر اساس تغییر دلاری TVL زنجیره‌ها</span>
+                <span className="block text-xs font-normal text-muted">بر اساس تغییر دلاری ارزش قفل‌شده زنجیره‌ها</span>
               </caption>
               <thead>
                 <tr>
@@ -263,7 +263,7 @@ export function TvlFlowDashboard() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-ink"><bdi dir="ltr">{c.name}</bdi></p>
                           <p className="text-xs text-muted">
-                            TVL <MoneyValue value={c.tvl} compact />
+                            ارزش قفل‌شده <MoneyValue value={c.tvl} compact />
                           </p>
                         </div>
                         <span className="hidden w-24 shrink-0 sm:block">
@@ -315,7 +315,7 @@ export function TvlFlowDashboard() {
                 >
                   <bdi dir="ltr" className="w-full truncate text-center text-xs font-semibold">{c.name}</bdi>
                   <span className="num-ltr text-2xs font-semibold opacity-90">
-                    {ch ? `${ch.pct > 0 ? '+' : ''}${ch.pct.toFixed(1)}%` : '—'}
+                    {ch ? `${ch.pct > 0 ? '+' : ''}${toFaDigits(ch.pct.toFixed(1))}٪` : '—'}
                   </span>
                 </div>
               );
@@ -331,7 +331,7 @@ export function TvlFlowDashboard() {
             <SearchField value={protoQuery} onChange={setProtoQuery} placeholder="جستجوی پروتکل…" className="min-w-0 flex-1 md:max-w-xs" />
             <div className="w-48">
               <Select aria-label="مرتب‌سازی" value={protoSort} onChange={(e) => setProtoSort(e.target.value as typeof protoSort)}>
-                <option value="tvl">بیشترین TVL</option>
+                <option value="tvl">بیشترین ارزش قفل‌شده</option>
                 <option value="grow7">بیشترین رشد ۷ روزه</option>
                 <option value="drop7">بیشترین افت ۷ روزه</option>
                 <option value="grow1">سریع‌ترین ورود ۱ روزه</option>
@@ -348,7 +348,7 @@ export function TvlFlowDashboard() {
                 <thead>
                   <tr>
                     <th scope="col" className="!ps-4 md:!ps-5">پروتکل</th>
-                    <th scope="col" className="col-num hidden sm:table-cell">TVL</th>
+                    <th scope="col" className="col-num hidden sm:table-cell">ارزش قفل‌شده</th>
                     <th scope="col" className="col-num">۷ روز</th>
                     <th scope="col" className="col-num !pe-4 md:!pe-5">۱ روز</th>
                   </tr>

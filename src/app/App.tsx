@@ -3,6 +3,7 @@ import { lazy, Suspense, useState } from 'react';
 import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
+import { AuthBootstrap, AuthGate } from '@/features/auth/AuthGate';
 
 // ⚠️ فقط صفحه اصلی (بازار) مستقیم import می‌شود — بقیه lazy تا باندل
 // اولیه سبک بماند و اپ زود بالا بیاید (تغییر اساسی برای روان‌سازی)
@@ -15,9 +16,21 @@ const PendlePage = lazy(() => import('@/features/pendle/presentation/PendlePage'
 const PendleMarketDetailPage = lazy(() => import('@/features/pendle/presentation/PendleMarketDetailPage').then((m) => ({ default: m.PendleMarketDetailPage })));
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
 const AccountingPage = lazy(() => import('@/features/accounting/presentation/AccountingPage'));
+const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
+const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
+const SecurityPage = lazy(() => import('@/features/auth/SecurityPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
 const LoopPage = lazy(() => import('@/features/defi-loop/presentation/LoopAnalysisPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
+
+/** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
+function Private({ children, label }: { children: React.ReactNode; label?: string }) {
+  return (
+    <AuthGate>
+      <Lazy label={label}>{children}</Lazy>
+    </AuthGate>
+  );
+}
 
 /** Suspense مشترک برای همه صفحات lazy — اسکلتون هم‌ریتم صفحه (نه اسپلش لوگو) */
 function Lazy({ children, label }: { children: React.ReactNode; label?: string }) {
@@ -34,15 +47,16 @@ export function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onCloseSettings={() => setSettingsOpen(false)}
       >
+        <AuthBootstrap />
         <Routes>
           <Route path="/" element={<MarketsHomePage />} />
           <Route path="/market" element={<MarketsHomePage />} />
           <Route
             path="/dashboard"
             element={
-              <Lazy>
+              <Private>
                 <DashboardPage />
-              </Lazy>
+              </Private>
             }
           />
           <Route
@@ -88,15 +102,39 @@ export function App() {
           <Route
             path="/accounting"
             element={
-              <Lazy label="حسابداری">
+              <Private label="حسابداری">
                 <AccountingPage />
-              </Lazy>
+              </Private>
+            }
+          />
+          <Route
+            path="/holdings"
+            element={
+              <Private label="دارایی‌های چندشبکه‌ای">
+                <HoldingsPage />
+              </Private>
+            }
+          />
+          <Route
+            path="/arcus"
+            element={
+              <Private label="آرکوس">
+                <ArcusPage />
+              </Private>
+            }
+          />
+          <Route
+            path="/security"
+            element={
+              <Private label="امنیت و دستگاه‌ها">
+                <SecurityPage />
+              </Private>
             }
           />
           <Route
             path="/boros"
             element={
-              <Lazy label="تحلیل Boros">
+              <Lazy label="تحلیل بوروس">
                 <BorosPage />
               </Lazy>
             }
@@ -128,7 +166,7 @@ export function App() {
           <Route
             path="/defi-loop"
             element={
-              <Lazy label="Yield Loop">
+              <Lazy label="حلقهٔ بازده">
                 <LoopPage />
               </Lazy>
             }

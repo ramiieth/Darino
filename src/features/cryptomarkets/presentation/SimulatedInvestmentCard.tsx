@@ -72,7 +72,7 @@ export function SimulatedInvestmentCard({
     <Section
       id="whatif"
       title={t('hypTitle')}
-      description={`اگر ${fmtUSD(capital)} (موجودی نقد فعلی) در ابتدای بازه سرمایه‌گذاری شده بود`}
+      description={`اگر ${fmtUSD(capital)} (${investable.mode === 'manual' ? 'سرمایهٔ دستی سناریو' : 'موجودی نقد فعلی'}) در ابتدای بازه سرمایه‌گذاری شده بود`}
     >
       <Surface className="p-4 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

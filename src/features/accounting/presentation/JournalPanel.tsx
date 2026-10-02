@@ -1,5 +1,5 @@
 /**
- * Journal (دفتر روزنامه)
+ * تاریخچهٔ تراکنش‌ها
  *  - CashEntryForm: cash deposit / withdrawal / expense / manual two-line entry
  *    (smart Jalali–Gregorian date)
  *  - JournalPanel: append-only list of entries — corrections only via reversal
@@ -16,7 +16,8 @@ import { Dialog } from '@/shared/components/ui/Sheet';
 import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { EmptyState } from '@/shared/components/ui/StateViews';
 import { useAccountingData } from './AccountingContext';
-import { accountNameFa, type JournalEntry, type JournalLine } from '@/features/accounting/domain/types';
+import { accountNameFa, type Account, type JournalEntry, type JournalLine } from '@/features/accounting/domain/types';
+import { normalSide } from '@/features/accounting/domain/engine';
 import { formatDualDate } from '@/shared/utils/jalali';
 import { toFaDigits } from '@/shared/utils/formatters';
 
@@ -26,19 +27,26 @@ const QUICK_TABS = [
   { value: 'deposit' as const, label: 'واریز نقد', icon: <HandCoins /> },
   { value: 'withdraw' as const, label: 'برداشت نقد', icon: <ArrowUpFromLine /> },
   { value: 'expense' as const, label: 'هزینه', icon: <Receipt /> },
-  { value: 'manual' as const, label: 'سند دستی', icon: <PenLine /> }
+  { value: 'manual' as const, label: 'ثبت دستی', icon: <PenLine /> }
 ];
 
 const SOURCE_FA: Record<string, string> = {
-  opening: 'افتتاحیه',
+  opening: 'موجودی اولیه',
   deposit: 'واریز',
   withdraw: 'برداشت',
   expense: 'هزینه',
   buy: 'خرید',
   sell: 'فروش',
   manual: 'دستی',
-  reversal: 'معکوس'
+  reversal: 'لغو',
+  custody: 'دارایی چندشبکه‌ای'
 };
+
+/** اثر یک خط روی موجودی حساب خودش: + یعنی موجودی آن حساب زیاد شد، − یعنی کم شد */
+function lineEffect(l: JournalLine, accounts: Account[]): number {
+  const type = accounts.find((a) => a.key === l.account)?.type ?? 'asset';
+  return normalSide(type) === 'debit' ? l.debit - l.credit : l.credit - l.debit;
+}
 
 export function CashEntryForm() {
   const { accounts, cashBalance, deposit, withdraw, expense, addManual } = useAccountingData();
@@ -67,7 +75,7 @@ export function CashEntryForm() {
           { account: debitAcc, debit: usd, credit: 0 },
           { account: creditAcc, debit: 0, credit: usd }
         ];
-        ok = await addManual(lines, d, memo.trim() || 'سند دستی');
+        ok = await addManual(lines, d, memo.trim() || 'ثبت دستی');
       } else {
         ok =
           quick === 'deposit'
@@ -88,11 +96,11 @@ export function CashEntryForm() {
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       <Surface className="space-y-5 p-4 md:p-6 lg:col-span-7">
-        <SegmentedControl label="نوع سند" options={QUICK_TABS} value={quick} onChange={setQuick} fill />
+        <SegmentedControl label="نوع ثبت" options={QUICK_TABS} value={quick} onChange={setQuick} fill />
 
         {quick === 'manual' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="حساب بدهکار">
+            <Field label="به حساب">
               <Select value={debitAcc} onChange={(e) => setDebitAcc(e.target.value)}>
                 {accountOptions.map((a) => (
                   <option key={a.key} value={a.key}>
@@ -102,8 +110,8 @@ export function CashEntryForm() {
               </Select>
             </Field>
             <Field
-              label="حساب بستانکار"
-              error={debitAcc === creditAcc ? 'حساب بدهکار و بستانکار نباید یکسان باشند' : undefined}
+              label="از حساب"
+              error={debitAcc === creditAcc ? 'حساب مبدأ و مقصد نباید یکسان باشند' : undefined}
             >
               <Select value={creditAcc} onChange={(e) => setCreditAcc(e.target.value)}>
                 {accountOptions.map((a) => (
@@ -126,17 +134,17 @@ export function CashEntryForm() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            suffix="$"
+            suffix="دلار"
             
           />
         </Field>
-        <SmartDateField value={date} onChange={setDate} label="تاریخ سند" />
+        <SmartDateField value={date} onChange={setDate} label="تاریخ" />
         <Field label="شرح" hint="اختیاری">
           <Input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="مثلاً: حقوق مهر" />
         </Field>
 
         <Button onClick={() => void submit()} disabled={!valid} loading={busy} className="w-full" icon={<Plus />}>
-          ثبت سند
+          ثبت
         </Button>
       </Surface>
 
@@ -159,7 +167,7 @@ export function CashEntryForm() {
           </Surface>
           <p className="flex items-start gap-2 text-xs leading-5 text-muted">
             <Lock aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            سندها فقط‌افزودنی‌اند و ویرایش یا حذف نمی‌شوند؛ اصلاح هر سند با «ثبت معکوس» در دفتر روزنامه انجام می‌شود.
+            تراکنش‌ها ویرایش یا پاک نمی‌شوند؛ برای اصلاح، در «تاریخچهٔ تراکنش‌ها» آن را لغو کنید.
           </p>
         </div>
       </aside>
@@ -173,18 +181,19 @@ export function JournalPanel() {
   const [busy, setBusy] = useState(false);
   const [limit, setLimit] = useState(40);
 
-  const sorted = useMemo(() => [...entries].sort((a, b) => b.id - a.id), [entries]);
+  // ترتیب زمانی (شناسه‌ها دیگر ترتیبی نیستند)؛ سندهای مشتق از عملیات هم در جای زمانی خود
+  const sorted = useMemo(() => [...entries].sort((a, b) => b.date - a.date || b.createdAt - a.createdAt), [entries]);
 
   if (sorted.length === 0) {
-    return <EmptyState message="هنوز سندی ثبت نشده است" hint="سندها پس از ثبت تراکنش اینجا نمایش داده می‌شوند." />;
+    return <EmptyState message="هنوز تراکنشی ثبت نشده است" hint="تراکنش‌ها پس از ثبت اینجا نمایش داده می‌شوند." />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted">{toFaDigits(sorted.length)} سند · جدیدترین در بالا</p>
+        <p className="text-sm text-muted">{toFaDigits(sorted.length)} تراکنش · جدیدترین در بالا</p>
         <Badge tone="neutral" icon={<Lock />}>
-          فقط‌افزودنی
+          غیرقابل ویرایش
         </Badge>
       </div>
 
@@ -192,19 +201,19 @@ export function JournalPanel() {
         {sorted.slice(0, limit).map((e) => {
           const total = e.lines.reduce((s, l) => s + l.debit, 0);
           return (
-            <article key={e.id} className="p-4 md:px-5" aria-label={`سند ${e.id}`}>
+            <article key={e.id} className="p-4 md:px-5" aria-label={`تراکنش ${e.memo}`}>
               <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="num-ltr text-xs font-semibold text-subtle">#{e.id}</span>
-                    <Badge tone={e.source === 'reversal' ? 'loss' : 'neutral'}>{SOURCE_FA[e.source] ?? e.source}</Badge>
+                    <Badge tone={e.source === 'reversal' ? 'loss' : e.derivedFrom ? 'info' : 'neutral'}>{SOURCE_FA[e.source] ?? e.source}</Badge>
+                    {e.derivedFrom && <Badge tone="neutral">خودکار از عملیات</Badge>}
                   </div>
                   {/* memo is user data — wraps, never truncated */}
                   <p className="mt-1 text-sm font-semibold leading-6 text-ink">{e.memo}</p>
                   <p className="text-xs text-muted">{formatDualDate(e.date)}</p>
                 </div>
                 <div className="shrink-0 text-end">
-                  <p className="text-xs text-muted">مبلغ سند</p>
+                  <p className="text-xs text-muted">مبلغ</p>
                   <p className="text-base font-bold text-ink">
                     <MoneyValue value={total} />
                   </p>
@@ -212,29 +221,33 @@ export function JournalPanel() {
               </div>
 
               <table className="mt-3 w-full text-sm">
-                <caption className="sr-only">طرف‌های سند {e.id}</caption>
+                <caption className="sr-only">اثر تراکنش روی حساب‌ها</caption>
                 <thead>
                   <tr className="text-xs text-subtle">
                     <th scope="col" className="pb-1 text-start font-semibold">حساب</th>
-                    <th scope="col" className="w-28 pb-1 text-right font-semibold">بدهکار</th>
-                    <th scope="col" className="w-28 pb-1 text-right font-semibold">بستانکار</th>
+                    <th scope="col" className="w-32 pb-1 text-end font-semibold">تغییر</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-divider border-t border-divider">
                   {e.lines.map((l, i) => (
                     <tr key={i}>
                       <td className="py-1.5 pe-2 text-muted">{accountNameFa(l.account, accounts)}</td>
-                      <td className="py-1.5 text-right">{l.debit > 0 ? <MoneyValue value={l.debit} /> : <span className="text-subtle">—</span>}</td>
-                      <td className="py-1.5 text-right">{l.credit > 0 ? <MoneyValue value={l.credit} /> : <span className="text-subtle">—</span>}</td>
+                      <td className="py-1.5 text-end">
+                        <MoneyValue value={lineEffect(l, accounts)} signed />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              {e.source !== 'reversal' && (
+              {e.derivedFrom ? (
+                <p className="mt-3 text-end text-xs text-muted">
+                  این تراکنش از روی عملیات ساخته شده است؛ برای اصلاح، همان عملیات را در «دارایی شبکه‌ای» ویرایش یا باطل کنید.
+                </p>
+              ) : e.source !== 'reversal' && (
                 <div className="mt-3 flex justify-end">
                   <Button variant="destructive" size="sm" icon={<Undo2 />} onClick={() => setPending(e)}>
-                    ثبت معکوس
+                    لغو تراکنش
                   </Button>
                 </div>
               )}
@@ -245,7 +258,7 @@ export function JournalPanel() {
 
       {sorted.length > limit && (
         <Button variant="ghost" size="sm" className="w-full text-accent" onClick={() => setLimit((l) => l + 40)}>
-          نمایش سندهای قدیمی‌تر ({toFaDigits(sorted.length - limit)})
+          نمایش تراکنش‌های قدیمی‌تر ({toFaDigits(sorted.length - limit)})
         </Button>
       )}
 
@@ -253,8 +266,8 @@ export function JournalPanel() {
       <Dialog
         open={pending !== null}
         onClose={() => setPending(null)}
-        title="ثبت سند معکوس؟"
-        description={pending ? `سند #${pending.id} — ${pending.memo}` : undefined}
+        title="لغو این تراکنش؟"
+        description={pending ? pending.memo : undefined}
         footer={
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setPending(null)}>
@@ -276,14 +289,14 @@ export function JournalPanel() {
                 }
               }}
             >
-              ثبت معکوس
+              لغو تراکنش
             </Button>
           </div>
         }
       >
         <p className="text-sm leading-6 text-muted">
-          یک سند جدید با طرف‌های قرینه ثبت می‌شود و اثر سند اصلی را خنثی می‌کند. سند اصلی و سند معکوس هر دو در دفتر و
-          ممیزی باقی می‌مانند.
+          یک تراکنش برعکس ثبت می‌شود و اثر تراکنش اصلی را خنثی می‌کند. هر دو در تاریخچه
+          باقی می‌مانند.
         </p>
       </Dialog>
     </div>

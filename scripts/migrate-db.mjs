@@ -45,7 +45,7 @@ const statements = splitSqlStatements(schema);
 let ok = 0;
 for (const st of statements) {
   try {
-    await sql.unsafe(st);
+    await sql.query(st); // query() اجرا می‌کند؛ unsafe() فقط قطعهٔ SQL می‌سازد و هرگز اجرا نمی‌شد
     ok++;
     console.log('✓', st.split('\n')[0].slice(0, 70));
   } catch (e) {

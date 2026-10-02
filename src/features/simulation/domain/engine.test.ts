@@ -32,16 +32,16 @@ describe('renderRow (الگوی الزامی امن)', () => {
   it('قیمت null → همه ستون‌ها N/A بدون حذف ردیف', () => {
     const r = renderRow('SOLSTICE', 0.52, null, 32_516.6, 18_300);
     expect(r.asset).toBe('SOLSTICE');
-    expect(r.currentPrice).toBe('N/A');
-    expect(r.value).toBe('N/A');
-    expect(r.profitLoss).toBe('N/A');
-    expect(r.vsEth).toBe('N/A');
+    expect(r.currentPrice).toBe('—');
+    expect(r.value).toBe('—');
+    expect(r.profitLoss).toBe('—');
+    expect(r.vsEth).toBe('—');
   });
 
   it('قیمت معتبر → محاسبه با فرمت $ لاتین', () => {
     const r = renderRow('ETH', 3335, 1875, 32_516.6, 18_300);
-    expect(r.value).toMatch(/^\$[\d,]+\.\d{2}$/);
-    expect(r.currentPrice).toBe('$1,875.00');
+    expect(r.value).toMatch(/^[۰-۹,]+\.[۰-۹]{2} دلار$/);
+    expect(r.currentPrice).toBe('۱,۸۷۵.۰۰ دلار');
   });
 });
 
@@ -90,14 +90,14 @@ describe('engine (پوشش کامل)', () => {
 
 describe('formatters (سیاست نمایش مالی)', () => {
   it('قیمت‌ها لاتین با $', () => {
-    expect(fmtUSD(36_900)).toBe('$36,900.00');
+    expect(fmtUSD(36_900)).toBe('۳۶,۹۰۰.۰۰ دلار');
   });
   it('درصد لاتین با علامت', () => {
-    expect(fmtPct(2.41)).toBe('+2.41%');
-    expect(fmtPct(-1.2)).toBe('-1.20%');
+    expect(fmtPct(2.41)).toBe('+۲.۴۱٪');
+    expect(fmtPct(-1.2)).toBe('-۱.۲۰٪');
   });
   it('تومان با ارقام فارسی', () => {
-    expect(fmtToman(36_900, 148_000)).toBe('≈ ۵٫۴۶ میلیارد تومان');
+    expect(fmtToman(36_900, 148_000)).toBe('≈ ۵.۴۶ میلیارد تومان');
     expect(fmtNum(1234.5)).toContain('۱');
   });
 });

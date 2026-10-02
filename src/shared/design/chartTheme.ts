@@ -7,6 +7,7 @@
  *  • Gain/loss colours only for signed data; categorical series use chart-1…6.
  */
 import { Chart as ChartJS, type ChartOptions } from 'chart.js';
+import { fmtCompactFa, toFaDigits } from '@/shared/utils/formatters';
 
 export type ChartToken =
   | 'chart-1' | 'chart-2' | 'chart-3' | 'chart-4' | 'chart-5' | 'chart-6'
@@ -29,7 +30,7 @@ let defaultsApplied = false;
 export function applyChartDefaults(): void {
   if (defaultsApplied) return;
   defaultsApplied = true;
-  ChartJS.defaults.font.family = "'Vazirmatn', system-ui, sans-serif";
+  ChartJS.defaults.font.family = "'Vazirmatn FD', 'Vazirmatn', system-ui, sans-serif";
   ChartJS.defaults.font.size = 11;
   ChartJS.defaults.animation = { duration: 250 };
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -97,8 +98,6 @@ export function baseChartOptions(opts: {
 export function axisUsd(v: number): string {
   const a = Math.abs(v);
   const s = v < 0 ? '-' : '';
-  if (a >= 1e9) return `${s}$${(a / 1e9).toFixed(1)}B`;
-  if (a >= 1e6) return `${s}$${(a / 1e6).toFixed(1)}M`;
-  if (a >= 1e3) return `${s}$${(a / 1e3).toFixed(1)}K`;
-  return `${s}$${a.toFixed(a < 10 ? 2 : 0)}`;
+  // محور: عدد فارسی فشرده بدون «$» (واحد «دلار» در عنوان/راهنمای نمودار)
+  return a >= 1e3 ? `${s}${fmtCompactFa(a)}` : `${s}${toFaDigits(a.toFixed(a < 10 ? 2 : 0))}`;
 }
