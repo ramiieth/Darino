@@ -1,3 +1,4 @@
+import { visiblePositions } from '../domain/visibility';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, Send, RefreshCw } from 'lucide-react';
@@ -30,7 +31,7 @@ export default function AssistantPage() {
     setBusy(true);setError(null);
     const sources = [...p.wallets.map(s => ({provider:'zerion' as const,fetchedAt:s.state?.data?.fetchedAt ?? 0,stale:s.stale,value:s.value})),...p.arcus.filter(s => s.holding.arcus!.env==='mainnet').map(s => ({provider:'arcus' as const,fetchedAt:s.state?.account.fetchedAt ?? 0,stale:s.stale,value:s.value}))];
     // Send only analysis fields: no addresses, account labels, transaction hashes, API keys, or manual scenarios.
-    const positions = p.wallets.flatMap(s => (s.state?.data?.positions ?? []).map(x => ({symbol:x.symbol.slice(0,40),name:tokenName(x.symbol,x.name).slice(0,120),chain:chainIdentity(x.chain,s.state?.data?.chains).name.slice(0,80),protocol:x.protocol?.slice(0,120) ?? null,value:x.value,type:x.type.slice(0,40),quantity:x.quantity?.slice(0,120) ?? null,price:x.price})));
+    const positions = p.wallets.flatMap(s => visiblePositions(s.state?.data?.positions ?? []).map(x => ({symbol:x.symbol.slice(0,40),name:tokenName(x.symbol,x.name).slice(0,120),chain:chainIdentity(x.chain,s.state?.data?.chains).name.slice(0,80),protocol:x.protocol?.slice(0,120) ?? null,value:x.value,type:x.type.slice(0,40),quantity:x.quantity?.slice(0,120) ?? null,price:x.price})));
     const arcus = p.arcus.filter(s => s.holding.arcus!.env==='mainnet').map(s => ({equity:s.value,freeCollateral:s.state?.account.data?.freeCollateral ?? null,positions:(s.state?.positions.data ?? []).map(x => ({symbol:x.marketDisplayName,side:x.side,leverage:x.leverage,unrealizedPnl:x.unrealizedPnl,marginUsed:x.marginUsed,borrowedCapital:x.borrowedCapital,notional:x.positionValueNotional,size:x.size,entryPrice:x.averageEntryPrice,markPrice:x.markPx,marginMode:x.marginMode}))}));
     if(positions.length>300 || sources.length>50 || arcus.length>20 || arcus.some(a => a.positions.length>100)) {setError('پرتفولیو برای یک درخواست تحلیل بزرگ است؛ تعداد منابع را کاهش دهید. هیچ داده‌ای ارسال نشد.');setBusy(false);return;}
     try {

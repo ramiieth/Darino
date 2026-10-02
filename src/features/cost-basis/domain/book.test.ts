@@ -21,3 +21,10 @@ it('cannot finance a sale using lots acquired after its transaction date',()=>{
  const r=replayCost({...book,lots:book.lots.map(l=>({...l,at:3000}))},[tx]);
  expect(r.realized).toBe('0');expect(r.processed).toEqual([]);expect(r.issues[0].reason).toContain('کامل نیست');
 });
+
+it('displaying fewer dust units does not falsely report excess FIFO inventory',()=>{
+ const v=valueCost(book.lots,'2.99',3000,'3');expect(v.excess).toBe('0');expect(v.pnl).toBe(4990);
+});
+it('provider-marked spam cannot realize a sale or consume genuine purchase lots',()=>{
+ const r=replayCost(book,[{...tx,spam:true}]);expect(r.realized).toBe('0');expect(r.lots).toEqual(book.lots);
+});
