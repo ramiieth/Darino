@@ -35,7 +35,7 @@ export function CalculatorsPage() {
     <Page>
       <PageHeader
         title="ماشین‌حساب سرمایه‌گذاری"
-        subtitle="محاسبه دقیق با موتور مالی دقیق — نتایج صرفاً محاسباتی‌اند و پیش‌بینی آینده نیستند."
+        subtitle="محاسبهٔ سود، رشد و بازده سرمایه‌گذاری"
       />
       <div className="space-y-6">
         <div>

@@ -92,7 +92,7 @@ describe('PropertyMarketPage', () => {
   it('جدول مناطق: بدون «کل اهواز» و «میانه»، محله‌های کیانپارس یکی، اعداد فارسی', async () => {
     usePropertyMarketStore.setState({ listings: MANY });
     render(<PropertyMarketPage />);
-    const table = await screen.findByRole('table');
+    const tables = await screen.findAllByRole('table');
     // کیانپارس شرقی/غربی/نامشخص → یک منطقه
     expect(screen.getAllByText('کیانپارس').length).toBe(1);
     expect(screen.queryByText(/کیانپارس شرقی/)).toBeNull();
@@ -105,7 +105,7 @@ describe('PropertyMarketPage', () => {
     expect(screen.getByText('۱۵۵ میلیون')).toBeTruthy();
     expect(screen.getByText(/۶۲۰ دلار/)).toBeTruthy();
     // هیچ رقم لاتین در جدول
-    expect(table.textContent).not.toMatch(/[0-9$]/);
+    expect(tables.map(t => t.textContent).join('')).not.toMatch(/[0-9$]/);
     // هیچ منطقه‌ای پنهان نمی‌شود — حتی با ۱ آگهی (کم‌رنگ)
     expect(screen.getAllByText('زرگان').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /نمایش همه/ })).toBeNull();
@@ -115,7 +115,7 @@ describe('PropertyMarketPage', () => {
     const withTypes = MANY.map((l, i) => ({ ...l, yearBuilt: i === 2 ? null : i === 1 ? 1380 : 1405 - (i % 4) }));
     usePropertyMarketStore.setState({ listings: withTypes });
     render(<PropertyMarketPage />);
-    await screen.findByRole('table');
+    await screen.findAllByRole('table');
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
       'منطقه', '۱۴۰۵نوساز', '۱۴۰۴۱ سال', '۱۴۰۳۲ سال', '۱۴۰۲۳ سال', '۱۴۰۱۴ سال', '۱۴۰۰۵ سال', '۱۳۹۹۶ سال', '۱۳۹۸۷ سال',
       '۱۳۹۷ و قبل‌تر۸ سال به بالا'

@@ -15,7 +15,6 @@ import { KeyValueList } from '@/shared/components/ui/FinancialValue';
 import { useSettingsStore, effectiveApiKeys } from '@/shared/store/settingsStore';
 import { useMarketStore } from '@/shared/store/marketStore';
 import { useUsdRate } from '@/shared/store/usdtStore';
-import { ScenarioCashCard } from './ScenarioCashCard';
 import { UsdtRateField } from '@/shared/components/ui/UsdtRateField';
 import { useWatchlistStore } from '@/shared/store/watchlistStore';
 import { useAvBudgetStore } from '@/shared/store/avBudgetStore';
@@ -123,7 +122,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         <section className="space-y-3" aria-labelledby="fx-title">
           <div>
             <h3 id="fx-title" className="text-sm font-bold text-ink">نرخ دلار (تتر زنده)</h3>
-            <p className="text-xs text-muted">ارزش‌گذاری دلار در کل اپ با نرخ لحظه‌ای تتر از والکس یا بیت‌پین — هر دقیقه به‌روز می‌شود.</p>
+            <p className="text-xs text-muted">نرخ زندهٔ تتر</p>
           </div>
           <UsdtRateField effective={usdRate} />
         </section>
@@ -139,15 +138,12 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </section>
 
-        {/* سرمایهٔ نقد سناریوها: خودکار از حسابداری یا دستی (همگام بین دستگاه‌ها) */}
-        <ScenarioCashCard compact />
-
-        {/* base capital */}
+        {/* سرمایهٔ دستی هر بازه */}
         <section className="space-y-3" aria-labelledby="base-title">
           <div>
             <h3 id="base-title" className="text-sm font-bold text-ink">{t('scenarioBaseTitle')}</h3>
             <p className="text-xs text-muted">
-              ملاک شبیه‌سازی‌ها «سرمایهٔ نقد سناریوها» در بالاست؛ این مقادیر فقط جایگزین هنگام نبود داده هستند.
+              سرمایهٔ هر بازه دستی و مستقل از موجودی واقعی است.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -200,7 +196,7 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         <section className="flex items-center justify-between gap-3 rounded-field border border-divider p-3" aria-label={t('settingsCacheTitle')}>
           <div>
             <p className="text-sm font-semibold text-ink">{t('settingsCacheTitle')}</p>
-            <p className="text-xs text-muted">{storage.persistent ? 'IndexedDB / LocalStorage' : 'حافظه موقت (پیش‌نمایش)'}</p>
+            <p className="text-xs text-muted">{storage.persistent ? 'ذخیره‌شده روی این دستگاه' : 'حافظه موقت (پیش‌نمایش)'}</p>
           </div>
           <Button
             variant="destructive"

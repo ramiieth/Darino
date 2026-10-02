@@ -41,7 +41,7 @@ export default function HoldingsPage() {
     <Page>
       <PageHeader
         title="دارایی‌های چندشبکه‌ای"
-        subtitle="موجودی به تفکیک شبکه، توکن و محل نگهداری؛ ثبت دستی سواپ، بریج، انتقال و سپرده — فقط ثبت و تحلیل، بدون اجرای تراکنش"
+        subtitle="ثبت دستی دارایی‌ها و عملیات؛ مستقل از پرتفولیوی متصل"
         meta={
           authed ? (
             <Badge tone={sync.state === 'ok' ? 'gain' : sync.state === 'syncing' ? 'info' : sync.state === 'offline' ? 'warn' : 'neutral'}>

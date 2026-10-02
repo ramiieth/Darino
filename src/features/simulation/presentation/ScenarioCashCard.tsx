@@ -1,84 +1,27 @@
-/**
- * سرمایهٔ نقد سناریو — خودکار (از موجودی نقد حسابداری) یا دستی
- * با هر تغییر، همهٔ سناریوها (شبیه‌سازی، «اگر سرمایه‌گذاری کرده بودم»…) فوراً بازمحاسبه می‌شوند.
- */
 import { useEffect, useState } from 'react';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
-import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { toast } from '@/shared/store/toastStore';
 import { normalizeNumericInput } from '@/features/custody/domain/decimal';
-import { saveScenarioCash, useInvestableCash } from '@/shared/hooks/useInvestableCash';
-
+import { useSettingsStore } from '@/shared/store/settingsStore';
 export function ScenarioCashCard({ compact = false }: { compact?: boolean }) {
-  const inv = useInvestableCash();
-  const [mode, setMode] = useState<'auto' | 'manual'>(inv.mode);
-  const [manual, setManual] = useState(inv.manualUsd !== null ? String(inv.manualUsd) : '');
+  const { scenario, hydrate, hydrated, saveScenario } = useSettingsStore();
+  const [values, setValues] = useState([String(scenario.baseCapital2025), String(scenario.baseCapital2026)]);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setMode(inv.mode);
-    setManual(inv.manualUsd !== null ? String(inv.manualUsd) : '');
-  }, [inv.mode, inv.manualUsd]);
-
-  const parsed = Number(normalizeNumericInput(manual));
-  const manualValid = manual.trim() !== '' && Number.isFinite(parsed) && parsed > 0;
-
-  async function save(nextMode: 'auto' | 'manual') {
-    if (nextMode === 'manual' && !manualValid) return toast('error', 'مبلغ معتبر وارد کنید');
+  useEffect(() => { void hydrate(); }, [hydrate]);
+  useEffect(() => { setValues([String(scenario.baseCapital2025), String(scenario.baseCapital2026)]); }, [scenario.baseCapital2025, scenario.baseCapital2026]);
+  const parsed = values.map(v => Number(normalizeNumericInput(v)));
+  const valid = values.every((v, i) => v.trim() && Number.isFinite(parsed[i]) && parsed[i] > 0);
+  async function save() {
+    if (!valid) return;
     setSaving(true);
-    try {
-      await saveScenarioCash({ mode: nextMode, manualUsd: manualValid ? parsed : inv.manualUsd });
-      toast('success', nextMode === 'auto' ? 'سرمایهٔ سناریو: خودکار از موجودی نقد' : 'سرمایهٔ سناریو به‌روز شد');
-    } finally {
-      setSaving(false);
-    }
+    try { await saveScenario({ ...scenario, baseCapital2025: parsed[0], baseCapital2026: parsed[1] }); toast('success', 'سرمایه‌های دستی ذخیره و سناریوها بازمحاسبه شدند'); }
+    catch { toast('error', 'ذخیرهٔ سرمایه انجام نشد'); } finally { setSaving(false); }
   }
-
-  return (
-    <Surface className={compact ? 'space-y-3 p-4' : 'space-y-4 p-4 md:p-5'}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-ink">سرمایهٔ نقد سناریوها</h3>
-          <p className="text-xs leading-5 text-muted">
-            {inv.mode === 'auto'
-              ? 'خودکار: موجودی نقد حسابداری (تتر و دلارهای دیجیتال) — پس از هر خرید، فروش، سواپ یا برداشت به‌روز می‌شود.'
-              : 'دستی: مبلغی که خودتان تعیین کرده‌اید.'}
-          </p>
-        </div>
-        <p className="text-lg font-bold text-ink">
-          <MoneyValue value={inv.cash} state={inv.loading ? 'loading' : 'ready'} />
-        </p>
-      </div>
-      <SegmentedControl
-        label="نوع سرمایهٔ سناریو"
-        options={[
-          { value: 'auto', label: 'خودکار از حسابداری' },
-          { value: 'manual', label: 'دستی' }
-        ]}
-        value={mode}
-        onChange={(m) => {
-          setMode(m);
-          if (m === 'auto') void save('auto');
-        }}
-        fill
-      />
-      {mode === 'auto' ? (
-        <p className="text-xs text-muted">
-          موجودی نقد فعلی حسابداری: <MoneyValue value={inv.accountingCash} state={inv.accountingCash === null ? 'loading' : 'ready'} />
-        </p>
-      ) : (
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label="مبلغ سرمایهٔ سناریو" className="min-w-[180px] flex-1">
-            <Input dir="ltr" inputMode="decimal" value={manual} onChange={(e) => setManual(e.target.value)} suffix="دلار" />
-          </Field>
-          <Button loading={saving} disabled={!manualValid} onClick={() => save('manual')}>
-            ذخیره و بازمحاسبه
-          </Button>
-        </div>
-      )}
-    </Surface>
-  );
+  return <Surface className={compact ? 'space-y-3 p-4' : 'space-y-4 p-4 md:p-5'}>
+    <div><h3 className="text-sm font-bold text-ink">سرمایهٔ دستی شبیه‌سازی</h3><p className="text-xs leading-6 text-muted">مبلغ مستقل برای هر بازه</p></div>
+    <div className="grid gap-3 sm:grid-cols-2">{['از ۱ ژانویهٔ ۲۰۲۵', 'از ۱ ژوئیهٔ ۲۰۲۶'].map((label, i) => <Field key={label} label={label}><Input dir="ltr" inputMode="decimal" suffix="دلار" value={values[i]} onChange={e => setValues(v => v.map((x,j) => j === i ? e.target.value : x))} /></Field>)}</div>
+    <Button loading={saving} disabled={!valid || !hydrated} onClick={() => void save()}>ذخیره و بازمحاسبه</Button>
+  </Surface>;
 }

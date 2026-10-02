@@ -257,10 +257,11 @@ export function verifyMarginIndependent(
   return Math.abs(expected - marginRequired) < 1e-9;
 }
 
-/** ۵) هیچ Fee بدون Source ساخته نشده — همه خط‌ها یا amount=0 با source=na یا amount>0 با source واقعی */
+/** هزینهٔ صفر می‌تواند از منبع واقعی گزارش شود؛ هزینهٔ مثبت باید منبع واقعی داشته باشد. */
 export function verifyFeeSources(b: MarketAuditBreakdown): boolean {
   return b.feeLines.every((l) => {
-    if (l.amount === 0) return l.source === 'na';
+    if (!Number.isFinite(l.amount) || l.amount < 0) return false;
+    if (l.amount === 0 && l.source === 'na') return true;
     return l.source === 'api' || l.source === 'market-data' || l.source === 'user-input';
   });
 }

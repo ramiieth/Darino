@@ -8,7 +8,7 @@ import { useMergedCryptoPrices } from '@/shared/hooks/useMergedCryptoPrices';
 import { useStockPrices } from './useStockPrices';
 import { useSettingsStore } from '@/shared/store/settingsStore';
 import { useAssetMeta } from '@/shared/hooks/useAssetMeta';
-import { useInvestableCash, investableCashOr } from '@/shared/hooks/useInvestableCash';
+
 
 export function useTimeline(timeline: 1 | 2) {
   const crypto = useMergedCryptoPrices();
@@ -24,11 +24,6 @@ export function useTimeline(timeline: 1 | 2) {
   const assetMeta = useAssetMeta();
   const scenario = useSettingsStore((s) => s.scenario);
   const hydrated = useSettingsStore((s) => s.hydrated);
-  // سرمایه پایه = موجودی نقد واقعی حسابداری (Single Source of Truth)
-  // پس از هر برداشت/فروش برای مخارج، همین مقدار به‌روز می‌شود.
-  const investable = useInvestableCash();
-  const base = investableCashOr(investable.cash);
-
   const result = useMemo(() => {
     return buildTimeline({
       timeline,
@@ -38,13 +33,13 @@ export function useTimeline(timeline: 1 | 2) {
         Object.keys(assetMeta.tokenizedPrices).length > 0 ? assetMeta.tokenizedPrices : null,
       ethLivePrice: crypto.prices.ethereum ?? null,
       overrides: {
-        baseCapital2025: base,
-        baseCapital2026: base,
+        baseCapital2025: scenario.baseCapital2025,
+        baseCapital2026: scenario.baseCapital2026,
         ethRefJuly2026: hydrated ? scenario.ethRefJuly2026 : undefined
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeline, crypto.prices, stockLive, assetMeta.tokenizedPrices, scenario, hydrated, base]);
+  }, [timeline, crypto.prices, stockLive, assetMeta.tokenizedPrices, scenario, hydrated]);
 
   return {
     ...result,

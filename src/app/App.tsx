@@ -12,15 +12,14 @@ const SimulationPage = lazy(() => import('@/features/simulation/presentation/Sim
 const DeFiPage = lazy(() => import('@/features/defi/presentation/DeFiPage').then((m) => ({ default: m.DeFiPage })));
 const VehiclePage = lazy(() => import('@/features/vehicle/presentation/VehiclePage').then((m) => ({ default: m.VehiclePage })));
 const PropertyMarketPage = lazy(() => import('@/features/propertyMarket/presentation/PropertyMarketPage').then((m) => ({ default: m.PropertyMarketPage })));
-const PendlePage = lazy(() => import('@/features/pendle/presentation/PendlePage').then((m) => ({ default: m.PendlePage })));
-const PendleMarketDetailPage = lazy(() => import('@/features/pendle/presentation/PendleMarketDetailPage').then((m) => ({ default: m.PendleMarketDetailPage })));
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
 const AccountingPage = lazy(() => import('@/features/accounting/presentation/AccountingPage'));
 const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
 const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
+const ConnectedPage = lazy(() => import('@/features/connected/presentation/ConnectedPage'));
+const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
 const SecurityPage = lazy(() => import('@/features/auth/SecurityPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
-const LoopPage = lazy(() => import('@/features/defi-loop/presentation/LoopAnalysisPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
@@ -72,22 +71,6 @@ export function App() {
             element={
               <Lazy>
                 <DeFiPage />
-              </Lazy>
-            }
-          />
-          <Route
-            path="/pendle"
-            element={
-              <Lazy>
-                <PendlePage />
-              </Lazy>
-            }
-          />
-          <Route
-            path="/pendle/:chainId/:address"
-            element={
-              <Lazy>
-                <PendleMarketDetailPage />
               </Lazy>
             }
           />
@@ -164,14 +147,6 @@ export function App() {
             }
           />
           <Route
-            path="/defi-loop"
-            element={
-              <Lazy label="حلقهٔ بازده">
-                <LoopPage />
-              </Lazy>
-            }
-          />
-          <Route
             path="/design-system"
             element={
               <Lazy label="سیستم طراحی">
@@ -179,6 +154,8 @@ export function App() {
               </Lazy>
             }
           />
+          <Route path="/wallets" element={<Private label="کیف پول‌های متصل"><ConnectedPage /></Private>} />
+          <Route path="/assistant" element={<Private label="دستیار پرتفولیو"><AssistantPage /></Private>} />
           <Route path="*" element={<MarketsHomePage />} />
         </Routes>
       </AppShell>

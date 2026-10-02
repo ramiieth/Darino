@@ -189,11 +189,11 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="min-w-0 lg:col-span-5">
           <SimContextChips result={result} />
           <ScenarioCashCard />
         </div>
-        <div className="lg:col-span-7">
+        <div className="min-w-0 lg:col-span-7">
           <CategoryReturnChart result={result} />
         </div>
       </div>

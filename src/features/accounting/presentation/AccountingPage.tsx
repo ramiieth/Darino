@@ -74,7 +74,7 @@ function AccountingScreen() {
     <Page>
       <PageHeader
         title="حسابداری"
-        subtitle="موجودی، خرید و فروش، سود و زیان و تاریخچهٔ تراکنش‌ها — تاریخ شمسی و میلادی"
+        subtitle="دفتر ثبت دستی و سوابق قبلی"
       />
 
       {/* overview — what is on the books right now */}

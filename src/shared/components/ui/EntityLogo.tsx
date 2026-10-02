@@ -1,7 +1,7 @@
 /**
  * EntityLogo — لوگوی یکپارچهٔ شبکه، توکن و پلتفرم
  *
- *  • منبع تصویر فقط: مسیر محلی اپ (public/logos/*.png) یا آیکون شبکه‌های دیفای‌لاما
+ *  • منبع تصویر فقط: مسیر محلی اپ (public/logos/*.png) یا آیکون‌های میزبان‌های معتبر زریون و دیفای‌لاما
  *    (https://icons.llama.fi/<نام>.jpg — همان منبعی که بخش دیفای اپ استفاده می‌کند).
  *    URL دلخواه کاربر هرگز بارگذاری نمی‌شود و SVG inline نمی‌شود.
  *  • پس‌زمینهٔ لوگو همیشه سفید است تا لوگوهای شفاف (مثل آرک) در حالت تیره هم دیده شوند.
@@ -14,10 +14,11 @@ import { useState } from 'react';
 import { cn } from '@/shared/lib/cn';
 
 const SAFE_LOCAL = /^\/logos\/[a-z0-9-]+\.png$/;
+const SAFE_ZERION = /^https:\/\/(?:token-icons\.s3\.amazonaws\.com|chain-icons\.s3\.amazonaws\.com|protocol-icons\.s3\.amazonaws\.com|cdn\.zerion\.io|assets\.zerion\.io)\/[a-zA-Z0-9%._/+-]{1,300}\.(?:png|jpg|jpeg|webp|svg)$/;
 const SAFE_LLAMA = /^https:\/\/icons\.llama\.fi\/[a-z0-9%._-]{1,80}\.jpg$/;
 
 export function safeLogoSrc(src: string | null | undefined): string | null {
-  return src && (SAFE_LOCAL.test(src) || SAFE_LLAMA.test(src)) && !src.includes('..') ? src : null;
+  return src && (SAFE_LOCAL.test(src) || SAFE_LLAMA.test(src) || SAFE_ZERION.test(src)) && !src.includes('..') ? src : null;
 }
 
 function Letters({ text, size, square }: { text: string; size: number; square?: boolean }) {

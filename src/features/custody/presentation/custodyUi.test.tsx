@@ -96,7 +96,7 @@ describe('حالت خالی — بدون داده یا موجودی ساختگی
     fireEvent.click((await screen.findAllByRole('button', { name: /افزودن زیرحساب/ }))[0]);
     const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
     expect(inputs.every((i) => i.type === 'checkbox' || i.value === '')).toBe(true);
-    expect(document.body.textContent).toContain('کلید خصوصی یا عبارت بازیابی نمی‌خواهد');
+    expect(document.body.textContent).toContain('بدون کلید خصوصی');
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });

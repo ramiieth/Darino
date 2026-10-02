@@ -47,7 +47,7 @@ export default function BorosDashboard() {
   const header = (
     <PageHeader
       title="تحلیل بوروس"
-      subtitle="بازارهای نرخ تأمین مالی و بازدهی — فقط تحلیل و شبیه‌سازی؛ هیچ معامله‌ای انجام نمی‌شود."
+      subtitle="تحلیل و شبیه‌سازی نرخ تأمین مالی"
       meta={
         markets.length > 0 ? (
           <FreshnessBar
@@ -95,7 +95,7 @@ export default function BorosDashboard() {
             </Button>
           }
         >
-          ارتباط زنده با API بوروس برقرار نیست؛ آخرین داده ذخیره‌شده نمایش داده می‌شود و تلاش مجدد خودکار ادامه دارد.
+          آخرین دادهٔ ذخیره‌شده نمایش داده می‌شود؛ اتصال در حال بررسی است.
         </Notice>
       )}
 

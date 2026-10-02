@@ -109,7 +109,7 @@ export function AuditTab({ markets }: { markets: BorosMarket[] }) {
       <Section
         id="engine-audit"
         title="بررسی محاسبات موتور"
-        description="سود/زیان تفکیکی بدون دوبار‌شماری، هزینه‌های خط‌به‌خط با منبع، مارجین مستقل و چهار معیار بازده"
+        description="سود و زیان، مارجین و هزینه‌ها"
       >
         <Surface>
           <ul className="divide-y divide-divider">
