@@ -4,8 +4,7 @@
  * ⚠️ این فایل هرگز از کد Client (src/) import نمی‌شود.
  * بنابراین DATABASE_URL هرگز وارد Client Bundle نمی‌شود.
  *
- * کاربر: تک‌کاربره با userId = 'local-user' (از هدر x-user-id یا پیش‌فرض).
- * برای Auth آینده: فقط کافی است userId واقعی جایگزین شود.
+ * کاربر: تک‌کاربره؛ userId از نشست معتبر Passkey تعیین می‌شود (api/_authCore.ts).
  * ============================================================ */
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
@@ -30,12 +29,7 @@ export function db(): NeonQueryFunction<false, false> {
   return sql;
 }
 
-/** userId مؤثر از هدر درخواست (پیش‌فرض تک‌کاربره) */
-export function userIdOf(req: { headers?: Record<string, string | string[] | undefined> }): string {
-  const h = req.headers?.['x-user-id'];
-  const v = Array.isArray(h) ? h[0] : h;
-  return typeof v === 'string' && v.trim() ? v.trim() : 'local-user';
-}
+/* userId دیگر از هدر خوانده نمی‌شود — فقط از نشست Passkey (requireSession در _authCore.ts) */
 
 /** پاسخ JSON یکسان برای همه endpointها */
 export function json(res: { statusCode?: number; setHeader(k: string, v: string): void; end(b: string): void }, status: number, body: unknown): void {

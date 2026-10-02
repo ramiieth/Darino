@@ -23,8 +23,11 @@ export default {
         standalone: { raw: '(display-mode: standalone)' }
       },
       fontFamily: {
-        sans: ['Vazirmatn', 'system-ui', '-apple-system', 'Segoe UI', 'Tahoma', 'sans-serif'],
-        mono: ['Vazirmatn', 'ui-monospace', 'SFMono-Regular', 'monospace']
+        // «Vazirmatn FD»: همهٔ ارقام فارسی رسم می‌شوند (حتی اگر متن رقم لاتین داشته باشد)
+        sans: ['Vazirmatn FD', 'Vazirmatn', 'system-ui', '-apple-system', 'Segoe UI', 'Tahoma', 'sans-serif'],
+        mono: ['Vazirmatn FD', 'Vazirmatn', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        // فقط برای شناسه‌های فنی لاتین (آدرس کیف پول، هش تراکنش) که باید دقیق خوانده شوند
+        latin: ['Vazirmatn', 'ui-monospace', 'SFMono-Regular', 'monospace']
       },
       colors: {
         /* ---- Brand (reference) ---- */

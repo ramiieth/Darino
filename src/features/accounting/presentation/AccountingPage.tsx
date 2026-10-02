@@ -7,7 +7,7 @@
  * Deep links: /accounting?tab=trade|deposit|expense|cash|journal|ledger|pnl|audit
  */
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, ScrollText, ShieldCheck, TrendingUp, PlusCircle } from 'lucide-react';
+import { BookOpen, ScrollText, ShieldCheck, TrendingUp, PlusCircle, RefreshCw } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Tabs, SegmentedControl } from '@/shared/components/ui/SegmentedControl';
@@ -24,16 +24,18 @@ import { AssetDepositPanel } from './AssetDepositPanel';
 import { LedgerPanel } from './LedgerPanel';
 import { PnlPanel } from './PnlPanel';
 import { AuditPanel } from './AuditPanel';
+import { ReconcilePanel } from './ReconcilePanel';
 
-type Section = 'record' | 'journal' | 'ledger' | 'pnl' | 'audit';
+type Section = 'record' | 'journal' | 'ledger' | 'pnl' | 'audit' | 'reconcile';
 type RecordKind = 'trade' | 'deposit' | 'expense' | 'cash';
 
 const SECTIONS = [
   { value: 'record' as const, label: 'ثبت تراکنش', icon: <PlusCircle /> },
-  { value: 'journal' as const, label: 'دفتر روزنامه', icon: <ScrollText /> },
-  { value: 'ledger' as const, label: 'دفتر کل', icon: <BookOpen /> },
+  { value: 'journal' as const, label: 'تاریخچهٔ تراکنش‌ها', icon: <ScrollText /> },
+  { value: 'ledger' as const, label: 'خلاصهٔ حساب‌ها', icon: <BookOpen /> },
   { value: 'pnl' as const, label: 'سود و زیان', icon: <TrendingUp /> },
-  { value: 'audit' as const, label: 'ممیزی', icon: <ShieldCheck /> }
+  { value: 'audit' as const, label: 'سابقهٔ تغییرات', icon: <ShieldCheck /> },
+  { value: 'reconcile' as const, label: 'همگام‌سازی و بررسی', icon: <RefreshCw /> }
 ];
 
 // short labels keep the four kinds on one line at 320px
@@ -41,7 +43,7 @@ const KINDS = [
   { value: 'trade' as const, label: 'خرید/فروش' },
   { value: 'deposit' as const, label: 'واریز دارایی' },
   { value: 'expense' as const, label: 'برداشت نقد' },
-  { value: 'cash' as const, label: 'سند دستی' }
+  { value: 'cash' as const, label: 'ثبت دستی' }
 ];
 
 const RECORD_KINDS: RecordKind[] = ['trade', 'deposit', 'expense', 'cash'];
@@ -72,7 +74,7 @@ function AccountingScreen() {
     <Page>
       <PageHeader
         title="حسابداری"
-        subtitle="دفتر دوطرفه، بهای تمام‌شده FIFO و تاریخچه غیرقابل تغییر — تاریخ شمسی و میلادی"
+        subtitle="موجودی، خرید و فروش، سود و زیان و تاریخچهٔ تراکنش‌ها — تاریخ شمسی و میلادی"
       />
 
       {/* overview — what is on the books right now */}
@@ -92,7 +94,7 @@ function AccountingScreen() {
           />
           <Metric
             size="md"
-            label="سود/زیان تحقق‌یافته"
+            label="سود و زیان فروش‌ها"
             value={<MoneyValue value={o.realizedPnl} signed tone="auto" state={o.state === 'loading' ? 'loading' : 'ready'} />}
           />
           <Metric
@@ -123,6 +125,7 @@ function AccountingScreen() {
             {section === 'ledger' && <LedgerPanel />}
             {section === 'pnl' && <PnlPanel />}
             {section === 'audit' && <AuditPanel />}
+            {section === 'reconcile' && <ReconcilePanel />}
           </>
         )}
       </div>

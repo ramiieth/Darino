@@ -4,9 +4,11 @@
  *  - fetch با Timeout کوتاه (سقوط سریع به حالت محلی)
  *  - تشخیص در دسترس بودن سرور (health — یک بار در نشست)
  *  - در حالت تست (vitest) کاملاً غیرفعال است → تست‌ها محلی می‌مانند
- *  - هیچ Secret ارسال/دریافت نمی‌شود (فقط userId در هدر)
+ *  - هویت فقط با کوکی نشست HttpOnly (Passkey) — هیچ userId/Secret در هدر نیست
+ *  - هدر x-darino-csrf برای همهٔ درخواست‌ها (سرور درخواست تغییردهنده بدون آن را رد می‌کند)
+ *  - پاسخ 401 → رویداد «darino:unauthenticated» تا رابط صفحهٔ ورود را نشان دهد
  * ============================================================ */
-import { API_BASE, USER_ID, isTestMode } from '@/lib/database/constants';
+import { API_BASE, isTestMode } from '@/lib/database/constants';
 
 /** آیا Remote مجاز است؟ (در تست و آفلاین خیر) */
 export function isRemoteAllowed(): boolean {
@@ -74,10 +76,20 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-/** درخواست JSON به API سرور (با Timeout و هدر userId) */
+/** خطای HTTP با کد وضعیت (برای تشخیص 401/403) */
+export class HttpError extends Error {
+  constructor(public status: number, public code: string | null) {
+    super(`HTTP ${status}`);
+    this.name = 'HttpError';
+  }
+}
+
+export const UNAUTHENTICATED_EVENT = 'darino:unauthenticated';
+
+/** درخواست JSON به API سرور (با Timeout، کوکی نشست و هدر CSRF) */
 export async function fetchJson<T>(
   path: string,
-  opts: { method?: 'GET' | 'POST'; body?: unknown; timeoutMs?: number } = {}
+  opts: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
   const { method = 'GET', body, timeoutMs = 6000 } = opts;
   const controller = new AbortController();
@@ -88,12 +100,23 @@ export async function fetchJson<T>(
       headers: {
         accept: 'application/json',
         'content-type': body ? 'application/json' : undefined,
-        'x-user-id': USER_ID
+        'x-darino-csrf': '1'
       } as Record<string, string>,
       body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal
+      signal: controller.signal,
+      credentials: 'same-origin',
+      cache: 'no-store'
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      let code: string | null = null;
+      try {
+        code = ((await res.json()) as { error?: string }).error ?? null;
+      } catch {
+        /* بدنهٔ غیر JSON */
+      }
+      if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
+      throw new HttpError(res.status, code);
+    }
     return (await res.json()) as T;
   } finally {
     clearTimeout(timer);

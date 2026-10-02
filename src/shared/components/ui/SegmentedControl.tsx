@@ -1,5 +1,6 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
+import { toFaDigits } from '@/shared/utils/formatters';
 
 export interface SegmentOption<T extends string> {
   value: T;
@@ -80,7 +81,7 @@ export function Tabs<T extends string>({
             {opt.icon && <span className={active ? 'text-accent' : 'text-subtle'}>{opt.icon}</span>}
             {opt.label}
             {typeof opt.badge === 'number' && opt.badge > 0 && (
-              <span className="badge bg-surface-2 text-muted">{opt.badge.toLocaleString('fa-IR')}</span>
+              <span className="badge bg-surface-2 text-muted">{toFaDigits(opt.badge.toLocaleString('en-US'))}</span>
             )}
           </button>
         );
@@ -145,7 +146,7 @@ export function SegmentedControl<T extends string>({
             {opt.icon}
             {opt.label}
             {typeof opt.badge === 'number' && opt.badge > 0 && (
-              <span className="badge bg-accent-soft text-accent">{opt.badge.toLocaleString('fa-IR')}</span>
+              <span className="badge bg-accent-soft text-accent">{toFaDigits(opt.badge.toLocaleString('en-US'))}</span>
             )}
           </button>
         );
@@ -210,7 +211,7 @@ export function ChipGroup<T extends string>({
             {opt.icon}
             {opt.label}
             {typeof opt.badge === 'number' && (
-              <span className={cn('tnum text-2xs', active ? 'text-card/70' : 'text-subtle')}>{opt.badge.toLocaleString('fa-IR')}</span>
+              <span className={cn('tnum text-2xs', active ? 'text-card/70' : 'text-subtle')}>{toFaDigits(opt.badge.toLocaleString('en-US'))}</span>
             )}
           </button>
         );

@@ -1,6 +1,6 @@
 /**
  * ProvenanceBadge — where a number comes from (trust & transparency)
- * LIVE · BOROS · CALCULATED · SIMULATED · ESTIMATED · N/A
+ * زنده · بوروس · محاسبه‌شده · شبیه‌سازی · تخمینی · نامشخص
  */
 import { Badge, type Tone } from '@/shared/components/ui/Badge';
 
@@ -16,12 +16,12 @@ const TONE: Record<ProvenanceKind, Tone> = {
 };
 
 const DEFAULT_LABEL: Record<ProvenanceKind, string> = {
-  live: 'LIVE',
-  boros: 'BOROS',
-  calculated: 'CALC',
-  simulated: 'SIM',
-  estimated: 'EST',
-  na: 'N/A'
+  live: 'زنده',
+  boros: 'بوروس',
+  calculated: 'محاسبه‌شده',
+  simulated: 'شبیه‌سازی',
+  estimated: 'تخمینی',
+  na: 'نامشخص'
 };
 
 export function ProvenanceBadge({
@@ -34,7 +34,7 @@ export function ProvenanceBadge({
   className?: string;
 }) {
   return (
-    <Badge tone={TONE[kind]} ltr className={className}>
+    <Badge tone={TONE[kind]} className={className}>
       {label ?? DEFAULT_LABEL[kind]}
     </Badge>
   );

@@ -9,6 +9,7 @@
  *
  * استفاده: "vercel-build": "node scripts/ensure-schema.mjs && npm run build"
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +36,7 @@ function splitSqlStatements(sql) {
 /** بررسی امن بودن schema — فقط DDL امن مجاز است */
 function assertSchemaIsSafe(sql) {
   const upper = sql.toUpperCase();
-  const banned = ['DROP TABLE', 'TRUNCATE', 'DELETE FROM', 'DROP DATABASE'];
+  const banned = ['DROP TABLE', 'DROP COLUMN', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM', 'DROP DATABASE'];
   for (const b of banned) {
     if (upper.includes(b)) {
       throw new Error(`schema حاوی دستور مخرب است: ${b}`);
@@ -53,30 +54,25 @@ if (!url) {
 const sql = neon(url);
 
 try {
-  // بررسی سبک — جداول موجودند؟
-  // ⚠️ نام‌ها Quoted تا دقیقاً جدول camelCase بررسی شود (توضیح در api/_schema.ts)؛
-  // روی دیتابیس قدیمی (lowercase) هم DDL دوباره اجرا و خودترمیم می‌شود.
-  const rows = await sql`SELECT
-    to_regclass('public."accAccounts"') IS NOT NULL AS a,
-    to_regclass('public."accEntries"') IS NOT NULL AS e,
-    to_regclass('public."accLots"') IS NOT NULL AS l,
-    to_regclass('public."accEvents"') IS NOT NULL AS ev,
-    to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
-    to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d,
-    to_regclass('public."pmListings"') IS NOT NULL AS pm1,
-    to_regclass('public."pmSnapshots"') IS NOT NULL AS pm2`;
-  const r = rows[0] ?? {};
-  if (r.a && r.e && r.l && r.ev && r.p && r.d && r.pm1 && r.pm2) {
-    console.log('✅ Schema از قبل آماده است — بدون DDL.');
-    process.exit(0);
-  }
-
+  // اثر انگشت اسکیما (همان الگوریتم api/_schema.ts) — اگر همین نسخه قبلاً اعمال شده، بدون DDL
   const schema = readFileSync(resolve(here, '../db/schema.sql'), 'utf8');
   const statements = splitSqlStatements(schema);
+  const hash = createHash('sha256').update(statements.join(';\n')).digest('hex');
+  const meta = await sql`SELECT to_regclass('public."schemaMeta"') IS NOT NULL AS m`;
+  if (meta[0]?.m) {
+    const cur = await sql`SELECT hash FROM "schemaMeta" WHERE id = 1`;
+    if (cur[0]?.hash === hash) {
+      console.log('✅ Schema از قبل آماده است (نسخهٔ فعلی) — بدون DDL.');
+      process.exit(0);
+    }
+  }
+
   assertSchemaIsSafe(statements.join(' '));
   for (const st of statements) {
-    await sql.unsafe(st);
+    await sql.query(st); // query() اجرا می‌کند؛ unsafe() فقط قطعهٔ SQL می‌سازد و هرگز اجرا نمی‌شد
   }
+  await sql`INSERT INTO "schemaMeta" (id, hash, "appliedAt") VALUES (1, ${hash}, ${Date.now()})
+    ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash, "appliedAt" = EXCLUDED."appliedAt"`;
   console.log(`✅ Schema روی Neon اعمال شد (${statements.length} statement — idempotent).`);
 } catch (e) {
   // soft-fail: Build نباید به‌خاطر خطای موقت DB شکسته شود

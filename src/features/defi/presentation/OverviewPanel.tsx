@@ -54,7 +54,7 @@ export function OverviewPanel() {
   return (
     <div className="space-y-4">
       {error && !data ? (
-        <ErrorState message="ارتباط با CoinGecko برقرار نشد" />
+        <ErrorState message="ارتباط با کوین‌گکو برقرار نشد" />
       ) : (
         <Surface className="p-4 md:p-6">
           <MetricGrid cols={3}>

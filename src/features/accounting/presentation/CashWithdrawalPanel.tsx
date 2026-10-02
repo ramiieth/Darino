@@ -115,7 +115,7 @@ export function CashWithdrawalPanel() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            suffix="$"
+            suffix="دلار"
             
           />
         </Field>
@@ -142,8 +142,8 @@ export function CashWithdrawalPanel() {
           </Surface>
           <p className="flex items-start gap-2 text-xs leading-5 text-muted">
             <Info aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            این عملیات فقط انتقال موجودی نقد است — هیچ دارایی فروخته نمی‌شود و FIFO یا سود/زیان تحقق‌یافته اجرا نمی‌شود. موجودی
-            جدید مبنای عملکرد و شبیه‌سازی‌ها خواهد بود.
+            این عملیات فقط انتقال موجودی نقد است — هیچ دارایی فروخته نمی‌شود و سود یا زیانی ثبت نمی‌شود. موجودی
+            جدید ملاک عملکرد و شبیه‌سازی‌ها خواهد بود.
           </p>
         </div>
       </aside>
@@ -152,7 +152,7 @@ export function CashWithdrawalPanel() {
         open={previewing && validAmount}
         onClose={() => setPreviewing(false)}
         title="تأیید برداشت"
-        description="پس از تأیید، سند انتقال در دفتر کل ثبت می‌شود."
+        description="پس از تأیید، این انتقال در تاریخچهٔ تراکنش‌ها ثبت می‌شود."
         footer={
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setPreviewing(false)}>

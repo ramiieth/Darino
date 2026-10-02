@@ -16,9 +16,9 @@ type CalcTab = 'pnl' | 'dca' | 'cagr' | 'xirr' | 'compare';
 
 const TABS: { value: CalcTab; label: string; description: string }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
-  { value: 'dca', label: 'خرید دوره‌ای (DCA)', description: 'نتیجه سرمایه‌گذاری منظم با مبلغ ثابت در یک بازه' },
-  { value: 'cagr', label: 'رشد سالانه (CAGR)', description: 'نرخ رشد سالانه مرکب بین دو ارزش' },
-  { value: 'xirr', label: 'بازده واقعی (XIRR)', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
+  { value: 'dca', label: 'خرید دوره‌ای', description: 'نتیجه سرمایه‌گذاری منظم با مبلغ ثابت در یک بازه' },
+  { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش' },
+  { value: 'xirr', label: 'بازده واقعی', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
   { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' }
 ];
 
@@ -35,7 +35,7 @@ export function CalculatorsPage() {
     <Page>
       <PageHeader
         title="ماشین‌حساب سرمایه‌گذاری"
-        subtitle="محاسبه دقیق با موتور مالی decimal.js — نتایج صرفاً محاسباتی‌اند و پیش‌بینی آینده نیستند."
+        subtitle="محاسبه دقیق با موتور مالی دقیق — نتایج صرفاً محاسباتی‌اند و پیش‌بینی آینده نیستند."
       />
       <div className="space-y-6">
         <div>

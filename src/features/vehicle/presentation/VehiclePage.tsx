@@ -196,7 +196,7 @@ export function VehiclePage() {
       <Section id="ranking" title="رتبه‌بندی خودروها" description={`${toFaDigits(ranked.length)} خودرو · بر اساس قیمت بازار`}>
         {ranked.length === 0 ? (
           <EmptyState
-            message={snapshots.length < 2 ? 'برای مقایسه بازدهی حداقل دو Snapshot لازم است' : 'در این بازه خودروی قابل مقایسه‌ای نیست'}
+            message={snapshots.length < 2 ? 'برای مقایسه بازدهی حداقل دو اسنپ‌شات لازم است' : 'در این بازه خودروی قابل مقایسه‌ای نیست'}
             action={
               snapshots.length < 2 ? (
                 <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
@@ -367,7 +367,7 @@ function VehicleDetail({
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted">قیمت بازار (آخرین Snapshot)</p>
+        <p className="text-sm text-muted">قیمت بازار (آخرین اسنپ‌شات)</p>
         <p className="mt-1 text-3xl font-extrabold tracking-tight text-ink">{fmtTomanAmount(endRec?.marketPriceToman ?? null)}</p>
         <p className="mt-1 text-sm text-muted">
           بازدهی تومانی <ReturnBadge pct={ret?.tomanPct ?? null} /> · دلاری <ReturnBadge pct={ret?.usdPct ?? null} />
@@ -458,7 +458,7 @@ function VehicleDetail({
                   <tr key={b.asset}>
                     <td className="!ps-4 font-semibold text-ink">{BENCHMARK_FA[b.asset]}</td>
                     <td className="col-num num-ltr text-xs text-muted">
-                      {b.startPriceUsd !== null ? fmtUsdAmount(b.startPriceUsd) : 'N/A'} → {b.endPriceUsd !== null ? fmtUsdAmount(b.endPriceUsd) : 'N/A'}
+                      {b.startPriceUsd !== null ? fmtUsdAmount(b.startPriceUsd) : '—'} → {b.endPriceUsd !== null ? fmtUsdAmount(b.endPriceUsd) : '—'}
                     </td>
                     <td className="col-num"><ReturnBadge pct={b.usdPct} /></td>
                     <td className="col-num !pe-4"><ReturnBadge pct={b.tomanPct} /></td>

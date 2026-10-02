@@ -26,16 +26,16 @@ export const ASSET_CLASS_LABELS: Record<CalculatorAssetClass, string> = {
 
 /** توکن‌های صرافی‌های Perpetual (با شناسه CoinGecko) */
 export const PERP_TOKENS: { symbol: string; nameFa: string; coinId: string }[] = [
-  { symbol: 'HYPE', nameFa: 'هایپرلیکوئید (Hyperliquid)', coinId: 'hyperliquid' },
+  { symbol: 'HYPE', nameFa: 'هایپرلیکوئید', coinId: 'hyperliquid' },
   { symbol: 'GMX', nameFa: 'GMX', coinId: 'gmx' },
   { symbol: 'DYDX', nameFa: 'dYdX', coinId: 'dydx' },
-  { symbol: 'JUP', nameFa: 'جیوپیتر (Jupiter)', coinId: 'jupiter-exchange-solana' },
+  { symbol: 'JUP', nameFa: 'جیوپیتر', coinId: 'jupiter-exchange-solana' },
   { symbol: 'GNS', nameFa: 'گینز نتورک', coinId: 'gains-network' },
   { symbol: 'VRTX', nameFa: 'ورتکس پروتکل', coinId: 'vertex-protocol' },
   { symbol: 'KWENTA', nameFa: 'کوئنتا', coinId: 'kwenta' },
   { symbol: 'PERP', nameFa: 'پرپچوال پروتکل', coinId: 'perpetual-protocol' },
   { symbol: 'SNX', nameFa: 'سینتتیکس', coinId: 'synthetix' },
-  { symbol: 'MUX', nameFa: 'MUX پروتکل', coinId: 'mux-protocol' }
+  { symbol: 'MUX', nameFa: 'ماکس پروتکل', coinId: 'mux-protocol' }
 ];
 
 /** کاتالوگ کامل بر اساس کلاس */

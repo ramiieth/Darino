@@ -191,6 +191,35 @@ class AppDatabase extends Dexie {
       pmListings: 'token, city, scrapedAt',
       pmSnapshots: 'id, dateTs, source'
     });
+    // v11: دارایی چندشبکه‌ای (فقط محلی — به سرور همگام نمی‌شود)
+    //   فقط جدول جدید اضافه می‌شود؛ هیچ جدول/دادهٔ قبلی تغییر یا حذف نمی‌شود.
+    //   بازگشت: حذف این جدول‌ها هیچ اثری روی بقیهٔ اپ ندارد.
+    this.version(11).stores({
+      priceCache: 'key, fetchedAt',
+      assetMeta: 'key, updatedAt',
+      settings: 'key',
+      fxRates: 'id, updatedAt',
+      watchlist: 'symbol, addedAt',
+      accAccounts: 'key',
+      accEntries: '++id, date, createdAt',
+      accLots: '++id, asset, openedAt',
+      accEvents: '++id, at',
+      vehicles: 'id',
+      vehicleSnapshots: 'id, dateTs',
+      realAssets: 'id, neighborhoodId',
+      realEstateSnapshots: 'id, dateTs',
+      tokenizedAssetRegistry: 'key, provider, status, underlyingSymbol, assetType, sourceRank, updatedAt',
+      tokenizedAssetSyncRuns: '++id, provider, sourceCategory, startedAt',
+      portfolioAssets: '++id, assetType, assetId, updatedAt',
+      dashboardSnapshots: '++id, timestamp, createdAt',
+      pmListings: 'token, city, scrapedAt',
+      pmSnapshots: 'id, dateTs, source',
+      custodyHoldings: 'id, kind, updatedAt',
+      custodyOperations: 'id, kind, status, occurredAt, updatedAt',
+      custodyNetworks: 'id',
+      custodyAssets: 'id, networkId',
+      custodyPrefs: 'id'
+    });
   }
 }
 

@@ -23,7 +23,7 @@ export function PositionsSection({ o }: { o: PortfolioOverview }) {
   );
 
   return (
-    <Section id="positions" title="دارایی‌ها" description="مقدار، بهای تمام‌شده و سود/زیان باز" action={action}>
+    <Section id="positions" title="دارایی‌ها" description="مقدار، هزینهٔ خرید و سود و زیان فعلی" action={action}>
       <Surface className="px-4 md:px-0">
         {o.state === 'loading' ? (
           <div className="md:px-5">

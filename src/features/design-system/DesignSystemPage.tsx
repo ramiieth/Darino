@@ -273,12 +273,12 @@ export default function DesignSystemPage() {
               <Button variant="outline">حاشیه‌دار</Button>
               <Button variant="ghost">کم‌رنگ</Button>
               <Button variant="destructive" icon={<Trash2 />}>
-                حذف/معکوس
+                حذف/لغو
               </Button>
               <Button variant="link">پیوند متنی</Button>
               <span className="rounded-field bg-ink p-2">
                 <Button variant="inverse" size="sm">
-                  معکوس
+                  روشن
                 </Button>
               </span>
             </div>
@@ -304,10 +304,10 @@ export default function DesignSystemPage() {
       <Section id="controls" title="کنترل‌ها" description="ارتفاع، شعاع، حلقه فوکوس و اعتبارسنجی یکسان">
         <Surface className="grid gap-6 p-4 md:grid-cols-2 md:p-6">
           <Field label="مبلغ" hint="اعداد LTR، واحد در انتهای فیلد">
-            <Input dir="ltr" inputMode="decimal" placeholder="0.00" suffix="$" />
+            <Input dir="ltr" inputMode="decimal" placeholder="0.00" suffix="دلار" />
           </Field>
           <Field label="مبلغ برداشت" error="مبلغ از موجودی نقد بیشتر است">
-            <Input dir="ltr" defaultValue="99999" suffix="$" />
+            <Input dir="ltr" defaultValue="99999" suffix="دلار" />
           </Field>
           <Field label="زنجیره">
             <Select defaultValue="1">
@@ -320,7 +320,7 @@ export default function DesignSystemPage() {
             <SearchField value={q} onChange={setQ} placeholder="جستجوی نماد یا نام…" />
           </div>
           <Demo title="Tabs — بخش‌های یک صفحه">
-            <Tabs value={tab} onChange={setTab} options={[{ value: 'a', label: 'ثبت تراکنش' }, { value: 'b', label: 'دفتر روزنامه', badge: 12 }, { value: 'c', label: 'ممیزی' }]} />
+            <Tabs value={tab} onChange={setTab} options={[{ value: 'a', label: 'ثبت تراکنش' }, { value: 'b', label: 'تاریخچهٔ تراکنش‌ها', badge: 12 }, { value: 'c', label: 'سابقهٔ تغییرات' }]} />
           </Demo>
           <Demo title="SegmentedControl — پارامتر نما">
             <SegmentedControl value={seg} onChange={setSeg} options={[{ value: '1d', label: '۱ روز' }, { value: '7d', label: '۷ روز' }, { value: '30d', label: '۳۰ روز' }]} />
@@ -450,7 +450,7 @@ export default function DesignSystemPage() {
         <Surface className="p-4 md:p-6">
           <KeyValueList
             rows={[
-              { label: 'Dialog', value: 'تأیید متمرکز و کوتاه (ثبت معکوس، تأیید برداشت)' },
+              { label: 'Dialog', value: 'تأیید متمرکز و کوتاه (لغو تراکنش، تأیید برداشت)' },
               { label: 'Sheet (auto)', value: 'اطلاعات زمینه‌ای — پایین‌برگه در موبایل، دیالوگ در دسکتاپ' },
               { label: 'Panel', value: 'جریان کاری ثانویه/جزئیات — پنل کناری در دسکتاپ' },
               { label: 'صفحه کامل', value: 'کار پیچیده (ماشین‌حساب، جزئیات بازار)' }
@@ -469,15 +469,15 @@ export default function DesignSystemPage() {
         <Dialog
           open={sheet === 'dialog'}
           onClose={() => setSheet(null)}
-          title="ثبت سند معکوس؟"
+          title="لغو این تراکنش؟"
           footer={
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setSheet(null)}>انصراف</Button>
-              <Button variant="destructive" className="flex-1" onClick={() => setSheet(null)}>ثبت معکوس</Button>
+              <Button variant="destructive" className="flex-1" onClick={() => setSheet(null)}>لغو تراکنش</Button>
             </div>
           }
         >
-          <p className="text-sm text-muted">یک سند جدید با طرف‌های قرینه ثبت می‌شود.</p>
+          <p className="text-sm text-muted">یک تراکنش برعکس ثبت می‌شود.</p>
         </Dialog>
       </Section>
 
@@ -492,7 +492,7 @@ export default function DesignSystemPage() {
               { label: 'درصد', value: '+2.41% / -1.20% — علامت صریح برای تغییر؛ APY بدون علامت' },
               { label: 'ارز', value: '$ پیش از عدد؛ منفی: -$12.50' },
               { label: 'تاریخ', value: 'شمسی به‌صورت پیش‌فرض، میلادی در صورت نیاز کنار آن' },
-              { label: 'نیم‌فاصله', value: 'دارایی‌ها، پیش‌نمایش، تحقق‌یافته — همیشه با ZWNJ' },
+              { label: 'نیم‌فاصله', value: 'دارایی‌ها، پیش‌نمایش، تراکنش‌ها — همیشه با ZWNJ' },
               { label: 'سلب مسئولیت', value: 'بازده گذشته یا اعلام‌شده تضمینی برای آینده نیست؛ شبیه‌سازی‌ها فرضی‌اند' },
               { label: 'نامشخص', value: '«—» با برچسب دسترس‌پذیر «نامشخص»؛ هرگز ۰' }
             ]}

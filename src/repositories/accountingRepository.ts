@@ -47,7 +47,8 @@ export function serializeAccounting(
       id: e.id,
       date: e.date,
       createdAt: e.createdAt,
-      payload: { memo: e.memo, lines: e.lines, source: e.source }
+      // trade و reversesId هم ذخیره می‌شوند (قبلاً پیوند سند معکوس روی سرور از بین می‌رفت)
+      payload: { memo: e.memo, lines: e.lines, source: e.source, ...(e.reversesId !== undefined ? { reversesId: e.reversesId } : {}), ...(e.trade ? { trade: e.trade } : {}) }
     })),
     lots: lots.map((l) => ({
       id: l.id,
@@ -63,8 +64,17 @@ export function serializeAccounting(
 
 export function deserializeEntries(payload: unknown[]): JournalEntry[] {
   return payload.map((p) => {
-    const r = p as { id: number; date: number; createdAt: number; payload: { memo: string; lines: JournalEntry['lines']; source?: JournalEntry['source'] } };
-    return { id: r.id, date: r.date, memo: r.payload.memo, lines: r.payload.lines, source: r.payload.source ?? 'manual', createdAt: r.createdAt };
+    const r = p as { id: number; date: number; createdAt: number; payload: { memo: string; lines: JournalEntry['lines']; source?: JournalEntry['source']; reversesId?: number; trade?: JournalEntry['trade'] } };
+    return {
+      id: r.id,
+      date: r.date,
+      memo: r.payload.memo,
+      lines: r.payload.lines,
+      source: r.payload.source ?? 'manual',
+      createdAt: r.createdAt,
+      ...(typeof r.payload.reversesId === 'number' ? { reversesId: r.payload.reversesId } : {}),
+      ...(r.payload.trade ? { trade: r.payload.trade } : {})
+    };
   });
 }
 
@@ -176,6 +186,22 @@ export async function pullAccountingFromRemote(): Promise<SyncReport | null> {
     return null;
   } finally {
     syncInFlight = false;
+  }
+}
+
+/**
+ * وضعیت دفتر روی سرور — برای تصمیم «افتتاحیهٔ خودکار».
+ * local_only: سرور پایگاه داده ندارد یا اپ در حالت محلی/تست است.
+ * unknown: سرور هست ولی الان پاسخ معتبر نداد (آفلاین/بدون ورود) → افتتاحیه ساخته نمی‌شود.
+ */
+export async function remoteLedgerState(): Promise<'empty' | 'has_data' | 'local_only' | 'unknown'> {
+  if (!isRemoteAllowed()) return typeof navigator !== 'undefined' && navigator.onLine === false ? 'unknown' : 'local_only';
+  try {
+    const res = await fetchJson<RemoteAccountingResponse>('/api/accounting', { timeoutMs: 8000 });
+    if (!res.configured) return 'local_only';
+    return res.entries.length > 0 ? 'has_data' : 'empty';
+  } catch {
+    return 'unknown';
   }
 }
 

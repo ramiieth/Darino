@@ -207,7 +207,7 @@ export function AssetDepositPanel() {
         open={previewing && !!selected && price !== null && valueUsd !== null}
         onClose={() => setPreviewing(false)}
         title="تأیید واریز دارایی"
-        description="واریز فقط ورود موجودی است: بدون FIFO و بدون سود/زیان."
+        description="واریز فقط موجودی را اضافه می‌کند؛ فروشی انجام نمی‌شود و سود یا زیانی ثبت نمی‌شود."
         footer={
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setPreviewing(false)}>
@@ -235,7 +235,7 @@ export function AssetDepositPanel() {
             />
             <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted">
               <Lock aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              دارایی و ارزش خالص افزایش می‌یابد و سند به‌صورت غیرقابل تغییر در دفتر کل ثبت می‌شود.
+              دارایی و ارزش خالص افزایش می‌یابد و تراکنش به‌صورت دائمی در تاریخچه ثبت می‌شود.
             </p>
           </>
         )}

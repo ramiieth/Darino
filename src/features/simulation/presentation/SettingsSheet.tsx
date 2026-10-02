@@ -15,6 +15,7 @@ import { KeyValueList } from '@/shared/components/ui/FinancialValue';
 import { useSettingsStore, effectiveApiKeys } from '@/shared/store/settingsStore';
 import { useMarketStore } from '@/shared/store/marketStore';
 import { useUsdRate } from '@/shared/store/usdtStore';
+import { ScenarioCashCard } from './ScenarioCashCard';
 import { UsdtRateField } from '@/shared/components/ui/UsdtRateField';
 import { useWatchlistStore } from '@/shared/store/watchlistStore';
 import { useAvBudgetStore } from '@/shared/store/avBudgetStore';
@@ -132,24 +133,27 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           <h3 id="eth-title" className="text-sm font-bold text-ink">{t('scenarioEthTitle')}</h3>
           <div className="grid grid-cols-2 gap-4">
             {field(t('ethAmountLabel'), 'ethAmount', 'ETH')}
-            {field(t('ethBuyPriceLabel'), 'ethBuyPrice', '$')}
-            {field(t('ethInitialLabel'), 'ethInitialInvestment', '$')}
-            {field(t('usdcLabel'), 'usdcAllocation2026', '$')}
+            {field(t('ethBuyPriceLabel'), 'ethBuyPrice', 'دلار')}
+            {field(t('ethInitialLabel'), 'ethInitialInvestment', 'دلار')}
+            {field(t('usdcLabel'), 'usdcAllocation2026', 'دلار')}
           </div>
         </section>
+
+        {/* سرمایهٔ نقد سناریوها: خودکار از حسابداری یا دستی (همگام بین دستگاه‌ها) */}
+        <ScenarioCashCard compact />
 
         {/* base capital */}
         <section className="space-y-3" aria-labelledby="base-title">
           <div>
             <h3 id="base-title" className="text-sm font-bold text-ink">{t('scenarioBaseTitle')}</h3>
             <p className="text-xs text-muted">
-              با فعال بودن حسابداری، موجودی نقد واقعی مبنای شبیه‌سازی‌هاست — این مقادیر فقط جایگزین هستند.
+              ملاک شبیه‌سازی‌ها «سرمایهٔ نقد سناریوها» در بالاست؛ این مقادیر فقط جایگزین هنگام نبود داده هستند.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {field(t('base2025Label'), 'baseCapital2025', '$')}
-            {field(t('base2026Label'), 'baseCapital2026', '$')}
-            {field(t('ethRef2026Label'), 'ethRefJuly2026', '$')}
+            {field(t('base2025Label'), 'baseCapital2025', 'دلار')}
+            {field(t('base2026Label'), 'baseCapital2026', 'دلار')}
+            {field(t('ethRef2026Label'), 'ethRefJuly2026', 'دلار')}
           </div>
         </section>
 

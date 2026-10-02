@@ -21,7 +21,7 @@ const SOURCE: Record<string, { label: string; tone: Tone }> = {
   api: { label: 'API', tone: 'brand' },
   'market-data': { label: 'داده بازار', tone: 'info' },
   'user-input': { label: 'ورودی کاربر', tone: 'neutral' },
-  na: { label: 'N/A', tone: 'neutral' }
+  na: { label: 'نامشخص', tone: 'neutral' }
 };
 
 function AuditRow({ b }: { b: MarketAuditBreakdown }) {
@@ -35,8 +35,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
               <span className="text-xs font-normal text-muted">({toFaDigits(b.daysToMaturity)} روز)</span>
             </span>
             <span className="flex items-center gap-3 text-xs font-normal text-muted">
-              <span>Net لانگ <MoneyValue value={b.netLong} signed tone="auto" className="font-semibold" /></span>
-              <span>Net شورت <MoneyValue value={b.netShort} signed tone="auto" className="font-semibold" /></span>
+              <span>خالص لانگ <MoneyValue value={b.netLong} signed tone="auto" className="font-semibold" /></span>
+              <span>خالص شورت <MoneyValue value={b.netShort} signed tone="auto" className="font-semibold" /></span>
             </span>
           </span>
         }
@@ -49,8 +49,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
               rows={[
                 { label: 'تسویه ناخالص لانگ', value: <MoneyValue value={b.grossSettlementLong} signed tone="auto" /> },
                 { label: 'تسویه ناخالص شورت', value: <MoneyValue value={b.grossSettlementShort} signed tone="auto" /> },
-                { label: 'MTM لانگ (تحقق‌نیافته)', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
-                { label: 'MTM شورت (تحقق‌نیافته)', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
+                { label: 'ارزش روز لانگ (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
+                { label: 'ارزش روز شورت (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
                 { label: 'ناخالص کل لانگ', value: <MoneyValue value={b.totalGrossLong} signed tone="auto" /> },
                 { label: 'ناخالص کل شورت', value: <MoneyValue value={b.totalGrossShort} signed tone="auto" /> },
                 { label: 'خالص لانگ', emphasis: true, value: <MoneyValue value={b.netLong} signed tone="auto" /> },
@@ -82,13 +82,13 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
               rows={[
                 { label: 'Notional', value: <span className="num-ltr">{b.marginParams.size}</span> },
                 { label: 'نرخ / کف', value: <span className="num-ltr">{fmtPct(b.marginParams.rate * 100)} / {fmtPct(b.marginParams.rateFloor * 100)}</span> },
-                { label: 'YTM / کف', value: <span className="num-ltr">{b.marginParams.ytm.toFixed(3)} / {b.marginParams.ytmFloor}</span> },
+                { label: 'زمان تا سررسید / کف', value: <span className="num-ltr">{b.marginParams.ytm.toFixed(3)} / {b.marginParams.ytmFloor}</span> },
                 { label: 'IM', value: <PercentValue value={b.marginParams.imRatio * 100} signed={false} tone="none" /> },
                 { label: 'مارجین', emphasis: true, value: <MoneyValue value={b.marginRequired} /> },
-                { label: 'ROI مارجین لانگ', value: <PercentValue value={b.roiLongMargin} /> },
-                { label: 'ROI notional لانگ', value: <PercentValue value={b.roiLongNotional} /> },
+                { label: 'بازده مارجین لانگ', value: <PercentValue value={b.roiLongMargin} /> },
+                { label: 'بازده ارزش اسمی لانگ', value: <PercentValue value={b.roiLongNotional} /> },
                 { label: 'سالانه‌شده لانگ', value: <PercentValue value={b.annualizedLong} /> },
-                { label: 'ROI مارجین شورت', value: <PercentValue value={b.roiShortMargin} /> }
+                { label: 'بازده مارجین شورت', value: <PercentValue value={b.roiShortMargin} /> }
               ]}
             />
           </div>
@@ -108,8 +108,8 @@ export function AuditTab({ markets }: { markets: BorosMarket[] }) {
 
       <Section
         id="engine-audit"
-        title="ممیزی موتور"
-        description="PnL تفکیکی بدون دوبار‌شماری، هزینه‌های خط‌به‌خط با منبع، مارجین مستقل و چهار معیار بازده"
+        title="بررسی محاسبات موتور"
+        description="سود/زیان تفکیکی بدون دوبار‌شماری، هزینه‌های خط‌به‌خط با منبع، مارجین مستقل و چهار معیار بازده"
       >
         <Surface>
           <ul className="divide-y divide-divider">

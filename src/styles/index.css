@@ -1,3 +1,13 @@
+/* ------------------------------------------------------------
+   وزیرمتن «ارقام فارسی» (Vazirmatn FD — rastikerdar/vazirmatn v33.0.3، مجوز SIL OFL 1.1)
+   هر رقم لاتین را با شکل فارسی رسم می‌کند → در کل اپ هیچ رقم انگلیسی دیده نمی‌شود.
+   برای شناسه‌های لاتین (آدرس/هش) کلاس font-latin فونت معمولی را برمی‌گرداند.
+   ------------------------------------------------------------ */
+@font-face { font-family: 'Vazirmatn FD'; src: url('./fonts/vazirmatn-fd/Vazirmatn-FD-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Vazirmatn FD'; src: url('./fonts/vazirmatn-fd/Vazirmatn-FD-SemiBold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Vazirmatn FD'; src: url('./fonts/vazirmatn-fd/Vazirmatn-FD-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Vazirmatn FD'; src: url('./fonts/vazirmatn-fd/Vazirmatn-FD-ExtraBold.woff2') format('woff2'); font-weight: 800; font-style: normal; font-display: swap; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

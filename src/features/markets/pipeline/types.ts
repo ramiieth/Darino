@@ -32,7 +32,7 @@ export interface MarketAsset {
 
 /** برچسب فارسی Universe (متن UI — نه داده بازار) */
 export const UNIVERSE_FA: Record<MarketUniverse, string> = {
-  crypto_top_200: 'رمزارز (Top 200)',
+  crypto_top_200: 'رمزارز (۲۰۰ برتر)',
   ondo_tokenized: 'Ondo',
   xstocks: 'xStocks'
 };

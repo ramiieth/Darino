@@ -129,7 +129,7 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
     }
     const ts = jalaaliToTimestamp(jyN, jmN, jdN);
     if (snapshots.some((s) => s.dateTs === ts)) {
-      setError('برای این تاریخ قبلاً Snapshot ثبت شده است');
+      setError('برای این تاریخ قبلاً اسنپ‌شات ثبت شده است');
       return;
     }
 
@@ -203,13 +203,13 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
       open={open}
       onClose={onClose}
       title="ثبت قیمت خودرو"
-      description="یک Snapshot تاریخی جدید ساخته می‌شود؛ Snapshotهای قبلی تغییر نمی‌کنند. قیمت خالی = N/A (نه صفر)."
+      description="یک اسنپ‌شات تاریخی جدید ساخته می‌شود؛ اسنپ‌شات‌های قبلی تغییر نمی‌کنند. قیمت خالی = نامشخص (نه صفر)."
       variant="panel"
       size="lg"
       footer={
         <div className="space-y-2">
           {error && <p className="text-sm text-negative" role="alert">{error}</p>}
-          {saved && <p className="text-sm text-positive" role="status">Snapshot ثبت شد — Snapshotهای قبلی تغییری نکردند.</p>}
+          {saved && <p className="text-sm text-positive" role="status">اسنپ‌شات ثبت شد — اسنپ‌شات‌های قبلی تغییری نکردند.</p>}
           <Button
             onClick={() => void submit()}
             className="w-full"
@@ -217,7 +217,7 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
             icon={<Save />}
             disabled={saved || (mode === 'new-car' && !!dupVehicle)}
           >
-            {mode === 'update' ? `ثبت Snapshot (${toFaDigits(visible.length)} خودرو)` : 'ثبت خودرو جدید و Snapshot'}
+            {mode === 'update' ? `ثبت اسنپ‌شات (${toFaDigits(visible.length)} خودرو)` : 'ثبت خودرو جدید و اسنپ‌شات'}
           </Button>
         </div>
       }
@@ -253,7 +253,7 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
               <Input dir="ltr" inputMode="numeric" value={usdRate} onChange={(e) => setUsdRate(e.target.value)} suffix="تومان" />
             </Field>
           </div>
-          {dateLabel && <p className="text-xs text-muted">تاریخ Snapshot: <span className="font-semibold text-ink">{dateLabel}</span></p>}
+          {dateLabel && <p className="text-xs text-muted">تاریخ اسنپ‌شات: <span className="font-semibold text-ink">{dateLabel}</span></p>}
         </fieldset>
 
         {mode === 'update' && (
@@ -263,7 +263,7 @@ export function NewSnapshotSheet({ open, onClose }: { open: boolean; onClose: ()
               label="خودرو"
               hint={
                 selectedVehicle
-                  ? 'سایر خودروها با آخرین قیمت ثبت‌شده در Snapshot قرار می‌گیرند.'
+                  ? 'سایر خودروها با آخرین قیمت ثبت‌شده در اسنپ‌شات قرار می‌گیرند.'
                   : 'همه خودروها با امکان ویرایش دسته‌جمعی'
               }
             >

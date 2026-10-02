@@ -67,10 +67,10 @@ export type ScenarioRole = 'adverse' | 'base' | 'favorable';
 
 /** برچسب فارسی نقش اقتصادی — با توضیح جهت */
 export function scenarioRoleLabel(role: ScenarioRole, direction: BorosDirection): string {
-  if (role === 'base') return 'پایه (Base)';
+  if (role === 'base') return 'پایه';
   if (role === 'adverse')
-    return direction === 'long' ? 'بدبینانه (Adverse)' : 'نامطلوب (Adverse)';
-  return direction === 'long' ? 'خوش‌بینانه (Favorable)' : 'مطلوب (Favorable)';
+    return direction === 'long' ? 'بدبینانه' : 'نامطلوب';
+  return direction === 'long' ? 'خوش‌بینانه' : 'مطلوب';
 }
 
 export interface ScenarioInput {

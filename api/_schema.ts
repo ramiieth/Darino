@@ -7,11 +7,13 @@
  *   - اجرای چندباره = بی‌خطر (داده هرگز لمس نمی‌شود)
  *
  * استراتژی (Serverless-safe):
- *   - یک بررسی سبک (to_regclass) — اگر جداول موجودند → بدون DDL
- *   - اگر نبودند → اجرای statements از db/schema.sql
+ *   - اثر انگشت (SHA-256) statementهای db/schema.sql با مقدار ذخیره‌شده در "schemaMeta" مقایسه می‌شود
+ *   - برابر → بدون DDL؛ متفاوت/نبود → اجرای همهٔ statementها و ذخیرهٔ اثر انگشت جدید
+ *     (پس هر جدول/ستون/ایندکس جدید در schema.sql خودکار اعمال می‌شود — بدون فهرست دستی جدول‌ها)
  *   - نتیجه در حافظه instance کش می‌شود (هر cold-start یک‌بار بررسی سبک)
  *   - race بین instanceها امن است (DDL ها IF NOT EXISTS هستند)
  * ============================================================ */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
@@ -53,12 +55,17 @@ export function splitSqlStatements(sql: string): string[] {
 /** بررسی امن بودن schema (جلوگیری از خطای انسانی — فقط DDL امن مجاز است) */
 export function assertSchemaIsSafe(sql: string): void {
   const upper = sql.toUpperCase();
-  const banned = ['DROP TABLE', 'TRUNCATE', 'DELETE FROM', 'DROP DATABASE', 'ALTER TABLE ... DROP'];
+  const banned = ['DROP TABLE', 'DROP COLUMN', 'DROP SCHEMA', 'TRUNCATE', 'DELETE FROM', 'DROP DATABASE'];
   for (const b of banned) {
     if (upper.includes(b)) {
       throw new Error(`schema حاوی دستور مخرب است: ${b} — اجرا متوقف شد`);
     }
   }
+}
+
+/** اثر انگشت اسکیما — فقط روی statementهای واقعی (تغییر کامنت‌ها اجرای مجدد نمی‌خواهد) */
+export function schemaHash(source: string): string {
+  return createHash('sha256').update(splitSqlStatements(source).join(';\n')).digest('hex');
 }
 
 /** وضعیت آمادگی در حافظه instance (null = بررسی نشده / تلاش مجدد) */
@@ -71,34 +78,26 @@ let schemaReady: boolean | null = null;
 export async function ensureSchema(sql: NeonQueryFunction<false, false>): Promise<boolean> {
   if (schemaReady === true) return true;
   try {
-    // ۱) بررسی سبک — آیا جداول اصلی موجودند؟
-    // ⚠️ نام‌ها داخل دابل‌کوتیشن‌اند تا دقیقاً جدول camelCase بررسی شود؛
-    // بدون کوتیشن، PostgreSQL به lowercase تبدیل می‌کند و جدول‌های قدیمیِ
-    // خراب (lowercase) را «موجود» گزارش می‌دهد (false-green) در حالی که
-    // کوئری‌های Quoted روی آن‌ها خطا می‌دهند. با کوتیشن، روی دیتابیس قدیمی
-    // هم DDL دوباره اجرا و جدول‌های درست ساخته می‌شوند (self-heal).
-    const rows = await sql`SELECT
-      to_regclass('public."accAccounts"') IS NOT NULL AS a,
-      to_regclass('public."accEntries"') IS NOT NULL AS e,
-      to_regclass('public."accLots"') IS NOT NULL AS l,
-      to_regclass('public."accEvents"') IS NOT NULL AS ev,
-      to_regclass('public."portfolioAssets"') IS NOT NULL AS p,
-      to_regclass('public."dashboardSnapshots"') IS NOT NULL AS d,
-      to_regclass('public."pmListings"') IS NOT NULL AS pm1,
-      to_regclass('public."pmSnapshots"') IS NOT NULL AS pm2`;
-    const r = rows[0] as { a: boolean; e: boolean; l: boolean; ev: boolean; p: boolean; d: boolean; pm1: boolean; pm2: boolean };
-    if (r.a && r.e && r.l && r.ev && r.p && r.d && r.pm1 && r.pm2) {
-      schemaReady = true;
-      return true;
-    }
-    // ۲) اجرای DDL (idempotent — فقط IF NOT EXISTS؛ امنیت بررسی شد)
     const source = loadSchemaSql();
     const statements = splitSqlStatements(source);
-    // بررسی امنیت روی statementهای پاک‌شده از کامنت (بدون false-positive)
+    const hash = schemaHash(source);
+    // ۱) بررسی سبک — آیا همین نسخهٔ اسکیما قبلاً اعمال شده؟
+    // (to_regclass جدا پرسیده می‌شود چون SELECT از جدولِ ناموجود خطا می‌دهد)
+    const meta = (await sql`SELECT to_regclass('public."schemaMeta"') IS NOT NULL AS m`) as Array<{ m?: boolean }>;
+    if (meta[0]?.m) {
+      const cur = (await sql`SELECT hash FROM "schemaMeta" WHERE id = 1`) as Array<{ hash?: string }>;
+      if (cur[0]?.hash === hash) {
+        schemaReady = true;
+        return true;
+      }
+    }
+    // ۲) اجرای DDL (idempotent — فقط IF NOT EXISTS؛ امنیت روی statementهای بدون کامنت بررسی می‌شود)
     assertSchemaIsSafe(statements.join(' '));
     for (const st of statements) {
-      await sql.unsafe(st);
+      await sql.query(st); // query() اجرا می‌کند؛ unsafe() فقط قطعهٔ SQL می‌سازد و هرگز اجرا نمی‌شد
     }
+    await sql`INSERT INTO "schemaMeta" (id, hash, "appliedAt") VALUES (1, ${hash}, ${Date.now()})
+      ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash, "appliedAt" = EXCLUDED."appliedAt"`;
     schemaReady = true;
     return true;
   } catch {

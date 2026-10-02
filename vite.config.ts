@@ -241,6 +241,11 @@ export default defineConfig({
         // design-source artwork, never requested by the app
         globIgnores: ['**/icons/icon-master.png'],
         navigateFallback: '/index.html',
+        // مسیرهای API هرگز با پوستهٔ HTML کش‌شده پاسخ داده نمی‌شوند
+        navigateFallbackDenylist: [/^\/api\//],
+        // ⚠️ حریم خصوصی: پاسخ‌های حساب/دادهٔ مالی (Arcus، /api/accounting، /api/portfolio…)
+        //    عمداً در runtimeCaching نیستند و در cache سرویس‌ورکر ذخیره نمی‌شوند.
+        //    فقط دادهٔ عمومی بازار (CoinGecko) کش می‌شود. تست نگهبان: src/shared/pwaPrivacy.test.ts
         runtimeCaching: [
           // پروکسی کوین‌گکو (same-origin) — NetworkFirst با کش آفلاین
           // ⚠️ در PROD کلاینت به /api/cg می‌زند (نه /coingecko-api)؛ هر دو

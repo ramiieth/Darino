@@ -12,7 +12,7 @@ export function TrendChart({
   format: (v: number) => string;
 }) {
   if (points.length < 2) {
-    return <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">برای روند حداقل دو Snapshot لازم است</p>;
+    return <p className="rounded-field bg-surface-2 py-6 text-center text-sm text-muted">برای روند حداقل دو اسنپ‌شات لازم است</p>;
   }
   const W = 600;
   const H = 160;

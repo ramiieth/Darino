@@ -13,7 +13,7 @@ export const RISK_LEVEL_FA: Record<RiskLevel, string> = {
   high: 'زیاد',
   'very-high': 'خیلی زیاد',
   liquidation: 'در معرض لیکوییدیشن',
-  unknown: 'N/A'
+  unknown: 'نامشخص'
 };
 
 /** Health Factor = (Total Supply × LT) / Total Borrow — null اگر LT یا Borrow ناشناخته/صفر باشد */

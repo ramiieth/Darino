@@ -1,125 +1,143 @@
 /**
- * ابزارهای قالب‌بندی — سیاست نمایش (ممیزی §۸/§۱۰):
+ * ابزارهای قالب‌بندی — سیاست نمایش اعداد در کل اپ (درخواست کارفرما ۲۰۲۶-۱۰):
  *
- *  چیدمان/متن: RTL فارسی
- *  قیمت، ارزش، درصد، سود/زیان، تعداد واحد: ارقام لاتین + ایزوله LTR (.num-ltr)
- *  معادل تومانی: ارقام فارسی (طبق نظر کارفرما: «عدد کنار میلیارد تومان فارسی»)
- *  تعداد ردیف/متن روایی: ارقام فارسی
+ *  • ارقام همیشه فارسی (۰–۹ فارسی) — هیچ رقم انگلیسی.
+ *  • جداکنندهٔ هزارگان «,» و اعشار «.» (نه «٬» و «٫»): ۱,۲۳۴.۲۳
+ *  • دلار: بدون «$»؛ واژهٔ «دلار» پس از عدد (در کامپوننت‌ها با قلم کوچک — MoneyValue).
+ *  • درصد: «٪» · مقدار نامعتبر: «—»
+ *  • اعداد بزرگ (compact): «هزار / میلیون / میلیارد / تریلیون» (نه K/M/B/T)
+ *  • فونت «Vazirmatn FD» هم هر رقم لاتینِ باقی‌مانده را فارسی رسم می‌کند (لایهٔ دوم اطمینان).
  */
 
-const faDecimal = new Intl.NumberFormat('fa-IR', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
-const faInt = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 });
-const faPct = new Intl.NumberFormat('fa-IR', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
-const faCompact = new Intl.NumberFormat('fa-IR', {
-  notation: 'compact',
-  maximumFractionDigits: 1
-});
-const enDecimal = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
-const enInt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const enCompact = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
-/** قیمت‌های ۰.۰۱ تا ۱ دلار — تا ۶ رقم اعشار (بدون گرد شدن به $0.00) */
-const enPriceLow = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 6
-});
-/** قیمت‌های ریز زیر ۰.۰۱ دلار — ۴ رقم معنادار (مثل SHIB/PEPE) */
-const enSig4 = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 4 });
+const NA = '—';
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 
-/* ---------- ارقام لاتین (داده‌های مالی) ---------- */
-
-/** قیمت/ارزش دلاری: $ + ارقام لاتین (compact برای اعداد بزرگ) */
-export function fmtUSD(v: number | null | undefined, compact = false): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  // علامت منفی پیش از نماد ارز: «-$12.50» (نه «$-12.50»)
-  if (v < 0) return `-${fmtUSD(-v, compact)}`;
-  if (compact) return `$${enCompact.format(v)}`;
-  // قیمت‌های زیر ۱ دلار — دقت بیشتر تا هیچ‌وقت $0.00 نمایش داده نشود
-  if (v > 0 && v < 1) {
-    if (v < 0.01) return `$${enSig4.format(v)}`;
-    return `$${enPriceLow.format(v)}`;
-  }
-  return `$${enDecimal.format(v)}`;
+/** تبدیل ارقام لاتین به فارسی — بقیهٔ نویسه‌ها (از جمله , و .) دست نمی‌خورند */
+export function toFaDigits(input: string | number): string {
+  return String(input).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
 }
 
-/** مبلغ دلاری با علامت صریح برای سود/زیان: «+$12.50» / «-$12.50» / «$0.00» */
+const nf = (opts: Intl.NumberFormatOptions) => new Intl.NumberFormat('en-US', opts);
+const dec2 = nf({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const int0 = nf({ maximumFractionDigits: 0 });
+const compact1 = nf({ minimumFractionDigits: 0, maximumFractionDigits: 1 });
+/** قیمت‌های ۰.۰۱ تا ۱ دلار — تا ۶ رقم اعشار */
+const priceLow = nf({ minimumFractionDigits: 2, maximumFractionDigits: 6 });
+/** قیمت‌های ریز زیر ۰.۰۱ دلار — ۴ رقم معنادار */
+const sig4 = nf({ maximumSignificantDigits: 4 });
+
+const bad = (v: number | null | undefined): v is null | undefined => v === null || v === undefined || Number.isNaN(v);
+
+/** عدد فارسی با «,» و «.» — هستهٔ مشترک همهٔ قالب‌ها */
+export function faNumber(v: number, opts: Intl.NumberFormatOptions = { maximumFractionDigits: 2 }): string {
+  return toFaDigits(nf(opts).format(v));
+}
+
+/** «۱.۳ تریلیون» · «۷۲.۱ میلیون» · «۴.۵ هزار» */
+export function fmtCompactFa(v: number): string {
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  const units: [number, string][] = [
+    [1e12, 'تریلیون'],
+    [1e9, 'میلیارد'],
+    [1e6, 'میلیون'],
+    [1e3, 'هزار']
+  ];
+  for (const [n, w] of units) if (a >= n) return `${sign}${toFaDigits(compact1.format(a / n))} ${w}`;
+  return `${sign}${toFaDigits(compact1.format(a))}`;
+}
+
+/* ---------- دلار ---------- */
+
+/** فقط بخش عددی مبلغ دلاری (بدون واژهٔ «دلار») — برای کامپوننت‌هایی که واحد را کوچک نشان می‌دهند */
+export function fmtUsdNumber(v: number, compact = false): string {
+  if (v < 0) return `-${fmtUsdNumber(-v, compact)}`;
+  if (compact) return fmtCompactFa(v);
+  // قیمت‌های زیر ۱ دلار — دقت بیشتر تا هرگز «۰.۰۰» نمایش داده نشود
+  if (v > 0 && v < 1) return toFaDigits((v < 0.01 ? sig4 : priceLow).format(v));
+  return toFaDigits(dec2.format(v));
+}
+
+/** مبلغ دلاری: «۱,۲۳۴.۲۳ دلار» (compact برای اعداد بزرگ) */
+export function fmtUSD(v: number | null | undefined, compact = false): string {
+  if (bad(v)) return NA;
+  return `${fmtUsdNumber(v, compact)} دلار`;
+}
+
+/** مبلغ دلاری با علامت صریح برای سود/زیان: «+۱۲.۵۰ دلار» / «-۱۲.۵۰ دلار» / «۰.۰۰ دلار» */
 export function fmtUsdSigned(v: number | null | undefined, compact = false): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  // amounts (P/L, flows) — always 2 decimals; the extra precision is for unit prices only
+  if (bad(v)) return NA;
+  // مبالغ (سود/زیان، جریان) همیشه ۲ رقم اعشار؛ دقت بیشتر فقط برای قیمت واحد است
   const abs = Math.abs(v);
-  const body = compact ? `$${enCompact.format(abs)}` : `$${enDecimal.format(abs)}`;
+  const body = `${compact ? fmtCompactFa(abs) : toFaDigits(dec2.format(abs))} دلار`;
   return v > 0 ? `+${body}` : v < 0 ? `-${body}` : body;
 }
 
-/** عدد لاتین با دو رقم اعشار (مثل مقدار ETH) */
+/** مبلغ دلاری کامل بدون اعشار — «۸۸,۷۹۹ دلار» */
+export function fmtUsdAmount(usd: number | null | undefined): string {
+  if (bad(usd)) return NA;
+  return `${toFaDigits(int0.format(usd))} دلار`;
+}
+
+/* ---------- عدد و درصد ---------- */
+
+/** عدد با دو رقم اعشار (مثل مقدار اتر) — نام تاریخی؛ ارقام فارسی */
 export function fmtNumLatin(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  return enDecimal.format(v);
+  if (bad(v)) return NA;
+  return toFaDigits(dec2.format(v));
 }
 
-/** عدد صحیح لاتین (مثل تعداد USDT) */
+/** عدد صحیح — نام تاریخی؛ ارقام فارسی */
 export function fmtIntLatin(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  return enInt.format(v);
+  if (bad(v)) return NA;
+  return toFaDigits(int0.format(v));
 }
 
-/** درصد لاتین با علامت صریح: +2.41% / −1.20% */
+/** درصد با علامت صریح: «+۲.۴۱٪» / «-۱.۲۰٪» */
 export function fmtPct(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
+  if (bad(v)) return NA;
   const sign = v > 0 ? '+' : '';
-  return `${sign}${enDecimal.format(v)}%`;
+  return `${sign}${toFaDigits(dec2.format(v))}٪`;
 }
 
-/** درصد لاتین بدون علامت (نمودارها) */
+/** درصد بدون علامت (نمودارها) */
 export function fmtPctEn(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  return `${enDecimal.format(v)}%`;
+  if (bad(v)) return NA;
+  return `${toFaDigits(dec2.format(v))}٪`;
 }
 
-/* ---------- ارقام فارسی (متن روایی / تومان) ---------- */
-
-/** عدد فارسی با دو رقم اعشار */
+/** عدد با دو رقم اعشار */
 export function fmtNum(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  return faDecimal.format(v);
+  if (bad(v)) return NA;
+  return toFaDigits(dec2.format(v));
 }
 
-/** عدد صحیح فارسی */
+/** عدد صحیح */
 export function fmtInt(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  return faInt.format(v);
+  if (bad(v)) return NA;
+  return toFaDigits(int0.format(v));
 }
 
-/** درصد فارسی (متن روایی) */
+/** درصد (متن روایی) */
 export function fmtPctFa(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return 'N/A';
-  const sign = v > 0 ? '+' : '';
-  return `${sign}${faPct.format(v)}٪`;
+  return fmtPct(v);
 }
 
-/* ---------- معادل تومانی (ارقام فارسی طبق دستور کارفرما) ---------- */
+/* ---------- معادل تومانی ---------- */
 
 /**
  * معادل تومانی یک مبلغ دلاری با نرخ زنده تتر (تومان بر دلار):
- *  $36,900 × 148,000 → «≈ ۵٫۴۶ میلیارد تومان»
- * نرخ نامشخص (تتر هنوز دریافت نشده) → «—» (هرگز نرخ فرضی)
+ *  ۳۶,۹۰۰ دلار × ۱۴۸,۰۰۰ → «≈ ۵.۴۶ میلیارد تومان»
+ * نرخ نامشخص → «—» (هرگز نرخ فرضی)
  */
 export function fmtToman(usd: number | null | undefined, rateToman: number | null | undefined): string {
-  if (usd === null || usd === undefined || Number.isNaN(usd)) return 'N/A';
-  if (!rateToman || !(rateToman > 0)) return '—';
+  if (bad(usd)) return NA;
+  if (!rateToman || !(rateToman > 0)) return NA;
   const toman = usd * rateToman;
-  if (toman >= 1e9) return `≈ ${faDecimal.format(toman / 1e9)} میلیارد تومان`;
-  if (toman >= 1e6) return `≈ ${faDecimal.format(toman / 1e6)} میلیون تومان`;
-  if (toman >= 1e3) return `≈ ${faInt.format(toman / 1e3)} هزار تومان`;
-  return `≈ ${faDecimal.format(toman)} تومان`;
+  if (toman >= 1e9) return `≈ ${toFaDigits(dec2.format(toman / 1e9))} میلیارد تومان`;
+  if (toman >= 1e6) return `≈ ${toFaDigits(dec2.format(toman / 1e6))} میلیون تومان`;
+  if (toman >= 1e3) return `≈ ${toFaDigits(int0.format(toman / 1e3))} هزار تومان`;
+  return `≈ ${toFaDigits(dec2.format(toman))} تومان`;
 }
 
 /** تبدیل ارقام فارسی/عربی به لاتین — برای جستجو */
@@ -171,21 +189,10 @@ export function fmtDateTime(ts: number): string {
   }
 }
 
-/** تبدیل ارقام لاتین به فارسی (برای متن روایی/تومان) */
-export function toFaDigits(input: string | number): string {
-  return String(input).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
-}
-
-/** مبلغ تومانی کامل با جداکننده و ارقام فارسی — «۱۲٬۵۰۰٬۰۰۰٬۰۰۰ تومان» */
+/** مبلغ تومانی کامل — «۱۲,۵۰۰,۰۰۰,۰۰۰ تومان» */
 export function fmtTomanAmount(toman: number | null | undefined): string {
-  if (toman === null || toman === undefined || Number.isNaN(toman)) return '—';
-  return `${faInt.format(toman)} تومان`;
-}
-
-/** مبلغ دلاری کامل با جداکننده لاتین — «$88,799» */
-export function fmtUsdAmount(usd: number | null | undefined): string {
-  if (usd === null || usd === undefined || Number.isNaN(usd)) return '—';
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(usd)}`;
+  if (bad(toman)) return NA;
+  return `${toFaDigits(int0.format(toman))} تومان`;
 }
 
 /** سن نسبی داده — «همین الان»، «۴۵ ثانیه پیش»، «۳ دقیقه پیش»… (ارقام فارسی) */

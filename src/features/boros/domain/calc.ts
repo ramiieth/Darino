@@ -177,15 +177,15 @@ export function runScenarios(
   const rates = buildScenarioRates(hist, m.floatingApr);
   if (!rates) {
     // داده تاریخی کافی نیست → فقط سناریوی Base با نرخ فعلی (برچسب «پایه») — بدون Bear/Bull ساختگی
-    const base = runScenario(m, direction, size, fixedRate, days, gasUsd, priceImpact, 'پایه (Base)', m.floatingApr);
+    const base = runScenario(m, direction, size, fixedRate, days, gasUsd, priceImpact, 'پایه', m.floatingApr);
     return [base];
   }
   const mk = (label: string, r: number) =>
     runScenario(m, direction, size, fixedRate, days, gasUsd, priceImpact, label, r);
   return [
-    mk('بدبینانه (Adverse)', rates.bear),
-    mk('واقع‌بینانه (Base)', rates.base),
-    mk('خوش‌بینانه (Favorable)', rates.bull)
+    mk('بدبینانه', rates.bear),
+    mk('واقع‌بینانه', rates.base),
+    mk('خوش‌بینانه', rates.bull)
   ];
 }
 

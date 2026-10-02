@@ -11,7 +11,8 @@
  * ساختار payloadها با Types فعلی اپ (domain/types) هماهنگ است.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
+import { db, isDbConfigured, json, readBody } from './_neon.js';
+import { requireSession } from './_authCore.js';
 import { ensureSchema } from './_schema.js';
 
 interface SyncPayload {
@@ -26,7 +27,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     json(res, 200, { configured: false, accounts: [], entries: [], lots: [], events: [] });
     return;
   }
-  const userId = userIdOf(req);
+  // userId فقط از نشست معتبر (Passkey) — هدر x-user-id دیگر پذیرفته نمی‌شود
+  const auth = await requireSession(req, res);
+  if (!auth) return;
+  const userId = auth.userId;
   const sql = db();
 
   try {

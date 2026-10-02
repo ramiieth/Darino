@@ -56,8 +56,8 @@ export function PendleRealApyCard() {
   return (
     <Section
       id="pendle-picks"
-      title="بازده ثابت Pendle"
-      description="APY اعلام‌شده در برابر برآورد پس از هزینه‌ها"
+      title="بازده ثابت پندل"
+      description="بازده سالانه اعلام‌شده در برابر برآورد پس از هزینه‌ها"
       action={
         <Link to="/pendle" className={buttonClass('ghost', 'sm')}>
           همه بازارها

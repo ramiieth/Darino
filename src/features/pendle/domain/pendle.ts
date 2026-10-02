@@ -166,15 +166,15 @@ export function sortValue(m: PendleMarketView, key: PendleSortKey): number {
 }
 
 export const PENDLE_SORT_LABELS: Record<PendleSortKey, string> = {
-  fixedApy: 'بیشترین APY ثابت',
-  lpApy: 'بیشترین LP APY',
-  ytApy: 'بیشترین YT APY',
+  fixedApy: 'بیشترین بازده سالانه ثابت',
+  lpApy: 'بیشترین بازده نقدینگی',
+  ytApy: 'بیشترین بازده توکن بازده',
   totalYield: 'بیشترین بازده کل',
-  rewardApr: 'بیشترین Reward APR',
-  tvl: 'بیشترین TVL',
+  rewardApr: 'بیشترین نرخ پاداش سالانه',
+  tvl: 'بیشترین ارزش قفل‌شده',
   volume: 'بیشترین حجم',
   maturity: 'نزدیک‌ترین سررسید',
-  ptDiscount: 'بیشترین تخفیف PT',
+  ptDiscount: 'بیشترین تخفیف توکن اصل',
   liquidity: 'بیشترین نقدشوندگی'
 };
 

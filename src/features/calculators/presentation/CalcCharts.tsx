@@ -15,7 +15,7 @@ import {
 } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { fmtUSD } from '@/shared/utils/formatters';
+import { fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { axisUsd, baseChartOptions, cssColor, SERIES, type ChartToken } from '@/shared/design/chartTheme';
 
 ChartJS.register(LineElement, PointElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
@@ -48,11 +48,11 @@ export function LineChartCard({
   prefix?: '$' | '';
   suffix?: string;
 }) {
-  const fmt = (v: number) => (prefix === '$' ? fmtUSD(v) : `${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}${suffix}`);
+  const fmt = (v: number) => (prefix === '$' ? fmtUSD(v) : `${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: 2 }))}${suffix}`);
   const options = baseChartOptions({
     legend: datasets.length > 1,
     formatTooltip: (v) => fmt(v),
-    formatY: prefix === '$' ? axisUsd : (v) => `${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}${suffix}`
+    formatY: prefix === '$' ? axisUsd : (v) => `${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: 0 }))}${suffix}`
   });
   return (
     <Surface className="p-4 md:p-5">
@@ -100,10 +100,10 @@ export function BarChartCard({
   height?: number;
   unit?: '$' | '%';
 }) {
-  const fmt = (v: number) => (unit === '$' ? fmtUSD(v) : `${v > 0 ? '+' : ''}${v.toFixed(2)}%`);
+  const fmt = (v: number) => (unit === '$' ? fmtUSD(v) : `${v > 0 ? '+' : ''}${toFaDigits(v.toFixed(2))}٪`);
   const options = baseChartOptions({
     formatTooltip: (v) => fmt(v),
-    formatY: unit === '$' ? axisUsd : (v) => `${v.toFixed(0)}%`,
+    formatY: unit === '$' ? axisUsd : (v) => `${toFaDigits(v.toFixed(0))}٪`,
     maxXTicks: 10
   });
   return (

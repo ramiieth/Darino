@@ -49,7 +49,7 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
         out.push({
           ...base,
           type: 'extreme',
-          message: `Z-Score ${a.zScore?.toFixed(1)} — APR ${a.extreme === 'high' ? 'بسیار بالاتر' : 'بسیار پایین‌تر'} از میانگین تاریخی`,
+          message: `امتیاز انحراف ${a.zScore?.toFixed(1)} — نرخ سالانه ${a.extreme === 'high' ? 'بسیار بالاتر' : 'بسیار پایین‌تر'} از میانگین تاریخی`,
           severity: Math.abs(a.zScore ?? 0) > 3 ? 'high' : 'medium'
         });
       } else if (dev !== null && Math.abs(dev) > 25) {
@@ -64,7 +64,7 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
         out.push({
           ...base,
           type: 'liquidity',
-          message: `OI ${fmtUSD(m.notionalOI, true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h, true)}`,
+          message: `تعهدات باز ${fmtUSD(m.notionalOI, true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h, true)}`,
           severity: a.liquidityScore < 0.15 ? 'high' : 'medium'
         });
       }
@@ -137,18 +137,18 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
 
       <Section
         id="position-layer"
-        title="ریسک Position واقعی"
-        description="بدون Position واقعی در Boros، این شاخص‌ها از داده بازار حدس زده نمی‌شوند"
+        title="ریسک پوزیشن واقعی"
+        description="بدون پوزیشن واقعی در بوروس، این شاخص‌ها از داده بازار حدس زده نمی‌شوند"
       >
         <Surface className="px-4 md:px-5">
           <KeyValueList
             rows={[
-              { label: 'Position فعال', value: <Badge tone="neutral">ندارد</Badge> },
-              { label: 'Collateral واقعی', value: <span className="text-subtle">N/A</span> },
-              { label: 'Notional واقعی', value: <span className="text-subtle">N/A</span> },
-              { label: 'Liquidation Implied APR', value: <span className="text-subtle">N/A</span> },
-              { label: 'Health Factor', value: <span className="text-subtle">N/A</span> },
-              { label: 'Maintenance Margin', value: <span className="text-subtle">N/A</span> }
+              { label: 'پوزیشن فعال', value: <Badge tone="neutral">ندارد</Badge> },
+              { label: 'وثیقه واقعی', value: <span className="text-subtle">N/A</span> },
+              { label: 'ارزش اسمی واقعی', value: <span className="text-subtle">N/A</span> },
+              { label: 'نرخ لیکوئید ضمنی', value: <span className="text-subtle">N/A</span> },
+              { label: 'ضریب سلامت', value: <span className="text-subtle">N/A</span> },
+              { label: 'مارجین نگهداری', value: <span className="text-subtle">N/A</span> }
             ]}
           />
         </Surface>

@@ -153,7 +153,7 @@ export function TradePanel() {
           onChange={setSide}
           options={[
             { value: 'buy', label: 'خرید', icon: <ShoppingCart /> },
-            { value: 'sell', label: 'فروش (FIFO)', icon: <BadgeDollarSign /> }
+            { value: 'sell', label: 'فروش', icon: <BadgeDollarSign /> }
           ]}
         />
 
@@ -181,10 +181,10 @@ export function TradePanel() {
                 <Input dir="ltr" inputMode="decimal" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} placeholder="0.00" suffix={buySym} />
               </Field>
               <Field label="قیمت واحد" labelAside={priceAside(buySym, setBuyPrice)}>
-                <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} placeholder="0.00" suffix="$" />
+                <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} placeholder="0.00" suffix="دلار" />
               </Field>
               <Field label="کارمزد" hint="اختیاری">
-                <Input dir="ltr" inputMode="decimal" value={buyFee} onChange={(e) => setBuyFee(e.target.value)} placeholder="0.00" suffix="$" />
+                <Input dir="ltr" inputMode="decimal" value={buyFee} onChange={(e) => setBuyFee(e.target.value)} placeholder="0.00" suffix="دلار" />
               </Field>
               <SmartDateField value={buyDate} onChange={setBuyDate} label="تاریخ خرید" />
             </div>
@@ -234,10 +234,10 @@ export function TradePanel() {
                 <Input dir="ltr" inputMode="decimal" value={sellQty} onChange={(e) => setSellQty(e.target.value)} placeholder="0.00" suffix={sellSym || undefined} />
               </Field>
               <Field label="قیمت واحد" labelAside={sellSym ? priceAside(sellSym, setSellPrice) : undefined}>
-                <Input dir="ltr" inputMode="decimal" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} placeholder="0.00" suffix="$" />
+                <Input dir="ltr" inputMode="decimal" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} placeholder="0.00" suffix="دلار" />
               </Field>
               <Field label="کارمزد" hint="اختیاری — به‌صورت هزینه جداگانه ثبت می‌شود">
-                <Input dir="ltr" inputMode="decimal" value={sellFee} onChange={(e) => setSellFee(e.target.value)} placeholder="0.00" suffix="$" />
+                <Input dir="ltr" inputMode="decimal" value={sellFee} onChange={(e) => setSellFee(e.target.value)} placeholder="0.00" suffix="دلار" />
               </Field>
               <SmartDateField value={sellDate} onChange={setSellDate} label="تاریخ فروش" />
             </div>
@@ -252,7 +252,7 @@ export function TradePanel() {
       <aside className="lg:col-span-5" aria-live="polite">
         <div className="space-y-4 lg:sticky lg:top-8">
           <Surface variant="subtle" className="p-4 md:p-5">
-            <h3 className="text-sm font-bold text-ink">{side === 'buy' ? 'خلاصه خرید' : 'پیش‌نمایش فروش (FIFO)'}</h3>
+            <h3 className="text-sm font-bold text-ink">{side === 'buy' ? 'خلاصه خرید' : 'پیش‌نمایش فروش'}</h3>
             {side === 'buy' ? (
               <KeyValueList
                 className="mt-2"
@@ -272,12 +272,12 @@ export function TradePanel() {
                 className="mt-2"
                 dense
                 rows={[
-                  { label: 'بهای تمام‌شده (FIFO)', value: <MoneyValue value={sellPreview.costBasis} /> },
+                  { label: 'هزینهٔ خرید (از قدیمی‌ترین خریدها)', value: <MoneyValue value={sellPreview.costBasis} /> },
                   { label: 'ارزش فروش', value: <MoneyValue value={sellPreview.proceeds} /> },
                   { label: 'کارمزد', value: <MoneyValue value={sellPreview.fee} /> },
                   { label: 'دریافتی نقد', value: <MoneyValue value={sellPreview.proceeds - sellPreview.fee} /> },
                   {
-                    label: 'سود/زیان تحقق‌یافته',
+                    label: 'سود و زیان این فروش',
                     hint: 'پیش از کارمزد — کارمزد جداگانه هزینه می‌شود',
                     emphasis: true,
                     value: <MoneyValue value={sellPreview.realized} signed tone="auto" />

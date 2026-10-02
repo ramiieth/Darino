@@ -150,7 +150,7 @@ export function CompareCalculator() {
   const inputs = (
     <>
       <Field label="سرمایه برای هر دارایی">
-        <Input dir="ltr" inputMode="decimal" value={invest} onChange={(e) => setInvest(e.target.value)} suffix="$" />
+        <Input dir="ltr" inputMode="decimal" value={invest} onChange={(e) => setInvest(e.target.value)} suffix="دلار" />
       </Field>
       <SmartDateField label="تاریخ شروع" value={start ? parseIsoToTs(start) : null} onChange={(ts) => setStart(ts ? formatGregorianIso(ts) : '')} />
       <SmartDateField label="تاریخ پایان" value={end ? parseIsoToTs(end) : null} onChange={(ts) => setEnd(ts ? formatGregorianIso(ts) : '')} />
@@ -219,7 +219,7 @@ export function CompareCalculator() {
                     {th('value', 'ارزش')}
                     {th('profit', 'سود')}
                     {th('return', 'بازده')}
-                    <th scope="col" className="col-num !pe-4 md:!pe-5">CAGR</th>
+                    <th scope="col" className="col-num !pe-4 md:!pe-5">رشد سالانهٔ مرکب</th>
                   </tr>
                 </thead>
                 <tbody>

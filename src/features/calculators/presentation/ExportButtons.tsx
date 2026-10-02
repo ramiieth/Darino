@@ -16,7 +16,7 @@ export function exportCsvFile(filename: string, headers: string[], rows: (string
   };
   const content = '﻿' + [headers.join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
   downloadCsv(filename, content);
-  toast('success', 'فایل CSV دانلود شد');
+  toast('success', 'فایل اکسل دانلود شد');
 }
 
 type Section = { heading?: string; table?: { headers: string[]; rows: (string | number | null)[][] }; note?: string };
@@ -58,7 +58,7 @@ export function PdfReportModal({
       onClose={onClose}
       title={title}
       size="lg"
-      description="پیش‌نمایش گزارش — در پنجره چاپ «Save as PDF» را انتخاب کنید."
+      description="پیش‌نمایش گزارش — در پنجره چاپ «ذخیره به‌صورت پی‌دی‌اف» را انتخاب کنید."
       footer={
         <Button
           size="lg"

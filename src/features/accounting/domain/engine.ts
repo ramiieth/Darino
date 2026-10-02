@@ -13,14 +13,14 @@ import type {
   JournalEntry,
   JournalLine
 } from './types';
-import { cryptoAccountKey } from './types';
+import { cryptoAccountKey, cryptoAccountName } from './types';
 
 /** تلورانس اعشاری برای مقایسه بدهکار/بستانکار */
 export const EPS = 1e-6;
 
 /** اعتبارسنجی سند دوطرفه */
 export function validateEntry(lines: JournalLine[]): { ok: boolean; error?: string } {
-  if (lines.length < 2) return { ok: false, error: 'سند باید حداقل دو طرف داشته باشد' };
+  if (lines.length < 2) return { ok: false, error: 'تراکنش باید حداقل دو حساب داشته باشد' };
   for (const l of lines) {
     if (!l.account) return { ok: false, error: 'حساب نامعتبر است' };
     if (l.debit < 0 || l.credit < 0) return { ok: false, error: 'مبالغ نمی‌توانند منفی باشند' };
@@ -31,7 +31,7 @@ export function validateEntry(lines: JournalLine[]): { ok: boolean; error?: stri
   if (Math.abs(d - c) > EPS) {
     return {
       ok: false,
-      error: `بدهکار و بستانکار متوازن نیستند (${d.toFixed(2)} ≠ ${c.toFixed(2)})`
+      error: `ورودی و خروجی تراکنش برابر نیستند (${d.toFixed(2)} ≠ ${c.toFixed(2)})`
     };
   }
   return { ok: true };
@@ -104,7 +104,7 @@ export function buildReversal(
   return {
     id: -1, // پس از ذخیره جایگزین می‌شود
     date,
-    memo: memo ?? `معکوس سند #${entry.id} — ${entry.memo}`,
+    memo: memo ?? `لغو: ${entry.memo}`,
     lines: entry.lines.map((l) => ({ account: l.account, debit: l.credit, credit: l.debit })),
     createdAt: Date.now(),
     source: 'reversal',
@@ -214,14 +214,15 @@ export function makeBuyEntry(input: BuyInput): JournalEntry {
   return {
     id: -1,
     date: input.date,
-    memo: input.memo ?? `خرید ${sym}`,
+    memo: input.memo ?? `خرید ${cryptoAccountName(sym)}`,
     lines: [
       { account: cryptoAccountKey(sym), debit: gross, credit: 0 },
       { account: 'cash:usd', debit: 0, credit: gross + input.fee },
       ...(input.fee > 0 ? [{ account: 'expense:fee', debit: input.fee, credit: 0 }] : [])
     ],
     createdAt: Date.now(),
-    source: 'buy'
+    source: 'buy',
+    trade: { kind: 'buy', symbol: sym, qty: input.qty, unitPrice: input.unitPrice }
   };
 }
 
@@ -261,10 +262,11 @@ export function makeSellEntry(input: SellInput): SellResult {
     entry: {
       id: -1,
       date: input.date,
-      memo: input.memo ?? `فروش ${sym}`,
+      memo: input.memo ?? `فروش ${cryptoAccountName(sym)}`,
       lines,
       createdAt: Date.now(),
-      source: 'sell'
+      source: 'sell',
+      trade: { kind: 'sell', symbol: sym, qty: input.qty, unitPrice: input.unitPrice }
     },
     fifo: fifoResult,
     realized
@@ -279,19 +281,21 @@ export function makeDepositAssetEntry(
   symbol: string,
   valueUsd: number,
   date: number,
-  memo?: string
+  memo?: string,
+  qty?: number
 ): JournalEntry {
   const sym = symbol.toUpperCase();
   return {
     id: -1,
     date,
-    memo: memo ?? `واریز ${sym}`,
+    memo: memo ?? `واریز ${cryptoAccountName(sym)}`,
     lines: [
       { account: cryptoAccountKey(sym), debit: valueUsd, credit: 0 },
       { account: 'equity:capital', debit: 0, credit: valueUsd }
     ],
     createdAt: Date.now(),
-    source: 'deposit'
+    source: 'deposit',
+    ...(qty && qty > 0 ? { trade: { kind: 'deposit_asset' as const, symbol: sym, qty, unitPrice: valueUsd / qty } } : {})
   };
 }
 
@@ -363,7 +367,7 @@ export function makeSellToDestinationEntry(
     entry: {
       id: -1,
       date: input.date,
-      memo: input.memo ?? `فروش ${sym} برای مخارج`,
+      memo: input.memo ?? `فروش ${cryptoAccountName(sym)} برای مخارج`,
       lines,
       createdAt: Date.now(),
       source: 'sell-out'

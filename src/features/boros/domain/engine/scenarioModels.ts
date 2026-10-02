@@ -92,7 +92,7 @@ export function meanReversionScenario(input: {
       settlementPnl: null,
       netPnl: null,
       roiOnMargin: null,
-      note: 'داده تاریخی کافی برای سناریوی بازگشت به میانگین در دسترس نیست (N/A)'
+      note: 'داده تاریخی کافی برای سناریوی بازگشت به میانگین در دسترس نیست (نامشخص)'
     };
   }
   // میانگین وزنی هدف
@@ -120,7 +120,7 @@ export function meanReversionScenario(input: {
     settlementPnl,
     netPnl,
     roiOnMargin: input.margin > 0 ? (netPnl / input.margin) * 100 : 0,
-    note: `حرکت تدریجی از نرخ فعلی به میانگین ${(target * 100).toFixed(2)}٪ (میانگین وزنی 7D/30D/90D)`
+    note: `حرکت تدریجی از نرخ فعلی به میانگین ${(target * 100).toFixed(2)}٪ (میانگین وزنی ۷، ۳۰ و ۹۰ روزه)`
   };
 }
 
@@ -222,8 +222,8 @@ export type Robustness = 'robust' | 'conditional' | 'not-attractive' | 'na';
 /** برچسب فارسی Robustness */
 export const ROBUSTNESS_LABEL: Record<Robustness, string> = {
   robust: 'فرصت پایدار (تمام سناریوها مثبت)',
-  conditional: 'فرصت مشروط (Base مثبت، Bear منفی)',
-  'not-attractive': 'جذاب نیست (Base منفی)',
+  conditional: 'فرصت مشروط (پایه مثبت، نزولی منفی)',
+  'not-attractive': 'جذاب نیست (پایه منفی)',
   na: 'داده ناکافی'
 };
 

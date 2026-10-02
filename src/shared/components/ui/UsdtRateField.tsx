@@ -4,10 +4,10 @@
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import { StatusDot } from '@/shared/components/ui/Badge';
-import { fmtRelativeAge } from '@/shared/utils/formatters';
+import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 
 /** «۲۵۰٬۰۰۰» — ارقام و جداکننده فارسی */
-const faInt = (v: number) => new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 0 }).format(v);
+const faInt = (v: number) => toFaDigits(new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v));
 import { USDT_SOURCE_FA, type UsdtSource } from '@/shared/fx/usdtRate';
 import { useUsdtStore, type EffectiveRate } from '@/shared/store/usdtStore';
 

@@ -95,7 +95,7 @@ export function Sidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
         <button
           type="button"
           onClick={() => openPalette(true)}
-          aria-label="جستجو و فرمان‌ها (Ctrl+K)"
+          aria-label="جستجو و فرمان‌ها"
           className={cn(
             'flex h-10 w-full items-center gap-2 rounded-field border border-divider bg-canvas text-sm text-subtle transition-colors hover:border-divider-strong hover:text-muted',
             collapsed ? 'justify-center' : 'px-3'

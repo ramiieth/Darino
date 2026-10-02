@@ -14,7 +14,8 @@
  *  - مرورگر به‌دلیل CORS مستقیم به دیوار نمی‌زند؛ تنها مسیر جمع‌آوری همین سرور است.
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { db, isDbConfigured, json, readBody, userIdOf } from './_neon.js';
+import { db, isDbConfigured, json, readBody } from './_neon.js';
+import { requireSession } from './_authCore.js';
 import { ensureSchema } from './_schema.js';
 import { collectChunk, sanitizeCursor, COLLECT_SOURCES } from '../src/features/propertyMarket/collector/run.js';
 import { fetchCities, fetchListPage, matchCity } from '../src/features/propertyMarket/collector/client.js';
@@ -71,14 +72,16 @@ async function probeDivar(): Promise<{ ok: boolean; ms: number; listings: number
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const userId = userIdOf(req);
   try {
-    /* ---------- GET: پشتیبان Neon (اختیاری) ---------- */
+    /* ---------- GET: پشتیبان Neon (اختیاری) — فقط با نشست معتبر ---------- */
     if (req.method === 'GET') {
       if (!(await isDbUsable())) {
         json(res, 200, { configured: false, listings: [], snapshots: [] });
         return;
       }
+      const auth = await requireSession(req, res);
+      if (!auth) return;
+      const userId = auth.userId;
       try {
         const rows = (await db()`
           SELECT payload FROM "pmListings" WHERE "userId" = ${userId}
@@ -157,6 +160,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         json(res, 200, { ok: true, persisted: false });
         return;
       }
+      // نوشتن در پایگاه داده فقط با نشست معتبر (کلکشن بدون‌حالت عمومی می‌ماند)
+      const auth = await requireSession(req, res);
+      if (!auth) return;
+      const userId = auth.userId;
       const listings = (Array.isArray(body.listings) ? body.listings : [])
         .slice(0, MAX_PERSIST_LISTINGS)
         .filter((l): l is PropertyMarketListing =>

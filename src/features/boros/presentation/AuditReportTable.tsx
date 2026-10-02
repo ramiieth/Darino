@@ -140,32 +140,32 @@ export function AuditReportTable({ markets }: { markets: BorosMarket[] }) {
   return (
     <Section
       id="audit-report"
-      title="گزارش ممیزی"
-      description={`${toFaDigits(rows.length)} بازار · سرمایه ۱٬۰۰۰ دلار (لانگ) · Notional/مارجین · سالانه‌شده فقط نظری · Liquidation APR بدون Position واقعی N/A`}
+      title="گزارش بررسی محاسبات"
+      description={`${toFaDigits(rows.length)} بازار · سرمایه ۱٬۰۰۰ دلار (لانگ) · ارزش اسمی/مارجین · سالانه‌شده فقط نظری · نرخ لیکوئید بدون پوزیشن واقعی نامشخص`}
     >
       <Surface className="overflow-hidden">
         <div className="max-h-[70dvh] overflow-auto">
           <table className="data-table is-compact min-w-[1180px]">
-            <caption className="sr-only">گزارش ممیزی بازارهای Boros</caption>
+            <caption className="sr-only">گزارش بررسی محاسبات بازارهای بوروس</caption>
             <thead>
               <tr>
                 <th scope="col" className="!ps-5">#</th>
                 <th scope="col" className="sticky start-0 z-20">بازار</th>
                 <th scope="col" className="col-num">روز</th>
-                <th scope="col" className="col-num">Fixed</th>
+                <th scope="col" className="col-num">ثابت</th>
                 <th scope="col" className="col-num">شناور</th>
                 <th scope="col" className="col-num">لبه</th>
-                <th scope="col" className="col-num">Notional</th>
+                <th scope="col" className="col-num">ارزش اسمی</th>
                 <th scope="col" className="col-num">مارجین</th>
                 <th scope="col" className="col-num">تسویه</th>
-                <th scope="col" className="col-num">MTM</th>
+                <th scope="col" className="col-num">ارزش روز</th>
                 <th scope="col" className="col-num">هزینه</th>
                 <th scope="col" className="col-num">خالص</th>
                 <th scope="col" className="col-num">لبه اقتصادی</th>
-                <th scope="col" className="col-num">ROI م</th>
-                <th scope="col" className="col-num">ROI N</th>
+                <th scope="col" className="col-num">بازده م</th>
+                <th scope="col" className="col-num">بازده N</th>
                 <th scope="col" className="col-num">سالانه*</th>
-                <th scope="col" className="col-num">Liq APR</th>
+                <th scope="col" className="col-num">نرخ لیکوئید</th>
                 <th scope="col" className="col-num">نقدشوندگی</th>
                 <th scope="col">ریسک</th>
                 <th scope="col" className="col-num">اطمینان</th>

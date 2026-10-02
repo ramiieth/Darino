@@ -48,10 +48,10 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
               ))}
             </Select>
           </Field>
-          <Field label="حجم" hint="بر حسب YU">
+          <Field label="حجم" hint="بر حسب واحد بازده">
             <Input dir="ltr" type="number" value={size} onChange={(e) => setSize(Number(e.target.value) || 0)} suffix="YU" />
           </Field>
-          <Field label={<span className="inline-flex items-center gap-1.5">Collateral مقایسه <ProvenanceBadge kind="simulated" /></span>}>
+          <Field label={<span className="inline-flex items-center gap-1.5">وثیقه مقایسه <ProvenanceBadge kind="simulated" /></span>}>
             <Input
               dir="ltr"
               type="number"
@@ -77,7 +77,7 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
                   <th scope="col" className="sticky start-0 z-20 !ps-5">بازار</th>
                   <th scope="col" className="col-num">بازده موردانتظار</th>
                   <th scope="col" className="col-num">مارجین</th>
-                  <th scope="col" className="col-num">Net APR</th>
+                  <th scope="col" className="col-num">نرخ خالص سالانه</th>
                   <th scope="col" className="col-num">PnL برای {simCollateral.toFixed(2)} ETH</th>
                   <th scope="col" className="col-num">نقدشوندگی</th>
                   <th scope="col">ریسک</th>

@@ -66,10 +66,10 @@ export function PendleMarketDetailPage() {
   if (!market) {
     return (
       <Page>
-        <PageHeader back={{ label: 'بازارهای Pendle', to: '/pendle' }} title="بازار یافت نشد" />
+        <PageHeader back={{ label: 'بازارهای پندل', to: '/pendle' }} title="بازار یافت نشد" />
         <EmptyState
           message="این بازار در فهرست بازارهای فعال نیست"
-          hint="ممکن است سررسید شده باشد یا TVL آن کمتر از حد نمایش باشد."
+          hint="ممکن است سررسید شده باشد یا ارزش قفل‌شده آن کمتر از حد نمایش باشد."
         />
       </Page>
     );
@@ -80,19 +80,19 @@ export function PendleMarketDetailPage() {
   const labels = (history ?? []).map((h) => FA_TIME.format(new Date(h.timestamp)));
 
   const apyRows = [
-    { label: 'APY ثابت (PT)', value: m.fixedApyPct, emphasis: true },
-    { label: 'APY دارایی پایه', value: m.underlyingApyPct },
-    { label: 'LP APY', value: m.lpApyPct },
-    { label: 'YT APY', value: m.ytApyPct },
-    { label: 'Reward APR', value: m.rewardAprPct },
-    { label: 'APY کارمزد سواپ', value: m.swapFeeApyPct },
-    { label: 'بازده کل (Aggregated)', value: m.totalApyPct }
+    { label: 'بازده سالانه ثابت', value: m.fixedApyPct, emphasis: true },
+    { label: 'بازده سالانه دارایی پایه', value: m.underlyingApyPct },
+    { label: 'بازده نقدینگی', value: m.lpApyPct },
+    { label: 'بازده توکن بازده', value: m.ytApyPct },
+    { label: 'نرخ پاداش سالانه', value: m.rewardAprPct },
+    { label: 'بازده سالانه کارمزد سواپ', value: m.swapFeeApyPct },
+    { label: 'بازده کل ', value: m.totalApyPct }
   ];
 
   return (
     <Page>
       <PageHeader
-        back={{ label: 'بازارهای Pendle', to: '/pendle' }}
+        back={{ label: 'بازارهای پندل', to: '/pendle' }}
         eyebrow={`${m.protocol} · ${chainName(m.chainId)}`}
         title={<bdi dir="ltr">{m.name}</bdi>}
         actions={
@@ -118,7 +118,7 @@ export function PendleMarketDetailPage() {
       <Surface variant="focal" className="p-5 md:p-7">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-sm font-semibold text-muted">APY ثابت (implied)</p>
+            <p className="text-sm font-semibold text-muted">بازده سالانه ثابت (ضمنی)</p>
             <p className="mt-1 text-4xl font-extrabold tracking-tight text-ink md:text-5xl">
               <PercentValue value={m.fixedApyPct} signed={false} tone="none" />
             </p>
@@ -132,13 +132,13 @@ export function PendleMarketDetailPage() {
             <Metric
               size="md"
               align="end"
-              label="تخفیف PT نسبت به دارایی پایه"
+              label="تخفیف توکن اصل نسبت به دارایی پایه"
               value={<PercentValue value={m.ptDiscountPct} signed={false} tone="none" />}
             />
           )}
         </div>
         <MetricGrid cols={3} className="mt-6 border-t border-divider pt-5">
-          <Metric size="md" label="TVL" value={<MoneyValue value={m.details.totalTvl} compact />} />
+          <Metric size="md" label="ارزش قفل‌شده" value={<MoneyValue value={m.details.totalTvl} compact />} />
           <Metric size="md" label="نقدشوندگی" value={<MoneyValue value={m.details.liquidity} compact />} />
           <Metric size="md" label="حجم ۲۴ ساعت" value={<MoneyValue value={m.details.tradingVolume} compact />} />
         </MetricGrid>
@@ -152,14 +152,14 @@ export function PendleMarketDetailPage() {
           ) : history ? (
             <>
               <HistoryChart
-                title="APY ضمنی — ۹۰ روز"
+                title="بازده سالانه ضمنی — ۹۰ روز"
                 labels={labels}
                 data={history.map((h) => h.impliedApy * 100)}
-                format={(v) => `${v.toFixed(2)}%`}
+                format={(v) => `${toFaDigits(v.toFixed(2))}٪`}
                 color="chart-1"
               />
               <HistoryChart
-                title="TVL — ۹۰ روز"
+                title="ارزش قفل‌شده — ۹۰ روز"
                 labels={labels}
                 data={history.map((h) => h.tvl)}
                 format={(v) => fmtUSD(v, true)}
@@ -186,7 +186,7 @@ export function PendleMarketDetailPage() {
             </Surface>
           </Section>
           {m.lpApyBreakdown?.categories?.length > 0 && (
-            <Section id="lp-breakdown" title="اجزای LP APY" headingLevel={2}>
+            <Section id="lp-breakdown" title="اجزای بازده نقدینگی" headingLevel={2}>
               <Surface className="px-4">
                 <KeyValueList
                   dense
@@ -211,12 +211,12 @@ export function PendleMarketDetailPage() {
             <Spec label="آدرس بازار" value={m.address} copy />
             <Spec label="زنجیره" value={`${chainName(m.chainId)} (${m.chainId})`} />
             <Spec label="پروتکل" value={m.protocol} />
-            <Spec label="کارمزد" value={m.details.feeRate ? `${(m.details.feeRate * 100).toFixed(2)}%` : '—'} />
+            <Spec label="کارمزد" value={m.details.feeRate ? `${toFaDigits((m.details.feeRate * 100).toFixed(2))}٪` : '—'} />
           </dl>
         </Surface>
       </Section>
 
-      <p className="text-xs text-subtle">داده‌ها از Pendle Core API. بازده اعلام‌شده یا گذشته تضمینی برای آینده نیست.</p>
+      <p className="text-xs text-subtle">داده‌ها از سرویس رسمی پندل. بازده اعلام‌شده یا گذشته تضمینی برای آینده نیست.</p>
     </Page>
   );
 }

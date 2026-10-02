@@ -3,7 +3,7 @@
  * فقط‌افزودنی: سندها و رویدادها هرگز ویرایش/حذف نمی‌شوند
  * ============================================================ */
 import type { Account, FifoLot, JournalEntry, LedgerEvent } from '../domain/types';
-import { DEFAULT_ACCOUNTS } from '../domain/types';
+import { DEFAULT_ACCOUNTS, newLedgerId } from '../domain/types';
 
 /** افزودن جدول‌های حسابداری به دیتابیس موجود (نسخه ۴) */
 export function accountTables(stores: Record<string, string>): Record<string, string> {
@@ -114,36 +114,30 @@ export async function entryLoadAll(): Promise<JournalEntry[]> {
   return [...mem.entries].sort((a, b) => a.id - b.id);
 }
 
-/** افزودن سند — همیشه شناسه جدید می‌گیرد (هرگز ویرایش نمی‌شود) */
+/**
+ * افزودن سند — همیشه شناسهٔ یکتای جهانی جدید می‌گیرد (هرگز ویرایش نمی‌شود).
+ * شناسه دیگر شمارهٔ ترتیبی Dexie نیست تا سندهای دو دستگاه با هم تداخل نکنند.
+ */
 export async function entryAppend(entry: JournalEntry): Promise<JournalEntry> {
+  const saved = { ...entry, id: newLedgerId() };
   const db = await getAccDb();
   if (db) {
     try {
-      const id = await db.accEntries.add({ ...entry, id: undefined as unknown as number });
-      return { ...entry, id };
+      await db.accEntries.add(saved);
+      return saved;
     } catch {
       /* فالبک */
     }
   }
-  const saved = { ...entry, id: mem.nextEntryId++ };
   mem.entries.push(saved);
   return saved;
 }
 
 /** افزودن چند سند (افتتاحیه) */
 export async function entryAppendMany(entries: JournalEntry[]): Promise<JournalEntry[]> {
-  const db = await getAccDb();
-  if (db) {
-    try {
-      const withIds = entries.map((e) => ({ ...e, id: undefined as unknown as number }));
-      await db.accEntries.bulkAdd(withIds);
-      const all = await entryLoadAll();
-      return all.slice(-entries.length);
-    } catch {
-      /* فالبک */
-    }
-  }
-  return Promise.all(entries.map((e) => entryAppend(e)));
+  const out: JournalEntry[] = [];
+  for (const e of entries) out.push(await entryAppend(e));
+  return out;
 }
 
 /* ============ Put-Level (برای همگام‌سازی Neon → Dexie با حفظ ID) ============ */
@@ -223,18 +217,21 @@ export async function lotLoadAll(): Promise<FifoLot[]> {
   return [...mem.lots].sort((a, b) => a.id - b.id);
 }
 
-/** افزودن لات خرید */
+/**
+ * افزودن لات (فقط داده‌های قدیمی/مبنا) — لات‌های جدید از روی سندها بازسازی می‌شوند
+ * (domain/lotReplay.ts) و دیگر جداگانه ذخیره نمی‌شوند.
+ */
 export async function lotAppend(lot: FifoLot): Promise<FifoLot> {
+  const saved = { ...lot, id: newLedgerId() };
   const db = await getAccDb();
   if (db) {
     try {
-      const id = await db.accLots.add({ ...lot, id: undefined as unknown as number });
-      return { ...lot, id };
+      await db.accLots.add(saved);
+      return saved;
     } catch {
       /* فالبک */
     }
   }
-  const saved = { ...lot, id: mem.nextLotId++ };
   mem.lots.push(saved);
   return saved;
 }
@@ -274,19 +271,18 @@ export async function eventAppend(
   refId: number,
   detail: string
 ): Promise<LedgerEvent> {
-  const ev: LedgerEvent = { id: -1, at: Date.now(), kind, refId, detail };
+  const ev: LedgerEvent = { id: newLedgerId(), at: Date.now(), kind, refId, detail };
   const db = await getAccDb();
   if (db) {
     try {
-      const id = await db.accEvents.add({ ...ev, id: undefined as unknown as number });
-      return { ...ev, id };
+      await db.accEvents.add(ev);
+      return ev;
     } catch {
       /* فالبک */
     }
   }
-  const saved = { ...ev, id: mem.nextEventId++ };
-  mem.events.push(saved);
-  return saved;
+  mem.events.push(ev);
+  return ev;
 }
 
 /* ---------------- پاک‌سازی (فقط تست) ---------------- */

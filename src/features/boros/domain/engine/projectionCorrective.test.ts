@@ -162,7 +162,7 @@ describe('Test 6-8: Mark / Underlying / Settlement', () => {
     expect(p!.scenarios.bear).not.toBeNull();
     expect(p!.scenarios.bear!.assumedMark).toBeNull(); // Mark سناریو در دسترس نیست
     expect(p!.scenarios.bear!.mtmPnl).toBeNull();
-    expect(p!.scenarios.bear!.mtmReason).toContain('Underlying هرگز به‌جای Mark');
+    expect(p!.scenarios.bear!.mtmReason).toContain('نرخ شناور هرگز به‌جای مارک');
   });
 
   it('Test 7 — MTM بدون Mark سناریو = N/A در همه سناریوها', () => {

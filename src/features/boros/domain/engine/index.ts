@@ -222,7 +222,7 @@ export function sanityChecks(
   feesTotal: number | null
 ): SanityResult {
   // Check 6: Days <= 0 → حذف
-  if (days <= 0) return { valid: false, reason: 'سررسید گذشته (Days<=0)' };
+  if (days <= 0) return { valid: false, reason: 'سررسید گذشته ' };
   // Check 5: Notional = 0 → PnL صفر (ولی valid است — فقط صفر)
   if (size <= 0) return { valid: false, reason: 'حجم نامعتبر' };
   // Check 1: Fees <= Notional (اگر fee معتبر است)
@@ -231,7 +231,7 @@ export function sanityChecks(
   }
   // APR معتبر
   if (!Number.isFinite(m.markApr) || !Number.isFinite(m.floatingApr)) {
-    return { valid: false, reason: 'APR نامعتبر' };
+    return { valid: false, reason: 'نرخ سالانه نامعتبر' };
   }
   return { valid: true, reason: null };
 }
@@ -417,7 +417,7 @@ export class BorosCalculationEngine {
     const makerEntryFee = {
       amount: 0 as number | null,
       source: 'documentation',
-      note: 'طبق مستندات Boros (docs/Mechanics/Fees): Maker orders هنگام ثبت هزینه ندارند — تأیید رسمی'
+      note: 'طبق مستندات بوروس : سفارش‌های میکر هنگام ثبت هزینه ندارند — تأیید رسمی'
     };
 
     /* ---------- Status (Part 16/19 + Economic Edge + Anomaly) ---------- */

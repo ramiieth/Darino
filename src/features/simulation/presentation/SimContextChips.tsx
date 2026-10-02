@@ -26,7 +26,7 @@ export function SimContextChips({ result }: { result: TimelineResult }) {
           sub={
             result.ethLivePrice !== null ? (
               <>
-                ETH <MoneyValue value={result.ethLivePrice} />
+                اتریوم <MoneyValue value={result.ethLivePrice} />
               </>
             ) : (
               t('na')

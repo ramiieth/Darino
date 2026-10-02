@@ -219,7 +219,7 @@ export const BENCHMARK_FA: Record<BenchmarkAsset, string> = {
   bitcoin: 'BTC',
   'tether-gold': 'طلا (XAUT)',
   tether: 'USDT',
-  usd: 'دلار (USD)'
+  usd: 'دلار'
 };
 
 export interface BenchmarkComparison {

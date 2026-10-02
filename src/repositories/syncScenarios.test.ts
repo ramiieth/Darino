@@ -121,9 +121,12 @@ describe('Schema/Case — هم‌خوانی camelCase Quoted بین api و schem
   it('چک to_regclass در _schema.ts و ensure-schema.mjs از نام Quoted استفاده می‌کند', () => {
     const schemaTs = readFileSync(resolve(process.cwd(), 'api/_schema.ts'), 'utf8');
     const ensureJs = readFileSync(resolve(process.cwd(), 'scripts/ensure-schema.mjs'), 'utf8');
-    for (const t of ['accAccounts', 'accEntries', 'accLots', 'accEvents', 'portfolioAssets', 'dashboardSnapshots']) {
-      expect(schemaTs).toContain(`to_regclass('public."${t}"')`);
-      expect(ensureJs).toContain(`to_regclass('public."${t}"')`);
+    // آمادگی با اثر انگشت جدول "schemaMeta" سنجیده می‌شود (نه فهرست دستی جدول‌ها)
+    for (const src of [schemaTs, ensureJs]) {
+      expect(src).toContain(`to_regclass('public."schemaMeta"')`);
+      expect(src).toContain('FROM "schemaMeta"');
+      // هیچ to_regclass بدون کوتیشن (که lowercase می‌شود) باقی نمانده
+      expect(src).not.toMatch(/to_regclass\('public\.[a-zA-Z]/);
     }
   });
 });

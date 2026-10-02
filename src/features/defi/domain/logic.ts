@@ -199,7 +199,7 @@ export const CHAIN_NAMES_FA: Record<string, string> = {
   blast: 'بلاست',
   scroll: 'اسکرول',
   zksync: 'زی‌کی‌سینک',
-  'polygon-zkevm': 'پالیگان zkEVM',
+  'polygon-zkevm': 'پالیگان زی‌کی',
   gnosis: 'گنوسیس',
   osmosis: 'اسموسیس',
   'binance': 'بایننس'

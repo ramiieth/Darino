@@ -52,7 +52,7 @@ export function PnlCalculator() {
         setHistMsg(
           asset.kind === 'tokenized'
             ? 'داده تاریخی برای دارایی توکن‌ایز در دسترس نیست.'
-            : 'داده تاریخی فعلاً در دسترس نیست (محدودیت API).'
+            : 'داده تاریخی فعلاً در دسترس نیست (محدودیت سرویس).'
         );
       }
       setHistLoading(false);
@@ -91,13 +91,13 @@ export function PnlCalculator() {
           <Input dir="ltr" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} suffix={asset?.symbol} />
         </Field>
         <Field label="قیمت خرید">
-          <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} suffix="دلار" />
         </Field>
         <Field label="کارمزد خرید">
-          <Input dir="ltr" inputMode="decimal" value={buyFee} onChange={(e) => setBuyFee(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={buyFee} onChange={(e) => setBuyFee(e.target.value)} suffix="دلار" />
         </Field>
         <Field label="کارمزد فروش">
-          <Input dir="ltr" inputMode="decimal" value={sellFee} onChange={(e) => setSellFee(e.target.value)} suffix="$" />
+          <Input dir="ltr" inputMode="decimal" value={sellFee} onChange={(e) => setSellFee(e.target.value)} suffix="دلار" />
         </Field>
       </div>
     </>
@@ -177,7 +177,7 @@ export function PnlCalculator() {
                     ['درصد بازده', fmtPct(result.returnPct)]
                   ]
                 },
-                note: 'محاسبات با موتور مالی (decimal.js) و دقت ۱۲ رقم اعشار انجام شده است.'
+                note: 'محاسبات با موتور مالی و دقت ۱۲ رقم اعشار انجام شده است.'
               }
             ]}
           />

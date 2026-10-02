@@ -167,7 +167,7 @@ export class RateLimitedQueue {
 /** خطای محدودیت نرخ */
 export class RateLimitError extends Error {
   retryAfterMs: number;
-  constructor(message = 'Rate limited (429)', retryAfterMs = 60_000) {
+  constructor(message = 'محدودیت تعداد درخواست', retryAfterMs = 60_000) {
     super(message);
     this.name = 'RateLimitError';
     this.retryAfterMs = retryAfterMs;
