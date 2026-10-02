@@ -27,12 +27,13 @@ export function visibleWalletValue(data:WalletSnapshot):number|null {
 export function visibleTransfer(t:TransactionTransfer,chain:string):boolean {return trustedToken({...t,chain:t.chain??chain});}
 export function visibleTransaction(tx:WalletTransaction):boolean {
  if(tx.spam)return false;
- if(!tx.transfers.length)return true; // Genuine approvals/contract calls have no asset flow.
- const transfers=tx.transfers.filter(t=>visibleTransfer(t,tx.chain));
+ const flows=tx.transfers.length?tx.transfers:tx.approvals??[];
+ if(!flows.length)return true; // Genuine approvals/contract calls have no asset flow.
+ const transfers=flows.filter(t=>visibleTransfer(t,tx.chain));
  if(!transfers.length)return false;
  // Dust poisoning is an incoming transfer, never the outgoing leg of a swap or a gas fee.
  if(tx.type==='receive'&&transfers.every(t=>t.direction==='in')) {
-  if(transfers.every(t=>{try{return (t.value!==null&&t.value>=0&&t.value<=0.000001)||(t.quantity!==null&&new Decimal(t.quantity).isFinite()&&new Decimal(t.quantity).gte(0)&&new Decimal(t.quantity).lte('0.000001'));}catch{return false;}}))return false;
+  if(transfers.every(t=>{try{return (t.value!==null&&t.value>=0&&t.value<0.01)||(t.value===null&&t.price!=null&&t.price>=0&&t.quantity!==null&&new Decimal(t.quantity).times(t.price).gte(0)&&new Decimal(t.quantity).times(t.price).lt('0.01'))||(t.quantity!==null&&new Decimal(t.quantity).isFinite()&&new Decimal(t.quantity).gte(0)&&new Decimal(t.quantity).lte('0.000001'));}catch{return false;}}))return false;
  }
  return true;
 }

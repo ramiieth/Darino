@@ -11,7 +11,7 @@ export interface TransactionTransfer {
   direction: string; symbol: string; quantity: string | null; value: number | null; address: string | null; icon: string | null;
   verified?:boolean; spam?:boolean; chain?:string; tokenId?: string; name?: string; contract?: string | null; price?: number | null; sender?: string; recipient?: string; actId?: string;
 }
-export interface WalletTransaction { spam?:boolean; id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: TransactionTransfer[]; from?: string; to?: string; protocol?: string; protocolIcon?: string | null; method?: string; acts?: {id:string;type:string;protocol:string;contract:string}[]; feeToken?: TransactionTransfer }
+export interface WalletTransaction { spam?:boolean; id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: TransactionTransfer[]; from?: string; to?: string; protocol?: string; protocolIcon?: string | null; method?: string; acts?: {id:string;type:string;protocol:string;contract:string}[]; feeToken?: TransactionTransfer; approvals?:TransactionTransfer[] }
 export interface TransactionPage { rows: WalletTransaction[]; next: string | null; fetchedAt: number }
 export const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export const arr = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
@@ -60,11 +60,11 @@ export function normalizeTransaction(v: unknown): WalletTransaction {
       contract:str(implementation?.address) || null, price:finite(t.price),
       quantity:str(q.numeric) || (str(q.int) && typeof q.decimals === 'number' ? decimalQuantity(str(q.int),q.decimals) : null),
       value:finite(t.value), sender:str(t.sender), recipient:str(t.recipient), actId:str(t.act_id),
-      address:(t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null,
+      address:str(t.spender)||(t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null,
       icon:str(obj(f.icon).url) || null };
   };
   return {spam:obj(a.flags).is_trash===true,id:str(r.id),hash:str(a.hash),chain,type:str(a.operation_type),status:str(a.status),minedAt:str(a.mined_at),fee:finite(fee.value),
     from:str(a.sent_from),to:str(a.sent_to),protocol:str(app.name),protocolIcon:str(obj(app.icon).url) || null,method:str(obj(app.method).name),
     acts:arr(a.acts).map(v => {const x=obj(v),m=obj(x.application_metadata);return {id:str(x.id),type:str(x.type),protocol:str(m.name),contract:str(m.contract_address)};}),
-    feeToken:Object.keys(fee).length ? transfer(fee) : undefined, transfers:arr(a.transfers).map(transfer)};
+    feeToken:Object.keys(fee).length ? transfer(fee) : undefined, approvals:arr(a.approvals).map(transfer), transfers:arr(a.transfers).map(transfer)};
 }

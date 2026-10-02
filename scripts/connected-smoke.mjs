@@ -33,7 +33,8 @@ await page.route('**/*',async route => {
  else if(u.pathname==='/api/integrations') {
   const op=u.searchParams.get('op');
   if(op==='wallet') {body=failWallet?{error:'خطای آزمایشی اتصال'}:snapshot;status=failWallet?502:200;}
-  else if(op==='transactions') body={rows:[{id:'dust-receipt',hash:'0xdust',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.000001',value:0.004,address:null,icon:'/logos/token-eth.png',verified:true}]},{id:'spam-receipt',hash:'0xspam',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,spam:true,transfers:[]},{id:'t1',hash:'0xtest',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0.1,transfers:[{direction:'in',symbol:'ETH',quantity:'0.1',value:400,address:'0x'+'cd'.repeat(20),icon:'/logos/token-eth.png',verified:true,tokenId:'ethereum'}]}],next:null,fetchedAt:Date.now()};
+  else if(op==='transactions') body={rows:[{id:'dust-receipt',hash:'0xdust',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.000001',value:0.004,address:null,icon:'/logos/token-eth.png',verified:true}]},{id:'spam-receipt',hash:'0xspam',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,spam:true,transfers:[]},{id:'stable-dust-1',hash:'0xstable1',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.000014',value:0.000014,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'stable-dust-2',hash:'0xstable2',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.0001',value:0.0001,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'t1',hash:'0xtest',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0.1,transfers:[{direction:'in',symbol:'ETH',quantity:'0.1',value:400,address:'0x'+'cd'.repeat(20),icon:'/logos/token-eth.png',verified:true,tokenId:'ethereum'}]}],next:null,fetchedAt:Date.now()};
+  else if(op==='chart') body={points:[[Date.now()-86400000,1310],[Date.now()-72000000,1320],[Date.now()-36000000,1270],[Date.now(),1300.8]],fetchedAt:Date.now()};
   else if(op==='arcus-spot') body={tokens:[{address:'0x'+'11'.repeat(20),wrappedTokenAddress:null,symbol:'WETH',name:'Wrapped Ether',decimals:18,source:'arcus',verified:true}],fetchedAt:Date.now()};
   else if(op==='pnl') body={data:{attributes:{realized_gain:10,unrealized_gain:20,total_fee:1}}};
   else if(op==='analyze') {analysisBody=route.request().postDataJSON();body={answer:'تحلیل آزمایشی فارسی: تمرکز دارایی را بررسی کنید.',generatedAt:Date.now()};}
@@ -54,6 +55,8 @@ try {
  await page.getByRole('heading',{name:'دارایی‌های کیف آزمایشی'}).waitFor();
  await page.getByRole('button',{name:'دریافت / به‌روزرسانی'}).click();
  await page.getByText('تأییدشده',{exact:true}).first().waitFor();
+ assert.equal(await page.locator('main').getByText('۰.۰۰۰۰۱۴ USDT0',{exact:false}).count(),0);
+ assert.equal(await page.locator('main').getByText('۰.۰۰۰۱ USDT0',{exact:false}).count(),0);
  assert.equal(await page.getByText('۰.۰۰۰۰۰۱ ETH',{exact:false}).count(),0);
  assert.equal(await page.getByText('جعلی آزمایشی',{exact:false}).count(),0);
  await fits();
@@ -79,9 +82,21 @@ try {
  await page.getByRole('button',{name:'به‌روزرسانی پرتفولیو',exact:true}).click();
  await page.getByText('دادهٔ قدیمی',{exact:true}).waitFor({state:'hidden'});await fits();
  await page.setViewportSize({width:390,height:844});
+ await page.getByRole('img',{name:'نمودار ارزش کیف پول کیف آزمایشی؛ ۱ روز'}).waitFor();
  await page.screenshot({path:'/tmp/darino-clean-dashboard.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});
+ await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(450);
+ await page.screenshot({path:'/tmp/darino-reference-portfolio-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
  await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).click();
  await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
+ await page.getByRole('searchbox',{name:'جستجوی تراکنش'}).fill('ناموجود');
+ await page.getByText('تراکنش قابل نمایش یافت نشد.',{exact:true}).waitFor();
+ await page.getByRole('searchbox',{name:'جستجوی تراکنش'}).fill('');
+ await page.setViewportSize({width:1440,height:1000});
+ await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(450);
+ await page.screenshot({path:'/tmp/darino-reference-activity-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
  assert.equal(await page.locator('a[href="#/pendle"],a[href="#/loop"]').count(),0);
  await page.setViewportSize({width:390,height:844});
  await page.evaluate(()=>location.hash='#/accounting');
@@ -119,7 +134,7 @@ try {
  await arcusForm.getByRole('button',{name:'ذخیره',exact:true}).click();
  await page.getByRole('tab',{name:'اسپات',exact:true}).click();
  await page.getByText('منبع موجودی: زریون · فهرست توکن: آرکوس').waitFor();
- assert.equal(await page.getByText('WETH',{exact:true}).count()>0,true);await fits();
+ assert((await page.locator('main').innerText()).includes('WETH'));await fits();
  await page.screenshot({path:'/tmp/darino-spot-mobile.png',fullPage:true});
  const routes=['/','/dashboard','/wallets','/assistant','/simulation','/defi','/boros','/accounting','/holdings','/arcus','/calculators','/vehicle','/realestate','/security'];
  for(const theme of ['light','dark']) {

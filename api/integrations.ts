@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireSession } from './_authCore.js';
 import { json, readBody } from './_neon.js';
 import { validAddress } from '../src/features/connected/domain/model.js';
-import { getWallet, getTransactions, getPnl, ProviderError } from './_zerion.js';
+import { getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema } from './_assistant.js';
@@ -28,10 +28,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
-    if (req.method !== 'GET' || !['wallet','transactions','pnl'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
+    if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';
     if (!validAddress(address)) { json(res,400,{ error:'آدرس عمومی EVM یا سولانا معتبر نیست' }); return; }
-    const data = op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined);
+    const data = op === 'chart' ? await getBalanceChart(address,auth.userId,u.searchParams.get('period')??'day',(u.searchParams.get('ids')??'').split(',').filter(Boolean),u.searchParams.get('chain')??'') : op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined);
     json(res,200,data);
   } catch (e) {
     const status = e instanceof ProviderError ? e.status : 502;

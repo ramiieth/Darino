@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkedNext, getWallet, ProviderError } from '../../api/_zerion';
+import { checkedNext, getWallet, getBalanceChart, ProviderError } from '../../api/_zerion';
 import { analysisSchema, analyze } from '../../api/_assistant';
 const address = '0x' + 'ab'.repeat(20);
 beforeEach(() => { vi.stubEnv('ZERION_API_KEY','test-zerion'); vi.stubEnv('GEMINI_API_KEY','test-gemini'); });
@@ -27,6 +27,16 @@ describe('سرور اتصال‌های دارینو', () => {
     expect(snapshot.total).toBe(987.65);
     expect(snapshot.complete).toBe(false);
     expect(JSON.stringify(snapshot)).not.toContain('test-zerion');
+  });
+  it('wallet charts only use validated periods and asset IDs on the fixed authenticated provider', async()=>{
+    const fetcher=vi.fn(async(url:string)=>{
+      const u=new URL(url);expect(u.origin).toBe('https://api.zerion.io');expect(u.pathname).toBe(`/v1/wallets/${address}/charts/day`);expect(u.searchParams.get('filter[fungible_ids]')).toBe('eth,usdc');expect(u.searchParams.get('filter[chain_ids]')).toBe('base');
+      return new Response(JSON.stringify({data:{attributes:{points:[[1700000000,10],[1700000300,12]]}}}));
+    });vi.stubGlobal('fetch',fetcher);
+    await expect(getBalanceChart(address,'chart-user','day',['eth','usdc'],'base')).resolves.toMatchObject({points:[[1700000000000,10],[1700000300000,12]]});
+    await getBalanceChart(address,'chart-user','day',['eth','usdc'],'base');expect(fetcher).toHaveBeenCalledTimes(1);
+    await expect(getBalanceChart(address,'chart-user','../evil',['eth'],'')).rejects.toThrow();
+    await expect(getBalanceChart(address,'chart-user','day',['eth&evil=x'],'')).rejects.toThrow();
   });
   it('تحلیل معتبر، تاریخچهٔ محدود و کلید در هدر Gemini؛ فیلدهای اضافی حذف می‌شوند', async () => {
     const parsed = analysisSchema.parse({question:'ریسک؟',history:[{role:'user',text:'پرسش قبلی'},{role:'assistant',text:'پاسخ قبلی'}],context:{total:100,partial:false,sources:[],positions:[],arcus:[],profile:{horizon:'',risk:'',liquidity:''},address:'secret-address'}});

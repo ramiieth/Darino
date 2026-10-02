@@ -13,3 +13,9 @@ export const operationNames: Record<string,string> = { approve:'مجوز قرا�
 export function tokenQuantity(value:string|null|undefined):string {
  try { if(value==null)return '—';const n=new Decimal(value);if(!n.isFinite())return '—';return toFaDigits(n.toSignificantDigits(8).toFixed()); } catch{return '—';}
 }
+
+export function platformName(value:string):string {
+ const names:Record<string,string>={pendle:'پندل',arcus:'آرکوس',relay:'ریلی',lifi:'لای‌فای',uniswap:'یونی‌سواپ',aave:'آوه',ethena:'اتنا',boros:'بوروس',cap:'کپ',zerion:'زریون'};
+ const key=value.toLowerCase().replace(/[^a-z0-9]/g,'');
+ return names[key]??Object.entries(names).find(([id])=>key.startsWith(id))?.[1]??value;
+}
