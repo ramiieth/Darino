@@ -1,11 +1,11 @@
 /**
  * امنیت و دستگاه‌ها — پنل مدیریت ورود
- *  نشست‌های فعال همهٔ دستگاه‌ها (لغو تکی / خروج از بقیه) · کلید عبورها (نام، حذف، افزودن)
+ *  نشست‌های فعال همهٔ دستگاه‌ها (لغو تکی / خروج از بقیه) · رمز عبور و کد ۶ رقمی · کلید عبورها
  *  · کد اتصال دستگاه جدید · رویدادهای امنیتی · وضعیت همگام‌سازی · خروج این دستگاه
- * عملیات حساس فیس آیدی مجدد می‌خواهد (سرور: پنجرهٔ ۱۰ دقیقه‌ای step-up).
+ * عملیات حساس تأیید مجدد می‌خواهد (رمز + کد یا فیس آیدی؛ سرور: پنجرهٔ ۱۰ دقیقه‌ای step-up).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Fingerprint, LogOut, MonitorSmartphone, Plus, RefreshCw, Trash2, Pencil, Link2, Cloud, ShieldAlert } from 'lucide-react';
+import { Fingerprint, LogOut, MonitorSmartphone, Plus, RefreshCw, Trash2, Pencil, Link2, Cloud, ShieldAlert, KeyRound, Smartphone } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
@@ -17,6 +17,7 @@ import { toast } from '@/shared/store/toastStore';
 import { fmtDateTime, fmtRelativeAge } from '@/shared/utils/formatters';
 import { authApi, authErrorText, type PasskeyInfo, type SecurityEvent, type SessionInfo, useAuth } from './authClient';
 import { prepareSignOut, signOut, type SignOutCheck } from './signOut';
+import { ChangePasswordSheet, MoveTotpSheet, PasswordStepUpDialog } from './PasswordParts';
 import { syncCustodyNow, useCustodySync } from '@/features/custody/data/sync';
 
 const EVENT_LABEL: Record<string, string> = {
@@ -31,7 +32,14 @@ const EVENT_LABEL: Record<string, string> = {
   session_revoked: 'لغو نشست',
   sessions_revoked_others: 'خروج از دستگاه‌های دیگر',
   pair_code_created: 'ساخت کد اتصال',
-  step_up: 'تأیید مجدد فیس آیدی'
+  step_up: 'تأیید مجدد',
+  password_login_failed: 'ورود با رمز ناموفق',
+  password_set: 'تعیین رمز عبور',
+  password_reset: 'بازیابی رمز با کد راه‌اندازی',
+  password_changed: 'تغییر رمز عبور',
+  totp_setup_failed: 'کد ۶ رقمی نادرست (راه‌اندازی)',
+  totp_changed: 'انتقال کد ۶ رقمی به گوشی جدید',
+  totp_change_failed: 'کد ۶ رقمی نادرست (انتقال)'
 };
 
 const SYNC_LABEL: Record<string, string> = {
@@ -46,6 +54,8 @@ const SYNC_LABEL: Record<string, string> = {
 
 export default function SecurityPage() {
   const session = useAuth((s) => s.session);
+  const hasPassword = useAuth((s) => s.hasPassword);
+  const [pwSheet, setPwSheet] = useState<null | 'change' | 'totp'>(null);
   const sync = useCustodySync();
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null);
   const [ended, setEnded] = useState<SessionInfo[]>([]);
@@ -103,7 +113,7 @@ export default function SecurityPage() {
     <Page>
       <PageHeader
         title="امنیت و دستگاه‌ها"
-        subtitle="نشست‌های همهٔ دستگاه‌ها، کلید عبورها و رویدادهای ورود. لغو و حذف، تأیید مجدد فیس آیدی می‌خواهد."
+        subtitle="نشست‌های همهٔ دستگاه‌ها، رمز عبور، کلید عبورها و رویدادهای ورود. لغو و حذف، تأیید مجدد می‌خواهد."
         actions={
           <Button variant="outline" icon={<RefreshCw className={loading ? 'animate-spin' : ''} />} onClick={() => void load()} disabled={loading}>
             تازه‌سازی
@@ -203,6 +213,31 @@ export default function SecurityPage() {
           )}
         </section>
 
+        {/* ---------- رمز عبور + کد ۶ رقمی ---------- */}
+        <section className="space-y-3">
+          <h2 className="text-base font-bold text-ink">رمز عبور و کد ۶ رقمی</h2>
+          <Surface className="space-y-3 p-4">
+            {hasPassword ? (
+              <>
+                <p className="text-sm text-muted">ورود با رمز عبور + کد ۶ رقمی Google Authenticator فعال است.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" icon={<KeyRound />} onClick={() => setPwSheet('change')}>
+                    تغییر رمز عبور
+                  </Button>
+                  <Button variant="outline" icon={<Smartphone />} onClick={() => setPwSheet('totp')}>
+                    انتقال کد به گوشی جدید
+                  </Button>
+                </div>
+                <p className="text-xs leading-5 text-muted">
+                  اگر رمز یا گوشی را گم کردید: کد راه‌اندازی تازه‌ای در ورسل بگذارید و از صفحهٔ ورود «بازیابی» را بزنید؛ همهٔ دستگاه‌ها خارج می‌شوند.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted">رمز عبور تعیین نشده است. با کد راه‌اندازی از صفحهٔ ورود («بازیابی») می‌توانید رمز و کد ۶ رقمی بسازید.</p>
+            )}
+          </Surface>
+        </section>
+
         {/* ---------- کلید عبورها ---------- */}
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -234,8 +269,8 @@ export default function SecurityPage() {
                     size="icon-sm"
                     variant="ghost"
                     aria-label="حذف کلید عبور"
-                    disabled={(passkeys?.length ?? 0) <= 1 || busy === `del-${p.id}`}
-                    title={(passkeys?.length ?? 0) <= 1 ? 'آخرین کلید عبور قابل حذف نیست' : undefined}
+                    disabled={((passkeys?.length ?? 0) <= 1 && !hasPassword) || busy === `del-${p.id}`}
+                    title={(passkeys?.length ?? 0) <= 1 && !hasPassword ? 'آخرین کلید عبور قابل حذف نیست (رمز عبور تعیین نشده)' : undefined}
                     onClick={() => {
                       if (window.confirm('این کلید عبور حذف و همهٔ نشست‌هایی که با آن وارد شده‌اند لغو می‌شوند. ادامه می‌دهید؟')) {
                         void act(`del-${p.id}`, () => authApi.deletePasskey(p.id), 'کلید عبور حذف شد');
@@ -298,6 +333,10 @@ export default function SecurityPage() {
           </Surface>
         </section>
       </div>
+
+      <PasswordStepUpDialog />
+      <ChangePasswordSheet open={pwSheet === 'change'} onClose={() => setPwSheet(null)} />
+      <MoveTotpSheet open={pwSheet === 'totp'} onClose={() => setPwSheet(null)} />
 
       {rename && (
         <Sheet

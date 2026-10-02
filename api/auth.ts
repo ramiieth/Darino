@@ -16,6 +16,14 @@
  *  POST ?op=pair-code         کد یک‌بارمصرف ۱۰ دقیقه‌ای برای دستگاه جدید (تأیید مجدد لازم)
  *  GET  ?op=events            رویدادهای امنیتی اخیر
  *
+ *  رمز عبور + کد ۶ رقمی Google Authenticator (برای دستگاه‌های بدون کلید عبور؛ کد اجباری است):
+ *  POST ?op=password-setup-begin   کد راه‌اندازی + رمز جدید → کلید QR (هنوز چیزی فعال نمی‌شود)
+ *  POST ?op=password-setup-finish  اولین کد ۶ رقمی → ذخیرهٔ رمز و کلید + لغو همهٔ نشست‌های قبلی + ورود
+ *  POST ?op=password-login         ورود با رمز + کد — قفل پیش‌رونده پس از ۵ خطای پیاپی
+ *  POST ?op=password-stepup        تأیید مجدد با رمز + کد برای عملیات حساس
+ *  POST ?op=password-change        تغییر رمز (تأیید مجدد لازم) — نشست‌های دیگر لغو می‌شوند
+ *  POST ?op=totp-begin / totp-finish  انتقال کد به گوشی جدید (تأیید مجدد لازم)
+ *
  * راه‌اندازی اول: passkey اول فقط با DARINO_SETUP_TOKEN (متغیر محیطی Vercel) ثبت می‌شود.
  * مرجع: SimpleWebAuthn v14 — userVerification: required (Face ID/Touch ID/رمز دستگاه).
  * ============================================================ */
@@ -58,7 +66,11 @@ import {
   clientIp,
   type ActiveSession
 } from './_authCore.js';
-import type { AuthStore, StoredSession } from './_authStore.js';
+import type { AuthStore, StoredPassword, StoredSession } from './_authStore.js';
+import { hashPassword, lockDurationMs, newTotpSecret, passwordProblem, totpUri, verifyPassword, verifyTotp } from './_password.js';
+
+/** فرصت اسکن QR و وارد کردن اولین کد */
+const TOTP_SETUP_TTL_MS = 10 * 60_000;
 
 const FAIL_WINDOW_MS = 15 * 60_000;
 const FAIL_LIMIT = 20;
@@ -99,9 +111,9 @@ async function rateLimited(store: AuthStore, req: IncomingMessage): Promise<bool
   return (await store.countRecentFailures(ip, Date.now() - FAIL_WINDOW_MS)) >= FAIL_LIMIT;
 }
 
-function setChallengeCookie(req: IncomingMessage, res: Res, id: string): void {
+function setChallengeCookie(req: IncomingMessage, res: Res, id: string, ttlMs = CHALLENGE_TTL_MS): void {
   const secure = isHttps(req);
-  appendCookie(res, buildCookie(challengeCookieName(secure), id, CHALLENGE_TTL_MS / 1000, secure));
+  appendCookie(res, buildCookie(challengeCookieName(secure), id, ttlMs / 1000, secure));
 }
 function clearChallengeCookie(req: IncomingMessage, res: Res): void {
   const secure = isHttps(req);
@@ -143,10 +155,12 @@ export default async function handler(req: IncomingMessage, res: Res): Promise<v
 
     if (op === 'status' && method === 'GET') {
       const creds = await store.listCredentials(cfg.ownerId);
+      const pw = await store.getPassword(cfg.ownerId);
       json(res, 200, {
         available: true,
         authenticated: !!active,
         hasPasskeys: creds.length > 0,
+        hasPassword: !!pw,
         setupAvailable: !!cfg.setupToken,
         session: active ? { id: active.session.id, label: active.session.label, createdAt: active.session.createdAt, stepUpFresh: stepUpFresh(active.session) } : null
       });
@@ -157,6 +171,9 @@ export default async function handler(req: IncomingMessage, res: Res): Promise<v
     if (method === 'POST' && op === 'register-verify') return await registerVerify(req, res, store, active);
     if (method === 'POST' && op === 'login-options') return await loginOptions(req, res, store, active);
     if (method === 'POST' && op === 'login-verify') return await loginVerify(req, res, store, active);
+    if (method === 'POST' && op === 'password-setup-begin') return await passwordSetupBegin(req, res, store);
+    if (method === 'POST' && op === 'password-setup-finish') return await passwordSetupFinish(req, res, store);
+    if (method === 'POST' && op === 'password-login') return await passwordLogin(req, res, store, null);
 
     if (method === 'POST' && op === 'logout') {
       if (active) {
@@ -179,6 +196,55 @@ export default async function handler(req: IncomingMessage, res: Res): Promise<v
       json(res, 403, { ok: false, error: 'step_up_required' });
       return true;
     };
+
+    if (method === 'POST' && op === 'password-stepup') return await passwordLogin(req, res, store, active);
+
+    if (method === 'POST' && op === 'password-change') {
+      if (needStepUp()) return;
+      const pw = await store.getPassword(uid);
+      if (!pw) return json(res, 409, { ok: false, error: 'no_password' });
+      const body = await readBody(req);
+      const problem = passwordProblem(body.newPassword);
+      if (problem) return json(res, 400, { ok: false, error: problem });
+      const now = Date.now();
+      await store.putPassword({ ...pw, hash: await hashPassword(body.newPassword as string), failCount: 0, lockedUntil: 0, updatedAt: now });
+      const n = await store.revokeOtherSessions(uid, active.session.id, now);
+      await logEvent(store, req, uid, 'password_changed', { sessionsRevoked: n });
+      json(res, 200, { ok: true, sessionsRevoked: n });
+      return;
+    }
+
+    // انتقال کد ۶ رقمی به گوشی جدید: کلید تازه فقط پس از تأیید اولین کد جایگزین می‌شود
+    if (method === 'POST' && op === 'totp-begin') {
+      if (needStepUp()) return;
+      if (!(await store.getPassword(uid))) return json(res, 409, { ok: false, error: 'no_password' });
+      const secret = newTotpSecret();
+      const id = randomToken(16);
+      await store.putChallenge({ id, challenge: '', purpose: 'totp', userId: uid, expiresAt: Date.now() + TOTP_SETUP_TTL_MS, meta: { secret, sessionId: active.session.id } });
+      setChallengeCookie(req, res, id, TOTP_SETUP_TTL_MS);
+      json(res, 200, { ok: true, secret, uri: totpUri(secret) });
+      return;
+    }
+    if (method === 'POST' && op === 'totp-finish') {
+      const chalId = challengeIdOf(req);
+      const chal = chalId ? await store.takeChallenge(chalId) : null;
+      clearChallengeCookie(req, res);
+      const pw = await store.getPassword(uid);
+      if (!chal || chal.purpose !== 'totp' || chal.expiresAt < Date.now() || chal.meta.sessionId !== active.session.id || !pw) {
+        return json(res, 400, { ok: false, error: 'challenge_expired' });
+      }
+      const body = await readBody(req);
+      const secret = String(chal.meta.secret);
+      const step = verifyTotp(secret, body.code, 0);
+      if (step === null) {
+        await logEvent(store, req, uid, 'totp_change_failed', {});
+        return json(res, 400, { ok: false, error: 'bad_code' });
+      }
+      await store.putPassword({ ...pw, totpSecret: secret, totpLastStep: step, updatedAt: Date.now() });
+      await logEvent(store, req, uid, 'totp_changed', {});
+      json(res, 200, { ok: true });
+      return;
+    }
 
     if (method === 'GET' && op === 'sessions') {
       const list = await store.listSessions(uid);
@@ -247,7 +313,8 @@ export default async function handler(req: IncomingMessage, res: Res): Promise<v
         json(res, 404, { ok: false, error: 'not_found' });
         return;
       }
-      if (creds.length <= 1) {
+      // آخرین کلید عبور فقط وقتی قابل حذف است که رمز عبور راه ورود دیگری باشد
+      if (creds.length <= 1 && !(await store.getPassword(uid))) {
         json(res, 409, { ok: false, error: 'last_passkey' });
         return;
       }
@@ -471,5 +538,115 @@ async function loginVerify(req: IncomingMessage, res: Res, store: AuthStore, act
 
   await issueSession(req, res, store, { userId: cfg.ownerId, credentialId: cred.id, standalone: body.standalone === true });
   await logEvent(store, req, cfg.ownerId, 'login', { via: 'passkey' });
+  json(res, 200, { ok: true });
+}
+
+/* ---------------- رمز عبور + کد ۶ رقمی ---------------- */
+
+/**
+ * گام ۱ راه‌اندازی/بازیابی: کد راه‌اندازی + رمز جدید → کلید Google Authenticator.
+ * هیچ چیز فعال نمی‌شود؛ هش رمز و کلید فقط ۱۰ دقیقه در challenge یک‌بارمصرف می‌مانند.
+ */
+async function passwordSetupBegin(req: IncomingMessage, res: Res, store: AuthStore): Promise<void> {
+  const cfg = getAuthConfig();
+  if (!allowedOrigin(req, cfg)) return json(res, 403, { ok: false, error: 'origin' });
+  if (await rateLimited(store, req)) return json(res, 429, { ok: false, error: 'too_many_attempts' });
+  const body = await readBody(req);
+  const token = typeof body.setupToken === 'string' ? body.setupToken : '';
+  if (!cfg.setupToken || !safeEqual(token, cfg.setupToken)) {
+    await logEvent(store, req, cfg.ownerId, 'setup_failed', {});
+    return json(res, 403, { ok: false, error: cfg.setupToken ? 'bad_setup_token' : 'setup_disabled' });
+  }
+  const problem = passwordProblem(body.password);
+  if (problem) return json(res, 400, { ok: false, error: problem });
+  const secret = newTotpSecret();
+  const id = randomToken(16);
+  await store.putChallenge({
+    id,
+    challenge: '',
+    purpose: 'password',
+    userId: cfg.ownerId,
+    expiresAt: Date.now() + TOTP_SETUP_TTL_MS,
+    meta: { hash: await hashPassword(body.password as string), secret }
+  });
+  setChallengeCookie(req, res, id, TOTP_SETUP_TTL_MS);
+  json(res, 200, { ok: true, secret, uri: totpUri(secret) });
+}
+
+/** گام ۲: اولین کد درست → ذخیرهٔ رمز و کلید، لغو همهٔ نشست‌های قبلی، ورود */
+async function passwordSetupFinish(req: IncomingMessage, res: Res, store: AuthStore): Promise<void> {
+  const cfg = getAuthConfig();
+  if (!allowedOrigin(req, cfg)) return json(res, 403, { ok: false, error: 'origin' });
+  if (await rateLimited(store, req)) return json(res, 429, { ok: false, error: 'too_many_attempts' });
+  const chalId = challengeIdOf(req);
+  const body = await readBody(req);
+  const chal = chalId ? await store.takeChallenge(chalId) : null;
+  if (!chal || chal.purpose !== 'password' || chal.expiresAt < Date.now()) {
+    clearChallengeCookie(req, res);
+    return json(res, 400, { ok: false, error: 'challenge_expired' });
+  }
+  const secret = String(chal.meta.secret);
+  const step = verifyTotp(secret, body.code, 0);
+  if (step === null) {
+    // اشتباه تایپی: همان challenge برمی‌گردد تا QR دوباره اسکن نشود (تا پایان ۱۰ دقیقه)
+    await store.putChallenge(chal);
+    await logEvent(store, req, cfg.ownerId, 'totp_setup_failed', {});
+    return json(res, 400, { ok: false, error: 'bad_code' });
+  }
+  clearChallengeCookie(req, res);
+  const now = Date.now();
+  const prev = await store.getPassword(cfg.ownerId);
+  await store.putPassword({
+    userId: cfg.ownerId,
+    hash: String(chal.meta.hash),
+    totpSecret: secret,
+    totpPending: null,
+    totpLastStep: step,
+    failCount: 0,
+    lockedUntil: 0,
+    updatedAt: now
+  });
+  // هر نشست قبلی (از جمله نشست احتمالی مهاجم) باطل می‌شود
+  const n = await store.revokeOtherSessions(cfg.ownerId, '', now);
+  await logEvent(store, req, cfg.ownerId, prev ? 'password_reset' : 'password_set', { sessionsRevoked: n });
+  await issueSession(req, res, store, { userId: cfg.ownerId, credentialId: null, standalone: body.standalone === true });
+  await logEvent(store, req, cfg.ownerId, 'login', { via: 'password_setup' });
+  json(res, 200, { ok: true });
+}
+
+/** ورود (active = null) یا تأیید مجدد (active = نشست فعلی) با رمز + کد ۶ رقمی */
+async function passwordLogin(req: IncomingMessage, res: Res, store: AuthStore, active: ActiveSession | null): Promise<void> {
+  const cfg = getAuthConfig();
+  if (!allowedOrigin(req, cfg)) return json(res, 403, { ok: false, error: 'origin' });
+  if (await rateLimited(store, req)) return json(res, 429, { ok: false, error: 'too_many_attempts' });
+  const body = await readBody(req);
+  const pw = await store.getPassword(cfg.ownerId);
+  const now = Date.now();
+  if (!pw || !pw.totpSecret) {
+    await logEvent(store, req, cfg.ownerId, 'password_login_failed', { reason: 'no_password' });
+    return json(res, 401, { ok: false, error: 'bad_credentials' });
+  }
+  if (pw.lockedUntil > now) return json(res, 429, { ok: false, error: 'locked', retryAt: pw.lockedUntil });
+
+  const passOk = typeof body.password === 'string' && body.password.length <= 400 && (await verifyPassword(body.password, pw.hash));
+  const step = verifyTotp(pw.totpSecret, body.code, pw.totpLastStep, now);
+  if (!passOk || step === null) {
+    const failCount = pw.failCount + 1;
+    const lock = lockDurationMs(failCount);
+    const next: StoredPassword = { ...pw, failCount, lockedUntil: lock ? now + lock : 0 };
+    await store.putPassword(next);
+    await logEvent(store, req, cfg.ownerId, 'password_login_failed', { stepUp: !!active, locked: lock > 0 });
+    // پاسخ یکسان برای رمز یا کد اشتباه — مهاجم نمی‌فهمد کدام درست بوده
+    return json(res, 401, { ok: false, error: 'bad_credentials', ...(lock ? { retryAt: next.lockedUntil } : {}) });
+  }
+  await store.putPassword({ ...pw, failCount: 0, lockedUntil: 0, totpLastStep: step });
+
+  if (active) {
+    await store.markStepUp(active.session.id, now);
+    await logEvent(store, req, cfg.ownerId, 'step_up', { via: 'password' });
+    return json(res, 200, { ok: true, stepUp: true });
+  }
+  await issueSession(req, res, store, { userId: cfg.ownerId, credentialId: null, standalone: body.standalone === true });
+  await logEvent(store, req, cfg.ownerId, 'login', { via: 'password' });
   json(res, 200, { ok: true });
 }
