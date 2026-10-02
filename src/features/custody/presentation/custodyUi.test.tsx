@@ -53,7 +53,7 @@ describe('حالت خالی — بدون داده یا موجودی ساختگی
         </MemoryRouter>
       );
     });
-    expect(await screen.findByText('هنوز محل نگهداری‌ای ثبت نشده')).toBeTruthy();
+    expect(await screen.findByRole('link',{name:'افزودن کیف پول'})).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/\$\d/);
   });
 
@@ -65,11 +65,11 @@ describe('حالت خالی — بدون داده یا موجودی ساختگی
         </MemoryRouter>
       );
     });
-    expect(await screen.findByText('هنوز عملیاتی ثبت نشده')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /ثبت عملیات/ })).toBeTruthy();
+    expect(await screen.findByText('در انتظار دریافت فعالیت‌ها…')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'تأیید ارتباط' })).toBeTruthy();
     const labels = screen.getAllByRole('button').map((b) => b.textContent ?? '');
     expect(labels.some((l) => /اجرا|ارسال|Swap now|Bridge now|Execute/i.test(l))).toBe(false);
-    expect(document.body.textContent).toContain('تراکنشی اجرا نمی‌شود');
+    expect(document.body.textContent).toContain('این تأیید موجودی را تغییر نمی‌دهد');
   });
 
   it('صفحهٔ آرکوس بدون تنظیمات، فقط دعوت به افزودن زیرحساب را نشان می‌دهد و درخواستی نمی‌فرستد', async () => {
@@ -96,7 +96,7 @@ describe('حالت خالی — بدون داده یا موجودی ساختگی
     fireEvent.click((await screen.findAllByRole('button', { name: /افزودن زیرحساب/ }))[0]);
     const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
     expect(inputs.every((i) => i.type === 'checkbox' || i.value === '')).toBe(true);
-    expect(document.body.textContent).toContain('کلید خصوصی یا عبارت بازیابی نمی‌خواهد');
+    expect(document.body.textContent).toContain('بدون کلید خصوصی');
     expect(document.querySelector('input[type="password"]')).toBeNull();
   });
 });

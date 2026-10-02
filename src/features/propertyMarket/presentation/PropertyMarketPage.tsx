@@ -120,7 +120,7 @@ export function PropertyMarketPage() {
     <Page>
       <PageHeader
         title="بازار املاک اهواز"
-        subtitle="قیمت آپارتمان‌های فروشی دیوار (۹۰ متر به بالا) — به تفکیک منطقه و سال ساخت"
+        subtitle="آپارتمان‌های دیوار · ۹۰ متر به بالا"
         actions={
           <Button icon={busy ? <Square /> : <RefreshCw />} variant={busy ? 'outline' : 'primary'} onClick={refresh}>
             {busy ? 'توقف جمع‌آوری' : 'به‌روزرسانی داده'}

@@ -133,7 +133,7 @@ export function BalancesPanel({ d }: { d: CustodyData }) {
 
       {d.ledger.balances.some((b) => d.assetById.get(b.assetId)?.platformId === 'arcus') && (
         <Notice tone="info">
-          «USDG» در کیف پول زنجیرهٔ رابین‌هود یک توکن روی زنجیره است؛ «وثیقهٔ آرکوس» موجودی داخل حساب قراردادهای دائمی است. این دو دارایی جدا نگه داشته می‌شوند و با هم ادغام نمی‌شوند.
+          توکن USDG کیف پول و وثیقهٔ آرکوس، دو موجودی جدا هستند.
         </Notice>
       )}
 

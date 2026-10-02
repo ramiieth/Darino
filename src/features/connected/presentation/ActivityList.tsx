@@ -1,0 +1,17 @@
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Badge } from '@/shared/components/ui/Badge';
+import { TokenLogo,LogoImage } from '@/shared/components/ui/EntityLogo';
+import { MoneyValue } from '@/shared/components/ui/FinancialValue';
+import { chainIdentity,tokenName,operationNames } from './identity';
+import { dateTime } from './ConnectedPage';
+import { isInternal,type Activity,type ActivityLink } from '../domain/activity';
+import type { ChainInfo } from '../domain/model';
+const labels:Record<string,string>={DEPOSIT:'واریز به آرکوس',WITHDRAWAL:'برداشت از آرکوس',TRANSFER:'انتقال زیرحساب',bridge_swap:'بریج همراه سواپ',bridge:'بریج بین شبکه‌ها',arcus_withdrawal:'آرکوس ← کیف پول',arcus_deposit:'کیف پول ← آرکوس'};
+export function ActivityList({rows,links=[],addresses=[],chains=[]}:{rows:Activity[];links?:ActivityLink[];addresses?:string[];chains?:ChainInfo[]}) {
+ const byKey=new Map(rows.map(r=>[r.key,r]));
+ const children=new Set(links.filter(l=>byKey.has(l.from)&&byKey.has(l.to)).map(l=>l.to));
+ function card(row:Activity,nested=false){const tx=row.tx,chain=tx?chainIdentity(tx.chain,chains):null;
+ return <div className={nested?'mt-3 border-s-2 border-accent/30 ps-3':'space-y-3'}><div className="flex flex-wrap items-center gap-2"><LogoImage src={chain?.logo??'/logos/platform-arcus.png'} label={chain?.name??'آرکوس'} size={24} square/><span className="font-semibold">{row.provider==='arcus'?labels[row.kind]??row.kind:operationNames[row.kind]??row.kind}</span><Badge>{chain?.name??'آرکوس'}</Badge><Badge tone={['confirmed','APPLIED'].includes(row.status)?'gain':'warn'}>{['confirmed','APPLIED'].includes(row.status)?'تأییدشده':['pending','PENDING'].includes(row.status)?'در انتظار':row.status==='failed'?'ناموفق':row.status}</Badge>{tx&&isInternal(tx,addresses)&&<Badge tone="info">انتقال داخلی</Badge>}</div><p className="text-xs text-muted">{row.label} · {Number.isFinite(row.at)&&row.at>0?dateTime(row.at):'زمان نامشخص'}</p>{tx?.protocol&&<p className="inline-flex items-center gap-2 text-xs text-muted"><LogoImage src={tx.protocolIcon} label={tx.protocol} size={18}/>{tx.protocol}</p>}{row.amount&&<MoneyValue value={Number(row.amount)}/>}<ul className="space-y-2">{tx?.transfers.map((t,i)=><li key={i} className="flex flex-wrap items-center gap-2 text-sm"><TokenLogo logo={t.icon} symbol={t.symbol} name={tokenName(t.symbol,t.name??t.symbol)} networkLogo={chain?.logo??null} networkName={chain?.name??''} size={24}/><span className="text-xs text-muted">{t.direction==='in'?'ورودی':'خروجی'}</span><span>{tokenName(t.symbol,t.name??t.symbol)}</span><bdi dir="ltr" className="break-all">{t.quantity??'نامشخص'} {t.symbol}</bdi><MoneyValue value={t.value}/></li>)}</ul>{tx&&<details className="text-xs text-muted"><summary className="cursor-pointer">جزئیات تراکنش و کارمزد</summary><p className="mt-2">کارمزد <MoneyValue value={tx.fee}/></p><bdi dir="ltr" className="block break-all">{tx.hash||tx.id}</bdi>{tx.transfers.map((t,i)=>t.contract&&<bdi key={i} dir="ltr" className="block break-all">{t.symbol} · {t.contract}</bdi>)}</details>}</div>;
+ }
+ return <ul className="space-y-3">{rows.filter(r=>!children.has(r.key)).map(row=>{const link=links.find(l=>l.from===row.key&&byKey.has(l.to));return <li key={row.key}><Surface className="p-4">{link&&<p className="mb-3 text-xs font-semibold text-accent">{labels[link.kind]} · {link.proof?'تطبیق API '+(link.proof==='lifi'?'لای‌فای':'ریلی'):'ارتباط تأییدشده'}</p>}{card(row)}{link&&card(byKey.get(link.to)!,true)}</Surface></li>;})}</ul>;
+}

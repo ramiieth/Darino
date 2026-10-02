@@ -33,7 +33,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="px-gutter pt-3 md:px-8">
-          <Notice tone="warn">ورود در این محیط فعال نیست (پایگاه داده روی سرور تنظیم نشده). فقط دادهٔ محلی همین دستگاه در دسترس است و همگام‌سازی انجام نمی‌شود.</Notice>
+          <Notice tone="warn">ورود و همگام‌سازی فعال نیست؛ فقط دادهٔ همین دستگاه نمایش داده می‌شود.</Notice>
         </div>
         {children}
       </>
@@ -133,7 +133,7 @@ export function LoginScreen() {
           )}
 
           <p className="text-xs leading-5 text-muted">
-            رمز عبور فقط به‌صورت هش رمزنگاری‌شده روی سرور است و کد ۶ رقمی هر ۳۰ ثانیه عوض می‌شود. اپ نصب‌شده روی صفحهٔ اصلی آیفون نشست جدا از Safari دارد؛ یک‌بار داخل خود اپ وارد شوید.
+            اپ نصب‌شده روی آیفون نشست جدا از Safari دارد؛ یک‌بار داخل خود اپ وارد شوید.
           </p>
         </Surface>
       </div>

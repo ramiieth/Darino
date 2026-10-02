@@ -84,7 +84,7 @@ export function VehiclePage() {
   const header = (
     <PageHeader
       title="سرمایه‌گذاری خودرو"
-      subtitle="خودرو به‌عنوان یک دارایی — قیمت تاریخی، بازدهی تومانی و دلاری و مقایسه با سایر دارایی‌ها"
+      subtitle="قیمت و بازده خودروها"
       actions={
         <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
           ثبت قیمت جدید
@@ -107,8 +107,7 @@ export function VehiclePage() {
       {header}
 
       <Notice tone="neutral">
-        قیمت‌ها میانگین قیمت پیشنهادی فروشندگان و نمایشگاه‌داران است، نه لزوماً قیمت معامله‌شده. هر Snapshot (تاریخ، نرخ دلار همان
-        روز و قیمت‌ها) غیرقابل‌تغییر ذخیره می‌شود و تغییر نرخ دلار بعدی آن را عوض نمی‌کند.
+        قیمت‌ها پیشنهادی‌اند؛ بازده دلاری با نرخ ثبت‌شدهٔ همان تاریخ محاسبه می‌شود.
       </Notice>
 
       <Surface className="p-4 md:p-5">
@@ -292,8 +291,7 @@ export function VehiclePage() {
       <NewSnapshotSheet open={showNewSnapshot} onClose={() => setShowNewSnapshot(false)} />
 
       <p className="text-xs text-muted">
-        {toFaDigits(vehicles.length)} خودرو · {toFaDigits(snapshots.length)} Snapshot تاریخی · قیمت دلاری هر Snapshot در لحظه ثبت
-        ذخیره شده است.
+        {toFaDigits(vehicles.length)} خودرو · {toFaDigits(snapshots.length)} ثبت تاریخی
       </p>
     </Page>
   );
@@ -436,8 +434,7 @@ function VehicleDetail({
       <div>
         <h3 className="text-sm font-bold text-ink">اگر به‌جای این خودرو…</h3>
         <p className="mb-2 text-xs leading-5 text-muted">
-          سرمایه اولیه = قیمت بازار در {start?.dateLabel} ({ret?.startToman ? fmtTomanAmount(ret.startToman) : '—'}). قیمت‌های تاریخی از
-          coins.llama.fi (نزدیک‌ترین روز)؛ در صورت نبود، N/A.
+          سرمایهٔ پایه: قیمت خودرو در {start?.dateLabel} ({ret?.startToman ? fmtTomanAmount(ret.startToman) : '—'}). قیمت تاریخیِ ناموجود با «—» نمایش داده می‌شود.
         </p>
         {benchLoading && !benchmarks ? (
           <p className="rounded-field bg-surface-2 py-4 text-center text-sm text-muted">در حال دریافت قیمت‌های تاریخی…</p>

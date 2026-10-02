@@ -1,6 +1,6 @@
 /**
  * What-if (Historical Performance Simulation) — secondary, clearly hypothetical.
- *   «If my current cash had been invested at the start of the period…»
+ *   «If this manually entered capital had been invested at the start of the period…»
  *   result = capital × (1 + period return)
  *
  * Fully independent and illustrative: no link to accounting, ledgers or balances.
@@ -22,8 +22,11 @@ import {
   type PerfCoin,
   type PerfPeriod
 } from '@/features/cryptomarkets/data/useTopPerformers';
-import { useInvestableCash, investableCashOr } from '@/shared/hooks/useInvestableCash';
+import { useInvestableCash, saveScenarioCash } from '@/shared/hooks/useInvestableCash';
 import { fmtUSD, toFaDigits } from '@/shared/utils/formatters';
+import { Field, Input } from '@/shared/components/ui/Input';
+import { normalizeNumericInput } from '@/features/custody/domain/decimal';
+import { toast } from '@/shared/store/toastStore';
 import { t } from '@/shared/i18n/fa';
 import { PERF_PERIODS } from './TopPerformersCard';
 
@@ -58,7 +61,9 @@ export function SimulatedInvestmentCard({
   const { coins, perf1d, perf7d, perf30, perf60, perf90, loading, historyDone } = useTopPerformers();
   const investable = useInvestableCash();
   // hypothetical capital = current real cash balance
-  const capital = investableCashOr(investable.cash);
+  const capital = investable.cash ?? 0;
+  const [draft, setDraft] = useState('');
+  const entered = Number(normalizeNumericInput(draft));
   const period = periodProp ?? '30d';
   const [expanded, setExpanded] = useState(false);
 
@@ -72,9 +77,10 @@ export function SimulatedInvestmentCard({
     <Section
       id="whatif"
       title={t('hypTitle')}
-      description={`اگر ${fmtUSD(capital)} (${investable.mode === 'manual' ? 'سرمایهٔ دستی سناریو' : 'موجودی نقد فعلی'}) در ابتدای بازه سرمایه‌گذاری شده بود`}
+      description={investable.cash === null ? 'مبلغ فرضی را خودتان وارد کنید' : `اگر ${fmtUSD(capital)} سرمایهٔ دستی در ابتدای بازه سرمایه‌گذاری شده بود`}
     >
       <Surface className="p-4 md:p-5">
+        <div className="mb-4 flex flex-wrap items-end gap-3"><Field label="سرمایهٔ دستی این کارت (دلار)"><Input dir="ltr" inputMode="decimal" value={draft} placeholder={investable.cash === null ? 'مبلغ سرمایه' : String(investable.cash)} onChange={e => setDraft(e.target.value)} /></Field><Button disabled={!draft.trim() || !Number.isFinite(entered) || entered <= 0} onClick={() => { void saveScenarioCash({ mode: 'manual', manualUsd: entered }).catch(() => toast('error', 'ذخیره انجام نشد')); }}>ذخیره</Button></div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SegmentedControl
             options={PERF_PERIODS}
@@ -90,7 +96,7 @@ export function SimulatedInvestmentCard({
         </div>
 
         <div className="mt-4">
-          {loading && noData ? (
+          {investable.cash === null ? <p className="py-5 text-sm text-muted">برای نمایش نتیجه، سرمایهٔ دستی را ذخیره کنید.</p> : loading && noData ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
@@ -135,9 +141,9 @@ export function SimulatedInvestmentCard({
           )}
         </div>
 
-        <Notice tone="neutral" className="mt-4">
+        <p className="mt-4 text-xs text-muted">
           {t('hypDisclaimer')}
-        </Notice>
+        </p>
       </Surface>
     </Section>
   );

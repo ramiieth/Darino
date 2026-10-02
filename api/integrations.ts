@@ -1,0 +1,41 @@
+/** One authenticated read-only endpoint for wallet data and Gemini analysis. No credentials reach the client. */
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { requireSession } from './_authCore.js';
+import { json, readBody } from './_neon.js';
+import { validAddress } from '../src/features/connected/domain/model.js';
+import { getWallet, getTransactions, getPnl, ProviderError } from './_zerion.js';
+import { lookupBridge } from './_bridge.js';
+import { getSpotTokens } from './_arcusSpot.js';
+import { analyze, analysisSchema } from './_assistant.js';
+const limits = new Map<string, { start: number; count: number }>();
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!['GET','POST'].includes(req.method ?? '')) { json(res,405,{ error: 'روش درخواست مجاز نیست' }); return; }
+  const auth = await requireSession(req, res); if (!auth) return;
+  const u = new URL(req.url ?? '/', 'https://darino.local');
+  const op = u.searchParams.get('op') ?? 'status';
+  if (op === 'status' && req.method === 'GET') { json(res,200,{ zerion: !!process.env.ZERION_API_KEY, gemini: !!process.env.GEMINI_API_KEY }); return; }
+  // Isolate limits per account and operation; no model retry that could duplicate billing.
+  const k = `${auth.userId}:${op}`; const now = Date.now();
+  const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
+  if (++limit.count > (op === 'analyze' ? 4 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (limits.size > 1000) limits.clear(); limits.set(k,limit);
+  try {
+    if (req.method === 'POST' && op === 'analyze') {
+      const parsed = analysisSchema.safeParse(await readBody(req));
+      if (!parsed.success) { json(res,400,{ error:'اطلاعات تحلیل کامل یا معتبر نیست' }); return; }
+      json(res,200,{ answer: await analyze(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
+    }
+    if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
+    if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
+    if (req.method !== 'GET' || !['wallet','transactions','pnl'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
+    const address = u.searchParams.get('address')?.trim() ?? '';
+    if (!validAddress(address)) { json(res,400,{ error:'آدرس عمومی EVM یا سولانا معتبر نیست' }); return; }
+    const data = op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined);
+    json(res,200,data);
+  } catch (e) {
+    const status = e instanceof ProviderError ? e.status : 502;
+    if (e instanceof ProviderError && e.retryAfter) res.setHeader('Retry-After',String(e.retryAfter));
+    json(res,status,{ error:e instanceof ProviderError ? e.message : 'ارتباط با سرویس برقرار نشد؛ آخرین دادهٔ موفق حفظ شده است' });
+  }
+}

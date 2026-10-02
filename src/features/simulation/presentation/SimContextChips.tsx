@@ -12,7 +12,7 @@ export function SimContextChips({ result }: { result: TimelineResult }) {
 
   return (
     <Surface className="p-4 md:p-5">
-      <MetricGrid cols={2}>
+      <MetricGrid cols={2} className="grid-cols-1 sm:grid-cols-2">
         <Metric
           size="lg"
           label={t('baseCapital')}

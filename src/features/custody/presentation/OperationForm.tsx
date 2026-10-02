@@ -337,7 +337,7 @@ export function OperationForm({
       onClose={onClose}
       size="lg"
       title={isEdit ? 'ویرایش عملیات' : 'ثبت عملیات جدید'}
-      description="فقط یادداشت در دارینو — هیچ تراکنش، سواپ یا بریج واقعی اجرا نمی‌شود."
+      description="ثبت دستی؛ بدون اجرای تراکنش"
       footer={
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -607,7 +607,7 @@ export function OperationForm({
         </section>
 
         {needsValuation && !normalized.valuation && (
-          <Notice tone="warn">بدون ارزش دلاری، این عملیات در حسابداری حساب نمی‌شود و در «همگام‌سازی و بررسی» حسابداری به‌عنوان «در انتظار» نمایش داده می‌شود.</Notice>
+          <Notice tone="warn">برای ورود این عملیات به حسابداری، ارزش دلاری را ثبت کنید.</Notice>
         )}
         {validation.warnings.map((w) => (
           <Notice key={w} tone="warn">

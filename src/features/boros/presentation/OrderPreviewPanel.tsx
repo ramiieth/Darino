@@ -85,7 +85,7 @@ export function OrderPreviewPanel({
 
   return (
     <div className="space-y-5">
-      <Notice tone="info">پیش‌نمایش سفارش — هنوز پوزیشن واقعی در بوروس ایجاد نشده و هیچ مقداری «پوزیشن واقعی» نیست.</Notice>
+      <Notice tone="info">پیش‌نمایش محاسبات؛ سفارش اجرا نمی‌شود.</Notice>
       {inputs}
 
       <Surface variant="focal" className="p-5 md:p-6">
@@ -148,7 +148,7 @@ export function OrderPreviewPanel({
       {preview.collateralSufficient === null ? (
         <Notice tone="neutral">کفایت وثیقه: نامشخص — وثیقه یا قیمت وارد نشده است.</Notice>
       ) : preview.collateralSufficient ? (
-        <Notice tone="success">وثیقه واردشده از مارجین موردنیاز بیشتر است (بررسی ریاضی — نه تضمین).</Notice>
+        <Notice tone="success">وثیقه برای مارجین محاسبه‌شده کافی است؛ تضمین جلوگیری از لیکوئیدشدن نیست.</Notice>
       ) : (
         <Notice tone="warn">وثیقه واردشده کمتر از مارجین موردنیاز است.</Notice>
       )}

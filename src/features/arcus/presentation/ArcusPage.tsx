@@ -1,3 +1,4 @@
+import { ArcusSpotPanel } from './ArcusSpotPanel';
 /**
  * Arcus — حساب Perpetuals (فقط‌خواندنی)
  *  خلاصهٔ حساب · پوزیشن‌ها · سفارش‌ها · تاریخچه (معاملات، سفارش‌ها، funding، واریز/برداشت) · تطبیق با دفتر
@@ -95,6 +96,7 @@ export default function ArcusPage() {
   const d = useCustody();
   const arcusHoldings = d.holdings.filter((h) => h.kind === 'arcus' && h.arcus && !h.archivedAt);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [product,setProduct] = useState<'perp'|'spot'>('perp');
   const [live, setLive] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [section, setSection] = useState<'positions' | 'orders' | 'history' | 'reconcile'>('positions');
@@ -118,8 +120,8 @@ export default function ArcusPage() {
     <Page>
       <PageHeader
         title="آرکوس"
-        eyebrow={<span className="inline-flex items-center gap-1.5"><LogoImage src="/logos/platform-arcus.png" label="آرکوس" size={16} square /> حساب قراردادهای دائمی — فقط‌خواندنی</span>}
-        subtitle="موجودی، پوزیشن‌ها، سفارش‌ها و تاریخچهٔ حساب. هیچ معامله، لغو سفارش، تغییر اهرم یا برداشتی از دارینو انجام نمی‌شود."
+        eyebrow={<span className="inline-flex items-center gap-1.5"><LogoImage src="/logos/platform-arcus.png" label="آرکوس" size={16} square /> پرپچوال و اسپات — فقط‌خواندنی</span>}
+        subtitle="موجودی، پوزیشن‌ها و تاریخچهٔ حساب"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" icon={<Plus />} onClick={() => setFormOpen(true)}>
@@ -138,7 +140,7 @@ export default function ArcusPage() {
         <div className="space-y-4">
           <EmptyState
             message="هنوز زیرحساب آرکوس ذخیره نشده"
-            hint="آدرس عمومی کیف پول، شمارهٔ زیرحساب (۰ تا ۹) و محیط (شبکهٔ اصلی یا آزمایشی) را وارد و ذخیره کنید. کلید خصوصی یا کلید دسترسی لازم نیست."
+            hint="آدرس عمومی و شمارهٔ زیرحساب را اضافه کنید."
             action={
               <Button icon={<Plus />} onClick={() => setFormOpen(true)}>
                 افزودن زیرحساب آرکوس
@@ -149,6 +151,8 @@ export default function ArcusPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <Tabs label="محصول آرکوس" options={[{value:'perp',label:'پرپچوال'},{value:'spot',label:'اسپات'}]} value={product} onChange={setProduct}/>
+          {product==='spot' && ref ? <ArcusSpotPanel key={ref.address+ref.env} address={ref.address} env={ref.env}/> : <>
           <div className="flex flex-wrap items-end gap-3">
             {arcusHoldings.length > 1 && (
               <Field label="زیرحساب" className="min-w-[220px]">
@@ -185,9 +189,9 @@ export default function ArcusPage() {
           ) : (
             <Surface className="p-4 md:p-6">
               <MetricGrid cols={4}>
-                <Metric size="lg" label="ارزش حساب" value={acc?.data ? <Usd v={acc.data.equity} /> : acc?.loading ? '…' : NA} sub="موجودی نقدی خالص + Σ(اندازه × قیمت اوراکل)" />
+                <Metric size="lg" label="ارزش حساب" value={acc?.data ? <Usd v={acc.data.equity} /> : acc?.loading ? '…' : NA} />
                 <Metric size="md" label="وثیقهٔ آزاد" value={acc?.data ? <Usd v={acc.data.freeCollateral} /> : NA} />
-                <Metric size="md" label="مارجین درگیر" value={state?.positions.data ? <Usd v={totalMarginUsed(positions)} /> : NA} sub="جمع مارجین پوزیشن‌ها" />
+                <Metric size="md" label="مارجین درگیر" value={state?.positions.data ? <Usd v={totalMarginUsed(positions)} /> : NA} />
                 <Metric
                   size="md"
                   label="سود/زیان کل"
@@ -222,9 +226,10 @@ export default function ArcusPage() {
           {section === 'history' && state && ref && (
             <HistorySection refAcc={ref} state={state} range={range} setRange={setRange} historyRange={historyRange} marketById={marketById} markets={markets.data ?? []} />
           )}
-          {section === 'reconcile' && state && ref && holding && <ReconcileSection refAcc={ref} holding={holding} state={state} d={d} />}
+          {section === 'reconcile' && <Surface className="space-y-3 p-4"><p className="text-sm text-muted">برداشت به کیف پول و بریج بعدی، دو فعالیت مستقل هستند.</p><Link className="text-accent" to="/holdings">واریز، برداشت و تطبیق با کیف پول</Link></Surface>}
 
           <PrivacyNote />
+          </>}
         </div>
       )}
 
@@ -247,9 +252,9 @@ function PrivacyNote() {
     <Disclosure summary="حریم خصوصی و نحوهٔ اتصال">
       <ul className="list-disc space-y-1.5 ps-5 text-xs leading-5 text-muted">
         <li>اطلاعات حساب در آرکوس عمومی است: هر کسی که آدرس را بداند می‌تواند موجودی، پوزیشن و معاملات را بخواند. دارینو نمی‌تواند این را مسدود کند.</li>
-        <li>مرورگر شما مستقیم از سرور رسمی آرکوس می‌خواند؛ آدرس به سرور دارینو ارسال نمی‌شود و هیچ کلید یا امضایی استفاده نمی‌شود.</li>
-        <li>تنظیمات (آدرس عمومی، زیرحساب، محیط) فقط پس از «ذخیره» روی همین دستگاه نگه داشته می‌شود. دادهٔ دریافتی فقط در حافظهٔ همین جلسه است و دائمی ذخیره نمی‌شود، مگر خودتان رکوردی را به عملیات اضافه کنید.</li>
-        <li>دریافت زنده فقط وقتی صفحه باز و دیده می‌شود کار می‌کند؛ با بستن اپ یا پنهان شدن آن قطع می‌شود و ثبت پیوستهٔ رویدادها در پس‌زمینه در این نسخه وجود ندارد.</li>
+        <li>داده از سرور رسمی آرکوس دریافت می‌شود؛ کلید خصوصی یا امضا لازم نیست.</li>
+        <li>آدرس عمومی و زیرحساب ذخیره‌شده بین دستگاه‌های واردشده همگام می‌شوند؛ موجودی دریافتی در حافظهٔ جلسه است.</li>
+        <li>دریافت زنده فقط هنگام دیده‌شدن صفحه فعال است.</li>
         <li>این بخش فقط قراردادهای دائمی را نشان می‌دهد؛ معاملات نقدی (اسپات) و توکن‌های سهام پوشش داده نشده‌اند.</li>
       </ul>
     </Disclosure>
@@ -300,12 +305,12 @@ function PositionsList({ res, orders, marketById }: { res: Res<ArcusPosition[]>;
               <KV k="حد سود" v={tp?.triggerPrice ? <Num v={tp.triggerPrice} /> : NA} />
               <KV k="حد ضرر" v={sl?.triggerPrice ? <Num v={sl.triggerPrice} /> : NA} />
             </dl>
-            {!markOk && <p className="mt-2 text-xs text-muted">قیمت مارک در دسترس نبوده؛ طبق مستندات، ارزش اسمی و سود/زیان با قیمت ورود محاسبه شده‌اند.</p>}
+            {!markOk && <p className="mt-2 text-xs text-muted">قیمت مارک موجود نیست؛ محاسبه با قیمت ورود انجام شده.</p>}
           </Surface>
         );
       })}
       <p className="text-xs text-muted">
-        قیمت لیکوئید در دادهٔ عمومی آرکوس منتشر نمی‌شود و دارینو آن را تخمین نمی‌زند. «سود و زیان باز» طبق تعریف آرکوس تفاوت مارجین قفل‌شده هنگام ورود با مارجین لازم در قیمت فعلی است. حد سود و حد ضرر فقط برای سفارش‌هایی نمایش داده می‌شود که کل پوزیشن را می‌بندند.
+        قیمت لیکوئید در API موجود نیست. سود و زیان باز مطابق دادهٔ آرکوس است؛ حد سود و ضرر فقط برای بستن کل پوزیشن نمایش داده می‌شوند.
       </p>
     </div>
   );
@@ -440,7 +445,7 @@ function HistorySection({
       {h.loading && h.progress && <p className="text-xs text-muted">در حال دریافت… صفحهٔ {h.progress.pages} · {h.progress.rows} رکورد</p>}
       {h.error && <Notice tone={h.data ? 'stale' : 'error'}>{errorText(h.error)}</Notice>}
       {loadedForRange && !h.data!.complete && <Notice tone="warn" title="تاریخچه ممکن است کامل نباشد">{h.data!.limitation}</Notice>}
-      {loadedForRange && h.data!.complete && <p className="text-xs text-muted">تاریخچهٔ این بازه کامل دریافت شد ({h.data!.rows.length} رکورد، {h.data!.pages} صفحه). فقط در حافظهٔ این جلسه نگه داشته می‌شود.</p>}
+      {loadedForRange && h.data!.complete && <p className="text-xs text-muted">{h.data!.rows.length} رکورد دریافت شد.</p>}
 
       {(kind === 'fills' || kind === 'funding') && (
         <Surface className="p-4">
@@ -557,7 +562,7 @@ function ReconcileSection({
   return (
     <div className="space-y-4">
       <Notice tone="info">
-        واریز و برداشت‌های Arcus این‌جا با عملیات ثبت‌شده مقایسه می‌شوند. ربط‌دادن یا افزودن فقط با انتخاب شما انجام می‌شود؛ یادداشت و فیلدهای دستی حفظ می‌شوند. چون موجودی Arcus از equity همگام خوانده می‌شود، سپرده دوباره به آن اضافه نمی‌شود.
+        واریز و برداشت‌های آرکوس را با سوابق دستی تطبیق دهید. ثبت فقط با تأیید شما انجام می‌شود.
       </Notice>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" loading={h.loading} onClick={() => void loadHistory(refAcc, 'transfers', allRange)}>

@@ -1,0 +1,70 @@
+import { arr, obj, str, finite, normalizePosition, normalizeTransaction, deduplicatePositions, addressKey, type WalletSnapshot, type ChainInfo, type TransactionPage } from '../src/features/connected/domain/model.js';
+export class ProviderError extends Error { constructor(public status: number, message: string, public retryAfter = 0) { super(message); } }
+const BASE = 'https://api.zerion.io';
+const cache = new Map<string, { at: number; value: WalletSnapshot }>();
+const running = new Map<string, Promise<WalletSnapshot>>();
+let chainsCache: { at: number; data: ChainInfo[] } | null = null;
+// Queue within this server instance, leaving room under the free plan's 3 RPS.
+let tail: Promise<unknown> = Promise.resolve();
+let lastCall = 0;
+async function get(path: string, deadline = Date.now() + 18000): Promise<Record<string, unknown>> {
+  const run = tail.catch(() => undefined).then(async () => {
+    const delay = Math.max(0, 360 - (Date.now() - lastCall));
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    if(Date.now() >= deadline) throw new ProviderError(504, 'زمان دریافت داده تمام شد');
+    lastCall = Date.now();
+    const key = process.env.ZERION_API_KEY;
+    if (!key) throw new ProviderError(503, 'کلید زریون هنوز در سرور تنظیم نشده است');
+    const r = await fetch(BASE + path, { headers: { Authorization: `Basic ${Buffer.from(key + ':').toString('base64')}`, accept: 'application/json' }, signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline-Date.now()))) });
+    if (!r.ok) throw new ProviderError(r.status === 401 ? 503 : r.status, r.status === 429 ? 'سهمیهٔ زریون تمام شده؛ کمی بعد دوباره تلاش کنید' : r.status === 400 ? 'این آدرس یا شبکه برای این داده پشتیبانی نمی‌شود' : 'دریافت داده از زریون انجام نشد', Number(r.headers.get('Retry-After') ?? r.headers.get('RateLimit-Org-Second-Reset')) || 0);
+    return obj(await r.json());
+  });
+  tail = run;
+  return run;
+}
+export function checkedNext(next: string, address: string, resource: 'positions' | 'transactions'): string {
+  const u = new URL(next, BASE);
+  if (u.origin !== BASE || ![ `/v1/wallets/${address}/${resource}`, `/v1/wallets/${address}/${resource}/` ].includes(u.pathname) || u.username || u.password || next.length > 6000) throw new ProviderError(400, 'صفحهٔ بعد معتبر نیست');
+  // Keep provider cursor, enforce read-only filtering and USD values.
+  u.searchParams.set('currency', 'usd'); u.searchParams.set('page[size]', '100');
+  u.searchParams.set('filter[trash]', 'only_non_trash');
+  if (resource === 'positions') u.searchParams.set('filter[positions]', 'no_filter');
+  return u.pathname + u.search;
+}
+export async function getChains(): Promise<ChainInfo[]> {
+  if (chainsCache && Date.now() - chainsCache.at < 86400000) return chainsCache.data;
+  const r = await get('/v1/chains/');
+  const data = arr(r.data).map(v => { const x = obj(v), a = obj(x.attributes), f = obj(a.flags); return { id: str(x.id), name: str(a.name), icon: str(obj(a.icon).url) || null, positions: f.supports_positions === true, transactions: f.supports_transactions === true }; });
+  chainsCache = { at: Date.now(), data }; return data;
+}
+export async function getWallet(address: string, userId: string, force = false): Promise<WalletSnapshot> {
+  const key = `${userId}:${addressKey(address)}`;
+  const hit = cache.get(key); if (hit && Date.now() - hit.at < (force || !hit.value.complete ? 60000 : 900000)) return hit.value;
+  if (running.has(key)) return running.get(key)!;
+  const work = (async () => {
+    const deadline = Date.now() + 48000;
+    const chains = await getChains().catch(() => chainsCache?.data ?? []);
+    const p = await get(`/v1/wallets/${address}/portfolio?currency=usd&filter[positions]=no_filter`, deadline);
+    const a = obj(obj(p.data).attributes);
+    const rows = []; let next = `/v1/wallets/${address}/positions/?currency=usd&filter[positions]=no_filter&filter[trash]=only_non_trash&page[size]=100`;
+    const visited = new Set<string>(); let pages = 0; let detailsError: string | undefined;
+    try {
+    while (next && pages < 10) {
+      if (visited.has(next)) throw new ProviderError(502, 'صفحه‌بندی زریون تکراری است');
+      visited.add(next); const r = await get(next, deadline); rows.push(...arr(r.data).map(normalizePosition)); pages++;
+      const link = str(obj(r.links).next); next = link ? checkedNext(link, address, 'positions') : '';
+    }
+    } catch(e) { detailsError = e instanceof ProviderError ? e.message : 'جزئیات دارایی‌ها دریافت نشد؛ دوباره تلاش کنید'; }
+    const positions = deduplicatePositions(rows);
+    const value: WalletSnapshot = { address, fetchedAt: Date.now(), total: finite(obj(a.total).positions), change: finite(obj(a.changes).absolute_1d), positions, chains, complete: !next && !detailsError, detailsError, unpriced: positions.filter(p => p.value === null).length };
+    if (cache.size > 200) cache.delete(cache.keys().next().value!);
+    cache.set(key, { at: Date.now(), value }); return value;
+  })();
+  running.set(key, work); try { return await work; } finally { running.delete(key); }
+}
+export async function getTransactions(address: string, next?: string): Promise<TransactionPage> {
+  const path = next ? checkedNext(next, address, 'transactions') : `/v1/wallets/${address}/transactions/?currency=usd&filter[trash]=only_non_trash&page[size]=100`;
+  const r = await get(path); const link = str(obj(r.links).next);
+  return { rows: arr(r.data).map(normalizeTransaction), next: link ? checkedNext(link, address, 'transactions') : null, fetchedAt: Date.now() };
+}
+export async function getPnl(address: string): Promise<unknown> { return await get(`/v1/wallets/${address}/pnl?currency=usd`); }

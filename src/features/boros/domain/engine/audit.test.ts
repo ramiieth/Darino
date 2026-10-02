@@ -208,6 +208,12 @@ describe('۴) Margin مستقل از PnL/Fees/Score', () => {
 describe('۵) Fee Model — Source هر هزینه', () => {
   const b = auditMarket({ m, size: SIZE, nowSec: NOW, gasUsd: 5, slippageRate: 0.001 });
 
+  it('هزینهٔ صفر گزارش‌شده معتبر است؛ هزینهٔ مثبت بدون منبع معتبر نیست', () => {
+    const zero = { ...b, feeLines: [{ ...b.feeLines[0], amount:0, source:'api' as const }] };
+    expect(verifyFeeSources(zero)).toBe(true);
+    expect(verifyFeeSources({ ...zero, feeLines: [{ ...zero.feeLines[0], amount:1, source:'na' }] })).toBe(false);
+  });
+
   it('هر خط Fee دارای Source است (api/market-data/user-input/na)', () => {
     expect(verifyFeeSources(b)).toBe(true);
     const labels = b.feeLines.map((l) => l.label);
@@ -321,6 +327,7 @@ describe('۸) چهار مفهوم جدا', () => {
 /* ================= ۹) جدول ۱۰+ بازار واقعی + ۸ بررسی ================= */
 describe('۹) تست نهایی — ۱۰+ بازار با ۸ بررسی Production Gate', () => {
   // شبیه‌سازی ۱۲ بازار واقعی (ترکیب venues/assets با پارامترهای متفاوت)
+  const replayNow = Math.floor(Date.now() / 1000);
   const realMarkets: BorosMarket[] = Array.from({ length: 12 }, (_, i) => {
     const venues = ['Hyperliquid', 'Binance', 'OKX', 'Gate', 'Bybit', 'KuCoin'];
     const assets = ['ETH', 'BTC', 'SOL', 'HYPE', 'XRP', 'BNB'];
@@ -336,11 +343,11 @@ describe('۹) تست نهایی — ۱۰+ بازار با ۸ بررسی Producti
       lastTradedApr: mark,
       midApr: mark * 0.98,
       floatingApr: floating,
-      maturity: NOW + days * 86_400,
+      maturity: replayNow + days * 86_400,
       notionalOI: 500 + i * 300,
       volume24h: 20 + i * 15,
       ohlcv: Array.from({ length: 30 }, (_, j) => ({
-        ts: NOW - (30 - j) * 86_400,
+        ts: replayNow - (30 - j) * 86_400,
         c: mark * (0.9 + 0.006 * j + (i % 3) * 0.002)
       }))
     };

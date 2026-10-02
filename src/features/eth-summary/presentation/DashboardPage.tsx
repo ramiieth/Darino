@@ -1,30 +1,15 @@
-/**
- * Dashboard — first viewport answers:
- *   what do I own · what is it worth · what changed · what needs attention · what next
- *
- *   desktop (lg+, 12 cols)            phones
- *   ┌───────────── 8 ─────┬── 4 ──┐   hero
- *   │ hero                │ act.  │   actions
- *   │                     │ attn. │   attention
- *   ├─────────────────────┼───────┤   positions
- *   │ positions           │ watch │   watchlist
- *   ├─────────────────────┼───────┤   movers
- *   │ movers              │pendle │   pendle
- *   ├─────────────────────┴───────┤   what-if · scenario · tools
- *   │ what-if │ eth scenario      │
- *   └─────────────────────────────┘
- */
+/** Dashboard: connected real portfolio, watchlist and separate manual scenarios. */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, LineChart } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
-import { NetWorthHero } from './NetWorthHero';
-import { PositionsSection } from './PositionsSection';
-import { AttentionPanel, QuickActions } from './DashboardAside';
-import { usePortfolioOverview } from './usePortfolioOverview';
-import { useAccounting } from '@/features/accounting/data/useAccounting';
-import { PendleRealApyCard } from '@/features/pendle/presentation/PendleRealApyCard';
+
+
+import { PortfolioSummary } from '@/features/connected/presentation/PortfolioSummary';
+import { useConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
+import { useCustodySync } from '@/features/custody/data/sync';
+
 import { EthSummaryCard } from './EthSummaryCard';
 import { WatchlistSection } from './WatchlistSection';
 import { TopPerformersCard } from '@/features/cryptomarkets/presentation/TopPerformersCard';
@@ -39,43 +24,23 @@ function greeting(): string {
 }
 
 export function DashboardPage() {
-  const accounting = useAccounting();
-  const overview = usePortfolioOverview(accounting);
+  useCustodySync();
+  const portfolio = useConnectedPortfolio();
   // shared period for «movers» and «what-if»
   const [perfPeriod, setPerfPeriod] = useState<PerfPeriod>('30d');
 
   return (
     <Page>
-      <PageHeader eyebrow={greeting()} title="داشبورد" subtitle="نمای کلی دارایی‌ها و تغییرات امروز" />
+      <PageHeader eyebrow={greeting()} title="داشبورد" />
 
-      <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="min-w-0 lg:col-span-8">
-          <NetWorthHero o={overview} />
-        </div>
-        <div className="min-w-0 space-y-6 lg:col-span-4">
-          <Section id="actions" title="اقدام سریع">
-            <QuickActions className="lg:grid-cols-1 [&>*]:lg:col-span-1" />
-          </Section>
-          <AttentionPanel o={overview} />
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="min-w-0 lg:col-span-8">
-          <PositionsSection o={overview} />
-        </div>
-        <div className="min-w-0 lg:col-span-4">
-          <WatchlistSection />
-        </div>
-      </div>
+      <PortfolioSummary portfolio={portfolio} />
+      <WatchlistSection />
 
       <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
         <div className="min-w-0 lg:col-span-8">
           <TopPerformersCard period={perfPeriod} onPeriodChange={setPerfPeriod} />
         </div>
-        <div className="min-w-0 lg:col-span-4">
-          <PendleRealApyCard />
-        </div>
+
       </div>
 
       <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">

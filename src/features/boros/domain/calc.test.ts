@@ -474,7 +474,7 @@ describe('Sanity Checks — جلوگیری از خطای مالی', () => {
 
   it('analyzeAll فقط موارد valid را برمی‌گرداند (Eligibility Filter)', () => {
     const expired = { ...m, maturity: Math.floor(Date.now() / 1000) - 1000 };
-    const all = BorosCalculationEngine.analyzeAll([m, expired], 1000);
+    const all = BorosCalculationEngine.analyzeAll([{ ...m, maturity: Math.floor(Date.now() / 1000) + 20 * 86400 }, expired], 1000);
     expect(all.every((a) => a.valid)).toBe(true);
     expect(all).toHaveLength(1);
   });

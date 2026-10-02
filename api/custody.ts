@@ -37,7 +37,10 @@ export function neonCustodyStore(sql: NeonQueryFunction<false, false>): CustodyS
     async upsertIfNewer(userId, r) {
       const rows = (await sql`
         INSERT INTO "custodyRecords" ("userId", collection, id, revision, "updatedAt", payload)
-        VALUES (${userId}, ${r.collection}, ${r.id}, ${r.revision}, ${r.updatedAt}, ${JSON.stringify(r.payload)}::jsonb)
+        SELECT ${userId}, ${r.collection}, ${r.id}, ${r.revision}, ${r.updatedAt}, ${JSON.stringify(r.payload)}::jsonb
+        WHERE NOT ((${r.collection}='operations' OR (${r.collection}='prefs' AND ${r.id}='acc-lot-baseline')) AND EXISTS (
+          SELECT 1 FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1' AND payload->'value'->>'migrationConfirmed'='true'
+        ))
         ON CONFLICT ("userId", collection, id) DO UPDATE SET
           revision = EXCLUDED.revision, "updatedAt" = EXCLUDED."updatedAt", payload = EXCLUDED.payload
         WHERE ("custodyRecords".revision, "custodyRecords"."updatedAt") < (EXCLUDED.revision, EXCLUDED."updatedAt")
@@ -74,6 +77,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         json(res, 413, { ok: false, error: 'too_many_records' });
         return;
       }
+      const existing=await store.list(auth.userId);
+      const cost=existing.find(r=>r.collection==='prefs'&&r.id==='cost-basis-v1')?.payload as {value?:{migrationConfirmed?:boolean}}|undefined;
+      const retired=cost?.value?.migrationConfirmed===true || input.some(r=>r.collection==='prefs'&&r.id==='cost-basis-v1'&&(r.payload as {value?:{migrationConfirmed?:boolean}})?.value?.migrationConfirmed===true);
       const applied: string[] = [];
       const stale: string[] = [];
       let invalid = 0;
@@ -82,6 +88,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           invalid++;
           continue;
         }
+        if(retired && (r.collection==='operations'||(r.collection==='prefs'&&r.id==='acc-lot-baseline'))) {invalid++;continue;}
         const ok = await store.upsertIfNewer(auth.userId, r);
         (ok ? applied : stale).push(`${r.collection}|${r.id}`);
       }

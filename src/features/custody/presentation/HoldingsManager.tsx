@@ -79,7 +79,7 @@ export function HoldingForm({ open, onClose, initial, presetKind, d }: { open: b
       open={open}
       onClose={onClose}
       title={initial ? 'ویرایش محل نگهداری' : 'افزودن محل نگهداری'}
-      description="فقط آدرس عمومی لازم است. دارینو هرگز کلید خصوصی یا عبارت بازیابی نمی‌خواهد."
+      description="فقط آدرس عمومی؛ بدون کلید خصوصی"
       footer={
         <div className="flex w-full justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -135,7 +135,7 @@ export function HoldingForm({ open, onClose, initial, presetKind, d }: { open: b
               <Input dir="ltr" inputMode="numeric" disabled={lockArcus} value={accountIndex} onChange={(e) => setAccountIndex(e.target.value.replace(/[^\d۰-۹]/g, '').replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))))} />
             </Field>
             <Notice tone="info" className="sm:col-span-2">
-              اتصال فقط‌خواندنی است: آرکوس اطلاعات حساب را برای هر کسی که آدرس را بداند عمومی نمایش می‌دهد و دارینو نمی‌تواند این را محدود کند. کلید دسترسی یا امضا لازم نیست و درخواست نمی‌شود.
+              اتصال فقط‌خواندنی؛ اطلاعات حساب با آدرس عمومی قابل مشاهده است.
             </Notice>
           </div>
         )}

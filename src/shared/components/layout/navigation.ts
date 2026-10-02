@@ -6,7 +6,7 @@
  * Grouping follows user goals, not data providers:
  *   بازارها     what the market is doing (home route `/`)
  *   دارایی من   what I own and its record
- *   بازدهی     yield products (DeFi · Pendle · Boros · Loop)
+ *   بازدهی     yield product (Boros)
  *   ابزارها    what-if tools
  */
 import {
@@ -14,9 +14,7 @@ import {
   CandlestickChart,
   BookOpenText,
   Boxes,
-  Percent,
   Radar,
-  Repeat,
   LineChart,
   Calculator,
   Car,
@@ -25,6 +23,8 @@ import {
   Layers,
   Activity,
   ShieldCheck,
+  Wallet,
+  Sparkles,
   type LucideIcon
 } from 'lucide-react';
 
@@ -88,27 +88,29 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
         primary: true
       },
+      { id: 'wallets', to: '/wallets', label: 'کیف پول‌های متصل', description: 'زریون؛ موجودی و تراکنش‌های واقعی', icon: Wallet },
+      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل فارسی دارایی‌های زریون و آرکوس', icon: Sparkles },
       {
         id: 'accounting',
         to: '/accounting',
-        label: 'حسابداری',
-        description: 'موجودی، تراکنش‌ها، خلاصهٔ حساب‌ها و سود و زیان',
+        label: 'خرید و سود و زیان',
+        description: 'هزینهٔ خرید رمزارزها و FIFO',
         icon: BookOpenText,
         primary: true
       },
       {
         id: 'holdings',
         to: '/holdings',
-        label: 'دارایی شبکه‌ای',
-        title: 'دارایی‌های چندشبکه‌ای',
-        description: 'موجودی به تفکیک شبکه و کیف پول؛ ثبت سواپ، بریج و سپرده',
+        label: 'دارایی و فعالیت شبکه‌ای',
+        title: 'دارایی‌ها و فعالیت شبکه‌ای',
+        description: 'موجودی واقعی، سواپ، بریج و انتقال',
         icon: Layers
       },
       {
         id: 'arcus',
         to: '/arcus',
         label: 'آرکوس',
-        title: 'آرکوس — حساب قراردادهای دائمی',
+        title: 'آرکوس — پرپچوال و اسپات',
         description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
         icon: Activity
       },
@@ -127,26 +129,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'بازدهی',
     items: [
       {
-        id: 'pendle',
-        to: '/pendle',
-        label: 'پندل',
-        description: 'بازدهی ثابت و توکن‌های بازده',
-        icon: Percent
-      },
-      {
         id: 'boros',
         to: '/boros',
         label: 'بوروس',
         title: 'تحلیل بوروس',
         description: 'بازارهای نرخ تأمین مالی',
         icon: Radar
-      },
-      {
-        id: 'loop',
-        to: '/defi-loop',
-        label: 'حلقهٔ بازده',
-        description: 'استراتژی‌های اهرمی بازدهی',
-        icon: Repeat
       }
     ]
   },

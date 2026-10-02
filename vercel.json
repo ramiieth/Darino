@@ -25,6 +25,10 @@
     },
     "api/custody.ts": {
       "includeFiles": "db/schema.sql"
+    },
+    "api/integrations.ts": {
+      "includeFiles": "db/schema.sql",
+      "maxDuration": 60
     }
   },
   "rewrites": [

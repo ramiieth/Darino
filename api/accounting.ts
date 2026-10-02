@@ -39,6 +39,27 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       json(res, 503, { ok: false, error: 'database_unavailable', message: 'اتصال به دیتابیس برقرار نیست — داده محلی (Dexie) فعال است' });
       return;
     }
+    const savedBook = await sql`SELECT payload FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1'`;
+    const rawBook = savedBook[0]?.payload;
+    const costBook = (typeof rawBook === 'string' ? JSON.parse(rawBook) : rawBook)?.value;
+    if (new URL(req.url ?? '/', 'https://darino.local').searchParams.get('op') === 'retire' && req.method === 'POST') {
+      if (costBook?.version !== 1 || costBook?.migrationConfirmed !== true || !Array.isArray(costBook.lots)) {
+        json(res,409,{error:'cost_basis_not_confirmed'});return;
+      }
+      // One atomic statement; only this authenticated user's obsolete ledger is removed.
+      await sql`WITH entries AS (DELETE FROM "accEntries" WHERE "userId"=${userId} RETURNING id),
+        lots AS (DELETE FROM "accLots" WHERE "userId"=${userId} RETURNING id),
+        events AS (DELETE FROM "accEvents" WHERE "userId"=${userId} RETURNING id),
+        oldOperations AS (DELETE FROM "custodyRecords" WHERE "userId"=${userId} AND (collection='operations' OR (collection='prefs' AND id='acc-lot-baseline')) RETURNING id),
+        accounts AS (DELETE FROM "accAccounts" WHERE "userId"=${userId} RETURNING key)
+        SELECT (SELECT count(*) FROM entries) AS removed`;
+      json(res,200,{ok:true});return;
+    }
+    if(costBook?.migrationConfirmed === true) {
+      if(req.method==='GET') json(res,200,{configured:true,retired:true,accounts:[],entries:[],lots:[],events:[]});
+      else json(res,409,{error:'legacy_accounting_retired'});
+      return;
+    }
     // ---------- GET: خواندن کامل (منبع حقیقت → کلاینت) ----------
     if (req.method === 'GET') {
       const [accounts, entries, lots, events] = await Promise.all([
@@ -70,7 +91,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           skipped++;
           continue;
         }
-        await sql`INSERT INTO "accAccounts" ("userId", key, "nameFa", type, "createdAt") VALUES (${userId}, ${a.key}, ${a.nameFa}, ${a.type}, ${a.createdAt})`;
+        const written = await sql`INSERT INTO "accAccounts" ("userId", key, "nameFa", type, "createdAt") SELECT ${userId}, ${a.key}, ${a.nameFa}, ${a.type}, ${a.createdAt} WHERE NOT EXISTS (
+          SELECT 1 FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1' AND payload->'value'->>'migrationConfirmed'='true'
+        ) ON CONFLICT DO NOTHING RETURNING 1`;
+        if (!written.length) { skipped++; continue; }
         inserted++;
       }
 
@@ -81,7 +105,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           skipped++;
           continue;
         }
-        await sql`INSERT INTO "accEntries" ("userId", id, date, "createdAt", payload) VALUES (${userId}, ${e.id}, ${e.date}, ${e.createdAt}, ${JSON.stringify(e.payload)}::jsonb)`;
+        const written = await sql`INSERT INTO "accEntries" ("userId", id, date, "createdAt", payload) SELECT ${userId}, ${e.id}, ${e.date}, ${e.createdAt}, ${JSON.stringify(e.payload)}::jsonb WHERE NOT EXISTS (
+          SELECT 1 FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1' AND payload->'value'->>'migrationConfirmed'='true'
+        ) ON CONFLICT DO NOTHING RETURNING 1`;
+        if (!written.length) { skipped++; continue; }
         inserted++;
       }
 
@@ -92,7 +119,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           skipped++;
           continue;
         }
-        await sql`INSERT INTO "accLots" ("userId", id, asset, "openedAt", payload) VALUES (${userId}, ${l.id}, ${l.asset}, ${l.openedAt}, ${JSON.stringify(l.payload)}::jsonb)`;
+        const written = await sql`INSERT INTO "accLots" ("userId", id, asset, "openedAt", payload) SELECT ${userId}, ${l.id}, ${l.asset}, ${l.openedAt}, ${JSON.stringify(l.payload)}::jsonb WHERE NOT EXISTS (
+          SELECT 1 FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1' AND payload->'value'->>'migrationConfirmed'='true'
+        ) ON CONFLICT DO NOTHING RETURNING 1`;
+        if (!written.length) { skipped++; continue; }
         inserted++;
       }
 
@@ -103,7 +133,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           skipped++;
           continue;
         }
-        await sql`INSERT INTO "accEvents" ("userId", id, at, payload) VALUES (${userId}, ${ev.id}, ${ev.at}, ${JSON.stringify(ev.payload)}::jsonb)`;
+        const written = await sql`INSERT INTO "accEvents" ("userId", id, at, payload) SELECT ${userId}, ${ev.id}, ${ev.at}, ${JSON.stringify(ev.payload)}::jsonb WHERE NOT EXISTS (
+          SELECT 1 FROM "custodyRecords" WHERE "userId"=${userId} AND collection='prefs' AND id='cost-basis-v1' AND payload->'value'->>'migrationConfirmed'='true'
+        ) ON CONFLICT DO NOTHING RETURNING 1`;
+        if (!written.length) { skipped++; continue; }
         inserted++;
       }
 

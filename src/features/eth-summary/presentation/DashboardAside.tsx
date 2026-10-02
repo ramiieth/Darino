@@ -5,12 +5,12 @@
  */
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownToLine, ArrowLeftRight, Calculator, CalendarClock, CircleCheck, Clock3, TriangleAlert } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeftRight, Calculator, CircleCheck, Clock3, TriangleAlert } from 'lucide-react';
 import { Section } from '@/shared/components/ui/GlassCard';
 import { buttonClass } from '@/shared/components/ui/Button';
-import { useWatchlistStore } from '@/shared/store/watchlistStore';
-import { usePendleMarkets } from '@/features/pendle/data/usePendleMarkets';
-import { toFaDigits } from '@/shared/utils/formatters';
+
+
+
 import { cn } from '@/shared/lib/cn';
 import type { PortfolioOverview } from './usePortfolioOverview';
 
@@ -43,8 +43,6 @@ interface Item {
 }
 
 export function AttentionPanel({ o }: { o: PortfolioOverview }) {
-  const watch = useWatchlistStore((s) => s.items);
-  const { markets } = usePendleMarkets();
 
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
@@ -66,22 +64,8 @@ export function AttentionPanel({ o }: { o: PortfolioOverview }) {
         detail: 'ارزش کل ناقص است.'
       });
     }
-    // watched Pendle markets maturing within 14 days
-    const soon = markets
-      .filter((m) => watch[`pendle:${m.address}`] !== undefined && m.daysToExpiry !== null && m.daysToExpiry >= 0 && m.daysToExpiry <= 14)
-      .slice(0, 3);
-    for (const m of soon) {
-      out.push({
-        id: `pendle-${m.address}`,
-        tone: 'info',
-        icon: CalendarClock,
-        title: `سررسید ${m.name}`,
-        detail: `${toFaDigits(m.daysToExpiry ?? 0)} روز دیگر`,
-        to: `/pendle/${m.chainId}/${m.address}`
-      });
-    }
     return out;
-  }, [o.state, o.stale, o.unpriced, markets, watch]);
+  }, [o.state, o.stale, o.unpriced]);
 
   return (
     <Section id="attention" title="نیازمند توجه" headingLevel={2}>

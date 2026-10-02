@@ -11,7 +11,7 @@ import {
   syncAccountingWithRemote
 } from '@/repositories/accountingRepository';
 import { replayLedger, type LotBaseline, type PendingOp } from '@/features/accounting/domain/lotReplay';
-import { ensureBaseline, mayAutoSeed, readBaseline } from '@/features/accounting/data/lotBaseline';
+import { ensureBaseline, readBaseline } from '@/features/accounting/data/lotBaseline';
 import { useCustody } from '@/features/custody/data/useCustody';
 import { useCustodyStore } from '@/features/custody/data/repository';
 import {
@@ -24,7 +24,7 @@ import {
   eventLoadAll,
   lotLoadAll
 } from '@/features/accounting/data/db';
-import { settingGet, settingSet } from '@/shared/lib/db';
+import { settingGet } from '@/shared/lib/db';
 import {
   accountBalanceOf,
   avgCostOf,
@@ -58,65 +58,11 @@ import {
   type JournalLine,
   type LedgerEvent
 } from '@/features/accounting/domain/types';
-import { ETH_POSITION } from '@/features/simulation/domain/constants';
 import { toast } from '@/shared/store/toastStore';
 import { faNumber, fmtUSD } from '@/shared/utils/formatters';
 
-/** seed سینگلتون — همه نمونه‌ها منتظر همان عملیات واقعی می‌مانند
- *  (رفع race در StrictMode: قبلاً نمونه دوم قبل از اتمام seed، خالی reload می‌کرد)
- */
-let seedPromise: Promise<void> | null = null;
-
-const SEED_KEY = 'acc:seeded';
-
-/** ثبت افتتاحیه: نقد ۲۳٬۱۲۶ (USDC) + لات اولیه ETH (۳.۳۳ @ ۲٬۸۲۰) */
-/** seed سینگلتون — همه نمونه‌ها منتظر همان عملیات واقعی می‌مانند
- *  (رفع race در StrictMode: قبلاً نمونه دوم قبل از اتمام seed، خالی reload می‌کرد)
- */
-function seedOpening(): Promise<void> {
-  if (!seedPromise) {
-    seedPromise = (async () => {
-      try {
-        // خودترمیمی: اگر سندها موجودند، seed لازم نیست (حتی اگر پرچم باشد)
-        const existing = await entryLoadAll();
-        if (existing.length > 0) return;
-        // دستگاه تازه (مثلاً اپ آیفون) نباید قبل از دریافت دفتر سرور افتتاحیهٔ خودش را بسازد —
-        // فقط اگر سرور خالی است یا اپ در حالت محلی (بدون سرور) کار می‌کند.
-        if (!mayAutoSeed(existing.length, await remoteLedgerState())) return;
-        // پرچم هست ولی سندها نیستند → از دست رفتن داده → بازسازی افتتاحیه
-        const now = Date.now();
-        // ۱) نقد (تخصیص USDC کاربر)
-        const cashEntry = makeDepositEntry(ETH_POSITION.USDC_ALLOCATION_2026, now, 'موجودی اولیه — نقد (یو‌اس‌دی‌سی)');
-        cashEntry.source = 'opening';
-        // ۲) لات اولیه ETH با قیمت خرید
-        const ethEntry: JournalEntry = {
-          id: -1,
-          date: now,
-          memo: 'موجودی اولیه — اتریوم',
-          lines: [
-            { account: cryptoAccountKey('ETH'), debit: ETH_POSITION.INITIAL_INVESTMENT, credit: 0 },
-            { account: 'equity:capital', debit: 0, credit: ETH_POSITION.INITIAL_INVESTMENT }
-          ],
-          createdAt: now,
-          source: 'opening',
-          // لات اولیه از روی همین سند ساخته می‌شود (نه جدول لات جداگانه)
-          trade: { kind: 'deposit_asset', symbol: 'ETH', qty: ETH_POSITION.AMOUNT, unitPrice: ETH_POSITION.BUY_PRICE }
-        };
-        const saved = await entryAppendMany([cashEntry, ethEntry]);
-        await accountEnsure({ key: cryptoAccountKey('ETH'), nameFa: cryptoAccountName('ETH'), type: 'asset' });
-        for (const e of saved) {
-          await eventAppend('opening', e.id, `${e.memo} — ${fmtUSD(e.lines[0].debit)}`);
-        }
-        await settingSet(SEED_KEY, true);
-      } catch {
-        /* seed در دسترس نبود — کاربر از صفر شروع می‌کند */
-      }
-    })().finally(() => {
-      seedPromise = null;
-    });
-  }
-  return seedPromise;
-}
+/** Automatic opening balances are retired; migration reads existing purchase records only. */
+function seedOpening(): Promise<void> { return Promise.resolve(); }
 
 export interface AccountingState {
   /** سندهای ذخیره‌شده + سندهای مشتق از عملیات دارایی چندشبکه‌ای (مرتب بر اساس تاریخ) */

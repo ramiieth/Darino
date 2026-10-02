@@ -246,7 +246,7 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
       <Section
         id="user-capital"
         title="بهترین فرصت‌ها برای سرمایه شما"
-        description={`با ${simCollateral.toFixed(3)} اتریوم شبیه‌سازی — ارزش اسمی، مارجین، کارمزد و سود/زیان برای همین مقدار محاسبه می‌شود`}
+        description={`سرمایهٔ فرضی: ${simCollateral.toFixed(3)} اتریوم`}
       >
         {userOpps.length === 0 ? (
           <EmptyState

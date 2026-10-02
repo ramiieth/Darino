@@ -113,7 +113,7 @@ export default function SecurityPage() {
     <Page>
       <PageHeader
         title="امنیت و دستگاه‌ها"
-        subtitle="نشست‌های همهٔ دستگاه‌ها، رمز عبور، کلید عبورها و رویدادهای ورود. لغو و حذف، تأیید مجدد می‌خواهد."
+        subtitle="دستگاه‌ها و روش‌های ورود"
         actions={
           <Button variant="outline" icon={<RefreshCw className={loading ? 'animate-spin' : ''} />} onClick={() => void load()} disabled={loading}>
             تازه‌سازی

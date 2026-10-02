@@ -49,7 +49,7 @@ export function MarketsHomePage() {
     <Page>
       <PageHeader
         title="بازارها"
-        subtitle="رمزارزها، دارایی‌های توکن‌ایز و بازار سنتی — قیمت، تغییرات و ارزش بازار"
+        subtitle="رمزارز، سهام توکن‌ایز و بازار سنتی"
         meta={<MarketsStatus tab={tab} />}
         actions={
           <Button variant="outline" size="sm" icon={<RefreshCw />} loading={syncing} onClick={refreshAllMarkets}>
@@ -62,14 +62,14 @@ export function MarketsHomePage() {
 
       <Surface className="px-4">
         <ListRow
-          to="/pendle"
+          to="/boros"
           leading={
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
               <Percent className="h-5 w-5" />
             </span>
           }
-          title="بازارهای پندل"
-          subtitle="بازده ثابت توکن اصل، توکن بازده و نقدینگی — بازده سالانه اعلام‌شده و تحلیل پس از هزینه"
+          title="بازارهای بوروس"
+          subtitle="بازارهای نرخ تأمین مالی"
         />
       </Surface>
     </Page>
