@@ -1,3 +1,4 @@
+import { useInstallStore } from '@/shared/store/installStore';
 import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -46,6 +47,8 @@ export function AppShell({
   const closePalette = useCallback(() => setPaletteOpen(false), [setPaletteOpen]);
 
   useInstallPrompt();
+  const installedPwa = useInstallStore(s => s.installed);
+  useEffect(() => { document.documentElement.dataset.installedPwa = String(installedPwa); return () => { delete document.documentElement.dataset.installedPwa; }; }, [installedPwa]);
 
   // نرخ زنده تتر (والکس/بیت‌پین) — تنها مبنای دلار در کل اپ، هر دقیقه
   useUsdtPolling();

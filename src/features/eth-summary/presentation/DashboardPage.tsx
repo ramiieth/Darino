@@ -15,6 +15,7 @@ import { WatchlistSection } from './WatchlistSection';
 import { TopPerformersCard } from '@/features/cryptomarkets/presentation/TopPerformersCard';
 import { SimulatedInvestmentCard } from '@/features/cryptomarkets/presentation/SimulatedInvestmentCard';
 import type { PerfPeriod } from '@/features/cryptomarkets/data/useTopPerformers';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { t } from '@/shared/i18n/fa';
 import { COVERAGE } from '@/features/simulation/domain/constants';
 
@@ -34,6 +35,7 @@ export function DashboardPage() {
       <PageHeader eyebrow={greeting()} title="داشبورد" />
 
       <PortfolioSummary portfolio={portfolio} />
+      <Disclosure summary="بازار و سناریوهای من" className="native-dashboard-extras rounded-card border border-divider bg-card p-4">
       <WatchlistSection />
 
       <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
@@ -70,6 +72,7 @@ export function DashboardPage() {
           </Section>
         </div>
       </div>
+      </Disclosure>
     </Page>
   );
 }
