@@ -1,5 +1,5 @@
 /** ============================================================
- * ذخیره‌سازی احراز هویت (Passkey) — رابط + پیاده‌سازی Neon
+ * ذخیره‌سازی احراز هویت (Passkey + رمز عبور) — رابط + پیاده‌سازی Neon
  *
  *  • از نشست فقط هش SHA-256 توکن ذخیره می‌شود (خود توکن فقط در کوکی HttpOnly است).
  *  • challengeها یک‌بارمصرف‌اند (DELETE … RETURNING) و ۵ دقیقه اعتبار دارند.
@@ -25,7 +25,7 @@ export interface StoredCredential {
 export interface StoredChallenge {
   id: string;
   challenge: string;
-  purpose: 'setup' | 'add' | 'pair' | 'login' | 'stepup';
+  purpose: 'setup' | 'add' | 'pair' | 'login' | 'stepup' | 'password' | 'totp';
   userId: string | null;
   expiresAt: number;
   meta: Record<string, unknown>;
@@ -56,7 +56,24 @@ export interface StoredEvent {
   detail: Record<string, unknown>;
 }
 
+export interface StoredPassword {
+  userId: string;
+  /** هش scrypt (خود رمز هرگز ذخیره نمی‌شود) */
+  hash: string;
+  /** کلید کد ۶ رقمی (Google Authenticator) — برای ورود با رمز اجباری است */
+  totpSecret: string | null;
+  /** رزرو (کلید جدید تا پیش از تأیید در challenge نگه داشته می‌شود، نه این‌جا) */
+  totpPending: string | null;
+  totpLastStep: number;
+  failCount: number;
+  lockedUntil: number;
+  updatedAt: number;
+}
+
 export interface AuthStore {
+  getPassword(userId: string): Promise<StoredPassword | null>;
+  putPassword(p: StoredPassword): Promise<void>;
+
   listCredentials(userId: string): Promise<StoredCredential[]>;
   getCredential(id: string): Promise<StoredCredential | null>;
   addCredential(c: StoredCredential): Promise<void>;
@@ -136,6 +153,27 @@ function sessFromRow(r: Row): StoredSession {
 
 export function neonAuthStore(sql: NeonQueryFunction<false, false>): AuthStore {
   return {
+    async getPassword(userId) {
+      const rows = (await sql`SELECT * FROM "authPassword" WHERE "userId" = ${userId}`) as Row[];
+      const r = rows[0];
+      if (!r) return null;
+      return {
+        userId: String(r.userId),
+        hash: String(r.hash),
+        totpSecret: r.totpSecret === null ? null : String(r.totpSecret),
+        totpPending: r.totpPending === null ? null : String(r.totpPending),
+        totpLastStep: Number(r.totpLastStep ?? 0),
+        failCount: Number(r.failCount ?? 0),
+        lockedUntil: Number(r.lockedUntil ?? 0),
+        updatedAt: Number(r.updatedAt)
+      };
+    },
+    async putPassword(p) {
+      await sql`INSERT INTO "authPassword" ("userId", hash, "totpSecret", "totpPending", "totpLastStep", "failCount", "lockedUntil", "updatedAt")
+        VALUES (${p.userId}, ${p.hash}, ${p.totpSecret}, ${p.totpPending}, ${p.totpLastStep}, ${p.failCount}, ${p.lockedUntil}, ${p.updatedAt})
+        ON CONFLICT ("userId") DO UPDATE SET hash = EXCLUDED.hash, "totpSecret" = EXCLUDED."totpSecret", "totpPending" = EXCLUDED."totpPending",
+          "totpLastStep" = EXCLUDED."totpLastStep", "failCount" = EXCLUDED."failCount", "lockedUntil" = EXCLUDED."lockedUntil", "updatedAt" = EXCLUDED."updatedAt"`;
+    },
     async listCredentials(userId) {
       const rows = (await sql`SELECT * FROM "authCredentials" WHERE "userId" = ${userId} ORDER BY "createdAt"`) as Row[];
       return rows.map(credFromRow);
@@ -248,8 +286,16 @@ export function memoryAuthStore(): AuthStore & { _dump(): unknown } {
   const sessions = new Map<string, StoredSession>();
   const pairs = new Map<string, { userId: string; expiresAt: number; usedAt: number | null }>();
   const events: StoredEvent[] = [];
+  const passwords = new Map<string, StoredPassword>();
   return {
-    _dump: () => ({ creds: [...creds.values()], sessions: [...sessions.values()], events }),
+    _dump: () => ({ creds: [...creds.values()], sessions: [...sessions.values()], events, passwords: [...passwords.values()] }),
+    async getPassword(u) {
+      const p = passwords.get(u);
+      return p ? { ...p } : null;
+    },
+    async putPassword(p) {
+      passwords.set(p.userId, { ...p });
+    },
     async listCredentials(u) {
       return [...creds.values()].filter((c) => c.userId === u);
     },

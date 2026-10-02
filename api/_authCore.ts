@@ -204,7 +204,7 @@ export async function issueSession(
   req: IncomingMessage,
   res: CookieRes,
   store: AuthStore,
-  p: { userId: string; credentialId: string; standalone: boolean },
+  p: { userId: string; credentialId: string | null; standalone: boolean },
   now = Date.now()
 ): Promise<StoredSession> {
   const token = randomToken(32);

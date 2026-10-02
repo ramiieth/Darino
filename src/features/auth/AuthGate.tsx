@@ -1,5 +1,5 @@
 /**
- * AuthGate — صفحه‌های «دارایی من» فقط پس از ورود با کلید عبور
+ * AuthGate — صفحه‌های «دارایی من» فقط پس از ورود (رمز عبور + کد ۶ رقمی، یا کلید عبور)
  *  • این گارد فقط رابط است؛ کنترل دسترسی واقعی روی سرور (requireSession) انجام می‌شود.
  *  • آفلاین: اگر آخرین بار وارد بوده‌اید، دادهٔ محلی با برچسب «آفلاین» نمایش داده می‌شود.
  *  • سرور بدون پایگاه داده (توسعهٔ محلی): حالت فقط‌محلی با هشدار.
@@ -14,6 +14,7 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { authErrorText, loginWithPasskey, registerPasskey, useAuth, webAuthnSupported } from './authClient';
+import { PasswordLoginForm, PasswordSetupWizard } from './PasswordParts';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const status = useAuth((s) => s.status);
@@ -41,12 +42,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 export function LoginScreen() {
-  const { hasPasskeys, setupAvailable } = useAuth();
+  const { hasPasskeys, hasPassword, setupAvailable } = useAuth();
   const [busy, setBusy] = useState<null | 'login' | 'pair' | 'setup'>(null);
   const [error, setError] = useState<string | null>(null);
   const [pairCode, setPairCode] = useState('');
   const [setupToken, setSetupToken] = useState('');
   const supported = webAuthnSupported();
+  const firstRun = !hasPasskeys && !hasPassword;
 
   const run = async (kind: 'login' | 'pair' | 'setup', fn: () => Promise<void>) => {
     setBusy(kind);
@@ -74,42 +76,56 @@ export function LoginScreen() {
             </div>
           </div>
 
-          {!supported && <Notice tone="error">این مرورگر از کلید عبور پشتیبانی نمی‌کند.</Notice>}
           {error && <Notice tone="error">{error}</Notice>}
 
+          {hasPassword && <PasswordLoginForm />}
+
           {hasPasskeys && (
-            <Button size="lg" className="w-full" icon={<Fingerprint />} loading={busy === 'login'} disabled={!supported || !!busy} onClick={() => run('login', loginWithPasskey)}>
+            <Button
+              size={hasPassword ? 'md' : 'lg'}
+              variant={hasPassword ? 'outline' : 'primary'}
+              className="w-full"
+              icon={<Fingerprint />}
+              loading={busy === 'login'}
+              disabled={!supported || !!busy}
+              onClick={() => run('login', loginWithPasskey)}
+            >
               ورود با کلید عبور (فیس آیدی / تاچ آیدی)
             </Button>
           )}
 
-          {hasPasskeys && (
+          {hasPasskeys && supported && (
             <Disclosure summary={<span className="inline-flex items-center gap-1.5"><Link2 className="h-4 w-4" /> دستگاه جدید با کد اتصال</span>}>
               <div className="space-y-3">
                 <p className="text-xs leading-5 text-muted">
-                  در دستگاهی که وارد هستید، از «امنیت و دستگاه‌ها» یک کد اتصال بسازید و این‌جا وارد کنید. کد ۱۰ دقیقه اعتبار دارد و یک‌بارمصرف است. اگر کلید عبور شما در جاکلیدی آی‌کلود همگام است، معمولاً همان دکمهٔ «ورود با کلید عبور» روی دستگاه‌های Apple هم کار می‌کند.
+                  در دستگاهی که وارد هستید، از «امنیت و دستگاه‌ها» یک کد اتصال بسازید و این‌جا وارد کنید تا برای این دستگاه کلید عبور ساخته شود. کد ۱۰ دقیقه اعتبار دارد و یک‌بارمصرف است.
                 </p>
                 <Field label="کد اتصال">
                   <Input dir="ltr" autoComplete="one-time-code" autoCapitalize="characters" maxLength={9} value={pairCode} onChange={(e) => setPairCode(e.target.value)} placeholder="کد ۸ نویسه‌ای" />
                 </Field>
-                <Button className="w-full" variant="secondary" loading={busy === 'pair'} disabled={!supported || !!busy || pairCode.replace(/[^A-Za-z0-9۰-۹٠-٩]/g, '').length !== 8} onClick={() => run('pair', () => registerPasskey({ mode: 'pair', pairCode }))}>
+                <Button className="w-full" variant="secondary" loading={busy === 'pair'} disabled={!!busy || pairCode.replace(/[^A-Za-z0-9۰-۹٠-٩]/g, '').length !== 8} onClick={() => run('pair', () => registerPasskey({ mode: 'pair', pairCode }))}>
                   ساخت کلید عبور برای این دستگاه
                 </Button>
               </div>
             </Disclosure>
           )}
 
-          {(!hasPasskeys || setupAvailable) && (
-            <Disclosure defaultOpen={!hasPasskeys} summary={<span className="inline-flex items-center gap-1.5"><KeyRound className="h-4 w-4" /> راه‌اندازی اولیه / بازیابی</span>}>
+          {(firstRun || setupAvailable) && (
+            <Disclosure
+              defaultOpen={firstRun}
+              summary={<span className="inline-flex items-center gap-1.5"><KeyRound className="h-4 w-4" /> {firstRun ? 'راه‌اندازی: رمز عبور + Google Authenticator' : 'بازیابی با کد راه‌اندازی'}</span>}
+            >
+              <PasswordSetupWizard setupAvailable={setupAvailable} hasPassword={hasPassword} />
+            </Disclosure>
+          )}
+
+          {(firstRun || setupAvailable) && supported && (
+            <Disclosure summary="روش دیگر: کلید عبور به‌جای رمز (نیازمند جاکلیدی آی‌کلود یا مدیر رمز)">
               <div className="space-y-3">
-                <p className="text-xs leading-5 text-muted">
-                  کد راه‌اندازی همان مقدار متغیر محیطی <bdi dir="ltr">DARINO_SETUP_TOKEN</bdi> در ورسل (Vercel) است. پس از ساختن کلید عبور، این متغیر را از ورسل حذف کنید.
-                </p>
-                {!setupAvailable && <Notice tone="warn">راه‌اندازی غیرفعال است — ابتدا DARINO_SETUP_TOKEN (حداقل ۲۴ نویسه) را در ورسل تنظیم و دوباره منتشر کنید.</Notice>}
                 <Field label="کد راه‌اندازی">
-                  <Input dir="ltr" type="password" autoComplete="off" value={setupToken} onChange={(e) => setSetupToken(e.target.value)} />
+                  <Input dir="ltr" type="password" autoComplete="off" value={setupToken} onChange={(e) => setSetupToken(e.target.value.trim())} />
                 </Field>
-                <Button className="w-full" variant={hasPasskeys ? 'outline' : 'primary'} loading={busy === 'setup'} disabled={!supported || !!busy || !setupAvailable || setupToken.length < 24} onClick={() => run('setup', () => registerPasskey({ mode: 'setup', setupToken }))}>
+                <Button className="w-full" variant="outline" loading={busy === 'setup'} disabled={!!busy || !setupAvailable || setupToken.length < 24} onClick={() => run('setup', () => registerPasskey({ mode: 'setup', setupToken }))}>
                   ساخت کلید عبور و ورود
                 </Button>
               </div>
@@ -117,7 +133,7 @@ export function LoginScreen() {
           )}
 
           <p className="text-xs leading-5 text-muted">
-            کلید عبور روی همین دستگاه (تراشهٔ امن دستگاه یا جاکلیدی آی‌کلود) ساخته می‌شود و کلید خصوصی آن هرگز به دارینو ارسال نمی‌شود. اپ نصب‌شده روی صفحهٔ اصلی آیفون نشست جدا از Safari دارد؛ یک‌بار داخل خود اپ وارد شوید.
+            رمز عبور فقط به‌صورت هش رمزنگاری‌شده روی سرور است و کد ۶ رقمی هر ۳۰ ثانیه عوض می‌شود. اپ نصب‌شده روی صفحهٔ اصلی آیفون نشست جدا از Safari دارد؛ یک‌بار داخل خود اپ وارد شوید.
           </p>
         </Surface>
       </div>
