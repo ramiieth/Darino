@@ -7,7 +7,11 @@ export interface LivePosition {
   receipt: string | null; displayable: boolean; spam: boolean;
 }
 export interface WalletSnapshot { address: string; fetchedAt: number; total: number | null; change: number | null; positions: LivePosition[]; chains: ChainInfo[]; complete: boolean; unpriced: number; detailsError?: string }
-export interface WalletTransaction { id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: { direction: string; symbol: string; quantity: string | null; value: number | null; address: string | null; icon: string | null }[] }
+export interface TransactionTransfer {
+  direction: string; symbol: string; quantity: string | null; value: number | null; address: string | null; icon: string | null;
+  chain?:string; tokenId?: string; name?: string; contract?: string | null; price?: number | null; sender?: string; recipient?: string; actId?: string;
+}
+export interface WalletTransaction { id: string; hash: string; chain: string; type: string; status: string; minedAt: string; fee: number | null; transfers: TransactionTransfer[]; from?: string; to?: string; protocol?: string; protocolIcon?: string | null; method?: string; acts?: {id:string;type:string;protocol:string;contract:string}[]; feeToken?: TransactionTransfer }
 export interface TransactionPage { rows: WalletTransaction[]; next: string | null; fetchedAt: number }
 export const obj = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export const arr = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
@@ -47,8 +51,20 @@ export function deduplicatePositions(rows: LivePosition[]): LivePosition[] {
   return rows.filter(p => { if (!p.id || seen.has(p.id)) return false; seen.add(p.id); return p.displayable && !p.spam && !(p.type === 'wallet' && receipts.has(`${p.chain}:${p.tokenId}`)); });
 }
 export function normalizeTransaction(v: unknown): WalletTransaction {
-  const r = obj(v), a = obj(r.attributes), fee = obj(a.fee);
-  return { id: str(r.id), hash: str(a.hash), chain: str(obj(obj(obj(r.relationships).chain).data).id),
-    type: str(a.operation_type), status: str(a.status), minedAt: str(a.mined_at), fee: finite(fee.value),
-    transfers: arr(a.transfers).map(v => { const t = obj(v), f = obj(t.fungible_info); return { direction: str(t.direction), symbol: str(f.symbol), quantity: str(obj(t.quantity).numeric) || null, value: finite(t.value), address: (t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null, icon: str(obj(f.icon).url) || null }; }) };
+  const r = obj(v), a = obj(r.attributes), fee = obj(a.fee), app = obj(a.application_metadata);
+  const chain = str(obj(obj(obj(r.relationships).chain).data).id);
+  const transfer = (value: unknown): TransactionTransfer => {
+    const t = obj(value), f = obj(t.fungible_info), q = obj(t.quantity);
+    const implementation = arr(f.implementations).map(obj).find(i => i.chain_id === chain);
+    return { chain, direction:str(t.direction), symbol:str(f.symbol), name:str(f.name), tokenId:str(f.id),
+      contract:str(implementation?.address) || null, price:finite(t.price),
+      quantity:str(q.numeric) || (str(q.int) && typeof q.decimals === 'number' ? decimalQuantity(str(q.int),q.decimals) : null),
+      value:finite(t.value), sender:str(t.sender), recipient:str(t.recipient), actId:str(t.act_id),
+      address:(t.direction === 'in' ? str(t.sender) : t.direction === 'out' ? str(t.recipient) : '') || null,
+      icon:str(obj(f.icon).url) || null };
+  };
+  return {id:str(r.id),hash:str(a.hash),chain,type:str(a.operation_type),status:str(a.status),minedAt:str(a.mined_at),fee:finite(fee.value),
+    from:str(a.sent_from),to:str(a.sent_to),protocol:str(app.name),protocolIcon:str(obj(app.icon).url) || null,method:str(obj(app.method).name),
+    acts:arr(a.acts).map(v => {const x=obj(v),m=obj(x.application_metadata);return {id:str(x.id),type:str(x.type),protocol:str(m.name),contract:str(m.contract_address)};}),
+    feeToken:Object.keys(fee).length ? transfer(fee) : undefined, transfers:arr(a.transfers).map(transfer)};
 }

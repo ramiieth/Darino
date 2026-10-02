@@ -93,24 +93,24 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         id: 'accounting',
         to: '/accounting',
-        label: 'حسابداری',
-        description: 'سوابق دستی قبلی؛ مستقل از موجودی واقعی داشبورد',
+        label: 'خرید و سود و زیان',
+        description: 'هزینهٔ خرید رمزارزها و FIFO',
         icon: BookOpenText,
         primary: true
       },
       {
         id: 'holdings',
         to: '/holdings',
-        label: 'دارایی شبکه‌ای',
-        title: 'دارایی‌های چندشبکه‌ای',
-        description: 'موجودی به تفکیک شبکه و کیف پول؛ ثبت سواپ، بریج و سپرده',
+        label: 'دارایی و فعالیت شبکه‌ای',
+        title: 'دارایی‌ها و فعالیت شبکه‌ای',
+        description: 'موجودی واقعی، سواپ، بریج و انتقال',
         icon: Layers
       },
       {
         id: 'arcus',
         to: '/arcus',
         label: 'آرکوس',
-        title: 'آرکوس — حساب قراردادهای دائمی',
+        title: 'آرکوس — پرپچوال و اسپات',
         description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
         icon: Activity
       },

@@ -177,6 +177,7 @@ export async function applyRemote(p: { holdings: Holding[]; operations: Operatio
   for (const a of p.assets) customAssets = upsert(customAssets, a);
   for (const x of p.prefs ?? []) prefs = upsert(prefs, x);
   emit({ holdings, operations, customNetworks, customAssets, prefs });
+  if((prefs.find(p=>p.id==='cost-basis-v1')?.value as {legacyRetired?:boolean}|undefined)?.legacyRetired) {await retireManualOperations();const {accountingReset}=await import('@/features/accounting/data/db');await accountingReset();}
 }
 
 /**
@@ -217,4 +218,11 @@ export function __resetCustodyForTests(): void {
   dbPromise = null;
   listeners.clear();
   localChangeListeners.clear();
+}
+
+/** After confirmed cost-basis migration, obsolete manual operations cannot repopulate balances. */
+export async function retireManualOperations(): Promise<void> {
+  const db = await getCustodyDb();
+  if(db) { await db.custodyOperations.clear(); await db.custodyPrefs.delete('acc-lot-baseline'); }
+  emit({operations:[],prefs:state.prefs.filter(p=>p.id!=='acc-lot-baseline')});
 }

@@ -6,9 +6,10 @@ const browser = await chromium.launch({channel:'chrome'});
 const page = await browser.newPage({viewport:{width:390,height:844}});
 const errors=[]; page.on('pageerror',e => errors.push({url:page.url(),stack:e.stack}));
 const address = '0x'+'ab'.repeat(20); let failWallet=false; let analysisBody;
-const snapshot={address,fetchedAt:Date.now(),total:1200,change:20,complete:true,unpriced:0,chains:[{id:'ethereum',name:'Ethereum',icon:null}],positions:[{id:'eth',tokenId:'eth',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:'/logos/token-eth.png',quantity:'0.300000000000000001',value:1200,price:4000,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false}]};
+const snapshot={address,fetchedAt:Date.now(),total:1300,change:20,complete:true,unpriced:0,chains:[{id:'ethereum',name:'Ethereum',icon:null}],positions:[{id:'eth',tokenId:'eth',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:'/logos/token-eth.png',quantity:'0.300000000000000001',value:1200,price:4000,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false},{id:'weth',tokenId:'weth',chain:'robinhood',contract:'0x'+'11'.repeat(20),name:'Wrapped Ether',symbol:'WETH',icon:'/logos/token-eth.png',quantity:'2',value:100,price:50,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false}]};
 await page.route('**/*',async route => {
  const u=new URL(route.request().url());
+ if(u.hostname==='api.arcus.xyz') { const account={address,accountIndex:0,netQuoteBalance:'500',equity:'500',freeCollateral:'500',netDeposits:'500',pendingDeposits:'0',pendingWithdrawals:'0',positions:{},sequenceNumber:1};return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(u.pathname==='/v1/account'?account:[])}); }
  if(u.origin!==base) return route.abort();
  if(!u.pathname.startsWith('/api/') && !u.pathname.includes('-api')) return route.continue();
  let body={configured:false}; let status=200;
@@ -19,11 +20,13 @@ await page.route('**/*',async route => {
   else if(op==='events') body={events:[]};
   else body={available:true,authenticated:true,session:{id:'qa',label:'QA',createdAt:Date.now(),stepUpFresh:true}};
  }
+ else if(u.pathname==='/api/accounting') body={configured:false,accounts:[],entries:[],lots:[],events:[]};
  else if(u.pathname==='/api/custody') body={configured:false,records:[]};
  else if(u.pathname==='/api/integrations') {
   const op=u.searchParams.get('op');
   if(op==='wallet') {body=failWallet?{error:'خطای آزمایشی اتصال'}:snapshot;status=failWallet?502:200;}
   else if(op==='transactions') body={rows:[{id:'t1',hash:'0xtest',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0.1,transfers:[{direction:'in',symbol:'ETH',quantity:'0.1',value:400,address:'0x'+'cd'.repeat(20),icon:'/logos/token-eth.png'}]}],next:null,fetchedAt:Date.now()};
+  else if(op==='arcus-spot') body={tokens:[{address:'0x'+'11'.repeat(20),wrappedTokenAddress:null,symbol:'WETH',name:'Wrapped Ether',decimals:18,source:'arcus',verified:true}],fetchedAt:Date.now()};
   else if(op==='pnl') body={data:{attributes:{realized_gain:10,unrealized_gain:20,total_fee:1}}};
   else if(op==='analyze') {analysisBody=route.request().postDataJSON();body={answer:'تحلیل آزمایشی فارسی: تمرکز دارایی را بررسی کنید.',generatedAt:Date.now()};}
   else body={zerion:true,gemini:true};
@@ -46,7 +49,7 @@ try {
  await fits();
  failWallet=true; await page.getByRole('button',{name:'به‌روزرسانی',exact:true}).click();
  await page.getByText('خطای آزمایشی اتصال',{exact:true}).first().waitFor();
- assert(/[1۱][,٬][2۲][0۰][0۰]/.test(await page.locator('main').innerText()),'last successful balance lost');
+ assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'last successful balance lost');
  failWallet=false;
  await page.evaluate(()=>location.hash='#/assistant');
  await page.getByRole('heading',{name:'دستیار پرتفولیو',exact:true}).waitFor();
@@ -54,7 +57,7 @@ try {
  await page.getByRole('button',{name:'ارسال برای تحلیل'}).click();
  await page.getByText('تحلیل آزمایشی فارسی: تمرکز دارایی را بررسی کنید.',{exact:true}).waitFor();
  assert(!JSON.stringify(analysisBody).includes(address),'wallet address sent to AI');
- assert.equal(analysisBody.context.total,1200);
+ assert.equal(analysisBody.context.total,1300);
  await fits(); await page.screenshot({path:'/tmp/darino-assistant-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
  await page.waitForTimeout(400); await page.screenshot({path:'/tmp/darino-assistant-desktop.png',fullPage:false}); await fits();
@@ -64,6 +67,35 @@ try {
  await page.evaluate(()=>location.hash='#/dashboard');
  await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor(); await fits();
  assert.equal(await page.locator('a[href="#/pendle"],a[href="#/loop"]').count(),0);
+ await page.setViewportSize({width:390,height:844});
+ await page.evaluate(()=>location.hash='#/accounting');
+ await page.getByRole('heading',{name:'سابقهٔ خرید و سود و زیان',exact:true}).waitFor();
+ await page.getByRole('button',{name:'به‌روزرسانی',exact:true}).click();
+ await page.getByRole('button',{name:'بررسی خریدهای قبلی'}).click();
+ await page.getByText('خرید قبلی قابل انتقال یافت نشد.').waitFor();
+ await page.getByRole('button',{name:'تأیید انتقال و کنارگذاشتن دفتر قدیمی'}).click();
+ await page.getByRole('button',{name:'بررسی خریدهای قبلی'}).waitFor({state:'hidden'});
+ const costSection=page.getByRole('region',{name:'تکمیل بهای خرید اولیه'});
+ await costSection.locator('select').selectOption('fungible:eth');
+ await costSection.locator('input').nth(0).fill('0.300000000000000001');
+ await costSection.locator('input').nth(1).fill('2000');
+ await page.getByRole('button',{name:'ثبت بهای خرید',exact:true}).click();
+ await page.getByText('دسته‌های خرید',{exact:true}).waitFor();
+ await fits();await page.screenshot({path:'/tmp/darino-cost-mobile.png',fullPage:true});
+ await page.evaluate(()=>location.hash='#/holdings');
+ await page.getByRole('heading',{name:'دارایی‌ها و فعالیت شبکه‌ای',exact:true}).waitFor();await fits();
+ await page.screenshot({path:'/tmp/darino-network-mobile.png',fullPage:true});
+ await page.evaluate(()=>location.hash='#/arcus');
+ await page.getByRole('button',{name:'افزودن زیرحساب آرکوس',exact:true}).click();
+ const arcusForm=page.getByRole('dialog');
+ await arcusForm.getByLabel('نام',{exact:true}).fill('آرکوس آزمایشی');
+ await arcusForm.getByLabel('آدرس عمومی کیف پول',{exact:true}).fill(address);
+ await arcusForm.getByLabel('شمارهٔ زیرحساب',{exact:true}).fill('0');
+ await arcusForm.getByRole('button',{name:'ذخیره',exact:true}).click();
+ await page.getByRole('tab',{name:'اسپات',exact:true}).click();
+ await page.getByText('منبع موجودی: زریون · فهرست توکن: آرکوس').waitFor();
+ assert.equal(await page.getByText('WETH',{exact:true}).count()>0,true);await fits();
+ await page.screenshot({path:'/tmp/darino-spot-mobile.png',fullPage:true});
  const routes=['/','/dashboard','/wallets','/assistant','/simulation','/defi','/boros','/accounting','/holdings','/arcus','/calculators','/vehicle','/realestate','/security'];
  for(const theme of ['light','dark']) {
  await page.evaluate(t => document.documentElement.classList.toggle('dark',t==='dark'),theme);
@@ -78,5 +110,5 @@ try {
  }
  }
  assert.deepEqual(errors,[]);
- console.log('PASS: preview → confirmation → transactions → stale retention → AI privacy → manual simulation; 14 routes at 320/390/1440px fit in light and dark themes.');
+ console.log('PASS: preview → confirmation → transactions → stale retention → AI privacy → manual simulation → cost migration → purchase cost → network activity → Arcus spot; 14 routes at 320/390/1440px fit in light and dark themes.');
 } finally {await browser.close();}

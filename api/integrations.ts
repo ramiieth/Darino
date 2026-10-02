@@ -4,6 +4,8 @@ import { requireSession } from './_authCore.js';
 import { json, readBody } from './_neon.js';
 import { validAddress } from '../src/features/connected/domain/model.js';
 import { getWallet, getTransactions, getPnl, ProviderError } from './_zerion.js';
+import { lookupBridge } from './_bridge.js';
+import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema } from './_assistant.js';
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -24,6 +26,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (!parsed.success) { json(res,400,{ error:'اطلاعات تحلیل کامل یا معتبر نیست' }); return; }
       json(res,200,{ answer: await analyze(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
     }
+    if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
+    if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if (req.method !== 'GET' || !['wallet','transactions','pnl'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';
     if (!validAddress(address)) { json(res,400,{ error:'آدرس عمومی EVM یا سولانا معتبر نیست' }); return; }

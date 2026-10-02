@@ -1,3 +1,4 @@
+import { ArcusSpotPanel } from './ArcusSpotPanel';
 /**
  * Arcus — حساب Perpetuals (فقط‌خواندنی)
  *  خلاصهٔ حساب · پوزیشن‌ها · سفارش‌ها · تاریخچه (معاملات، سفارش‌ها، funding، واریز/برداشت) · تطبیق با دفتر
@@ -95,6 +96,7 @@ export default function ArcusPage() {
   const d = useCustody();
   const arcusHoldings = d.holdings.filter((h) => h.kind === 'arcus' && h.arcus && !h.archivedAt);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [product,setProduct] = useState<'perp'|'spot'>('perp');
   const [live, setLive] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [section, setSection] = useState<'positions' | 'orders' | 'history' | 'reconcile'>('positions');
@@ -118,7 +120,7 @@ export default function ArcusPage() {
     <Page>
       <PageHeader
         title="آرکوس"
-        eyebrow={<span className="inline-flex items-center gap-1.5"><LogoImage src="/logos/platform-arcus.png" label="آرکوس" size={16} square /> حساب قراردادهای دائمی — فقط‌خواندنی</span>}
+        eyebrow={<span className="inline-flex items-center gap-1.5"><LogoImage src="/logos/platform-arcus.png" label="آرکوس" size={16} square /> پرپچوال و اسپات — فقط‌خواندنی</span>}
         subtitle="موجودی، پوزیشن‌ها و تاریخچهٔ حساب"
         actions={
           <div className="flex flex-wrap gap-2">
@@ -149,6 +151,8 @@ export default function ArcusPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <Tabs label="محصول آرکوس" options={[{value:'perp',label:'پرپچوال'},{value:'spot',label:'اسپات'}]} value={product} onChange={setProduct}/>
+          {product==='spot' && ref ? <ArcusSpotPanel key={ref.address+ref.env} address={ref.address} env={ref.env}/> : <>
           <div className="flex flex-wrap items-end gap-3">
             {arcusHoldings.length > 1 && (
               <Field label="زیرحساب" className="min-w-[220px]">
@@ -222,9 +226,10 @@ export default function ArcusPage() {
           {section === 'history' && state && ref && (
             <HistorySection refAcc={ref} state={state} range={range} setRange={setRange} historyRange={historyRange} marketById={marketById} markets={markets.data ?? []} />
           )}
-          {section === 'reconcile' && state && ref && holding && <ReconcileSection refAcc={ref} holding={holding} state={state} d={d} />}
+          {section === 'reconcile' && <Surface className="space-y-3 p-4"><p className="text-sm text-muted">برداشت به کیف پول و بریج بعدی، دو فعالیت مستقل هستند.</p><Link className="text-accent" to="/holdings">واریز، برداشت و تطبیق با کیف پول</Link></Surface>}
 
           <PrivacyNote />
+          </>}
         </div>
       )}
 
