@@ -78,7 +78,7 @@ export function apiUrl(path: string): string {
 
 /** خطای HTTP با کد وضعیت (برای تشخیص 401/403) */
 export class HttpError extends Error {
-  constructor(public status: number, public code: string | null) {
+  constructor(public status: number, public code: string | null, public retryAfter = 0) {
     super(`HTTP ${status}`);
     this.name = 'HttpError';
   }
@@ -115,7 +115,7 @@ export async function fetchJson<T>(
         /* بدنهٔ غیر JSON */
       }
       if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event(UNAUTHENTICATED_EVENT));
-      throw new HttpError(res.status, code);
+      throw new HttpError(res.status, code, Number(res.headers.get('Retry-After')) || 0);
     }
     return (await res.json()) as T;
   } finally {

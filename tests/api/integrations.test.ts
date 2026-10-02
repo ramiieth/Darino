@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkedNext, getWallet, getBalanceChart, ProviderError } from '../../api/_zerion';
 import { analysisSchema, analyze } from '../../api/_assistant';
 const address = '0x' + 'ab'.repeat(20);
-beforeEach(() => { vi.stubEnv('ZERION_API_KEY','test-zerion'); vi.stubEnv('GEMINI_API_KEY','test-gemini'); });
+beforeEach(() => { vi.stubEnv('ZERION_API_KEY','test-zerion-'+expect.getState().currentTestName); vi.stubEnv('GEMINI_API_KEY','test-gemini'); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe('سرور اتصال‌های دارینو', () => {
   it('صفحه‌بندی نمی‌تواند کلید را به میزبان یا کیف پول دیگری ارسال کند', () => {
@@ -17,7 +17,7 @@ describe('سرور اتصال‌های دارینو', () => {
   });
   it('مجموع رسمی با شکست جزئیات به صفر تبدیل نمی‌شود؛ کلید فقط در هدر سرور است', async () => {
     const fetcher = vi.fn(async (url:string, init:RequestInit) => {
-      expect(init.headers).toMatchObject({Authorization:'Basic '+Buffer.from('test-zerion:').toString('base64')});
+      expect(init.headers).toMatchObject({Authorization:'Basic '+Buffer.from(process.env.ZERION_API_KEY+':').toString('base64')});
       if(url.includes('/chains/')) return new Response(JSON.stringify({data:[]}));
       if(url.includes('/portfolio')) return new Response(JSON.stringify({data:{attributes:{total:{positions:987.65}}}}));
       return new Response('{}',{status:429});

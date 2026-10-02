@@ -1,3 +1,6 @@
+import { ArcusBalanceCard } from './ArcusBalanceCard';
+import { AssetValue } from '@/features/connected/presentation/AssetValue';
+import { chainIdentity,tokenQuantity } from '@/features/connected/presentation/identity';
 import { ArcusSpotPanel } from './ArcusSpotPanel';
 /**
  * Arcus — حساب Perpetuals (فقط‌خواندنی)
@@ -6,7 +9,7 @@ import { ArcusSpotPanel } from './ArcusSpotPanel';
  *  • هیچ سفارش، لغو، تغییر اهرم، برداشت یا انتقالی از این صفحه ممکن نیست.
  *  • فیلد ناموجود = «در دسترس نیست»؛ دادهٔ نامعلوم صفر نمی‌شود.
  *  • با شکست sync آخرین دادهٔ معتبر با برچسب «قدیمی» می‌ماند.
- *  • این اتصال برای Perpetuals است و به Spot/Stock Tokens تعمیم داده نشده.
+ *  • اعتبار پرپچوال مستقل از موجودی اسپات کیف پول نمایش داده می‌شود.
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -29,7 +32,6 @@ import { useCustody } from '@/features/custody/data/useCustody';
 import { saveOperation } from '@/features/custody/data/repository';
 import { HoldingForm } from '@/features/custody/presentation/HoldingsManager';
 import { formatAmount, cmp } from '@/features/custody/domain/decimal';
-import { UsdDec } from '@/features/custody/presentation/parts';
 import { linkTransfer, operationFromTransfer, reconcileTransfers, type ExternalTransfer } from '@/features/custody/domain/reconcile';
 import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 import type { Holding } from '@/features/custody/domain/types';
@@ -57,7 +59,7 @@ function rangeFromUs(r: RangeKey): string | null {
 
 function Usd({ v }: { v: string | null | undefined }) {
   if (v === null || v === undefined || v === '') return NA;
-  return <UsdDec v={v} />;
+  return <AssetValue value={Number(v)} primaryClassName="text-sm"/>;
 }
 
 function Num({ v, frac = 8 }: { v: string | null | undefined; frac?: number }) {
@@ -187,9 +189,9 @@ export default function ArcusPage() {
           {acc?.fetchedAt && acc.data === null ? (
             <EmptyState message="این زیرحساب هنوز هیچ فعالیتی ندارد" hint="آرکوس برای حساب بدون واریز یا معامله پاسخ «بدون فعالیت» می‌دهد. محیط (شبکهٔ اصلی یا آزمایشی) و شمارهٔ زیرحساب را بررسی کنید." />
           ) : (
-            <Surface className="p-4 md:p-6">
+            <div className="space-y-3"><ArcusBalanceCard account={acc?.data} env={ref?.env}/><Disclosure summary="جزئیات حساب"><Surface className="p-4 md:p-6">
               <MetricGrid cols={4}>
-                <Metric size="lg" label="ارزش حساب" value={acc?.data ? <Usd v={acc.data.equity} /> : acc?.loading ? '…' : NA} />
+
                 <Metric size="md" label="وثیقهٔ آزاد" value={acc?.data ? <Usd v={acc.data.freeCollateral} /> : NA} />
                 <Metric size="md" label="مارجین درگیر" value={state?.positions.data ? <Usd v={totalMarginUsed(positions)} /> : NA} />
                 <Metric
@@ -206,7 +208,7 @@ export default function ArcusPage() {
               <p className="mt-4 text-xs leading-5 text-muted">
                 مقادیر به دلار (واحد حساب؛ تسویه با USDG) و طبق تعریف رسمی آرکوس است. ارزش اسمی پوزیشن‌های اهرمی دارایی جداگانه نیست و به ارزش حساب اضافه نمی‌شود؛ وثیقه و سود/زیان داخل ارزش حساب هستند.
               </p>
-            </Surface>
+            </Surface></Disclosure></div>
           )}
 
           <Tabs
@@ -255,7 +257,7 @@ function PrivacyNote() {
         <li>داده از سرور رسمی آرکوس دریافت می‌شود؛ کلید خصوصی یا امضا لازم نیست.</li>
         <li>آدرس عمومی و زیرحساب ذخیره‌شده بین دستگاه‌های واردشده همگام می‌شوند؛ موجودی دریافتی در حافظهٔ جلسه است.</li>
         <li>دریافت زنده فقط هنگام دیده‌شدن صفحه فعال است.</li>
-        <li>این بخش فقط قراردادهای دائمی را نشان می‌دهد؛ معاملات نقدی (اسپات) و توکن‌های سهام پوشش داده نشده‌اند.</li>
+        <li>موجودی اسپات در کیف پول است؛ اعتبار پرپچوال در حساب آرکوس نگهداری می‌شود.</li>
       </ul>
     </Disclosure>
   );
@@ -283,9 +285,9 @@ function PositionsList({ res, orders, marketById }: { res: Res<ArcusPosition[]>;
         return (
           <Surface key={p.marketId} className="p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <MarketLogo m={m} name={p.marketDisplayName} />
-              <div className="min-w-0">
-                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p>
+              <span className="relative shrink-0"><MarketLogo m={m} name={p.marketDisplayName} size={40}/><span className="absolute -bottom-1 -left-1 rounded-full bg-card p-0.5"><LogoImage src={chainIdentity('robinhood').logo} label="رابین‌هود" size={16}/></span></span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p><p className="mt-1 text-xs text-muted">اندازهٔ پوزیشن <bdi dir="ltr">{tokenQuantity(p.size)} {m?.baseAsset??p.marketDisplayName.split('-')[0]}</bdi></p>
               </div>
               <Badge tone={p.side === 'LONG' ? 'gain' : 'loss'}>{p.side === 'LONG' ? 'لانگ (خرید)' : 'شورت (فروش)'}</Badge>
               <Badge tone="neutral">{p.marginMode === 'CROSS' ? 'مارجین متقاطع' : 'مارجین ایزوله'}</Badge>

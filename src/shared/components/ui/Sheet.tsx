@@ -1,7 +1,11 @@
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 import { t } from '@/shared/i18n/fa';
+
+const activeSheets:HTMLElement[]=[];
+let originalOverflow='';
 
 /**
  * Sheet — one overlay primitive with explicit presentation rules:
@@ -47,10 +51,14 @@ export function Sheet({
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
+    const panel=panelRef.current;
+    if(!panel)return;
+    if(!activeSheets.length)originalOverflow=document.body.style.overflow;
+    activeSheets.push(panel);
     document.body.style.overflow = 'hidden';
 
     const onKey = (e: KeyboardEvent) => {
+      if(activeSheets[activeSheets.length-1]!==panel)return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -81,8 +89,10 @@ export function Sheet({
     requestAnimationFrame(() => panelRef.current?.focus());
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-      previous?.focus?.();
+      const top=activeSheets[activeSheets.length-1]===panel;
+      const index=activeSheets.indexOf(panel);if(index>=0)activeSheets.splice(index,1);
+      if(!activeSheets.length)document.body.style.overflow=originalOverflow;
+      if(top&&previous?.isConnected)previous.focus();
     };
   }, [open, onClose]);
 
@@ -90,7 +100,7 @@ export function Sheet({
 
   const width = size === 'sm' ? 'md:max-w-md' : size === 'lg' ? 'md:max-w-2xl' : 'md:max-w-lg';
 
-  return (
+  return createPortal(
     <>
       <div
         data-sheet-overlay
@@ -188,7 +198,7 @@ export function Sheet({
           </div>
         )}
       </div>
-    </>
+    </>,document.body
   );
 }
 

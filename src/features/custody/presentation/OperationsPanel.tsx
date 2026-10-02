@@ -1,3 +1,5 @@
+import { SmartDateField } from '@/shared/components/ui/SmartDateField';
+import { parseIsoToTs,formatGregorianIso } from '@/shared/utils/jalali';
 /**
  * فهرست عملیات — فیلتر (نوع، شبکه، دارایی، محل، وضعیت، بازهٔ زمانی)،
  * مسیر بصری «مبدا ← ارائه‌دهنده ← مقصد» و جزئیات با لینک explorer و سابقهٔ تغییر.
@@ -183,10 +185,10 @@ export function OperationsPanel({ d }: { d: CustodyData }) {
             </Select>
           </Field>
           <Field label="از تاریخ">
-            <Input type="date" dir="ltr" value={filters.from} onChange={(e) => setF({ from: e.target.value })} />
+            <SmartDateField value={filters.from?parseIsoToTs(filters.from):null} onChange={ts=>setF({from:ts===null?'':formatGregorianIso(ts)})} compact/>
           </Field>
           <Field label="تا تاریخ">
-            <Input type="date" dir="ltr" value={filters.to} onChange={(e) => setF({ to: e.target.value })} />
+            <SmartDateField value={filters.to?parseIsoToTs(filters.to):null} onChange={ts=>setF({to:ts===null?'':formatGregorianIso(ts)})} compact/>
           </Field>
           <div className="flex items-end gap-3">
             <label className="flex items-center gap-2 text-sm text-ink">

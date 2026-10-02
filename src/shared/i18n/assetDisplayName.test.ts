@@ -42,8 +42,8 @@ describe('assetDisplayName — نام نمایشی دارایی', () => {
     expect(d.ticker).toBe('TSLAX');
     expect(d.mapped).toBe(false);
     expect(d.rtl).toBe(true);
-    const e = assetDisplayName('NVDA', 'NVIDIA Corporation');
-    expect(e.name).toBe('NVIDIA Corporation');
+    const e = assetDisplayName('UNKNOWN_STOCK', 'Example Corporation');
+    expect(e.name).toBe('Example Corporation');
     expect(e.rtl).toBe(false);
   });
 
