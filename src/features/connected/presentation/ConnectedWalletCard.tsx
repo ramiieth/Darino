@@ -1,0 +1,15 @@
+import { useState,useCallback } from 'react';
+import { MoreHorizontal,Check,Archive,Wallet } from 'lucide-react';
+import { Sheet } from '@/shared/components/ui/Sheet';
+import { Button } from '@/shared/components/ui/Button';
+import { LogoImage } from '@/shared/components/ui/EntityLogo';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { fmtRelativeAge } from '@/shared/utils/formatters';
+import { AssetValue } from './AssetValue';
+import type { ConnectedPortfolio } from '../data/useConnectedPortfolio';
+export function ConnectedWalletCard({source:s,selected,onSelect,onDisconnect}:{source:ConnectedPortfolio['wallets'][number];selected:boolean;onSelect:()=>void;onDisconnect:()=>void}) {
+ const [open,setOpen]=useState(false);const close=useCallback(()=>setOpen(false),[]);
+ return <div className={`native-wallet-card min-w-0 overflow-hidden rounded-card border bg-card p-4 ${selected?'border-accent/50 ring-1 ring-accent/10':'border-divider'}`}><div className="flex items-center gap-3"><LogoImage src="/logos/platform-zerion.png" label="زریون" size={36} square/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{s.holding.label}</p><p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted"><span className={`h-1.5 w-1.5 rounded-full ${s.stale?'bg-warning':'bg-positive'}`}/>{s.stale?'دادهٔ قدیمی':'متصل'}</p></div><Button variant="ghost" size="sm" aria-label={`مدیریت ${s.holding.label}`} onClick={()=>setOpen(true)}><MoreHorizontal className="h-5 w-5"/></Button></div>
+ <button type="button" aria-label={`انتخاب کیف پول ${s.holding.label}`} aria-pressed={selected} onClick={onSelect} className="mt-3 flex min-h-16 w-full items-center justify-between gap-3 rounded-field text-start active:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"><AssetValue value={s.value} stale={s.stale} primaryClassName="text-xl font-bold"/><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${selected?'bg-accent/10 text-accent':'bg-surface-2 text-muted'}`}>{selected?<Check className="h-4 w-4"/>:<Wallet className="h-4 w-4"/>}</span></button><p className="mt-2 text-[10px] text-muted">{s.state?.data?`به‌روزرسانی ${fmtRelativeAge(s.state.data.fetchedAt)}`:'در انتظار موجودی'}</p>{s.state?.error&&<p className="mt-2 text-xs text-warn">{s.state.error}</p>}
+ <Sheet open={open} onClose={close} title={s.holding.label}><div className="space-y-4"><AssetValue value={s.value} stale={s.stale} primaryClassName="text-2xl font-bold"/><div className="rounded-field bg-surface-2 p-3"><p className="mb-2 text-xs text-muted">آدرس عمومی</p><bdi dir="ltr" className="block break-all text-sm">{s.holding.address}</bdi></div>{s.state?.error&&<Notice tone="warn">{s.state.error}</Notice>}<Button className="w-full" onClick={()=>{close();onSelect();}}>دارایی‌ها و فعالیت</Button><Button className="w-full" variant="ghost" icon={<Archive/>} onClick={()=>{close();onDisconnect();}}>قطع همگام‌سازی</Button></div></Sheet></div>;
+}

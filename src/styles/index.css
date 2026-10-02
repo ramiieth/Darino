@@ -428,3 +428,29 @@
   [dir='rtl'] .sheet-anim[data-variant='panel'] { animation: darino-panel-rtl var(--dur-slow) var(--ease-emphasized) both; }
   [dir='ltr'] .sheet-anim[data-variant='panel'] { animation: darino-panel-ltr var(--dur-slow) var(--ease-emphasized) both; }
 }
+
+/* Wallet surfaces: touch-first layouts, with installed-PWA safe-area treatment. */
+.native-activity-list, .native-wallet-card, .native-portfolio-hero {
+  -webkit-tap-highlight-color: transparent;
+}
+.activity-native-row { touch-action: manipulation; }
+.asset-value { overflow-wrap: anywhere; }
+@media (pointer: coarse) {
+  .native-activity-explorer button, .native-wallet-card button { min-height: 44px; }
+  .activity-native-row { min-height: 88px; }
+}
+@media (display-mode: standalone) {
+  .native-portfolio-hero, .native-wallet-card { border-radius: 22px; }
+  .activity-native-row { padding-block: 14px; }
+  .native-activity-explorer { overscroll-behavior-y: contain; }
+  .asset-value { line-height: 1.35; }
+}
+.asset-value .num-ltr { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.asset-value > span > span { max-width: 100%; flex-wrap: wrap; }
+
+/* iOS standalone fallback uses the same install detection as the app shell. */
+[data-installed-pwa="true"] .native-portfolio-hero,
+[data-installed-pwa="true"] .native-wallet-card { border-radius: 22px; }
+[data-installed-pwa="true"] .activity-native-row { padding-block: 14px; }
+[data-installed-pwa="true"] .native-activity-explorer { overscroll-behavior-y: contain; }
+[data-installed-pwa="true"] .asset-value { line-height: 1.35; }

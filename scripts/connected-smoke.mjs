@@ -28,6 +28,7 @@ await page.route('**/*',async route => {
   else if(op==='events') body={events:[]};
   else body={available:true,authenticated:true,session:{id:'qa',label:'QA',createdAt:Date.now(),stepUpFresh:true}};
  }
+ else if(u.pathname==='/api/usdt') body={ok:true,source:'wallex',priceToman:150000,tradedAt:Date.now(),fetchedAt:Date.now()};
  else if(u.pathname==='/api/accounting') body={configured:false,accounts:[],entries:[],lots:[],events:[]};
  else if(u.pathname==='/api/custody') body={configured:false,records:[]};
  else if(u.pathname==='/api/integrations') {
@@ -54,7 +55,10 @@ try {
  await page.getByRole('button',{name:'تأیید و اتصال'}).click();
  await page.getByRole('heading',{name:'دارایی‌های کیف آزمایشی'}).waitFor();
  await page.getByRole('button',{name:'دریافت / به‌روزرسانی'}).click();
- await page.getByText('تأییدشده',{exact:true}).first().waitFor();
+ await page.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).click();
+ await page.getByRole('dialog',{name:'دریافت',exact:true}).getByText('تأییدشده',{exact:true}).waitFor();
+ await page.keyboard.press('Escape');
+ assert.equal(await page.getByRole('heading',{name:'منابع تأییدشده'}).count(),0);
  assert.equal(await page.locator('main').getByText('۰.۰۰۰۰۱۴ USDT0',{exact:false}).count(),0);
  assert.equal(await page.locator('main').getByText('۰.۰۰۰۱ USDT0',{exact:false}).count(),0);
  assert.equal(await page.getByText('۰.۰۰۰۰۰۱ ETH',{exact:false}).count(),0);
@@ -83,6 +87,8 @@ try {
  await page.getByText('دادهٔ قدیمی',{exact:true}).waitFor({state:'hidden'});await fits();
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('img',{name:'نمودار ارزش کیف پول کیف آزمایشی؛ ۱ روز'}).waitFor();
+ await page.getByText('≈ ۱۹۵.۱۲ میلیون تومان',{exact:true}).first().waitFor();
+ await page.waitForTimeout(350);await fits();
  await page.screenshot({path:'/tmp/darino-clean-dashboard.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
  await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(450);
@@ -90,6 +96,12 @@ try {
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).click();
  await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
+ await page.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).click();
+ await page.screenshot({path:'/tmp/darino-native-transaction-sheet.png',fullPage:true});
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'فیلتر تراکنش‌ها',exact:true}).click();
+ await page.getByRole('dialog',{name:'فیلتر تراکنش‌ها',exact:true}).getByLabel('نوع تراکنش').selectOption('receive');
+ await page.getByRole('button',{name:'نمایش نتیجه',exact:true}).click();
  await page.getByRole('searchbox',{name:'جستجوی تراکنش'}).fill('ناموجود');
  await page.getByText('تراکنش قابل نمایش یافت نشد.',{exact:true}).waitFor();
  await page.getByRole('searchbox',{name:'جستجوی تراکنش'}).fill('');
@@ -149,6 +161,17 @@ try {
   }
  }
  }
+ // Emulate the iOS installed-PWA signal before app modules load.
+ await page.addInitScript(()=>Object.defineProperty(navigator,'standalone',{get:()=>true,configurable:true}));
+ await page.evaluate(()=>location.hash='#/dashboard');await page.reload();
+ await page.waitForFunction(()=>document.documentElement.dataset.installedPwa==='true');
+ for(const width of [320,390]){
+  await page.setViewportSize({width,height:844});
+  for(const path of ['/dashboard','/wallets','/holdings']){await page.evaluate(p=>location.hash='#'+p,path);await page.waitForTimeout(350);await fits();}
+ }
+ await page.evaluate(()=>location.hash='#/dashboard');await page.waitForTimeout(450);
+ await page.screenshot({path:'/tmp/darino-native-pwa.png',fullPage:true});
+ console.log('PASS: iOS standalone PWA layouts at 320/390px.');
  assert.deepEqual(errors,[]);
  console.log('PASS: preview → confirmation → transactions → stale retention → AI privacy → manual simulation → cost migration → purchase cost → network activity → Arcus spot; 14 routes at 320/390/1440px fit in light and dark themes.');
 } finally {await browser.close();}
