@@ -18,7 +18,7 @@ describe('مجموع واقعی پرتفولیو', () => {
   it('کیف پول و حساب آرکوس تکراری، تست‌نت و موجودی دستی دوباره شمرده نمی‌شوند', () => {
     fixtures.holdings=[{id:'w1',kind:'wallet',address},{id:'w2',kind:'wallet',address:address.toUpperCase().replace('0X','0x')},{id:'cash',kind:'manual',value:900000},{id:'a1',kind:'arcus',arcus:{env:'mainnet',address,accountIndex:0}},{id:'a2',kind:'arcus',arcus:{env:'mainnet',address,accountIndex:0}},{id:'test',kind:'arcus',arcus:{env:'testnet',address,accountIndex:0}}];
     fixtures.enabled=['w1','w2'];
-    useConnectedStore.setState({wallets:{[address]:{data:{address,total:9999,fetchedAt:Date.now(),complete:true,unpriced:0,positions:[{id:'real',tokenId:'ethereum',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:null,quantity:'1',value:10.1,price:10.1,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false},{id:'fake',tokenId:'fake',chain:'ethereum',contract:null,name:'Fake',symbol:'USDT',icon:null,quantity:'1',value:9988.9,price:9988.9,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:true}],chains:[],change:null},loading:false,error:null,history:[],historyLoaded:false,historyAt:null,next:null,historyLoading:false,historyError:null}}});
+    useConnectedStore.setState({wallets:{[address]:{data:{address,total:9999,fetchedAt:Date.now(),complete:true,unpriced:1,positions:[{id:'real',tokenId:'ethereum',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:null,quantity:'1',value:10.1,price:10.1,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false},{id:'fake',tokenId:'fake',chain:'ethereum',contract:null,name:'Fake',symbol:'USDT',icon:null,quantity:'1',value:9988.9,price:9988.9,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:true}],chains:[],change:null},loading:false,error:null,history:[],historyLoaded:false,historyAt:null,next:null,historyLoading:false,historyError:null}}});
     for(const env of ['mainnet','testnet']) fixtures.arcus.set(`${env}:${address}:0`,{account:{data:{equity:env==='mainnet'?'2.2':'100000'},fetchedAt:Date.now(),error:null},positions:{data:[],fetchedAt:Date.now(),error:null}});
     const {result}=renderHook(()=>useConnectedPortfolio());
     expect(result.current.total).toBe(12.3);
@@ -26,12 +26,12 @@ describe('مجموع واقعی پرتفولیو', () => {
     expect(result.current.arcus).toHaveLength(2);
     expect(result.current.partial).toBe(false);
   });
-  it('دارایی دریافت‌نشده صفر فرض نمی‌شود و نبود جزئیات آرکوس به تحلیل اعلام می‌شود', () => {
+  it('دارایی دریافت‌نشده صفر فرض نمی‌شود و نبود جزئیات پوزیشن، موجودی معتبر آرکوس را ناقص نمی‌کند', () => {
     fixtures.holdings=[{id:'a',kind:'arcus',arcus:{env:'mainnet',address,accountIndex:0}}];
     const {result,rerender}=renderHook(()=>useConnectedPortfolio());
     expect(result.current.total).toBeNull(); expect(result.current.partial).toBe(true);
     fixtures.arcus.set(`mainnet:${address}:0`,{account:{data:{equity:'42'},fetchedAt:Date.now(),error:null},positions:{data:[],fetchedAt:Date.now(),error:new Error('unavailable')}});
     rerender();
-    expect(result.current.total).toBe(42); expect(result.current.partial).toBe(true); expect(result.current.stale).toBe(true);
+    expect(result.current.total).toBe(42); expect(result.current.partial).toBe(false); expect(result.current.stale).toBe(false);
   });
 });

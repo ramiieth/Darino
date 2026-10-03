@@ -74,5 +74,10 @@
   "token-weth.png": {
     "source": "https://coin-images.coingecko.com/coins/images/2518/large/weth.png?1696503332",
     "sha256": "68a80d3e51852f5b92553f6fc79e99494d95eab9da14d3237bc3f639dd60c5c6"
+  },
+  "chain-56.svg": {
+    "source": "https://zerion.io/_next/static/media/bnb-chain.9ceddd9b.svg",
+    "sha256": "a3989db71e620f836b995a70364d923bcb73e7ba0bdfb0cb0c211f0609f26def",
+    "normalization": "Removed XML declaration and external DTD; paths and colors unchanged."
   }
 }

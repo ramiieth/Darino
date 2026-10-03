@@ -39,7 +39,8 @@ async function cachedGet(path: string, deadline: number,force:boolean): Promise<
     const r = await fetch(BASE + path, { headers: { Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`, accept: 'application/json' }, signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline-Date.now()))) });
     if(r.status===429){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);throw new ProviderError(429,throttle.message,throttle.retryAfter);}
     if (!r.ok) throw new ProviderError(r.status === 401 ? 503 : r.status, r.status === 400 ? 'این آدرس یا شبکه برای این داده پشتیبانی نمی‌شود' : 'دریافت داده از زریون انجام نشد');
-    const data=obj(await r.json());const ttl=path.includes('/chains/')?86400000:path.includes('/charts/')?900000:path.includes('/transactions/')?300000:900000;
+    if(['Day','Month'].some(period=>r.headers.has('RateLimit-Org-'+period+'-Remaining')&&Number(r.headers.get('RateLimit-Org-'+period+'-Remaining'))===0)){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);}
+    const data=obj(await r.json());const ttl=path.includes('/chains/')?86400000:path.includes('/charts/')?1800000:path.includes('/transactions/')?900000:1800000;
     const at=Date.now();responseAt.set(data,at);await writeProviderCache(key,{at,data},ttl);return data;
   });
   tail = run;
@@ -62,7 +63,7 @@ export async function getChains(): Promise<ChainInfo[]> {
 }
 export async function getWallet(address: string, userId: string, force = false): Promise<WalletSnapshot> {
   const key = `${userId}:${addressKey(address)}`;
-  const hit = cache.get(key); if (hit && Date.now() - hit.at < (force || !hit.value.complete ? 60000 : 900000)) return hit.value;
+  const hit = cache.get(key); if (hit && Date.now() - hit.at < (force || !hit.value.complete ? 60000 : 1800000)) return hit.value;
   if (running.has(key)) return running.get(key)!;
   const lastKey=providerCacheKey('last-wallet:'+userId+':'+addressKey(address));
   const previous=await readProviderCache<WalletSnapshot>(lastKey);
@@ -103,7 +104,7 @@ export async function getBalanceChart(address:string,userId:string,period:string
  const params=new URLSearchParams({currency:'usd','filter[fungible_ids]':[...new Set(ids)].sort().join(',')});
  if(chain)params.set('filter[chain_ids]',chain);
  const path=`/v1/wallets/${address}/charts/${period}?${params}`,key=userId+':'+path,hit=chartCache.get(key);
- if(hit&&Date.now()-hit.at<900000)return hit.value;
+ if(hit&&Date.now()-hit.at<1800000)return hit.value;
  const response=await get(path);const value={...normalizeChart(response),fetchedAt:responseAt.get(response)??Date.now()};
  if(chartCache.size>=200)chartCache.delete(chartCache.keys().next().value!);
  chartCache.set(key,{at:value.fetchedAt,value});return value;

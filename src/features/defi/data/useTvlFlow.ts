@@ -1,3 +1,4 @@
+import { approvedNetwork } from '@/shared/lib/approvedNetworks';
 /**
  * TVL Flow — استور Zustand + بارگذاری سینگلتون
  * داده‌ها: زنجیره‌ها، پروتکل‌ها، تاریخچه هر زنجیره (پیش‌رونده در پس‌زمینه)
@@ -98,7 +99,7 @@ export function loadTvlFlow(): Promise<void> {
       st.setProtocols(protocols);
       st.setChains(
         chains
-          .filter((c) => c.tvl > 0)
+          .filter((c) => c.tvl > 0 && !!approvedNetwork(c.name))
           .sort((a, b) => b.tvl - a.tvl)
           .map((c) => ({
             name: c.name,
@@ -116,7 +117,7 @@ export function loadTvlFlow(): Promise<void> {
         flowChains.map((c) => ({ name: c.name, tvl: c.tvl })),
         {
           limit: 4,
-          sessionCap: 120,
+          sessionCap: 12,
           onProgress: (done, total) => st.setSyncProgress({ done, total })
         }
       );

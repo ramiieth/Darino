@@ -1,3 +1,4 @@
+import { approvedNetwork } from '@/shared/lib/approvedNetworks';
 /** ============================================================
  * فهرست کامل شبکه‌ها از دیفای‌لاما (api.llama.fi/v2/chains — عمومی، CORS باز)
  *
@@ -139,6 +140,7 @@ export function normalizeDirectory(raw: unknown): DirectoryChain[] {
   for (const r of raw as RawChain[]) {
     if (typeof r?.name !== 'string' || !r.name.trim() || r.name.length > 60) continue;
     const name = r.name.trim();
+    const approved=approvedNetwork(name);if(!approved)continue;
     if(retiredChains.has(identityKey(name))||r.deadFrom||r.disabled===true||r.deprecated===true||['shutdown','sunset','inactive','discontinued'].includes(String(r.status??'').toLowerCase()))continue;
     const chainId = typeof r.chainId === 'number' && Number.isSafeInteger(r.chainId) && r.chainId > 0 ? r.chainId : null;
     const sym = typeof r.tokenSymbol === 'string' && /^[A-Za-z0-9.$₮-]{1,12}$/.test(r.tokenSymbol) ? r.tokenSymbol : null;
@@ -149,8 +151,8 @@ export function normalizeDirectory(raw: unknown): DirectoryChain[] {
       tokenSymbol: sym ?? (gas === 'ethereum' ? 'ETH' : null),
       gasGeckoId: gas && /^[a-z0-9-]{1,80}$/.test(gas) ? gas : null,
       tvl: typeof r.tvl === 'number' && Number.isFinite(r.tvl) ? r.tvl : 0,
-      nameFa: CHAIN_NAME_FA[name] ?? null,
-      logo: llamaChainLogo(name),
+      nameFa: approved.name,
+      logo: approved.logo,
       inCatalog: (chainId !== null && catalogChainIds.has(chainId)) || catalogNames.has(name.toLowerCase())
     });
   }

@@ -18,10 +18,11 @@ snapshot.total=11331;
 await page.route('**/*',async route => {
  const u=new URL(route.request().url());
  if(u.hostname==='api.arcus.xyz') { const account={address,accountIndex:0,netQuoteBalance:'500',equity:'500',freeCollateral:'500',netDeposits:'500',pendingDeposits:'0',pendingWithdrawals:'0',positions:{},sequenceNumber:1};return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(u.pathname==='/v1/account'?account:[])}); }
- if(u.origin!==base) return route.abort();
- if(!u.pathname.startsWith('/api/') && !u.pathname.includes('-api')) return route.continue();
+ if(u.origin!==base&&u.hostname!=='api.llama.fi') return route.abort();
+ if(u.hostname!=='api.llama.fi'&&!u.pathname.startsWith('/api/') && !u.pathname.includes('-api')) return route.continue();
  let body={configured:false}; let status=200;
- if(u.pathname==='/api/auth') {
+ if(u.hostname==='api.llama.fi') {if(u.pathname==='/v2/chains')body=[{name:'Ethereum',tvl:20000000},{name:'Base',tvl:5000000},{name:'Blast',tvl:9000000},{name:'Solana',tvl:8000000}];else if(u.pathname==='/protocols')body=[{name:'Aave V3',slug:'aave-v3',tvl:15000000,change_7d:2.3,chain:'Ethereum',logo:'https://icons.llama.fi/aave-v3.jpg'},{name:'Multichain',slug:'multichain',tvl:10000,deadFrom:123}];else body=Array.from({length:31},(_,i)=>({date:Math.floor(Date.now()/1000)-(30-i)*86400,tvl:10000000+i*100000}));}
+ else if(u.pathname==='/api/auth') {
   const op=u.searchParams.get('op');
   if(op==='sessions') body={sessions:[],recentlyEnded:[]};
   else if(op==='passkeys') body={passkeys:[]};
@@ -59,7 +60,7 @@ try {
  await page.getByRole('button',{name:'مدیریت کیف آزمایشی جدید',exact:true}).click();await page.getByRole('dialog',{name:'کیف آزمایشی جدید',exact:true}).getByRole('button',{name:'تغییر نام',exact:true}).click();await page.getByLabel('نام کیف پول').fill('کیف آزمایشی');await page.getByRole('button',{name:'ذخیرهٔ نام',exact:true}).click();await page.keyboard.press('Escape');
  await page.evaluate(()=>location.hash='#/dashboard');await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();await page.getByRole('img',{name:'نمودار ارزش کیف پول کیف آزمایشی؛ ۱ روز'}).waitFor();
  assert.equal(await page.getByText('جعلی آزمایشی',{exact:false}).count(),0);
- failWallet=true;await page.getByRole('button',{name:'به‌روزرسانی پرتفولیو',exact:true}).click();await page.getByText(/خطای آزمایشی اتصال/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'last successful balance lost');failWallet=false;
+ failWallet=true;await page.getByRole('button',{name:'به‌روزرسانی پرتفولیو',exact:true}).click();await page.locator('summary').filter({hasText:'وضعیت همگام‌سازی'}).click();await page.getByText(/خطای آزمایشی اتصال/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'last successful balance lost');failWallet=false;
  await page.evaluate(()=>location.hash='#/assistant');
  await page.getByRole('heading',{name:'دستیار پرتفولیو',exact:true}).waitFor();
  await page.getByPlaceholder('پرتفولیوی من را تحلیل کن…').fill('ریسک من چقدر است؟');
@@ -76,7 +77,7 @@ try {
  await page.evaluate(()=>location.hash='#/dashboard');
  await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();
  await page.getByRole('button',{name:'به‌روزرسانی پرتفولیو',exact:true}).click();
- await page.getByText('دادهٔ قدیمی',{exact:true}).waitFor({state:'hidden'});await fits();
+ await page.locator('summary').filter({hasText:'وضعیت همگام‌سازی'}).waitFor({state:'hidden'});await fits();
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('img',{name:'نمودار ارزش کیف پول کیف آزمایشی؛ ۱ روز'}).waitFor();
  await page.getByText('≈ ۱۹۵.۱۲ میلیون تومان',{exact:true}).first().waitFor();
@@ -138,7 +139,7 @@ try {
  await fits();await page.screenshot({path:'/tmp/darino-cost-mobile.png',fullPage:true});
  await page.evaluate(()=>location.hash='#/holdings');await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await page.getByRole('link',{name:'دارایی و فعالیت شبکه‌ای',exact:true}).count(),0);await page.getByText('تطبیق انتقال‌های نیازمند بررسی',{exact:true}).waitFor();await fits();
  await page.getByRole('tab',{name:'دارایی‌ها',exact:true}).click();await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
- const networkPicker=page.getByRole('dialog',{name:'انتخاب شبکه',exact:true});await networkPicker.getByRole('option',{name:/موناد/}).waitFor();await networkPicker.getByRole('option',{name:/پلاسما/}).waitFor();assert.equal(await networkPicker.getByRole('option',{name:/بلست/}).count(),0);await fits();await page.screenshot({path:'/tmp/darino-network-picker.png'});await networkPicker.getByRole('option',{name:/رابین‌هود/}).click();await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();await page.getByRole('dialog',{name:'انتخاب شبکه',exact:true}).getByRole('option',{name:'همهٔ شبکه‌ها',exact:true}).click();
+ const networkPicker=page.getByRole('dialog',{name:'انتخاب شبکه',exact:true});await networkPicker.getByRole('option',{name:/موناد/}).waitFor();await networkPicker.getByRole('option',{name:/پلاسما/}).waitFor();assert.equal(await networkPicker.getByRole('option').count(),13);assert.equal(await networkPicker.getByRole('option',{name:/بلست/}).count(),0);await fits();await page.screenshot({path:'/tmp/darino-network-picker.png'});await networkPicker.getByRole('option',{name:/رابین‌هود/}).click();await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();await page.getByRole('dialog',{name:'انتخاب شبکه',exact:true}).getByRole('option',{name:'همهٔ شبکه‌ها',exact:true}).click();
  await page.evaluate(()=>location.hash='#/arcus');
  await page.getByRole('button',{name:'افزودن زیرحساب آرکوس',exact:true}).click();
  const arcusForm=page.getByRole('dialog');
@@ -177,7 +178,8 @@ try {
  await page.evaluate(()=>location.hash='#/dashboard');await page.waitForTimeout(450);
  await page.screenshot({path:'/tmp/darino-native-pwa.png',fullPage:true});
  console.log('PASS: iOS standalone PWA layouts at 320/390px.');
- quotaWallet=true;await page.evaluate(()=>location.hash='#/dashboard');await page.reload();await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();await page.getByText(/سهمیهٔ روزانهٔ زریون تمام شده/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'persisted wallet disappeared after reload and quota');await fits();console.log('PASS: cached wallet survives reload and daily quota; Monad/Plasma and Persian protocol identity present.');
+ await page.evaluate(()=>location.hash='#/defi');await page.getByRole('heading',{name:'اتریوم',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'بلست',exact:true}).count(),0);await fits();await page.screenshot({path:'/tmp/darino-defi-mobile.png',fullPage:true});await page.getByRole('tab',{name:'پروتکل‌ها',exact:true}).click();await page.getByRole('heading',{name:'آوه',exact:true}).waitFor();await fits();
+ quotaWallet=true;await page.evaluate(()=>location.hash='#/dashboard');await page.reload();await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();await page.locator('summary').filter({hasText:'وضعیت همگام‌سازی'}).click();await page.getByText(/سهمیهٔ روزانهٔ زریون تمام شده/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'persisted wallet disappeared after reload and quota');await fits();console.log('PASS: cached wallet survives reload and daily quota; Monad/Plasma and Persian protocol identity present.');
  assert.deepEqual(errors,[]);
  console.log('PASS: minimal management → rename → transactions → stale retention → AI privacy → manual simulation → cost migration → purchase cost → legacy route redirect → Arcus spot; 14 routes at 320/390/1440px fit in light and dark themes.');
 } finally {await browser.close();}
