@@ -454,3 +454,18 @@
 [data-installed-pwa="true"] .activity-native-row { padding-block: 14px; }
 [data-installed-pwa="true"] .native-activity-explorer { overscroll-behavior-y: contain; }
 [data-installed-pwa="true"] .asset-value { line-height: 1.35; }
+
+/* Portfolio tables adapt to their panel width, including the desktop activity rail. */
+.positions-list-container { container-type: inline-size; }
+@container (min-width: 640px) {
+  .positions-table-header { display: grid; }
+  .positions-grid { grid-template-columns: minmax(0,2fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr); gap: 1rem; }
+  .positions-price { display: block; }
+  .positions-quantity { grid-column: auto; grid-row: auto; padding: 0; font-size: .875rem; }
+  .positions-value { grid-column: auto; grid-row: auto; }
+  .positions-mobile-price { display: none; }
+}
+.portfolio-recent .activity-native-row { padding-inline: 0; gap: .625rem; }
+@media (min-width: 1024px) {
+  .portfolio-recent { position: sticky; top: 5rem; }
+}

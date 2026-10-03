@@ -92,9 +92,13 @@ try {
  await page.screenshot({path:'/tmp/darino-clean-dashboard.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
  await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(450);
+ const rail=page.getByRole('complementary',{name:'فعالیت‌های اخیر'});await rail.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).waitFor();
+ const columns=await page.evaluate(()=>{const main=document.querySelector('.portfolio-dashboard-grid')?.firstElementChild?.getBoundingClientRect(),rail=document.querySelector('.portfolio-recent')?.getBoundingClientRect();return {main:main&&{top:main.top,left:main.left,width:main.width},rail:rail&&{top:rail.top,left:rail.left,width:rail.width}};});assert(Math.abs(columns.main.top-columns.rail.top)<3,'desktop rail must align with assets');assert(columns.main.width>columns.rail.width,'chart should own wider desktop column');
+ await page.getByRole('button',{name:'بر اساس پلتفرم',exact:true}).click();await fits();assert.equal(await page.getByRole('button',{name:'بر اساس پلتفرم',exact:true}).getAttribute('aria-pressed'),'true');
+ await page.getByRole('button',{name:'بر اساس توکن',exact:true}).click();await fits();await page.waitForFunction(()=>{const c=document.querySelector('#portfolio-assets canvas');if(!c||!c.width||!c.height)return false;return c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v>0);});
  await page.screenshot({path:'/tmp/darino-reference-portfolio-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
- await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).click();
+ await page.getByRole('button',{name:'نمایش همهٔ تراکنش‌ها',exact:true}).click();assert.equal(await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).getAttribute('aria-selected'),'true');
  await page.locator('main').getByText('یونی‌سواپ',{exact:true}).first().waitFor();await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
  await page.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).click();
  await page.screenshot({path:'/tmp/darino-native-transaction-sheet.png',fullPage:true});
