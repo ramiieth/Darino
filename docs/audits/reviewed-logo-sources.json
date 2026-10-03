@@ -1,0 +1,78 @@
+{
+  "platform-zerion.svg": {
+    "source": "https://design.zerion.io/assets/zerion_icon-square_main.9c1ae08b.svg",
+    "sha256": "9c1ae08b8be307db9f8b0dc7dff7850a26127796b8937cda61d5053d2f48a61b"
+  },
+  "token-eth.svg": {
+    "source": "https://ethereum.org/images/assets/svgs/eth-diamond-purple.svg",
+    "sha256": "7320e64e211db747308cc3e546e5360d42f3790b7a14fba0504573790e17f124"
+  },
+  "chain-1.svg": {
+    "source": "https://ethereum.org/images/assets/svgs/eth-diamond-purple.svg",
+    "sha256": "7320e64e211db747308cc3e546e5360d42f3790b7a14fba0504573790e17f124"
+  },
+  "token-usdt.svg": {
+    "source": "https://tether.to/images/logoCircle.svg",
+    "sha256": "7c9f13b068996186c4df0f3dcdeeeb86e11cee6d8a9e7597cec19ccee164d7c5"
+  },
+  "token-usdt0.svg": {
+    "source": "https://docs.usdt0.to/downloads/usdt0/Symbol_USDT0_Secondary.svg",
+    "sha256": "b2c377563f8efeefbf5d5ad58b91a95037c37a8f2b28850f4fd5bb694b87b051"
+  },
+  "token-usdc.svg": {
+    "source": "https://6778953.fs1.hubspotusercontent-na1.net/hubfs/6778953/Pressroom/brandkit/logo-downloads/usdc.zip",
+    "sha256": "fe4f9d5f34ef4ebeb5d80e1f5ff63dcaf5a0d5495f4adf206e4c3011d1f5c57d"
+  },
+  "token-eurc.svg": {
+    "source": "https://6778953.fs1.hubspotusercontent-na1.net/hubfs/6778953/Pressroom/brandkit/logo-downloads/eurc.zip",
+    "sha256": "6ae03397ca1775169d5371b1e40562714a779e9656ab0ce41ca71f79da0b3e2d"
+  },
+  "chain-8453.svg": {
+    "source": "https://brand.base.org/base-brand.zip",
+    "sha256": "b4f2b487011713f98481cc53c4ce095629b4876acbdbc2f0f3ad69a9688ba82e"
+  },
+  "chain-4663.svg": {
+    "source": "https://cdn.robinhood.com/assets/generated_assets/hoodchain_docsite/feather-dark.svg",
+    "sha256": "82ef124f9e1446c480bdc6a8569df83f547cd3312ed231854dafd4c21610ae7d"
+  },
+  "chain-5042.svg": {
+    "source": "https://6778953.fs1.hubspotusercontent-na1.net/hubfs/6778953/Brand/Arc/Arc_Logos.zip",
+    "sha256": "0c641405f429884228c0db4287e1b89774d21973c2d443b028b7cfa854c6f828"
+  },
+  "chain-42161.png": {
+    "source": "https://arbitrum.io/brandkit/1225_Arbitrum_Logomark_FullColor_ClearSpace.png",
+    "sha256": "741ad44b95ee17b29a55637cfdc0cdaaf30c639b317857e58d54cd3b4bff4208"
+  },
+  "chain-137.jpg": {
+    "source": "https://icons.llama.fi/polygon.jpg",
+    "sha256": "07a52d30919dfee751c99f835273a85688e89764e12b438a709fda2f8fa620e7"
+  },
+  "chain-monad.jpg": {
+    "source": "https://icons.llama.fi/monad.jpg",
+    "sha256": "0f4512d8366d9fccb6cf7d857bb0acac3c0a241e2da7f2fd3c85d5274714b57a"
+  },
+  "chain-plasma.jpg": {
+    "source": "https://icons.llama.fi/plasma.jpg",
+    "sha256": "dd36ff4c421b05cbef630df6c99e0ee0eb6a8f9c01cb861f30577c9e4b073c87"
+  },
+  "token-usdg.png": {
+    "source": "https://coin-images.coingecko.com/coins/images/51281/large/GDN_USDG_Token_200x200.png?1730484111",
+    "sha256": "f398f6aad2fe260847cda3d99336fd2a514766f14634f8f1a3c255d218d4a4c3"
+  },
+  "token-hype.jpg": {
+    "source": "https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300",
+    "sha256": "d575e2e7908f36df45c402afc2e198b4ea32f123300ae06cc66a7f1ad85e6ef1"
+  },
+  "token-btc.png": {
+    "source": "https://coin-images.coingecko.com/coins/images/1/large/bitcoin.png?1696501400",
+    "sha256": "1eb4e75d64a76a5d1fba301715ae227c683b34e8f75291670cdf7ae2a59de86f"
+  },
+  "token-pol.png": {
+    "source": "https://coin-images.coingecko.com/coins/images/32440/large/pol.png?1759114181",
+    "sha256": "c84c849e4c1f8972718cd55772e7bac7137ef98bbb9ffc5c1462b007f7960b02"
+  },
+  "token-weth.png": {
+    "source": "https://coin-images.coingecko.com/coins/images/2518/large/weth.png?1696503332",
+    "sha256": "68a80d3e51852f5b92553f6fc79e99494d95eab9da14d3237bc3f639dd60c5c6"
+  }
+}

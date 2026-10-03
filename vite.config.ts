@@ -237,7 +237,7 @@ export default defineConfig({
       },
       workbox: {
         // woff2 only (every supported browser) — the .woff duplicates doubled the font precache
-        globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg,jpg,jpeg,webp}'],
         // design-source artwork, never requested by the app
         globIgnores: ['**/icons/icon-master.png'],
         navigateFallback: '/index.html',

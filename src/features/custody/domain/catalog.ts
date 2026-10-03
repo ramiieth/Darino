@@ -33,7 +33,7 @@ const NET_DEFS: NetDef[] = [
     nameEn: 'Ethereum',
     chainId: 1,
     explorer: 'https://etherscan.io',
-    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.png', coingeckoId: 'ethereum' },
+    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.svg', coingeckoId: 'ethereum' },
     reference: 'eth_chainId=1 · ethereum.org/developers/docs/data-and-analytics/block-explorers'
   },
   {
@@ -42,7 +42,7 @@ const NET_DEFS: NetDef[] = [
     nameEn: 'Arbitrum One',
     chainId: 42161,
     explorer: 'https://arbiscan.io',
-    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.png', coingeckoId: 'ethereum' },
+    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.svg', coingeckoId: 'ethereum' },
     reference: 'eth_chainId=42161 · docs.usdt0.to (Arbitrum One Chain ID 42161)'
   },
   {
@@ -51,7 +51,7 @@ const NET_DEFS: NetDef[] = [
     nameEn: 'Base',
     chainId: 8453,
     explorer: 'https://basescan.org',
-    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.png', coingeckoId: 'ethereum' },
+    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.svg', coingeckoId: 'ethereum' },
     reference: 'eth_chainId=8453 · docs.base.org/base-chain/quickstart/connecting-to-base'
   },
   {
@@ -60,7 +60,7 @@ const NET_DEFS: NetDef[] = [
     nameEn: 'OP Mainnet',
     chainId: 10,
     explorer: 'https://explorer.optimism.io',
-    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.png', coingeckoId: 'ethereum' },
+    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.svg', coingeckoId: 'ethereum' },
     reference: 'eth_chainId=10 · docs.optimism.io/superchain/networks'
   },
   {
@@ -88,7 +88,7 @@ const NET_DEFS: NetDef[] = [
     nameEn: 'Robinhood Chain',
     chainId: 4663,
     explorer: 'https://robinhoodchain.blockscout.com',
-    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.png', coingeckoId: 'ethereum' },
+    native: { symbol: 'ETH', name: 'اتریوم', nameEn: 'Ether', decimals: 18, logo: '/logos/token-eth.svg', coingeckoId: 'ethereum' },
     reference: 'eth_chainId=4663 · docs.robinhood.com/chain/connecting'
   },
   {
@@ -98,7 +98,7 @@ const NET_DEFS: NetDef[] = [
     chainId: 5042,
     explorer: 'https://explorer.arc.io',
     // USDC توکن اصلی و کارمزد آرک است (دقت native: ۱۸ رقم)
-    native: { symbol: 'USDC', name: 'یو‌اس‌دی‌سی', nameEn: 'USD Coin', decimals: 18, logo: '/logos/token-usdc.png', coingeckoId: 'usd-coin' },
+    native: { symbol: 'USDC', name: 'یو‌اس‌دی‌سی', nameEn: 'USD Coin', decimals: 18, logo: '/logos/token-usdc.svg', coingeckoId: 'usd-coin' },
     reference: 'eth_chainId=5042 · docs.arc.io/arc/references/rpc-endpoints · contract-addresses'
   }
 ];
@@ -118,11 +118,11 @@ export const NETWORKS: Network[] = NET_DEFS.map((n) => ({
 }));
 
 const T = {
-  USDC: { symbol: 'USDC', name: 'یو‌اس‌دی‌سی', nameEn: 'USD Coin', logo: '/logos/token-usdc.png', coingeckoId: 'usd-coin', ref: 'developers.circle.com/stablecoins/usdc-contract-addresses' },
-  USDT: { symbol: 'USDT', name: 'تتر', nameEn: 'Tether USD', logo: '/logos/token-usdt.png', coingeckoId: 'tether', ref: 'قرارداد رسمی تتر روی اتریوم' },
-  USDT0: { symbol: 'USD₮0', name: 'تتر', nameEn: 'USDT0', logo: '/logos/token-usdt0.png', coingeckoId: 'usdt0', ref: 'docs.usdt0.to/technical-documentation/deployments' },
+  USDC: { symbol: 'USDC', name: 'یو‌اس‌دی‌سی', nameEn: 'USD Coin', logo: '/logos/token-usdc.svg', coingeckoId: 'usd-coin', ref: 'developers.circle.com/stablecoins/usdc-contract-addresses' },
+  USDT: { symbol: 'USDT', name: 'تتر', nameEn: 'Tether USD', logo: '/logos/token-usdt.svg', coingeckoId: 'tether', ref: 'قرارداد رسمی تتر روی اتریوم' },
+  USDT0: { symbol: 'USD₮0', name: 'تتر', nameEn: 'USDT0', logo: '/logos/token-usdt0.svg', coingeckoId: 'usdt0', ref: 'docs.usdt0.to/technical-documentation/deployments' },
   USDG: { symbol: 'USDG', name: 'دلار جهانی', nameEn: 'Global Dollar', logo: '/logos/token-usdg.png', coingeckoId: 'global-dollar', ref: 'docs.paxos.com/guides/stablecoin/usdg/mainnet' },
-  EURC: { symbol: 'EURC', name: 'یورو کوین', nameEn: 'Euro Coin', logo: '/logos/token-eurc.png', coingeckoId: 'euro-coin', ref: 'docs.arc.io/arc/references/contract-addresses' }
+  EURC: { symbol: 'EURC', name: 'یورو کوین', nameEn: 'Euro Coin', logo: '/logos/token-eurc.svg', coingeckoId: 'euro-coin', ref: 'docs.arc.io/arc/references/contract-addresses' }
 };
 
 /** [شبکه، توکن، قرارداد، نماد روی زنجیره (eth_call symbol)] — همه decimals=6 تأییدشده */

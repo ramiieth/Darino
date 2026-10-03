@@ -88,7 +88,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
         primary: true
       },
-      { id: 'wallets', to: '/wallets', label: 'کیف پول‌های متصل', description: 'زریون؛ موجودی و تراکنش‌های واقعی', icon: Wallet },
+      { id: 'wallets', to: '/wallets', label: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
       { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل فارسی دارایی‌های زریون و آرکوس', icon: Sparkles },
       {
         id: 'accounting',
@@ -97,14 +97,6 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'هزینهٔ خرید رمزارزها و FIFO',
         icon: BookOpenText,
         primary: true
-      },
-      {
-        id: 'holdings',
-        to: '/holdings',
-        label: 'دارایی و فعالیت شبکه‌ای',
-        title: 'دارایی‌ها و فعالیت شبکه‌ای',
-        description: 'موجودی واقعی، سواپ، بریج و انتقال',
-        icon: Layers
       },
       {
         id: 'arcus',
