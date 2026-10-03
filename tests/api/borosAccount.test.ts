@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readBorosAccount, readBorosPreview, readBorosHistory, clearBorosAccountCache } from '../../api/_borosAccount';
+import { borosRead, readBorosAccount, readBorosPreview, readBorosHistory, clearBorosAccountCache } from '../../api/_borosAccount';
 import { accountTotals, packAccount, unpackAccount, x18, toX18, CROSS } from '../../src/shared/boros/account';
 import { borosRoot, borosHandle, accountAssets, accountBalances, accountPositions, accountSettlements, accountTransfers, accountSync } from '../fixtures/borosAccount';
 const fetcher=vi.fn();
@@ -46,4 +46,17 @@ describe('lazy read-only Boros account history',()=>{
   await expect(readBorosHistory(borosRoot,0,'order-history')).rejects.toThrow('account mismatch');
   fetcher.mockResolvedValue(new Response('',{status:429}));await expect(readBorosHistory(borosRoot,0,'order-history')).rejects.toThrow('سهمیه');
  });
+});
+
+describe('actionable readonly preview failures',()=>{
+ it('retries a temporary simulation error once without ever submitting a trade',async()=>{
+  fetcher.mockReset();fetcher.mockResolvedValueOnce(new Response('{}',{status:503})).mockResolvedValueOnce(new Response(JSON.stringify({matched:{size:'1000000000000000000',rate:.0857792615},postState:{marginRequired:'8052771003132609',liquidationApr:-.0193645316},priceImpact:.0008679072,status:'FILLED',statusCode:'Succeed'}),{status:201}));
+  const result=await readBorosPreview({marketAcc:borosHandle,marketId:209,side:0,size:toX18('1'),tif:2,slippage:.0105});
+  expect(result).toMatchObject({success:true,matchedSize:1,liquidationApr:-.0193645316});expect(fetcher).toHaveBeenCalledTimes(2);expect(fetcher.mock.calls.every(([u])=>u.endsWith('/simulations/place-order'))).toBe(true);
+ });
+ it.each([['INSUFFICIENT_MARGIN','مارجین آزاد'],['FOK_NOT_FILLED','کامل اجرا نمی‌شود'],['RATE_OUT_OF_RANGE','حد مجاز'],['MIN_ORDER_VALUE','حداقل سفارش']])('translates %s without exposing provider internals',async(code,message)=>{
+  fetcher.mockResolvedValue(new Response(JSON.stringify({message:code,secret:'never show this'}),{status:400}));
+  await expect(borosRead('/simulations/place-order',{})).rejects.toMatchObject({status:422,message:expect.stringContaining(message)});expect(fetcher).toHaveBeenCalledTimes(1);
+ });
+ it('does not retry quota exhaustion',async()=>{fetcher.mockResolvedValue(new Response('{}',{status:429}));await expect(borosRead('/simulations/place-order',{})).rejects.toMatchObject({status:429});expect(fetcher).toHaveBeenCalledTimes(1);});
 });

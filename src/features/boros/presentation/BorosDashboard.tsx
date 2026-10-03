@@ -18,22 +18,27 @@ import { ComparisonTab } from './ComparisonTab';
 import { SimulatorTab } from './SimulatorTab';
 import { RiskMonitorTab } from './RiskMonitorTab';
 import { AccountTab } from './AccountTab';
+import { BorosGuide } from './BorosGuide';
+import type { BorosDirection } from '../domain/types';
 import { AuditTab } from './AuditTab';
 
-type Tab = 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
+type Tab = 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit' | 'guide';
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'account', label: 'حساب من' },
-  { value: 'opp', label: 'فرصت‌ها' },
-  { value: 'compare', label: 'مقایسه' },
-  { value: 'sim', label: 'شبیه‌ساز' },
+  { value: 'opp', label: 'بازارها و فرصت‌ها' },
+  { value: 'compare', label: 'مقایسه بازارها' },
+  { value: 'sim', label: 'پیش‌نمایش' },
   { value: 'risk', label: 'مانیتور ریسک' },
+  { value:'guide',label:'راهنما' },
   { value: 'audit', label: 'بررسی محاسبات' }
 ];
 
 export default function BorosDashboard() {
   const { markets, loading, error, stale, syncProgress, loadedAt } = useBoros();
   const [tab, setTab] = useState<Tab>('opp');
+  const [target,setTarget]=useState<{marketId:number;direction:BorosDirection}|undefined>();
+  const inspect=(marketId:number,direction:BorosDirection='long')=>{setTarget({marketId,direction});setTab('sim');};
 
   // automatic retry after an error (temporary rate limit — no user action needed)
   useEffect(() => {
@@ -105,12 +110,13 @@ export default function BorosDashboard() {
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
         {tab === 'account' && <AccountTab markets={markets} />}
-        {tab !== 'account' && loading && markets.length === 0 && <PageSkeleton />}
-        {tab !== 'account' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
-        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
-        {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
-        {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}
+        {tab !== 'account' && tab !== 'guide' && loading && markets.length === 0 && <PageSkeleton />}
+        {tab !== 'account' && tab !== 'guide' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
+        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} onInspect={inspect} />}
+        {tab === 'compare' && <ComparisonTab markets={activeMarkets} onInspect={inspect} />}
+        {tab === 'sim' && <SimulatorTab key={target?.marketId+':'+target?.direction} markets={activeMarkets} initial={target} />}
         {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
+        {tab === 'guide' && <BorosGuide />}
         {tab === 'audit' && <AuditTab markets={activeMarkets} />}
       </div>
     </div>

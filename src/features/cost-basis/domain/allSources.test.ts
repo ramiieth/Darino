@@ -45,6 +45,8 @@ describe('cached and source-local purchase cost confirmation',()=>{
   const p=portfolio();p.wallets.push({...wallet,state:{...wallet.state,data:{...wallet.state.data,positions:[],complete:false},history:[{transfers:[{tokenId:'ethereum'}]}]},stale:true} as unknown as typeof p.wallets[number]);
   const r=allSourceCostSummary(p,undefined,[],{data:null,stale:false}).rows[0];
   expect(r.sources).toHaveLength(2);expect(r.holdingSources).toHaveLength(1);expect(r.snapshotComplete).toBe(true);
+  const book=reconcileBasis(undefined,r.asset,'0.65','1625',now);
+  expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0]).toMatchObject({basis:1625,pnl:325,status:'ready'});
  });
  it('persists cached costs but does not release live PnL until explicitly reconfirmed',()=>{
   const p=portfolio();p.wallets[0].stale=true;

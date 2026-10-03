@@ -22,8 +22,9 @@ export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | unde
   const holdingSources = portfolio.wallets.filter((_,index)=>a.sources.has(index));
   const sources = portfolio.wallets.filter((w, index) => a.sources.has(index) || w.state?.history.some(tx => tx.transfers.some(t => t.tokenId && `fungible:${t.tokenId}` === a.asset.key)));
   const cash = verifiedCash(a.asset.chain,a.asset.contract,{verified:true,tokenId:a.asset.tokenId,symbol:a.asset.symbol});
-  const ready = !!book && sources.length > 0 && sources.every(w => !!w.state?.data?.complete && (current ? ((cash || w.state.data.fetchedAt <= current.at) && new Decimal(current.quantity).eq(a.quantity)) || (!!w.state.historyLoaded && !w.state.historyError && (!w.state.next || w.state.history.some(tx => Date.parse(tx.minedAt) <= current.at))) : walletCovered(w)));
-  const stale = sources.some(w => w.stale);
+  const confirmedSnapshot=!!current&&!current.pendingBalanceConfirmation&&new Decimal(current.quantity).eq(a.quantity)&&holdingSources.every(w=>!!w.state?.data?.complete&&w.state.data.fetchedAt<=current.at);
+  const ready = confirmedSnapshot || !!book && sources.length > 0 && sources.every(w => !!w.state?.data?.complete && (current ? ((cash || w.state.data.fetchedAt <= current.at) && new Decimal(current.quantity).eq(a.quantity)) || (!!w.state.historyLoaded && !w.state.historyError && (!w.state.next || w.state.history.some(tx => Date.parse(tx.minedAt) <= current.at))) : walletCovered(w)));
+  const stale = (confirmedSnapshot||current?.pendingBalanceConfirmation?holdingSources:sources).some(w => w.stale);
   const price = a.priced ? a.value.div(a.quantity).toNumber() : null;
   const allQuantity = portfolio.wallets.flatMap(w => w.state?.data?.positions ?? []).filter(pos => pos.type === 'wallet' && trustedToken(pos) && assetKey(pos) === a.asset.key && pos.quantity && decimalPositive(pos.quantity)).reduce((sum, pos) => sum.plus(pos.quantity!), new Decimal(0)).toString();
   const valuation = valueCost(localResult?.lots.filter(l => l.asset.key === a.asset.key) ?? [], a.quantity.toString(), price, allQuantity);
@@ -39,4 +40,4 @@ export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | unde
  });
  return { rows, result, walletCovered };
 }
-export const COST_STATUS = { confirmation: 'تأیید موجودی به‌روز لازم است', missing: 'بهای خرید ثبت نشده', mismatch: 'خرید و موجودی نیازمند تطبیق', review: 'نیازمند بررسی', history: 'تاریخچه ناقص', stale: 'در انتظار همگام‌سازی', partial: 'بهای خرید ناقص', ready: 'تطبیق‌شده' };
+export const COST_STATUS = { confirmation: 'بهای ذخیره‌شده', missing: 'بهای خرید ثبت نشده', mismatch: 'خرید و موجودی نیازمند تطبیق', review: 'نیازمند بررسی', history: 'تاریخچه ناقص', stale: 'در انتظار همگام‌سازی', partial: 'بهای خرید ناقص', ready: 'تطبیق‌شده' };

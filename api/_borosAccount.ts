@@ -6,12 +6,30 @@ const str = (v: unknown) => typeof v === 'string' ? v.slice(0,160) : '';
 const syncAt = (v: unknown) => { const s = n((v as any)?.syncStatus?.timestamp); return s === null ? null : s * 1000; };
 const page = z.object({ results: z.array(z.record(z.unknown())).max(2000), resumeToken: z.string().nullable().optional(), syncStatus: z.object({ timestamp: z.number().finite(), blockNumber: z.number().finite() }).optional() });
 export class BorosReadError extends Error { constructor(public status: number, message: string) { super(message); } }
-export async function borosRead(path: string, body?: unknown) {
- const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { accept:'application/json', ...(body ? {'content-type':'application/json'} : {}) }, ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(15000) });
- if(r.status===401||r.status===403)throw new BorosReadError(502,'دسترسی به دادهٔ عمومی بوروس پذیرفته نشد؛ اتصال سرویس را بررسی کنید');
- if (!r.ok) throw new BorosReadError(r.status===429 ? 429 : 502, r.status===429 ? 'سهمیه بوروس محدود است؛ آخرین داده حفظ شد' : 'دریافت داده بوروس انجام نشد');
- return r.json();
+export function borosPreviewError(value:unknown):string {
+ const text=JSON.stringify(value).slice(0,4000).toLowerCase();
+ if(/margin|collateral|balance|insufficient.?cash/.test(text))return 'مارجین آزاد برای این حجم کافی نیست؛ حجم را کاهش دهید یا حساب و وثیقه را بررسی کنید';
+ if(/slippage|out.of.range|rate.*bound/.test(text))return 'نرخ اجرا از حد مجاز خارج است؛ حجم و حد لغزش نرخ را بررسی کنید';
+ if(/liquid|not.filled|fok/.test(text))return 'این حجم در حد لغزش انتخاب‌شده کامل اجرا نمی‌شود؛ حجم کوچک‌تر را بررسی کنید';
+ if(/minimum|min.*order|order.*small/.test(text))return 'حجم از حداقل سفارش این بازار کمتر است؛ حجم معتبر وارد کنید';
+ return 'پیش‌نمایش این سفارش پذیرفته نشد؛ حجم، بازار و مارجین را بررسی کنید';
 }
+export async function borosRead(path: string, body?: unknown) {
+ const preview=path==='/simulations/place-order';
+ for(let attempt=0;attempt<(preview?2:1);attempt++){
+  let r:Response;
+  try{r=await fetch(BASE+path,{method:body?'POST':'GET',headers:{accept:'application/json',...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(preview?20000:15000)});}
+  catch{if(preview&&attempt===0)continue;throw new BorosReadError(504,'پاسخ بوروس دیر رسید؛ دوباره پیش‌نمایش را بررسی کنید');}
+  if(r.status===429)throw new BorosReadError(429,'سهمیه بوروس محدود است؛ آخرین داده حفظ شد');
+  if(preview&&r.status>=500&&attempt===0)continue;
+  if(r.status===401||r.status===403)throw new BorosReadError(502,'دسترسی به دادهٔ عمومی بوروس پذیرفته نشد؛ اتصال سرویس را بررسی کنید');
+  if(preview&&r.status>=400&&r.status<500){let detail:unknown=null;try{detail=await r.json();}catch{}throw new BorosReadError(422,borosPreviewError(detail));}
+  if(!r.ok)throw new BorosReadError(502,'سرویس بوروس موقتاً پاسخ نمی‌دهد؛ دوباره تلاش کنید');
+  return r.json();
+ }
+ throw new BorosReadError(502,'سرویس بوروس موقتاً پاسخ نمی‌دهد');
+}
+
 const cache = new Map<string,{ at:number; value:BorosAccountSnapshot }>();
 const pending = new Map<string,Promise<BorosAccountSnapshot>>();
 export function clearBorosAccountCache() { cache.clear(); pending.clear(); previewCache.clear(); previewPending.clear(); historyCache.clear(); historyPending.clear(); }
