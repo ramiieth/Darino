@@ -6,11 +6,12 @@
  *  رشد/کاهش تومانی و دلاری: روزانه، هفتگی، ۱ تا ۷۲ ماهه
  * ============================================================ */
 import { useEffect, useMemo, useState } from 'react';
-import { Car, History, LayoutGrid, RefreshCw, Tags } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Anchor, Car, History, LayoutGrid, RefreshCw, Tags } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Button } from '@/shared/components/ui/Button';
 import { SearchField, Select } from '@/shared/components/ui/Input';
-import { ChipGroup, Tabs } from '@/shared/components/ui/SegmentedControl';
+import { ChipGroup, SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Sheet } from '@/shared/components/ui/Sheet';
 import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
@@ -32,8 +33,11 @@ import { BrandsPanel } from './BrandsPanel';
 import { CarDetail } from './CarDetail';
 import { PeriodPicker } from './PeriodPicker';
 import { CATEGORY_FA, normalizeQuery } from './format';
+import { ArvandSection } from '@/features/arvandCars/presentation/ArvandSection';
 
 type ViewTab = 'models' | 'changes' | 'brands';
+/** بازار کشور (car.ir) یا خودروهای وارداتی پلاک اروند (دیوار) */
+type MarketKind = 'national' | 'arvand';
 type CatFilter = 'all' | CarCategory;
 type StatusFilter = 'active' | 'all' | ProductionStatus;
 
@@ -47,6 +51,9 @@ const STATUS_FILTER_FA: Record<StatusFilter, string> = {
 
 export function CarMarketPage() {
   const st = useCarMarket();
+  const [params, setParams] = useSearchParams();
+  const marketKind: MarketKind = params.get('m') === 'arvand' ? 'arvand' : 'national';
+  const setMarketKind = (m: MarketKind) => setParams(m === 'arvand' ? { m: 'arvand' } : {}, { replace: true });
   const effective = useUsdRate();
   const history = useUsdtHistoryStore();
   const [tab, setTab] = useState<ViewTab>('models');
@@ -121,12 +128,14 @@ export function CarMarketPage() {
       <PageHeader
         title="بازار خودرو"
         actions={
-          <Button icon={<RefreshCw className={cn(busy && 'animate-spin')} />} onClick={() => void useCarMarketStore.getState().refresh()} disabled={busy}>
-            {busy ? 'در حال دریافت…' : 'به‌روزرسانی قیمت‌ها'}
-          </Button>
+          marketKind === 'national' && (
+            <Button icon={<RefreshCw className={cn(busy && 'animate-spin')} />} onClick={() => void useCarMarketStore.getState().refresh()} disabled={busy}>
+              {busy ? 'در حال دریافت…' : 'به‌روزرسانی قیمت‌ها'}
+            </Button>
+          )
         }
         meta={
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+          marketKind === 'national' && <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
             <span className="inline-flex items-center gap-1">
               <Car aria-hidden className="h-3.5 w-3.5" /> {toFaDigits(brandCount)} برند · {toFaDigits(counts.cat.all)} مدل
             </span>
@@ -139,6 +148,22 @@ export function CarMarketPage() {
         }
       />
 
+      <SegmentedControl<MarketKind>
+        label="بازار"
+        value={marketKind}
+        onChange={setMarketKind}
+        fill
+        className="mb-6 md:max-w-md"
+        options={[
+          { value: 'national', label: 'بازار کشور', icon: <Car /> },
+          { value: 'arvand', label: 'خودروهای اروند', icon: <Anchor /> }
+        ]}
+      />
+
+      {marketKind === 'arvand' ? (
+        <ArvandSection />
+      ) : (
+        <>
       {st.status === 'error' && st.message && (
         <Notice tone="warn" className="mb-6" title="به‌روزرسانی انجام نشد">
           {st.message}
@@ -272,6 +297,8 @@ export function CarMarketPage() {
             ۹۰ روز به‌روز نشده، یا حذف از فهرست car.ir (با آخرین قیمت ثبت‌شده). قیمت‌ها پیشنهادی بازارند و لزوماً قیمت معامله نیستند.
           </p>
         </div>
+      )}
+        </>
       )}
 
       <Sheet open={selected !== null} onClose={() => setSelected(null)} title={selected ? `${selected.brandFa} · ${selected.model}` : ''} variant="panel" size="lg">

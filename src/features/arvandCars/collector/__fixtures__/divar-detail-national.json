@@ -1,0 +1,143 @@
+{
+ "sections": [
+  {
+   "widgets": [
+    {
+     "widget_type": "LEGEND_TITLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.LegendTitleRowData",
+      "title": "فروش خودرو",
+      "high_level_heading": true,
+      "padding": "NO_PADDING"
+     }
+    },
+    {
+     "widget_type": "EXPANDABLE_SECTION",
+     "data": {
+      "@type": "type.googleapis.com/widgets.ExpandableSectionData",
+      "widget_list": [
+       {
+        "widget_type": "DESCRIPTION_ROW",
+        "data": {
+         "@type": "type.googleapis.com/widgets.DescriptionRowData",
+         "text": "انتشار آگهی: ۱۱ مهر ۱۴۰۵، ۲۱:۳۷\nآخرین به‌روز‌رسانی: ۱۱ مهر ۱۴۰۵، ۲۱:۳۷",
+         "is_primary": true,
+         "small": true,
+         "text_alignment": "RIGHT"
+        }
+       }
+      ],
+      "title": "۲ ساعت پیش در تهران، فدک، خ گلشن‌دوست",
+      "icon": {}
+     }
+    }
+   ]
+  },
+  {
+   "widgets": [
+    {
+     "widget_type": "TITLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.TitleRowData",
+      "text": "توضیحات",
+      "text_color": "TEXT_PRIMARY",
+      "text_type": "SECONDARY"
+     }
+    },
+    {
+     "widget_type": "DESCRIPTION_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.DescriptionRowData",
+      "text": "سانتافه ۲۰۱۴",
+      "is_primary": true,
+      "text_alignment": "RIGHT"
+     }
+    }
+   ]
+  },
+  {
+   "widgets": [
+    {
+     "widget_type": "GROUP_INFO_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.GroupInfoRow",
+      "items": [
+       {
+        "title": "کارکرد",
+        "value": "۱۶۷۰۰۰"
+       },
+       {
+        "title": "مدل (سال تولید)",
+        "value": "۲۰۱۴"
+       },
+       {
+        "title": "رنگ",
+        "value": "سفید"
+       }
+      ],
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "برند و مدل",
+      "value": "هیوندای سانتافه ix 45 2400cc"
+     },
+     "action_log": {
+      "server_side_info": {
+       "info": {
+        "@type": "type.googleapis.com/action_log.PostViewListDataItemInfo",
+        "post_token": "gaBTkNE5",
+        "jli": {
+         "category": {
+          "value": "light"
+         },
+         "brand_model": {
+          "value": [
+           "Hyundai Santafe ix45 2400cc"
+          ]
+         }
+        },
+        "field": "brand_model",
+        "value": "Hyundai Santafe ix45 2400cc"
+       },
+       "item_type": {
+        "type": "POST_VIEW_LIST_DATA_ITEM"
+       }
+      },
+      "enabled": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "مهلت بیمهٔ شخص ثالث",
+      "value": "۱۰ ماه"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "گیربکس",
+      "value": "اتوماتیک"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "نوع سوخت",
+      "value": "بنزین"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "قیمت پایه",
+      "value": "‏۵,۸۰۰,۰۰۰,۰۰۰ تومان"
+     }
+    }
+   ]
+  }
+ ]
+}

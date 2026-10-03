@@ -13,6 +13,9 @@
  * GET  ?market=car        → Snapshotهای روزانه خودرو از Neon
  * GET  ?market=car&cron=1 → Cron روزانه Vercel: واکشی + ذخیره Snapshot امروز
  *
+ * خودروهای وارداتی پلاک اروند (api/_arvand.ts):
+ * POST arvandSearch / arvandDetails / arvandPersist · GET ?market=arvand
+ *
  * طراحی (بازطراحی ۲۰۲۶-۰۹):
  *  - اپ تک‌کاربره است؛ پاک‌سازی، حذف تکراری و Snapshot سمت کلاینت (IndexedDB)
  *    انجام می‌شود. این فانکشن فقط «پراکسی واکشی» است و هیچ وابستگی‌ای به
@@ -36,6 +39,7 @@ import { fetchCarIrPrices } from '../src/features/carMarket/collector/carIr.js';
 import { buildCarSnapshot, isCarSnapshot } from '../src/features/carMarket/domain/snapshot.js';
 import type { CarSnapshot } from '../src/features/carMarket/domain/types.js';
 import { fetchUsdtDirect, type UsdtSource } from '../src/shared/fx/usdtRate.js';
+import { handleArvandAction, handleArvandGet } from './_arvand.js';
 
 /** سقف زمان هر تکه — زیر maxDuration=60 در vercel.json */
 const CHUNK_TIME_BUDGET_MS = 38_000;
@@ -167,6 +171,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       await handleCarGet(req, res, query);
       return;
     }
+    if (req.method === 'GET' && query.get('market') === 'arvand') {
+      await handleArvandGet(req, res);
+      return;
+    }
 
     /* ---------- GET: پشتیبان Neon (اختیاری) — فقط با نشست معتبر ---------- */
     if (req.method === 'GET') {
@@ -287,6 +295,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     /* ---------- carPrices: قیمت روز خودرو (بدون دیتابیس) ---------- */
+    /* ---------- خودروهای اروند (api/_arvand.ts) ---------- */
+    if (action.startsWith('arvand') && (await handleArvandAction(action, body, req, res))) return;
+
     if (action === 'carPrices') {
       try {
         const parsed = await fetchCarIrPrices();
