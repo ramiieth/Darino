@@ -142,7 +142,7 @@ export function ArvandSection() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-panel bg-gradient-to-br from-[#B07A12] via-[#C9921E] to-[#7A520A] p-5 text-white shadow-pop md:p-6">
+      <section className="relative overflow-hidden rounded-panel bg-gradient-to-br from-[#2E5BFF] via-[#1837B0] to-[#0B1B5C] p-5 text-white shadow-pop md:p-6">
         <div aria-hidden className="pointer-events-none absolute -end-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-24 start-10 h-56 w-56 rounded-full bg-black/10 blur-2xl" />
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -159,7 +159,7 @@ export function ArvandSection() {
                 توقف
               </Button>
             ) : (
-              <Button icon={<RefreshCw />} onClick={() => void useArvandStore.getState().collect()} className="!bg-white !text-[#7A520A]">
+              <Button icon={<RefreshCw />} onClick={() => void useArvandStore.getState().collect()} className="!bg-white !text-[#1837B0]">
                 به‌روزرسانی آگهی‌ها
               </Button>
             )}
@@ -211,7 +211,7 @@ export function ArvandSection() {
           {tab === 'compare' && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-muted">میانه قیمت آگهی‌های پلاک اروند در برابر همان مدل و سال با پلاک ملی (تهران)</p>
+                <p className="text-xs text-muted">میانه قیمت آگهی‌های پلاک اروند در برابر همان مدل و سال با پلاک ملی</p>
                 <div className="w-full sm:w-52">
                   <Select aria-label="مرتب‌سازی مدل‌ها" value={groupSort} onChange={(e) => setGroupSort(e.target.value as GroupSort)}>
                     <option value="gap">بیشترین اختلاف</option>
@@ -304,7 +304,7 @@ export function ArvandSection() {
 
       <p className="text-2xs leading-5 text-muted">
         منبع: آگهی‌های دیوار. هر آگهی با خواندن متن کامل آن بررسی می‌شود و فقط آگهی‌هایی که پلاک اروند یا منطقه آزاد را ذکر کرده‌اند نمایش داده
-        می‌شوند. مبنای پلاک ملی: آگهی‌های همان مدل و سال در تهران. قیمت‌ها پیشنهادی فروشندگان است؛ آگهی‌های نمایشگاهی چندخودرویی، شرایطی و قیمت‌های
+        می‌شوند. مبنای مقایسه: آگهی‌های همان مدل و سال با پلاک ملی. قیمت‌ها پیشنهادی فروشندگان است؛ آگهی‌های نمایشگاهی چندخودرویی، شرایطی و قیمت‌های
         پرت در میانه‌ها حساب نمی‌شوند. آگهی‌های حذف‌شده یا بیش از ۳۰ روز به‌روزنشده کنار گذاشته می‌شوند.
       </p>
 
@@ -319,15 +319,15 @@ function GroupDetail({ g, usdRate }: { g: ModelGroup; usdRate: number | null }) 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-field bg-gold/10 p-3">
-          <p className="text-2xs text-gold-text">میانه پلاک اروند</p>
+        <div className="rounded-field bg-accent-soft p-3">
+          <p className="text-2xs text-accent">میانه پلاک اروند</p>
           <p className="text-xl font-extrabold text-ink">{fmtCarToman(g.arvand.median)}</p>
           <p className="text-2xs text-muted">
             {toFaDigits(g.arvand.n)} آگهی · {fmtCarToman(g.arvand.min)} تا {fmtCarToman(g.arvand.max)}
           </p>
         </div>
-        <div className="rounded-field bg-accent-soft p-3">
-          <p className="text-2xs text-accent">میانه پلاک ملی (تهران)</p>
+        <div className="rounded-field bg-surface-2 p-3">
+          <p className="text-2xs text-muted">میانه پلاک ملی</p>
           <p className="text-xl font-extrabold text-ink">{fmtCarToman(g.national.median)}</p>
           <p className="text-2xs text-muted">
             {toFaDigits(g.national.n)} آگهی{g.national.n ? ` · ${fmtCarToman(g.national.min)} تا ${fmtCarToman(g.national.max)}` : ''}
@@ -336,7 +336,7 @@ function GroupDetail({ g, usdRate }: { g: ModelGroup; usdRate: number | null }) 
       </div>
       {g.gapPct !== null && (
         <p className="text-sm text-ink">
-          قیمت پلاک اروند <span className="num-ltr font-extrabold text-gold-text">{fmtCarPct(g.gapPct)}</span> نسبت به پلاک ملی
+          قیمت پلاک اروند <span className="num-ltr font-extrabold text-accent">{fmtCarPct(g.gapPct)}</span> نسبت به پلاک ملی
           {g.lowSample && <span className="ms-1 text-2xs text-warn">(نمونه کم)</span>}
         </p>
       )}
@@ -350,7 +350,7 @@ function GroupDetail({ g, usdRate }: { g: ModelGroup; usdRate: number | null }) 
       </div>
       {g.national.ads.length > 0 && (
         <div>
-          <h3 className="mb-2 text-sm font-bold text-ink">آگهی‌های پلاک ملی (تهران)</h3>
+          <h3 className="mb-2 text-sm font-bold text-ink">آگهی‌های پلاک ملی</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {g.national.ads.map((a) => (
               <AdCard key={a.token} ad={a} usdRate={usdRate} />

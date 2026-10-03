@@ -27,7 +27,7 @@ export const AdCard = memo(function AdCard({ ad, usdRate }: { ad: CarAd; usdRate
       href={`https://divar.ir/v/${ad.token}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex h-full flex-col overflow-hidden rounded-card border border-divider bg-card shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+      className="group flex h-full flex-col overflow-hidden rounded-card border border-divider bg-card shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-surface-2">
         {ad.image && imgOk ? (
@@ -52,7 +52,7 @@ export const AdCard = memo(function AdCard({ ad, usdRate }: { ad: CarAd; usdRate
       </div>
 
       <div className="flex flex-1 flex-col p-3.5">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5 text-ink group-hover:text-gold-text">{ad.title}</p>
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5 text-ink group-hover:text-accent">{ad.title}</p>
         <p className="mt-1 truncate text-2xs text-muted">
           {ad.model ?? '—'}
           {ad.year ? ` · ${toFaDigits(ad.year)}` : ''}
@@ -77,7 +77,7 @@ export const AdCard = memo(function AdCard({ ad, usdRate }: { ad: CarAd; usdRate
               {ad.km === 0 ? 'صفر کیلومتر' : `${toFaDigits(nf.format(ad.km))} کیلومتر`}
             </span>
           )}
-          {ad.where && (
+          {ad.where && ad.region !== 'tehran' && (
             <span className="inline-flex min-w-0 items-center gap-1">
               <MapPin aria-hidden className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{ad.where}</span>
