@@ -1,3 +1,4 @@
+import { CostSummaryPanel } from '@/features/cost-basis/presentation/CostSummaryPanel';
 import { NetworkPicker } from './NetworkPicker';
 import { AssetValue } from './AssetValue';
 import { WalletBalanceChart } from './WalletBalanceChart';
@@ -58,5 +59,6 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
  <Surface as="aside" aria-labelledby="portfolio-recent-title" className="portfolio-recent min-w-0 p-4 md:p-5"><h2 id="portfolio-recent-title" className="mb-3 text-base font-bold">فعالیت‌های اخیر</h2>{filteredActivity.length?<ActivityList preview rows={filteredActivity.slice(0,5)} links={activity.links} addresses={p.wallets.map(w=>w.holding.address!)} chains={chains}/>:<p className="py-6 text-xs leading-6 text-muted">{activityError??(activityBusy?'در حال دریافت تراکنش‌ها…':'تراکنش قابل نمایش یافت نشد.')}</p>}<button type="button" onClick={()=>setTab('activity')} className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl bg-surface-2 px-3 text-xs font-semibold text-ink">نمایش همهٔ تراکنش‌ها<ArrowLeft className="h-4 w-4" aria-hidden/></button></Surface>
  </div>:<><ActivityExplorer rows={filteredActivity} links={activity.links} addresses={p.wallets.map(w=>w.holding.address!)} chains={chains}/>{p.wallets.map(w=><div key={w.holding.id} className="mt-3 space-y-2">{w.state?.historyError&&<Notice tone="warn">{w.state.historyError}</Notice>}{w.state?.next&&<Button size="sm" variant="outline" loading={w.state.historyLoading} onClick={()=>void refreshTransactions(w.holding.address!,true)}>تراکنش‌های قدیمی‌تر · {w.holding.label}</Button>}</div>)}{p.arcus.map(a=>(a.state?.history.transfers.error||a.state?.history.transfers.data?.complete===false)&&<Notice key={a.holding.id} tone="warn">تاریخچهٔ {a.holding.label} کامل دریافت نشده است.</Notice>)}<div className="mt-5"><TransferReview activity={activity} chains={chains}/></div></>}
  </div></section>
+ {tab==='assets'&&<CostSummaryPanel portfolio={p} links={activity.links}/>}
  </>;
 }

@@ -513,3 +513,9 @@
   .boros-best-card { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .boros-market-card { transition: none; } }
+
+.cost-summary .data-table { table-layout: fixed; }
+.cost-summary .data-table th:first-child { width: 20%; }
+.cost-summary .data-table td, .cost-summary .data-table th { white-space: normal; overflow-wrap: anywhere; padding-inline: 10px; }
+.cost-summary .persian-amount { max-width: 100%; }
+.cost-summary .persian-amount bdi { min-width: 0; overflow-wrap: anywhere; }

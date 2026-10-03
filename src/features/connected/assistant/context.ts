@@ -1,3 +1,4 @@
+import { costSummary } from '@/features/cost-basis/domain/summary';
 import { useBorosAccount, accountIsStale } from '@/features/boros/data/useBorosAccount';
 import { accountTotals } from '@/shared/boros/account';
 import Decimal from 'decimal.js';
@@ -6,7 +7,7 @@ import type { AppContext, AssistantSection, InsightRow } from '@/shared/assistan
 import { useAssistantInsights } from '@/shared/assistant/insights';
 import type { ConnectedPortfolio } from '../data/useConnectedPortfolio';
 import { visiblePositions, visibleTransaction, visibleTransfer } from '../domain/visibility';
-import { verifiedCash, COST_PREF, replayCost, valueCost, assetKey, type CostBook } from '@/features/cost-basis/domain/book';
+import { verifiedCash, COST_PREF, type CostBook } from '@/features/cost-basis/domain/book';
 import { getPref } from '@/features/custody/data/repository';
 import { ACTIVITY_LINKS } from '../data/useActivity';
 import type { ActivityLink } from '../domain/activity';
@@ -78,18 +79,10 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
     const book = getPref<CostBook>(COST_PREF)?.value;
     let costRows: InsightRow[] = [];
     if (book) {
-        const historyCovered = p.wallets.length > 0 && p.wallets.every(w => w.state?.historyLoaded && !w.state.historyError && (!w.state.next || w.state.history.some(t => Date.parse(t.minedAt) <= book.asOf)));
-        const result = replayCost(book, p.wallets.flatMap(w => w.state?.history ?? []), activityLinks, p.wallets.map(w => w.holding.address!));
-        const grouped = new Map<string, typeof rows>();
-        rows.filter(r => r.type === 'wallet' && !verifiedCash(r.chain, r.contract, r) && r.quantity).forEach(r => grouped.set(assetKey(r), [...(grouped.get(assetKey(r)) ?? []), r]));
-        costRows = [...grouped].map(([key, positions]) => {
-            const quantity = positions.reduce((s, r) => s.plus(r.quantity!), new Decimal(0));
-            const priced = positions.every(r => r.value !== null);
-            const price = priced ? positions.reduce((s, r) => s.plus(r.value!), new Decimal(0)).div(quantity).toNumber() : null;
-            const v = valueCost(result.lots.filter(l => l.asset.key === key), quantity.toString(), price);
-            const valid = historyCovered && !p.stale && !result.issues.some(i => !i.assetKeys || i.assetKeys.includes(key));
-            return insight(tokenName(positions[0].symbol, positions[0].name), 'FIFO', { basisUsd: v.basis, unrealizedPnlUsd: valid ? v.pnl : null, coveredQuantity: number(v.covered), unknownQuantity: number(v.unknown), quantity: quantity.toNumber() }, 'saved', valid && v.pnl !== null ? 'ready' : 'partial', book.asOf, positions[0].symbol);
-        });
+        const summary = costSummary(p, book, activityLinks);
+        const result = summary.result!;
+        const historyCovered = p.wallets.length > 0 && p.wallets.every(summary.walletCovered);
+        costRows = summary.rows.map(row => insight(tokenName(row.asset.symbol, row.asset.name), 'FIFO', { basisUsd: row.basis, avgCostUsd: row.avgCost, unrealizedPnlUsd: row.pnl, unrealizedPnlPct: row.pnlPct, coveredQuantity: number(row.valuation.covered), unknownQuantity: number(row.valuation.unknown), quantity: row.quantity.toNumber(), valueUsd: row.priced ? row.value.toNumber() : null }, 'saved', row.status === 'ready' && row.pnl !== null ? 'ready' : 'partial', book.asOf, row.asset.symbol));
         costRows.unshift(insight('فروش‌های محاسبه‌شده', 'FIFO', { realizedPnlUsd: historyCovered && !p.stale && !result.issues.length ? number(result.realized) : null, issueCount: result.issues.length, baselineTs: book.asOf, recordedPurchases: book.lots.length, archivedPurchases: book.archivedPurchases?.length ?? 0 }, 'saved', historyCovered && !result.issues.length && !p.stale ? 'ready' : 'partial', book.asOf));
     }
     if (book)
