@@ -519,3 +519,16 @@
 .cost-summary .data-table td, .cost-summary .data-table th { white-space: normal; overflow-wrap: anywhere; padding-inline: 10px; }
 .cost-summary .persian-amount { max-width: 100%; }
 .cost-summary .persian-amount bdi { min-width: 0; overflow-wrap: anywhere; }
+
+/* Read-only Boros portfolio: compact web tabs and touch-friendly PWA panels. */
+.boros-account { min-width: 0; }
+.boros-account .persian-amount { max-width: 100%; gap: .35rem; }
+.boros-account .persian-amount > span { font-size: .75rem; line-height: 1.8; overflow-wrap: normal; word-break: normal; }
+.boros-account-tabs { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.boros-account-tabs button { min-height: 48px; touch-action: manipulation; }
+@media (display-mode: standalone) {
+ .boros-account-tabs { scroll-snap-type: x proximity; }
+ .boros-account-tabs button { scroll-snap-align: start; }
+}
+[data-installed-pwa="true"] .boros-account-tabs { scroll-snap-type: x proximity; }
+[data-installed-pwa="true"] .boros-account-tabs button { scroll-snap-align: start; }

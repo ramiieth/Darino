@@ -165,6 +165,7 @@ export function assetSearchText(symbol: string, fallbackName?: string | null): s
 /** Display spelling for unknown tickers; never changes provider or database identifiers. */
 const LETTER_FA:Record<string,string>={A:'ای',B:'بی',C:'سی',D:'دی',E:'ای',F:'اف',G:'جی',H:'اچ',I:'آی',J:'جی',K:'کی',L:'ال',M:'ام',N:'ان',O:'او',P:'پی',Q:'کیو',R:'آر',S:'اس',T:'تی',U:'یو',V:'وی',W:'دبلیو',X:'ایکس',Y:'وای',Z:'زد'};
 export function persianAssetName(symbol:string,fallback?:string|null):string {
+ if(/[\u0600-\u06ff]/.test(symbol??''))return symbol.trim();
  const d=assetDisplayName(symbol,fallback);
  if(d.rtl)return d.name;
  return (symbol??'').toUpperCase().split('').map(c=>LETTER_FA[c]??c.replace(/[0-9]/g,n=>'۰۱۲۳۴۵۶۷۸۹'[Number(n)])).join(' ').trim()||'دارایی';

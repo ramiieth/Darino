@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireSession } from './_authCore.js';
 import { z } from 'zod';
 import { rootSchema, previewRequestSchema, unpackAccount, CROSS } from '../src/shared/boros/account.js';
-import { readBorosAccount, readBorosPreview, BorosReadError } from './_borosAccount.js';
-const querySchema=z.object({root:rootSchema,accountId:z.coerce.number().int().min(0).max(255).default(0)});
+import { readBorosAccount, readBorosPreview, readBorosHistory, BorosReadError } from './_borosAccount.js';
+const querySchema=z.object({root:rootSchema,accountId:z.coerce.number().int().min(0).max(255).default(0),view:z.enum(['order-history','trade-history']).optional()});
 export default async function handler(req:IncomingMessage,res:ServerResponse):Promise<void>{
  res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','private, no-store');
  const method=req.method??'GET';
@@ -11,8 +11,8 @@ export default async function handler(req:IncomingMessage,res:ServerResponse):Pr
  if(!await requireSession(req,res))return;
  try {
   if(method==='GET'){
-   const url=new URL(req.url??'/', 'http://localhost');const {root,accountId}=querySchema.parse(Object.fromEntries(url.searchParams));
-   const data=await readBorosAccount(root,accountId);res.statusCode=200;res.end(JSON.stringify(data));return;
+   const url=new URL(req.url??'/', 'http://localhost');const {root,accountId,view}=querySchema.parse(Object.fromEntries(url.searchParams));
+   const data=view?await readBorosHistory(root,accountId,view):await readBorosAccount(root,accountId);res.statusCode=200;res.end(JSON.stringify(data));return;
   }
   let raw='';for await(const part of req){raw+=part.toString();if(raw.length>4096)throw new Error('body too large');}
   const body=previewRequestSchema.parse(JSON.parse(raw));const h=unpackAccount(body.marketAcc);
