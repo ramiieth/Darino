@@ -50,19 +50,33 @@ try {
  }
  await page.setViewportSize({ width: 390, height: 844 });
  await host.getByRole('tab', { name: 'شبیه‌ساز', exact: true }).click();
- await host.getByRole('radio', { name: 'پیش‌نمایش سفارش', exact: true }).click();
- const quantity = host.getByLabel('حجم', { exact: true }).last();
+ await host.getByRole('radio', { name: 'تحلیل ورود', exact: true }).click();
+ const quantity = host.getByLabel('حجم واحد بازده', { exact: true });
  await quantity.fill(''); await quantity.pressSequentially('0.65', { delay: 40 });
  await page.waitForTimeout(100);
  assert.equal(await quantity.inputValue(), '0.65');
  await quantity.fill('۰٫۶۵'); assert.equal(await quantity.inputValue(), '0.65');
  await host.getByLabel('وثیقه موجود', { exact: true }).fill('۰٫۱');
  assert.equal(await host.getByLabel('وثیقه موجود', { exact: true }).inputValue(), '0.1');
+ await host.getByLabel('مجموع کارمزدها', { exact: true }).fill('۰٫۲');
+ await host.getByLabel('هزینه لغزش', { exact: true }).fill('۰٫۱');
+ await host.getByLabel('گس', { exact: true }).fill('۰٫۰۵');
+ assert((await host.innerText()).includes('نرخ ضمنی لیکوییدشدن'));
+ assert((await host.innerText()).includes('سناریوی بدبینانه'));
  assert((await host.innerText()).includes('تسویه تا سررسید (فرض نرخ ثابت)'));
  assert(!(await host.innerText()).includes('سود تسویه‌شده'));
  const formulas = await host.innerText();
  assert(!formulas.includes('NaN') && !formulas.includes('Infinity'));
+ for (const width of [320, 390, 1440]) {
+  await page.setViewportSize({ width, height: 844 });
+  const fit = await host.evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  assert(fit.scroll <= fit.client + 1, `entry analysis overflow: ${width}`);
+ }
+ await host.getByRole('button', { name: 'محاسبه حجم با سرمایه', exact: true }).click();
+ assert(Number(await quantity.inputValue()) > 0);
+ await host.getByRole('radio', { name: 'شورت', exact: true }).click();
+ await page.setViewportSize({ width: 390, height: 844 });
  await page.screenshot({ path: '/tmp/darino-boros-preview-mobile.png' });
  assert.deepEqual(errors, []);
- console.log('PASS: 5 Boros tabs at 320/390/1440px in light/dark; decimal typing, native collateral units and forecast labels. PWA layout uses the same responsive surfaces; installation is not tested.');
+ console.log('PASS: 5 Boros tabs at 320/390/1440px in light/dark; decimal typing, native collateral units, manual entry costs, allocated YU size and forecast labels. PWA layout uses the same responsive surfaces; installation is not tested.');
 } finally { await browser.close(); }

@@ -39,7 +39,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
   const [capitalInput, setCapitalInput] = useState('1000');
   const capitalUsd = Number(capitalInput) || 0;
   /** MODE B = simulation (hypothetical capital) · MODE C = order preview */
-  const [previewMode, setPreviewMode] = useState<'sim' | 'preview'>('sim');
+  const [previewMode, setPreviewMode] = useState<'sim' | 'preview'>('preview');
 
   const market = markets.find((m) => m.marketId === marketId) ?? markets[0];
   const days = market ? daysToMaturity(market) : 0;
@@ -103,7 +103,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
           {previewMode === 'sim' && <Field label="حجم" className="md:col-span-3">
             <Input dir="ltr" inputMode="decimal" value={size} onChange={(e) => setSize(normalizeDecimalInput(e.target.value))} suffix="دلار" />
           </Field>}
-          <Field label="نرخ ثابت" hint={`پیش‌فرض: مارک ${fmtPct(market.markApr * 100)}`} className="md:col-span-3">
+          <Field label="نرخ ثابت" error={fixedRateInput !== '' && fixedRate === null ? 'نرخ معتبر وارد کنید' : undefined} hint={`پیش‌فرض: مارک ${fmtPct(market.markApr * 100)}`} className="md:col-span-3">
             <Input
               dir="ltr"
               inputMode="decimal"
@@ -135,12 +135,14 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
         onChange={setPreviewMode}
         options={[
           { value: 'sim', label: 'شبیه‌سازی با سرمایه فرضی' },
-          { value: 'preview', label: 'پیش‌نمایش سفارش' }
+          { value: 'preview', label: 'تحلیل ورود' }
         ]}
       />
 
       {previewMode === 'preview' && (
         <OrderPreviewPanel
+          markets={markets}
+          onSelectMarket={(id, side) => { setMarketId(id); setDirection(side); setFixedRateInput(''); }}
           market={market}
           direction={direction}
           fixedRate={fixedRate}
@@ -171,15 +173,15 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
             <MetricGrid cols={3} className="mt-6 border-t border-divider pt-5">
               <Metric label="مارجین اولیه" value={<MoneyValue value={proj.initialMargin} />} />
               <Metric label="ارزش اسمی قابل‌دستیابی" value={<MoneyValue value={proj.notional} />} />
-              <Metric label="ارزش اسمی / سرمایه" value={<span className="num-ltr">{proj.effectiveExposure.toFixed(2)}x</span>} />
+              <Metric label="ارزش اسمی / سرمایه" value={<span className="num-ltr">{toFaDigits(proj.effectiveExposure.toFixed(2))} برابر</span>} />
               <Metric label="حساسیت به ۱٪ نرخ" value={<MoneyValue value={proj.rateSensitivity} />} />
               <Metric label="سود تسویه" value={<MoneyValue value={proj.expectedSettlementPnl} signed tone="auto" />} />
               <Metric label="هزینه کل" value={<MoneyValue value={proj.totalCost !== null ? -Math.abs(proj.totalCost) : null} />} />
             </MetricGrid>
           </Surface>
 
-          <Notice tone="warn" title={`${proj.effectiveExposure.toFixed(1)}x لوریج دارایی نیست`}>
-            نسبت Notional به سرمایه، لوریج متعارف Collateral نیست؛ در Boros ریسک عمدتاً با حساسیت نرخ و حاشیه مارجین تعیین می‌شود.
+          <Notice tone="warn" title={`${toFaDigits(proj.effectiveExposure.toFixed(1))} برابر، اهرم دارایی نیست`}>
+            نسبت ارزش اسمی به سرمایه، اهرم متعارف وثیقه نیست؛ در بوروس ریسک عمدتاً با حساسیت نرخ و حاشیه مارجین تعیین می‌شود.
             سالانه‌شده فقط یک برون‌یابی ریاضی است و پیش‌بینی بازده آینده نیست.
           </Notice>
 
@@ -190,7 +192,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
             description="ترتیب اقتصادی تضمین‌شده: برای لانگ نامطلوب ≤ پایه ≤ مطلوب (برای شورت برعکس)"
           >
             {proj.scenarios.base === null ? (
-              <Notice tone="neutral">داده تاریخی کافی برای سناریو وجود ندارد (N/A).</Notice>
+              <Notice tone="neutral">داده تاریخی کافی برای سناریو وجود ندارد (نامشخص).</Notice>
             ) : (
               <Surface className="overflow-hidden">
                 <div className="overflow-x-auto">
@@ -221,7 +223,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                   </table>
                 </div>
                 <p className="border-t border-divider px-5 py-3 text-xs text-muted">
-                  MTM سناریو = N/A: Mark سناریو در دسترس نیست و نرخ شناور هرگز به‌جای Mark استفاده نمی‌شود.
+                  ارزش روز سناریو نامشخص است؛ نرخ مارک آینده در دسترس نیست.
                 </p>
               </Surface>
             )}
@@ -239,12 +241,12 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                       </span>
                     ),
                     hint: liqAvail ? LIQUIDATION_SOURCE_FA[proj.liquidation.liquidationApr.source] : LIVE_POSITION_NA_REASON,
-                    value: liqAvail ? <span className="num-ltr">{proj.liquidation.liquidationApr.value!.toFixed(2)}%</span> : <span className="text-subtle">N/A</span>
+                    value: liqAvail ? <span className="num-ltr">{toFaDigits(proj.liquidation.liquidationApr.value!.toFixed(2))}٪</span> : <span className="text-subtle">نامشخص</span>
                   },
                   {
                     label: 'حاشیه ریسک نظری نرخ سالانه (متریک شبیه‌ساز)',
                     hint: 'مارجین ÷ حساسیت نرخ — لیکوییدیشن واقعی بوروس نیست',
-                    value: proj.theoreticalAprRiskBufferPct !== null ? <span className="num-ltr">{proj.theoreticalAprRiskBufferPct.toFixed(1)} pp</span> : <span className="text-subtle">N/A</span>
+                    value: proj.theoreticalAprRiskBufferPct !== null ? <span className="num-ltr">{toFaDigits(proj.theoreticalAprRiskBufferPct.toFixed(1))} واحد درصد</span> : <span className="text-subtle">نامشخص</span>
                   }
                 ]}
               />
@@ -301,7 +303,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                     />
                   </>
                 ) : (
-                  <p className="text-xs text-muted">داده تاریخی کافی برای سناریوی تنش در دسترس نیست (N/A).</p>
+                  <p className="text-xs text-muted">داده تاریخی کافی برای سناریوی تنش در دسترس نیست (نامشخص).</p>
                 )}
               </Surface>
             </div>
@@ -338,11 +340,11 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
               <Surface className="px-4 md:px-5">
                 <KeyValueList
                   rows={[
-                    { label: 'کارمزد ورود', hint: '|Size| × FeeRate × YTM', value: <MoneyValue value={fees.entryFee} /> },
+                    { label: 'کارمزد ورود', hint: 'حجم × نرخ کارمزد × زمان باقی‌مانده', value: <MoneyValue value={fees.entryFee} /> },
                     { label: 'کارمزد خروج', value: <MoneyValue value={fees.exitFee} /> },
-                    { label: 'هزینه تسویه', hint: '|Size| × SettleRate × Period × Count', value: <MoneyValue value={fees.settlementCost} /> },
-                    { label: 'هزینه ورود به بازار', value: fees.entranceFee > 0 ? <MoneyValue value={fees.entranceFee} /> : <span className="text-subtle">N/A</span> },
-                    { label: 'لغزش', value: fees.slippageCost > 0 ? <MoneyValue value={fees.slippageCost} /> : <span className="text-subtle">N/A</span> },
+                    { label: 'هزینه تسویه', hint: 'حجم × نرخ تسویه × مدت نگهداری', value: <MoneyValue value={fees.settlementCost} /> },
+                    { label: 'هزینه ورود به بازار', value: fees.entranceFee > 0 ? <MoneyValue value={fees.entranceFee} /> : <span className="text-subtle">نامشخص</span> },
+                    { label: 'لغزش', value: fees.slippageCost > 0 ? <MoneyValue value={fees.slippageCost} /> : <span className="text-subtle">نامشخص</span> },
                     { label: 'گس', value: <MoneyValue value={fees.gasFee} /> },
                     { label: 'مجموع', emphasis: true, value: <MoneyValue value={fees.total} /> }
                   ]}
@@ -362,18 +364,18 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                     rows={[
                       { label: 'بازار', value: `${borosAssetName(market.asset)} · ${borosVenueName(market.venue)}` },
                       { label: 'سررسید', value: `${new Date(market.maturity * 1000).toLocaleDateString('fa-IR')} (${toFaDigits(Math.ceil(proj.daysToMaturity))} روز)` },
-                      { label: 'سرمایه', value: <span><MoneyValue value={proj.capital} /> ({proj.capitalMode})</span> }
+                      { label: 'سرمایه', value: <span><MoneyValue value={proj.capital} /> (فقط مارجین اولیه)</span> }
                     ]}
                   />
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-muted">مارجین (فرمول رسمی بوروس)</h4>
-                  <p className="py-2 text-xs text-muted">{proj.marginBreakdown.formula}</p>
+                  <p className="py-2 text-xs text-muted">حجم × بیشینه قدرمطلق نرخ و کف نرخ × ضریب مارجین × زمان مؤثر</p>
                   <KeyValueList
                     dense
                     rows={[
                       { label: 'کف نرخ → نرخ مؤثر', value: <span className="num-ltr">{fmtPct(proj.marginBreakdown.rateFloor * 100)} → {fmtPct(proj.marginBreakdown.effectiveRate * 100)}</span> },
-                      { label: 'زمان (سال) → مؤثر', value: <span className="num-ltr">{proj.marginBreakdown.yearsToMaturity.toFixed(4)} → {proj.marginBreakdown.effectiveTime.toFixed(4)}</span> },
+                      { label: 'زمان (سال) → مؤثر', value: <span className="num-ltr">{toFaDigits(proj.marginBreakdown.yearsToMaturity.toFixed(4))} → {toFaDigits(proj.marginBreakdown.effectiveTime.toFixed(4))}</span> },
                       { label: 'ضریب مارجین اولیه', value: <PercentValue value={proj.marginBreakdown.imFactor * 100} signed={false} tone="none" /> },
                       { label: 'مارجین رفت‌وبرگشت', value: <MoneyValue value={proj.recalculatedMargin} /> }
                     ]}
@@ -383,7 +385,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                   <h4 className="text-xs font-semibold text-muted">سود و زیان</h4>
                   <p className="py-2 text-xs leading-5 text-muted">
                     تسویه = {direction === 'long' ? 'ارزش اسمی × (شناور − ثابت) × روز/۳۶۵' : 'ارزش اسمی × (ثابت − شناور) × روز/۳۶۵'} ·
-                    MTM پایه = حساسیت × (Mark − ورود)/۱٪ — {proj.mtmReason} · خالص سررسید = تسویه − هزینه‌های مشخص
+                    ارزش روز پایه = حساسیت × (مارک − ورود)/۱٪ — {proj.mtmReason} · خالص سررسید = تسویه − هزینه‌های مشخص
                   </p>
                 </div>
               </div>
@@ -391,8 +393,8 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
           </Surface>
 
           <Notice tone="neutral">
-            «مارجین کافی به نظر می‌رسد» به معنای «بدون ریسک لیکوییدیشن» نیست — حرکت نامطلوب Mark APR یا زیان تسویه می‌تواند Position
-            را به Maintenance Margin نزدیک کند؛ وضعیت واقعی بدون Position زنده Boros در دسترس نیست.
+            «مارجین کافی به نظر می‌رسد» به معنای «بدون ریسک لیکوییدیشن» نیست — حرکت نامطلوب نرخ مارک یا زیان تسویه می‌تواند پوزیشن
+            را به مارجین نگهداری نزدیک کند؛ وضعیت واقعی بدون پوزیشن زنده بوروس در دسترس نیست.
           </Notice>
         </>
       )}

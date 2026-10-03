@@ -102,7 +102,7 @@ export default function BorosDashboard() {
       {syncProgress && (
         <div className="flex items-center gap-3 text-xs text-muted" role="status">
           <span className="shrink-0">
-            تاریخچه APR {toFaDigits(syncProgress.done)}/{toFaDigits(syncProgress.total)}
+            تاریخچه نرخ {toFaDigits(syncProgress.done)}/{toFaDigits(syncProgress.total)}
           </span>
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div
@@ -113,7 +113,7 @@ export default function BorosDashboard() {
         </div>
       )}
 
-      <Notice tone="neutral">سناریو تا سررسید با نرخ شناور فرضی؛ هزینه ورود به بازار و لغزش نامشخص است.</Notice>
+      <Notice tone="neutral">سناریوی سررسید؛ هزینه‌های شخصی را در تحلیل ورود وارد کنید.</Notice>
 
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
