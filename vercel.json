@@ -42,5 +42,11 @@
       "source": "/api/boros/:path*",
       "destination": "/api/boros?__p=/:path*"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/propertyMarket?market=car&cron=1",
+      "schedule": "30 6 * * *"
+    }
   ]
 }

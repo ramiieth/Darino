@@ -10,7 +10,7 @@ import { AuthBootstrap, AuthGate } from '@/features/auth/AuthGate';
 const DashboardPage = lazy(() => import('@/features/eth-summary/presentation/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const SimulationPage = lazy(() => import('@/features/simulation/presentation/SimulationPage').then((m) => ({ default: m.SimulationPage })));
 const DeFiPage = lazy(() => import('@/features/defi/presentation/DeFiPage').then((m) => ({ default: m.DeFiPage })));
-const VehiclePage = lazy(() => import('@/features/vehicle/presentation/VehiclePage').then((m) => ({ default: m.VehiclePage })));
+const CarMarketPage = lazy(() => import('@/features/carMarket/presentation/CarMarketPage').then((m) => ({ default: m.CarMarketPage })));
 const PropertyMarketPage = lazy(() => import('@/features/propertyMarket/presentation/PropertyMarketPage').then((m) => ({ default: m.PropertyMarketPage })));
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
 const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
@@ -120,8 +120,8 @@ export function App() {
           <Route
             path="/vehicle"
             element={
-              <Lazy label="خودرو">
-                <VehiclePage />
+              <Lazy label="بازار خودرو">
+                <CarMarketPage />
               </Lazy>
             }
           />
