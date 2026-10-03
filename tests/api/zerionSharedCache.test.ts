@@ -40,3 +40,9 @@ it('reserves distinct time slots across cold server instances and rejects an ove
  expect(await second.reserveProviderSlot(key,now,now+2000)).toBe(now+550);
  expect(await second.reserveProviderSlot(key,now,now+1000)).toBeNull();
 });
+it('a signed activity invalidation bypasses a warm transaction response and reaches another instance',async()=>{
+ const address='0x'+'fd'.repeat(20);const fetcher=vi.fn(async()=>new Response(JSON.stringify({data:[]})));vi.stubGlobal('fetch',fetcher);
+ const first=await import('../../api/_zerion');await first.getTransactions(address);const cache=await import('../../api/_providerCache');
+ await cache.writeProviderCache(cache.providerCacheKey('activity:'+address),{at:Date.now()+1},86400000);
+ vi.resetModules();await (await import('../../api/_zerion')).getTransactions(address);expect(fetcher).toHaveBeenCalledTimes(2);
+});
