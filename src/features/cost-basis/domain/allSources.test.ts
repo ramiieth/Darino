@@ -65,3 +65,16 @@ describe('cached and source-local purchase cost confirmation',()=>{
   expect(allSourceCostSummary(portfolio(),book,[],{data:boros,stale:false}).rows.find(r=>r.provider==='boros')).toMatchObject({basis:1625,pnl:null,status:'confirmation',ready:false});
  });
 });
+
+it('separates cached numeric estimates from live PnL and updates the estimate with fresh prices',()=>{
+ const p=portfolio();const asset=allSourceCostSummary(p,undefined,[],{data:boros,stale:false}).rows[0].asset;
+ const book=reconcileBasis(undefined,asset,'.65','1625',now);
+ p.wallets[0].stale=true;
+ expect(allSourceCostSummary(p,book,[],{data:boros,stale:false}).rows[0]).toMatchObject({pnl:null,estimatedPnl:325});
+ p.wallets[0].stale=false;p.wallets[0].state!.historyLoaded=false;p.wallets[0].state!.data!.fetchedAt=now+1000;p.wallets[0].state!.data!.positions[0].value=2000;
+ expect(allSourceCostSummary(p,book,[],{data:boros,stale:false}).rows[0]).toMatchObject({pnl:null,estimatedPnl:375});
+ const pending=reconcileBasis(book,asset,'.65','1625',now,true);
+ expect(allSourceCostSummary(p,pending,[],{data:null,stale:false}).rows[0]).toMatchObject({pnl:null,estimatedPnl:null});
+ p.wallets[0].state!.data!.positions[0].quantity='1';
+ expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0].estimatedPnl).toBeNull();
+});
