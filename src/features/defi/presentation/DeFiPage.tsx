@@ -1,6 +1,6 @@
 /**
  * DeFi — capital flow, market overview, stablecoins.
- * Panels stay mounted (state kept) and are hidden with `inert` when inactive.
+ * Only the selected panel mounts, avoiding hidden provider requests.
  * Boros is the active yield module.
  */
 import { useEffect, useState } from 'react';
@@ -13,7 +13,7 @@ import { OverviewPanel } from './OverviewPanel';
 import { StablecoinsCG } from './StablecoinsCG';
 import { TvlFlowDashboard } from './TvlFlowDashboard';
 import { useUiStore } from '@/shared/store/uiStore';
-import { cn } from '@/shared/lib/cn';
+
 
 type DeFiTab = 'flow' | 'overview' | 'stablecoins';
 
@@ -35,11 +35,6 @@ export function DeFiPage() {
     }
   }, [pendingDefi, clearDefi]);
 
-  const panel = (id: DeFiTab) => ({
-    className: cn(tab !== id && 'hidden'),
-    'aria-hidden': tab !== id,
-    inert: tab !== id ? ('' as const) : undefined
-  });
 
   return (
     <Page>
@@ -51,20 +46,14 @@ export function DeFiPage() {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'flow', label: 'جریان سرمایه' },
+            { value: 'flow', label: 'شبکه‌ها و پروتکل‌ها' },
             { value: 'overview', label: 'نمای کلی بازار' },
             { value: 'stablecoins', label: 'استیبل‌کوین‌ها' }
           ]}
         />
-        <div {...panel('flow')}>
-          <TvlFlowDashboard />
-        </div>
-        <div {...panel('overview')}>
-          <OverviewPanel />
-        </div>
-        <div {...panel('stablecoins')}>
-          <StablecoinsCG />
-        </div>
+        {tab==='flow'&&<TvlFlowDashboard />}
+        {tab==='overview'&&<OverviewPanel />}
+        {tab==='stablecoins'&&<StablecoinsCG />}
       </div>
 
       <Section id="yield-products" title="محصولات بازدهی">

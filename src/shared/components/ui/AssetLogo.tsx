@@ -91,6 +91,7 @@ export function AssetLogo({
   size?: number;
   className?: string;
 }) {
+  size = Math.round(size * 0.92);
   // فقط لوگو از logoStore (سبک — بدون sync قیمت توکنایز در لود عمومی)
   const logos = useLogoStore((s) => s.bySymbol);
   const top250 = useLogoStore((s) => s.top250);

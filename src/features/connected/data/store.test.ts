@@ -27,3 +27,10 @@ it('hydrates every cached wallet even when the first wallet exhausts the shared 
  const second='0x'+'ee'.repeat(20);const snapshot={address,fetchedAt:Date.now()-1000000,total:100,positions:[],chains:[],complete:true,unpriced:0,change:null};await saveWalletSnapshot(snapshot);await saveWalletSnapshot({...snapshot,address:second,total:200});
  vi.mocked(fetchJson).mockRejectedValue(new HttpError(429,'سهمیهٔ روزانه تمام شده',3600));await refreshWallet(address);await refreshWallet(second);expect(fetchJson).toHaveBeenCalledTimes(1);expect(useConnectedStore.getState().wallets[second].data?.total).toBe(200);expect(useConnectedStore.getState().wallets[second].data?.stale).toBe(true);
 });
+it('resumes successfully after Retry-After and clears the wallet failure',async()=>{
+ vi.useFakeTimers();const now=Date.now();vi.setSystemTime(now);
+ vi.mocked(fetchJson).mockRejectedValueOnce(new HttpError(429,'سهمیهٔ روزانه تمام شده',120));await refreshWallet(address,true);
+ await refreshWallet(address,true);expect(fetchJson).toHaveBeenCalledTimes(1);
+ vi.setSystemTime(now+121000);vi.mocked(fetchJson).mockResolvedValue({address,fetchedAt:Date.now(),total:12,positions:[],chains:[],complete:true,unpriced:0,change:null});
+ await refreshWallet(address,true);expect(fetchJson).toHaveBeenCalledTimes(2);expect(useConnectedStore.getState().wallets[address].error).toBeNull();expect(useConnectedStore.getState().wallets[address].data?.stale).toBeFalsy();
+});

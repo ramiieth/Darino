@@ -17,3 +17,8 @@ it('stops requests after quota failure, including requests for another wallet',a
  const fetcher=vi.fn(async()=>new Response('{}',{status:429,headers:{'RateLimit-Org-Day-Remaining':'0','RateLimit-Org-Day-Reset':'500'}}));vi.stubGlobal('fetch',fetcher);
  const {getTransactions}=await import('../../api/_zerion');await expect(getTransactions('0x'+'ef'.repeat(20))).rejects.toMatchObject({status:429,retryAfter:500});await expect(getTransactions('0x'+'ed'.repeat(20))).rejects.toMatchObject({status:429});expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it('honors quota exhaustion on a successful final response without discarding that response',async()=>{
+ const fetcher=vi.fn(async()=>new Response(JSON.stringify({data:[]}),{headers:{'RateLimit-Org-Day-Remaining':'0','RateLimit-Org-Day-Reset':'1800'}}));vi.stubGlobal('fetch',fetcher);
+ const {getTransactions}=await import('../../api/_zerion');expect((await getTransactions('0x'+'fa'.repeat(20))).rows).toEqual([]);
+ await expect(getTransactions('0x'+'fb'.repeat(20))).rejects.toMatchObject({status:429});expect(fetcher).toHaveBeenCalledTimes(1);
+});

@@ -5,11 +5,11 @@ import { useState } from 'react';
 import Decimal from 'decimal.js';
 import { Link,useSearchParams } from 'react-router-dom';
 import { TransferReview } from './TransferReview';
-import { refreshTransactions } from '../data/store';
+import { zerionRetryAt,refreshTransactions } from '../data/store';
 import { RefreshCw,Wallet,Sparkles,ArrowLeft,Layers } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { MoneyValue } from '@/shared/components/ui/FinancialValue';
-import { Badge } from '@/shared/components/ui/Badge';
+
 import { Notice } from '@/shared/components/ui/StateViews';
 import { Button,buttonClass } from '@/shared/components/ui/Button';
 import { PositionsList } from './PositionsList';
@@ -40,13 +40,13 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
  for(const position of snapshot.positions){const id=position.type==='wallet'?'wallet':position.protocol??position.type;platformGroups.set(id,[...(platformGroups.get(id)??[]),position]);}
  return <><Surface variant="focal" className="native-portfolio-hero overflow-hidden p-5 md:p-7">
  <div className="flex flex-wrap items-start justify-between gap-4">
- <div className="flex min-w-0 max-w-full items-center gap-3 md:gap-5"><span className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent sm:flex"><Layers className="h-8 w-8" aria-hidden/></span><div className="min-w-0"><p className="text-sm text-muted">ارزش دارایی‌های متصل</p><AssetValue value={p.total} stale={p.stale} inline className="mt-2" primaryClassName="text-3xl font-bold md:text-5xl"/><div className="mt-2 flex flex-wrap gap-2">{p.partial&&<Badge tone="warn">مجموع ناقص</Badge>}{p.stale&&<Badge tone="warn">دادهٔ قدیمی</Badge>}</div></div></div>
+ <div className="flex min-w-0 max-w-full items-center gap-3 md:gap-5"><span className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent sm:flex"><Layers className="h-8 w-8" aria-hidden/></span><div className="min-w-0"><p className="text-sm text-muted">ارزش دارایی‌های متصل</p><AssetValue value={p.total} stale={p.stale} inline className="mt-2" primaryClassName="text-3xl font-bold md:text-5xl"/></div></div>
  <Button variant="ghost" size="sm" aria-label="به‌روزرسانی پرتفولیو" icon={<RefreshCw/>} loading={p.loading} onClick={()=>void p.refresh()}>به‌روزرسانی</Button>
  </div>
  <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-4"><div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted"><span className="inline-flex flex-wrap items-baseline gap-2">کیف پول‌ها<MoneyValue value={walletValue}/></span>{realArcus.length>0&&<span className="inline-flex flex-wrap items-baseline gap-2">پرپچوال آرکوس<MoneyValue value={arcusValue}/></span>}</div><nav aria-label="دسترسی‌های پرتفولیو" className="flex flex-wrap gap-2"><Link to="/wallets" className={buttonClass('outline','sm')}><Wallet/>مدیریت کیف پول‌ها</Link><Link to="/assistant" className={buttonClass('outline','sm')}><Sparkles/>دستیار</Link><Link to="/accounting" className={buttonClass('ghost','sm')}>خرید و سود و زیان</Link></nav></div>
  </Surface>
- {walletError&&<p role="status" className="text-xs leading-6 text-warn">{walletError}</p>}
- {p.partial&&<Notice tone="warn">برخی منابع یا جزئیات دریافت نشده‌اند.</Notice>}{!p.wallets.length&&!p.arcus.length&&<Notice>یک کیف پول یا حساب آرکوس اضافه کنید.</Notice>}
+ {(p.stale||p.partial||walletError)&&<details className="rounded-xl border border-divider bg-card px-4 py-3 text-xs"><summary className="cursor-pointer text-muted">{p.total===null?'در انتظار دریافت موجودی':p.partial?'برخی موجودی‌ها هنوز دریافت نشده‌اند':'وضعیت همگام‌سازی'}</summary><div className="mt-3 space-y-2 leading-6" role="status">{walletError&&<p className="text-warn">{walletError}</p>}{zerionRetryAt()&&<p>تلاش بعدی: {new Date(zerionRetryAt()!).toLocaleString('fa-IR')}</p>}{p.wallets.map(w=><p key={w.holding.id}>{w.holding.label} · {w.state?.data?`آخرین دریافت: ${new Date(w.state.data.fetchedAt).toLocaleString('fa-IR')}`:'موجودی هنوز دریافت نشده است'}</p>)}{p.partial&&<p>مجموع فقط شامل موجودی‌های دریافت‌شده و قیمت‌گذاری‌شده است.</p>}</div></details>}{!p.wallets.length&&!p.arcus.length&&<Notice>یک کیف پول یا حساب آرکوس اضافه کنید.</Notice>}
+
  <section aria-label="پرتفولیو" id="portfolio-assets" className="min-w-0 space-y-5">
  <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-divider pb-3"><div role="tablist" aria-label="نمای پرتفولیو" className="flex gap-5">{([['assets','دارایی‌ها'],['activity','تراکنش‌ها']] as const).map(([id,label])=><button key={id} type="button" role="tab" id={`portfolio-tab-${id}`} aria-selected={tab===id} aria-controls={`portfolio-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?'assets':e.key==='End'?'activity':tab==='assets'?'activity':'assets';setTab(next);document.getElementById('portfolio-tab-'+next)?.focus();}}} onClick={()=>setTab(id)} className={`min-h-11 border-b-2 px-1 py-3 text-sm font-semibold ${tab===id?'border-accent text-accent':'border-transparent text-muted'}`}>{label}</button>)}</div><div className="w-full sm:w-56"><NetworkPicker value={network} onChange={setNetwork} chains={chains} ids={networks}/></div></div>
  <div role="tabpanel" id={`portfolio-panel-${tab}`} aria-labelledby={`portfolio-tab-${tab}`}>

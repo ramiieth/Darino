@@ -1,3 +1,4 @@
+import { approvedNetwork } from '@/shared/lib/approvedNetworks';
 /**
  * مدیریت محل‌های نگهداری، شبکه‌ها و توکن‌های واردشده توسط کاربر
  *  • فقط آدرس عمومی — هیچ کلید خصوصی، Seed Phrase یا API Signing Key درخواست/ذخیره نمی‌شود.
@@ -416,11 +417,11 @@ function TokenForm({ open, onClose, d }: { open: boolean; onClose: () => void; d
             label="شبکه"
             value={networkId}
             onChange={(v) => setNetworkId(v ?? '')}
-            options={d.networks.map((n) => ({
+            options={d.networks.filter(n=>approvedNetwork(n.id)).map((n) => ({
               value: n.id,
-              label: n.name,
+              label: approvedNetwork(n.id)?.name??n.name,
               keywords: `${n.nameEn ?? ''} ${n.chainId ?? ''}`,
-              icon: <LogoImage src={n.logo} label={n.name} size={28} square />,
+              icon: <LogoImage src={approvedNetwork(n.id)?.logo??n.logo} label={approvedNetwork(n.id)?.name??n.name} size={28} square />,
               badge: n.origin === 'user' ? <Badge tone="warn">واردشده توسط شما</Badge> : undefined
             }))}
           />
@@ -535,7 +536,7 @@ export function HoldingsManager({ d }: { d: CustodyData }) {
           {d.networks.map((n) => (
             <li key={n.id}>
               <Surface className="flex items-center gap-3 p-3">
-                <LogoImage src={n.logo} label={n.name} size={28} square />
+                <LogoImage src={approvedNetwork(n.id)?.logo??n.logo} label={approvedNetwork(n.id)?.name??n.name} size={28} square />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-ink">{n.name}</p>
                   <p className="text-xs text-muted">

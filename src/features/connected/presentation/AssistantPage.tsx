@@ -36,7 +36,7 @@ export default function AssistantPage() {
     if(positions.length>300 || sources.length>50 || arcus.length>20 || arcus.some(a => a.positions.length>100)) {setError('پرتفولیو برای یک درخواست تحلیل بزرگ است؛ تعداد منابع را کاهش دهید. هیچ داده‌ای ارسال نشد.');setBusy(false);return;}
     try {
       await savePref('ai-profile',profile);
-      const answer = await fetchJson<{answer:string;generatedAt:number}>('/api/integrations?op=analyze',{method:'POST',body:{question:text.trim(),history:messages.slice(-8).map(m => ({role:m.role,text:m.text.slice(0,14000)})),context:{total:p.total,partial:p.partial,sources,positions,arcus,profile}},timeoutMs:55000});
+      const answer = await fetchJson<{answer:string;generatedAt:number}>('/api/integrations?op=analyze',{method:'POST',body:{question:text.trim(),history:messages.slice(-8).map(m => ({role:m.role,text:m.text.slice(0,14000)})),context:{total:p.total,partial:p.partial||p.arcus.some(s=>s.holding.arcus!.env==='mainnet'&&(!s.state?.positions.fetchedAt||!!s.state.positions.error)),sources,positions,arcus,profile}},timeoutMs:55000});
       setMessages(m => [...m,{role:'user',text:text.trim(),at:Date.now()},{role:'assistant',text:answer.answer,at:answer.generatedAt}]);setQuestion('');
     } catch(e) {setError(providerError(e));} finally {setBusy(false);}
   }

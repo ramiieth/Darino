@@ -22,7 +22,7 @@ export function WalletBalanceChart({portfolio,network}:{portfolio:ConnectedPortf
  const ids=[...new Set(tokens.map(p=>p.tokenId).filter(Boolean))].sort();
  const supported=ids.length>0&&ids.length<=25&&tokens.every(p=>p.tokenId);
  const key=wallet&&supported?wallet.holding.address+'|'+period+'|'+network+'|'+ids.join(','):'';
- useEffect(()=>{let stopped=false;setError(null);setData(null);setBusy(false);if(!key)return;const hit=memory.get(key);if(hit&&Date.now()-hit.fetchedAt<900000){setData(hit);return;}
+ useEffect(()=>{let stopped=false;setError(null);setData(null);setBusy(false);if(!key)return;const hit=memory.get(key);if(hit&&Date.now()-hit.fetchedAt<1800000){setData(hit);return;}
  setBusy(true);void fetchJson<WalletChart>('/api/integrations?op=chart&address='+encodeURIComponent(wallet!.holding.address!)+'&period='+period+'&ids='+encodeURIComponent(ids.join(','))+(network==='all'?'':'&chain='+encodeURIComponent(network))).then(value=>{if(!stopped){if(memory.size>=100)memory.delete(memory.keys().next().value!);memory.set(key,value);setData(value);}}).catch(e=>{if(!stopped)setError(providerError(e));}).finally(()=>{if(!stopped)setBusy(false);});return()=>{stopped=true;};
  // The immutable request key owns lifecycle, not response or hook object references.
  // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -11,15 +11,15 @@ export const ACTIVITY_LINKS='activity-links-v1';
 export function useActivity(p:ConnectedPortfolio) {
  useCustodyStore();
  const [proofs,setProofs]=useState<{provider:'lifi'|'relay';sourceHash:string;sourceChain:number;destinationHash:string;destinationChain:number}[]>([]);const checked=useRef(new Map<string,number>());
- const key=[...p.wallets.map(w=>w.holding.address),...p.arcus.filter(a=>a.holding.arcus?.env==='mainnet').map(a=>a.holding.id)].join('|');
+ const key=[...p.wallets.map(w=>w.holding.address+':'+Boolean(w.state?.data&&!w.state.loading)),...p.arcus.filter(a=>a.holding.arcus?.env==='mainnet').map(a=>a.holding.id)].join('|');
  useEffect(()=>{
   let stopped=false;
   async function refresh(){
    if(stopped||document.visibilityState!=='visible')return;
-   for(const w of p.wallets) {if(stopped)return;await refreshTransactions(w.holding.address!);}
+   for(const w of p.wallets) {if(stopped)return;if(!w.state?.data||w.state.loading)continue;await refreshTransactions(w.holding.address!);}
    for(const a of p.arcus) {if(stopped)return;if(a.holding.arcus?.env==='mainnet')await loadHistory(a.holding.arcus,'transfers',{fromUs:null,key:'all'},true);}
   }
-  void refresh();const timer=setInterval(()=>void refresh(),300000);
+  void refresh();const timer=setInterval(()=>void refresh(),900000);
   const visible=()=>void refresh();document.addEventListener('visibilitychange',visible);
   return()=>{stopped=true;clearInterval(timer);document.removeEventListener('visibilitychange',visible);};
  // Sources, not response objects, own the polling lifecycle.

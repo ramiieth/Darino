@@ -1,3 +1,5 @@
+import { stopped } from '@/features/connected/domain/directory/model';
+import { retiredProtocols,identityKey } from '@/features/connected/domain/directory/names';
 /**
  * TVL Flow — سرویس DefiLlama (فقط API رسمی)
  *  - /v2/chains : لیست همه زنجیره‌ها + TVL فعلی (یک درخواست)
@@ -78,7 +80,7 @@ export interface ProtocolCompact {
 
 /** همه پروتکل‌ها (کش ۱ ساعت — فشرده برای کاهش حجم) */
 export async function fetchAllProtocols(): Promise<ProtocolCompact[]> {
-  const ck = 'tvl:protocols';
+  const ck = 'tvl:protocols:v2';
   try {
     const rec = await cacheBulkGetPrice([ck]);
     const r = rec.get(ck);
@@ -90,6 +92,7 @@ export async function fetchAllProtocols(): Promise<ProtocolCompact[]> {
     {
       name: string;
       slug: string;
+      deadFrom?:number; disabled?:boolean; deprecated?:boolean; status?:string;
       tvl?: number;
       change_1d?: number | null;
       change_7d?: number | null;
@@ -98,7 +101,7 @@ export async function fetchAllProtocols(): Promise<ProtocolCompact[]> {
       logo?: string;
     }[]
   >(`${LLAMA}/protocols`, { retries: 1, timeoutMs: 25_000 });
-  const out: ProtocolCompact[] = data.map((p) => ({
+  const out: ProtocolCompact[] = data.filter(p=>!stopped(p)&&!retiredProtocols.has(identityKey(p.slug))&&!retiredProtocols.has(identityKey(p.name))).map((p) => ({
     n: p.name,
     s: p.slug,
     t: p.tvl ?? 0,
