@@ -1,4 +1,6 @@
 import { EntryRecommendations } from './EntryRecommendations';
+import type { PreviewDraft } from '../domain/workflow';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
 import type { EntrySelection } from './VerifiedOpportunities';
 /**
  * Boros intelligence — funding-rate (yield) markets, analysis only
@@ -15,33 +17,21 @@ import { ErrorState, Notice } from '@/shared/components/ui/StateViews';
 import { FreshnessBar } from '@/shared/components/ui/FreshnessBar';
 import { useBoros, loadBoros, resetBorosLoad, retryBorosSoon } from '@/features/boros/data/useBoros';
 import { toFaDigits } from '@/shared/utils/formatters';
-import { OpportunitiesTab } from './OpportunitiesTab';
-import { ComparisonTab } from './ComparisonTab';
 import { SimulatorTab } from './SimulatorTab';
-import { RiskMonitorTab } from './RiskMonitorTab';
 import { AccountTab } from './AccountTab';
 import { BorosGuide } from './BorosGuide';
 import type { BorosDirection } from '../domain/types';
-import { AuditTab } from './AuditTab';
 
-type Tab = 'entry' | 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit' | 'guide';
-
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'sim', label: 'پیش‌نمایش' },
-  { value: 'entry', label: 'پیشنهاد ورود' },
-  { value: 'account', label: 'حساب من' },
-  { value: 'opp', label: 'بازارها و فرصت‌ها' },
-  { value: 'compare', label: 'مقایسه بازارها' },
-  { value: 'risk', label: 'مانیتور ریسک' },
-  { value:'guide',label:'راهنما' },
-  { value: 'audit', label: 'بررسی محاسبات' }
-];
+type Tab='opp'|'sim'|'account';
+const TABS:{value:Tab;label:string}[]=[{value:'opp',label:'بازارها'},{value:'sim',label:'پیش‌نمایش ورود'},{value:'account',label:'حساب من'}];
 
 export default function BorosDashboard() {
   const { markets, loading, error, stale, syncProgress, loadedAt } = useBoros();
-  const [tab, setTab] = useState<Tab>('sim');
-  const [target,setTarget]=useState<{marketId:number;direction:BorosDirection;entry?:EntrySelection}|undefined>();
-  const inspect=(marketId:number,direction:BorosDirection='long')=>{setTarget({marketId,direction});setTab('sim');};
+  const [tab, changeTab] = useState<Tab>('opp');
+  const [visited,setVisited]=useState({opp:true,sim:false,account:false});
+  const setTab=(v:Tab)=>{setVisited(s=>({...s,[v]:true}));changeTab(v);};
+  const [target,setTarget]=useState<{marketId:number;direction:BorosDirection;entry?:EntrySelection;draft?:PreviewDraft}|undefined>();
+  const inspect=(marketId:number,direction:BorosDirection='long',draft?:PreviewDraft)=>{setTarget({marketId,direction,draft});setTab('sim');};
 
   // automatic retry after an error (temporary rate limit — no user action needed)
   useEffect(() => {
@@ -115,16 +105,12 @@ export default function BorosDashboard() {
 
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
-        {tab === 'account' && <AccountTab markets={markets} />}
-        {tab !== 'account' && tab !== 'guide' && loading && markets.length === 0 && <PageSkeleton />}
-        {tab !== 'account' && tab !== 'guide' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
-        {tab === 'entry' && <EntryRecommendations markets={activeMarkets} onAccount={()=>setTab('account')} onSelect={entry=>{setTarget({marketId:entry.marketId,direction:entry.direction,entry});setTab('sim');}}/>}
-        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} onInspect={inspect} onRecommend={()=>setTab('entry')} />}
-        {tab === 'compare' && <ComparisonTab markets={activeMarkets} onInspect={inspect} />}
-        {tab === 'sim' && <SimulatorTab key={target?.marketId+':'+target?.direction} markets={activeMarkets} initial={target} />}
-        {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
-        {tab === 'guide' && <BorosGuide />}
-        {tab === 'audit' && <AuditTab markets={activeMarkets} />}
+        {tab !== 'account' && loading && markets.length === 0 && <PageSkeleton />}
+        {tab !== 'account' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
+        <section hidden={tab!=='opp'} aria-label="بخش بازارها"><EntryRecommendations markets={activeMarkets} active={tab==='opp'} onAccount={()=>setTab('account')} onInspect={inspect} onSelect={entry=>{setTarget({marketId:entry.marketId,direction:entry.direction,entry});setTab('sim');}}/></section>
+        {visited.sim&&<section hidden={tab!=='sim'} aria-label="بخش پیش‌نمایش"><SimulatorTab markets={activeMarkets} initial={target} active={tab==='sim'} onMarkets={()=>setTab('opp')}/></section>}
+        {visited.account&&<section hidden={tab!=='account'} aria-label="بخش حساب من"><AccountTab markets={markets} active={tab==='account'}/></section>}
+        <Disclosure summary="راهنمای بوروس"><BorosGuide/></Disclosure>
       </div>
     </div>
     </Page>

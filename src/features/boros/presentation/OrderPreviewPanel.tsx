@@ -1,10 +1,12 @@
+import { useBorosPlan } from './useBorosPlan';
+import type { PreviewDraft } from '../domain/workflow';
 import { quoteUsable } from '../domain/quoteValidity';
 import { MarginCalculator } from '../domain/engine/margin';
 import { FeeCalculator } from '../domain/engine/fees';
-import { entryCandidates, previewBudgetRemaining } from '../domain/recommendations';
+import { previewBudgetRemaining } from '../domain/recommendations';
 import { useBorosAccount,refreshBorosAccount,accountIsStale } from '../data/useBorosAccount';
-import { accountBudget,sameCollateralMarkets,type CapitalMode } from '../domain/accountBudget';
-import { VerifiedOpportunities,type EntrySelection } from './VerifiedOpportunities';
+import { accountBudget,type CapitalMode } from '../domain/accountBudget';
+import { type EntrySelection } from './VerifiedOpportunities';
 import type { OfficialPreview } from '@/shared/boros/account';
 import { OfficialPreviewPanel } from './OfficialPreviewPanel';
 import { usePublishInsight } from '@/shared/assistant/insights';
@@ -26,20 +28,20 @@ import type { BorosDirection, BorosMarket } from '../domain/types';
 const optionalNumber = (s: string) => /^\d+(?:\.\d*)?$|^\.\d+$/.test(s) ? Number(s) : null;
 const STATE_FA = { unavailable: 'داده تازه یا بازار فعال در دسترس نیست', incomplete: 'هزینه‌ها را تکمیل کنید', underfunded: 'سرمایه کافی نیست', negative: 'سود پایه مثبت نیست', positive: 'سناریوهای بررسی‌شده مثبت‌اند', conditional: 'فرصت مشروط' };
 
-export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket, initial,entry }: {
+export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket, initial,entry,draft,active=true,onMarkets }: {
   market: BorosMarket; direction: BorosDirection; fixedRate: number | null; underlyingApr: number; collateralPriceUsd: number;
-  entry?:EntrySelection;
+  entry?:EntrySelection;draft?:PreviewDraft;active?:boolean;onMarkets?:()=>void;
   initial?: { sizeYu: number; capitalUsd: number; feesUsd: number; gasUsd: number; slippageUsd: number };
   markets?: BorosMarket[];
   onSelectMarket?: (marketId: number, direction: BorosDirection,entry?:EntrySelection) => void;
 }) {
   const account=useBorosAccount();
-  const [mode,setMode]=useState<CapitalMode>(!initial&&account.root?'real':'hypothetical');const [marginMode,setMarginMode]=useState(entry?.marginMode??'cross');const [risk,setRisk]=useState('10');
-  const modeChosen=useRef(!!initial);
-  useEffect(()=>{if(account.root&&!modeChosen.current)setMode('real');},[account.root]);
+  const plan=useBorosPlan();const mode=plan.mode;const setMode=(v:CapitalMode)=>plan.update({mode:v});
+  const [marginMode,setMarginMode]=useState(entry?.marginMode??'cross');const risk=plan.risk;const setRisk=(v:string)=>plan.update({risk:v});
+  useEffect(()=>{if(active&&market.tokenId!==undefined)plan.update({selected:String(market.tokenId)});},[active,market.tokenId]);
   const budget=accountBudget(account.data,accountIsStale(account),market,marginMode);
-  useEffect(()=>{if(mode!=='real')return;const refresh=()=>{if(document.visibilityState==='visible')void refreshBorosAccount();};refresh();const t=setInterval(refresh,30000);return()=>clearInterval(t);},[mode]);
-  const [notional, setNotional] = useState(entry?String(entry.sizeYu):initial ? String(initial.sizeYu) : '2');
+  useEffect(()=>{if(mode!=='real'||!active)return;const refresh=()=>{if(document.visibilityState==='visible')void refreshBorosAccount();};refresh();const t=setInterval(refresh,30000);return()=>clearInterval(t);},[mode,active]);
+  const [notional, setNotional] = useState(entry?String(entry.sizeYu):draft?String(draft.sizeYu):initial ? String(initial.sizeYu) : '2');
   const [quote,setQuote]=useState<OfficialPreview|null>(entry?.quote??null);
   const quoteScope=useRef(entry?entry.identity+':'+entry.marginMode:'');
   const [now,setNow]=useState(Date.now());
@@ -48,14 +50,15 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const effectiveRate=quoted?.matchedApr??fixedRate;
   const officialMarginUsd=quoted?.margin!=null&&budget.currentMargin!==null&&budget.price!==null?Math.max(0,quoted.margin-budget.currentMargin)*budget.price:null;
 
-  const [collateral, setCollateral] = useState(initial ? String(initial.capitalUsd) : '');
-  const [capitalUnit, setCapitalUnit] = useState(initial ? 'usd' : 'asset');
-  const [gas, setGas] = useState(entry?String(entry.costs.gasUsd??''):initial ? String(initial.gasUsd) : '');
-  const [slippage, setSlippage] = useState(entry?String(entry.costs.slippageUsd??''):initial ? String(initial.slippageUsd) : '');
+  const collateral=plan.capital;const setCollateral=(v:string)=>plan.update({capital:v});
+  const capitalUnit=plan.capitalUnit;const setCapitalUnit=(v:string)=>plan.update({capitalUnit:v as 'usd'|'asset'});
+  const gas=plan.gas;const setGas=(v:string)=>plan.update({gas:v});
+  const [slippage, setSlippage] = useState(entry?String(entry.costs.slippageUsd??''):draft?String(draft.costs.slippageUsd??''):initial ? String(initial.slippageUsd) : '0');
   const extraFeeForEntry=(e:EntrySelection)=>e.extraEntranceUsd??(e.costs.feesUsd===null?'':Math.max(0,e.costs.feesUsd-FeeCalculator.calc({m:market,size:e.sizeYu,unitPriceUsd:collateralPriceUsd,nowSec:Math.floor(e.quote.fetchedAt/1000)}).total));
-  const [fees, setFees] = useState(entry?String(extraFeeForEntry(entry)):initial ? String(Math.max(0,initial.feesUsd-FeeCalculator.calc({m:market,size:initial.sizeYu,unitPriceUsd:collateralPriceUsd,nowSec:Math.floor(Date.now()/1000)}).total)) : '');
+  const fees=plan.entrance;const setFees=(v:string)=>plan.update({entrance:v});
+  useEffect(()=>{if(draft){setMode(draft.mode);setNotional(String(draft.sizeYu));setGas(String(draft.costs.gasUsd??''));setFees(String(draft.costs.feesUsd??''));if(draft.mode==='hypothetical'){setCapitalUnit('usd');setCollateral(String(draft.capitalUsd));}}else if(initial){setMode('hypothetical');setCapitalUnit('usd');setCollateral(String(initial.capitalUsd));setGas(String(initial.gasUsd));setFees(String(Math.max(0,initial.feesUsd-FeeCalculator.calc({m:market,size:initial.sizeYu,unitPriceUsd:collateralPriceUsd,nowSec:Math.floor(Date.now()/1000)}).total)));}},[draft,initial]);
   const [margin, setMargin] = useState('');
-  const [allocation, setAllocation] = useState('50');
+  const allocation=plan.allocation;const setAllocation=(v:string)=>plan.update({allocation:v});
   const [floating, setFloating] = useState('');
   useEffect(()=>{if(!entry)return;setMode('real');setMarginMode(entry.marginMode);setNotional(String(entry.sizeYu));quoteScope.current=entry.identity+':'+entry.marginMode;setQuote(entry.quote);setGas(String(entry.costs.gasUsd??''));setFees(String(extraFeeForEntry(entry)));setSlippage(String(entry.costs.slippageUsd??''));},[entry]);
   const collateralName = assetDisplayName(market.collateralSymbol ?? market.asset).name;
@@ -76,8 +79,6 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const analysis = useMemo(() => analyzeEntry({ m: market, direction, sizeYu: optionalNumber(notional) ?? 0, capitalUsd, entryRate: effectiveRate ?? market.markApr, floatingRate: assumedFloating, ...costInputs, nowSec:Math.floor(now/1000), marginUsd: mode==='real'||margin === '' ? null : optionalNumber(margin) ?? NaN }), [market, direction, notional, capitalUsd, effectiveRate, assumedFloating, gas, fees, slippage, margin, mode,now]);
   const officialRemaining=officialMarginUsd!==null&&completeCosts&&analysis?previewBudgetRemaining(capitalUsd,officialMarginUsd,costsSum,analysis.preview.expectedMtm):null;
   usePublishInsight('borosEntry', `${mode==='real'?'بودجهٔ واقعی':'سرمایهٔ فرضی'} · ${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { realAccountBudget:Number(mode==='real'), marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: effectiveRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: officialMarginUsd??analysis.margin, feesUsd: costInputs.feesUsd, quoteVerified:Number(!!quoted), liquidationApr:quoted?.liquidationApr??null, payApr:direction==='long'?(effectiveRate??market.markApr):assumedFloating, receiveApr:direction==='long'?assumedFloating:(effectiveRate??market.markApr), gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: officialRemaining??analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready',mode==='real'?account.data?.syncedAt??undefined:undefined,mode==='real'?budget.scope:undefined);
-  const extraCosts={...costInputs,feesUsd:additionalFee};
-  const candidates = useMemo(() => entryCandidates(sameCollateralMarkets(markets,market,mode).filter(m=>marginMode==='cross'||mode==='hypothetical'||m.marketId===market.marketId),market.tokenId??-1,capitalUsd,optionalNumber(allocation)??0,365,extraCosts,Math.floor(now/1000)),[markets,market,mode,marginMode,capitalUsd,allocation,gas,fees,slippage]);
   const autoSize = () => {
     const pct=optionalNumber(allocation)??0;
     if(pct<=0||pct>100||!completeCosts)return;
@@ -90,7 +91,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const field = (label: string, value: string, setValue: (v: string) => void, suffix: string, placeholder?: string) => <Field label={label}><Input dir="ltr" inputMode="decimal" value={value} onChange={e => setValue(normalizeDecimalInput(e.target.value))} suffix={suffix} placeholder={placeholder} /></Field>;
 
   return <div className="space-y-4">
-    <Surface className="p-3 space-y-3"><div className="grid grid-cols-2 gap-2" role="group" aria-label="مبنای سرمایه بوروس"><Button size="sm" variant={mode==='real'?'primary':'outline'} onClick={()=>{modeChosen.current=true;setMode('real');setQuote(null);setMargin('');}}>حساب واقعی</Button><Button size="sm" variant={mode==='hypothetical'?'primary':'outline'} onClick={()=>{modeChosen.current=true;setMode('hypothetical');setQuote(null);setMargin('');}}>سناریوی فرضی</Button></div>{mode==='real'?<div className="space-y-2"><div className="flex flex-wrap justify-between gap-2 text-sm"><span>موجودی آزاد برای معامله <span dir="ltr" className="text-xs text-muted">Available to Trade</span></span><div className="flex flex-col items-end gap-1"><QuantityValue value={budget.freeCollateral} unit={collateralName}/><span className="text-xs text-muted"><MoneyValue value={budget.budgetUsd}/></span></div></div><Button size="sm" variant="ghost" onClick={()=>void refreshBorosAccount(true)} disabled={account.loading}>تازه‌سازی حساب</Button>{!budget.available&&<Notice tone="warn">حساب را متصل یا تازه‌سازی کنید؛ بودجهٔ فرضی جایگزین موجودی واقعی نمی‌شود.</Notice>}<p className="text-xs text-muted">بودجه با برداشت و تغییر حساب به‌روز می‌شود؛ سود آینده برآورد است.</p></div>:<p className="text-xs text-muted">سرمایهٔ دستی مستقل از موجودی بوروس؛ برداشت، این سناریو را تغییر نمی‌دهد.</p>}</Surface>
+    <Surface className="p-3 space-y-3"><div className="grid grid-cols-2 gap-2" role="group" aria-label="مبنای سرمایه بوروس"><Button size="sm" variant={mode==='real'?'primary':'outline'} onClick={()=>{setMode('real');setQuote(null);setMargin('');}}>حساب واقعی</Button><Button size="sm" variant={mode==='hypothetical'?'primary':'outline'} onClick={()=>{setMode('hypothetical');setQuote(null);setMargin('');}}>سناریوی فرضی</Button></div>{mode==='real'?<div className="space-y-2"><div className="flex flex-wrap justify-between gap-2 text-sm"><span>موجودی آزاد برای معامله <span dir="ltr" className="text-xs text-muted">Available to Trade</span></span><div className="flex flex-col items-end gap-1"><QuantityValue value={budget.freeCollateral} unit={collateralName}/><span className="text-xs text-muted"><MoneyValue value={budget.budgetUsd}/></span></div></div><Button size="sm" variant="ghost" onClick={()=>void refreshBorosAccount(true)} disabled={account.loading}>تازه‌سازی حساب</Button>{!budget.available&&<Notice tone="warn">حساب را متصل یا تازه‌سازی کنید؛ بودجهٔ فرضی جایگزین موجودی واقعی نمی‌شود.</Notice>}<p className="text-xs text-muted">بودجه با برداشت و تغییر حساب به‌روز می‌شود؛ سود آینده برآورد است.</p></div>:<p className="text-xs text-muted">سرمایهٔ دستی مستقل از موجودی بوروس؛ برداشت، این سناریو را تغییر نمی‌دهد.</p>}</Surface>
     <Surface className="p-4 md:p-5 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         {field('حجم واحد بازده', notional, setNotional, '')}
@@ -119,6 +120,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
     {quote&&!quoted&&<Notice tone="stale">پیش‌نمایش قبلی اعتبار ندارد؛ پس از تغییر موجودی، حجم یا گذشت یک دقیقه قیمت را تازه‌سازی کنید.</Notice>}
     {quoted&&<p className="text-xs text-muted px-1">نرخ اجرای رسمی در محاسبه استفاده شد؛ این پیش‌نمایش معاملهٔ بازشده نیست.</p>}
 
+    {completeCosts&&(officialRemaining!==null?officialRemaining<0:analysis?.state==='underfunded')&&<Notice tone="warn">بودجه پس از مارجین و هزینه‌ها کافی نیست؛ حجم یا هزینه‌ها را بازبینی کنید.</Notice>}
     {mode==='hypothetical'&&analysis&&<Surface className="p-4 space-y-4"><h3 className="text-sm font-bold">پیش‌نمایش فرضی · مستقل از حساب</h3><MetricGrid cols={2}><Metric label={direction==='long'?'پرداخت ثابت · Pay Fixed':'پرداخت شناور · Pay Floating'} value={<PercentValue value={(direction==='long'?analysis.preview.fixedApr:assumedFloating)*100} tone="none"/>}/><Metric label={direction==='long'?'دریافت شناور · Receive Floating':'دریافت ثابت · Receive Fixed'} value={<PercentValue value={(direction==='long'?assumedFloating:analysis.preview.fixedApr)*100} tone="none"/>}/><Metric label="حساسیت به تغییر ۱ واحد درصد نرخ" value={<QuantityValue value={analysis.preview.rateSensitivityAsset} unit={collateralName}/>} sub={<MoneyValue value={analysis.preview.rateSensitivityUsd}/>}/><Metric label="نرخ لیکوییدشدن · تخمین تک‌پوزیشن" value={<PercentValue value={analysis.threshold.rate===null?null:analysis.threshold.rate*100} tone="none"/>}/></MetricGrid></Surface>}
     {!analysis ? <EmptyState message={mode==='real'?budget.available?'مارجین آزاد این وثیقه کافی نیست یا حجم معتبر نیست.':'دادهٔ تازهٔ حساب لازم است.':'سرمایه و حجم معتبر وارد کنید.'} /> : <>
       <Surface variant="focal" className="p-4 md:p-5">
@@ -133,8 +135,19 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
           <Metric label="بازده کل سرمایه" value={<PercentValue value={analysis.roiCapital} />} />
         </MetricGrid>
       </Surface>
-      <Disclosure summary="جزئیات محاسبه و سناریوهای تغییر نرخ"><Surface className="px-4 md:px-5"><KeyValueList rows={[
+      <Disclosure summary="این عدد چگونه حساب شد؟"><Surface className="px-4 md:px-5"><KeyValueList rows={[
         { label: 'تسویه تا سررسید (فرض نرخ ثابت)', value: <MoneyValue value={analysis.preview.expectedSettlementPnl} signed tone="auto" /> },
+        { label: 'کارمزد معامله · محاسبه از داده بازار', value: <MoneyValue value={protocolFees.entryFee} /> },
+        { label: 'کارمزد تسویه تا سررسید · تخمینی', value: <MoneyValue value={protocolFees.settlementCost} /> },
+        { label: 'هزینهٔ ورود اضافی · ورودی شما', value: <MoneyValue value={additionalFee} /> },
+        { label: 'گس کل دوره · ورودی شما', value: <MoneyValue value={costInputs.gasUsd} /> },
+        { label: 'هزینهٔ اضافی خارج از نرخ اجرا · ورودی شما', value: <MoneyValue value={costInputs.slippageUsd} /> },
+        { label: 'حجم استفاده‌شده', value: <QuantityValue value={Number(notional)} unit="واحد بازده"/> },
+        { label: 'نرخ پرداخت', value: <PercentValue value={(direction==='long'?(effectiveRate??market.markApr):assumedFloating)*100} tone="none"/> },
+        { label: 'نرخ دریافت', value: <PercentValue value={(direction==='long'?assumedFloating:(effectiveRate??market.markApr))*100} tone="none"/> },
+        { label: 'مدت تا سررسید', value: <QuantityValue value={analysis.preview.daysToMaturity} digits={1} unit="روز"/> },
+        { label: 'منبع نرخ ورود', value: quoted?'پیش‌نمایش رسمی بوروس':'فرض نرخ ورود' },
+        { label: 'زمان دریافت نرخ', value: quoted?.fetchedAt||market.snapshotAt?new Date(quoted?.fetchedAt??market.snapshotAt!).toLocaleString('fa-IR'):'نامشخص' },
         { label: 'کارمزد محاسبه‌شده بدون هزینه ورود به بازار', value: <MoneyValue value={analysis.estimatedFees} /> },
         { label: 'نرخ شناور سربه‌سر', value: <PercentValue value={analysis.breakEvenFloating === null ? null : analysis.breakEvenFloating * 100} signed={false} tone="none" /> },
         { label: 'ارزش روز نسبت به ورود', value: <MoneyValue value={analysis.preview.expectedMtm} signed tone="auto" /> },
@@ -147,18 +160,10 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
       ]} /></Surface>
       <p className="px-1 text-xs leading-6 text-muted">آستانه تحلیلی با کسر هزینه‌های واردشده و وضعیت فعلی محاسبه می‌شود؛ تسویه بعدی، تغییر وثیقه و پوزیشن‌های دیگر لحاظ نشده‌اند. سود دلاری با قیمت فعلی وثیقه است؛ سناریوها بازه اطمینان آماری نیستند. ظرفیت حجم، تأیید اجرای سفارش نیست.</p>
       </Disclosure>
-      {mode==='hypothetical'&&analysis.threshold.state === 'unsafe' && <Notice tone="warn">در فرض فعلی، ارزش پوزیشن از مارجین نگهداری کمتر است.</Notice>}
+      {completeCosts&&(officialRemaining!==null?officialRemaining<0:analysis?.state==='underfunded')&&<Notice tone="warn">بودجه پس از مارجین و هزینه‌ها کافی نیست؛ حجم یا هزینه‌ها را بازبینی کنید.</Notice>}
+    {mode==='hypothetical'&&analysis.threshold.state === 'unsafe' && <Notice tone="warn">در فرض فعلی، ارزش پوزیشن از مارجین نگهداری کمتر است.</Notice>}
     </>}
 
-    <Disclosure summary="بررسی بازارهای دیگر با این سرمایه">{mode==='real'?<VerifiedOpportunities candidates={candidates.filter(c=>c.result.scenarioMin!==null&&c.result.scenarioMin>= -capitalUsd*(optionalNumber(risk)??-1)/100)} market={market} marginMode={marginMode} capitalUsd={capitalUsd} riskPct={optionalNumber(risk)??NaN} costs={extraCosts} modelFees onSelect={selected=>{if(onSelectMarket)onSelectMarket(selected.marketId,selected.direction,selected);else if(selected.marketId===market.marketId&&selected.direction===direction){quoteScope.current=selected.identity+':'+selected.marginMode;setNotional(String(selected.sizeYu));setQuote(selected.quote);}}}/>:<Surface className="p-4 md:p-5">
-      <h3 className="text-sm font-bold">فرصت‌ها با این سرمایه</h3>
-      <p className="mt-1 text-xs text-muted">مقایسه با نرخ مارک و هزینه‌های یکسانِ واردشده؛ پیش از ورود، هزینه هر بازار را جدا بررسی کنید.</p>
-      {candidates.length === 0 ? <p className="py-4 text-sm text-muted">{completeCosts ? 'فرصت مثبت با داده تازه و سرمایه کافی یافت نشد.' : 'سرمایه، تخصیص و هر سه هزینه را وارد کنید؛ صفر باید صریح وارد شود.'}</p> : <div className="mt-3 divide-y divide-divider">
-        {candidates.filter(c=>optionalNumber(risk)!==null&&Number(risk)<=100&&c.result.scenarioMin!==null&&c.result.scenarioMin>= -capitalUsd*Number(risk)/100).slice(0, 5).map(c => <button type="button" key={`${c.m.marketId}-${c.direction}`} onClick={() => { setCapitalUnit('usd'); setCollateral(String(capitalUsd)); setNotional(String(Number(c.sizeYu.toFixed(8)))); setMargin(''); setFloating(''); onSelectMarket?.(c.m.marketId, c.direction); }} className="w-full flex items-center justify-between gap-3 py-3 text-start min-w-0">
-          <div className="min-w-0"><p className="text-sm font-semibold">{borosAssetName(c.m.asset)} · {borosVenueName(c.m.venue)}</p><p className="mt-1 text-xs text-muted">{c.direction === 'long' ? 'لانگ' : 'شورت'} · {new Date(c.m.maturity * 1000).toLocaleDateString('fa-IR')} · {STATE_FA[c.result.state]}</p></div>
-          <span className="shrink-0 text-sm"><MoneyValue value={c.result.net} signed tone="auto" /></span>
-        </button>)}
-      </div>}
-    </Surface>}</Disclosure>
+    {onMarkets&&<Button size="sm" variant="outline" onClick={onMarkets}>بازگشت به بازارها و پیشنهادها</Button>}
   </div>;
 }
