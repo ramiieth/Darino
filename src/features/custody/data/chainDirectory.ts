@@ -120,6 +120,7 @@ const catalogChainIds = new Set(NETWORKS.map((n) => n.chainId).filter((x): x is 
 const catalogNames = new Set(NETWORKS.map((n) => n.nameEn?.toLowerCase()).filter(Boolean));
 
 export function llamaChainLogo(name: string): string {
+  if(['monad','plasma'].includes(name.toLowerCase()))return '/logos/chain-'+name.toLowerCase()+'.jpg';
   return `https://icons.llama.fi/${encodeURIComponent(name.toLowerCase())}.jpg`;
 }
 

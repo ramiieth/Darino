@@ -10,7 +10,8 @@ export function catalogToken(t:Token) {
  const native=!contract||/^0x0{40}$/.test(contract)||/^0xe{40}$/.test(contract);
  return ASSETS.find(a=>a.networkId===t.chain&&(native?!a.contract&&a.symbol===t.symbol&&(t.verified===true||t.tokenId===a.coingeckoId||t.tokenId===a.id||t.tokenId===a.symbol.toLowerCase()):a.contract?.toLowerCase()===contract));
 }
-export function tokenLogo(t:Token):string|null {return safeLogoSrc(catalogToken(t)?.logo ?? t.icon);}
+const reviewedTokens:Record<string,string>={bitcoin:'/logos/token-btc.png',btc:'/logos/token-btc.png',weth:'/logos/token-weth.png',hyperliquid:'/logos/token-hype.jpg',hype:'/logos/token-hype.jpg','global-dollar':'/logos/token-usdg.png'};
+export function tokenLogo(t:Token):string|null {return safeLogoSrc(catalogToken(t)?.logo ?? (t.verified===true&&t.tokenId?reviewedTokens[t.tokenId]:null) ?? t.icon);}
 export function trustedToken(t:Token):boolean {return !t.spam && (!!catalogToken(t)||t.verified===true) && !!tokenLogo(t);}
 export function robinhoodGas(t:Token):boolean {const local=catalogToken(t);return t.chain==='robinhood'&&local?.symbol==='ETH'&&!local.contract;}
 export function visiblePosition(p:LivePosition):boolean {

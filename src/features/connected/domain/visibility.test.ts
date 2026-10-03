@@ -6,7 +6,7 @@ const receive:WalletTransaction={id:'tx',hash:'hash',chain:'ethereum',type:'rece
 describe('shared display policy for portfolio, activity and asset pickers',()=>{
  it('retains genuine catalog tokens without provider icons, never trusts a ticker or icon alone',()=>{
   expect(visiblePosition(eth)).toBe(true);
-  expect(visiblePosition({...eth,symbol:'USDT',contract:'0x'+'ab'.repeat(20),icon:'/logos/token-usdt.png',verified:false})).toBe(false);
+  expect(visiblePosition({...eth,symbol:'USDT',contract:'0x'+'ab'.repeat(20),icon:'/logos/token-usdt.svg',verified:false})).toBe(false);
   expect(trustedToken({...eth,contract:'0x'+'ab'.repeat(20),verified:true,icon:null})).toBe(false);
   expect(trustedToken({...eth,contract:'0x'+'ab'.repeat(20),verified:true,icon:'https://evil.example/a.png'})).toBe(false);
  });
@@ -33,7 +33,7 @@ describe('shared display policy for portfolio, activity and asset pickers',()=>{
   expect(visibleTransaction({...receive,transfers:receive.transfers.map(t=>({...t,quantity:'1',value:0.000001}))})).toBe(false);
  });
  it('honors provider trash flags and rejects spoof transfers without mutating raw FIFO history',()=>{
-  const spoof={...receive,transfers:receive.transfers.map(t=>({...t,symbol:'USDT',contract:'0x'+'ab'.repeat(20),verified:false,icon:'/logos/token-usdt.png'}))};
+  const spoof={...receive,transfers:receive.transfers.map(t=>({...t,symbol:'USDT',contract:'0x'+'ab'.repeat(20),verified:false,icon:'/logos/token-usdt.svg'}))};
   expect(visibleTransaction(spoof)).toBe(false);expect(spoof.transfers).toHaveLength(1);
   expect(visibleTransaction({...receive,spam:true})).toBe(false);
   expect(visibleTransaction({...receive,type:'approve',transfers:[]})).toBe(true);

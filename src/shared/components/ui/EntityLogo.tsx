@@ -47,29 +47,16 @@ export function LogoImage({
   className?: string;
 }) {
   const safe = safeLogoSrc(src);
-  const [failed, setFailed] = useState(false);
-  if (!safe || failed) {
+  const [failed, setFailed] = useState<string|null>(null);
+  if (!safe || failed===safe) {
     return (
       <span role="img" aria-label={label} className={cn('inline-flex', className)}>
         <Letters text={label} size={size} square={square} />
       </span>
     );
   }
-  return (
-    <img
-      src={safe}
-      alt={label}
-      width={size}
-      height={size}
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-      title={label}
-      onError={() => setFailed(true)}
-      className={cn('shrink-0 bg-white object-cover ring-1 ring-divider', square ? 'rounded-[28%]' : 'rounded-full', className)}
-      style={{ width: size, height: size }}
-    />
-  );
+  return <span className={cn('inline-flex shrink-0 items-center justify-center bg-white ring-1 ring-divider',square?'rounded-[28%]':'rounded-full',className)} style={{width:size,height:size}}><img src={safe} alt={label} width={size} height={size} loading="lazy" decoding="async" referrerPolicy="no-referrer" title={label} onError={()=>setFailed(safe)} className="max-h-full max-w-full object-contain" style={{width:size,height:size}}/></span>;
+
 }
 
 /** لوگوی توکن + نشان شبکه در گوشه */

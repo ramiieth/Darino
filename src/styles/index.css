@@ -469,3 +469,6 @@
 @media (min-width: 1024px) {
   .portfolio-recent { position: sticky; top: 5rem; }
 }
+
+.wallet-management-list, .wallet-management-row { -webkit-tap-highlight-color: transparent; }
+.wallet-management-row button { min-width: 44px; min-height: 44px; touch-action: manipulation; }

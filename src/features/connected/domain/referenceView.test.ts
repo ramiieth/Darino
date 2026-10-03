@@ -6,7 +6,7 @@ import {filterActivities} from './activityView';
 import {normalizeTransaction,type LivePosition,type WalletTransaction} from './model';
 const eth:LivePosition={id:'eth',tokenId:'ethereum',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:null,quantity:'1',value:3000,price:3000,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false};
 const usdt0='0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9';
-const tx:WalletTransaction={id:'send',hash:'0xhash',chain:'arbitrum',type:'send',status:'confirmed',minedAt:'2026-10-02T00:00:00Z',fee:0,transfers:[{direction:'out',symbol:'USDT0',tokenId:'usdt0',contract:usdt0,quantity:'140',value:139.89,address:'0xrecipient',icon:'/logos/token-usdt0.png',verified:true}]};
+const tx:WalletTransaction={id:'send',hash:'0xhash',chain:'arbitrum',type:'send',status:'confirmed',minedAt:'2026-10-02T00:00:00Z',fee:0,transfers:[{direction:'out',symbol:'USDT0',tokenId:'usdt0',contract:usdt0,quantity:'140',value:139.89,address:'0xrecipient',icon:'/logos/token-usdt0.svg',verified:true}]};
 describe('behaviour captured by Zerion reference screenshots',()=>{
  it('hides both 0.000014 and 0.0001 USDT0 receipts without hiding the legitimate outgoing payment',()=>{
   for(const quantity of ['0.000014','0.0001'])expect(visibleTransaction({...tx,type:'receive',transfers:tx.transfers.map(t=>({...t,direction:'in',quantity,value:Number(quantity)}))})).toBe(false);
@@ -24,7 +24,7 @@ describe('behaviour captured by Zerion reference screenshots',()=>{
   expect(positionRows([eth,{...eth,id:'other',tokenId:'other',chain:'base',verified:true}],true)).toHaveLength(2);
  });
  it('preserves real approval metadata without treating it as a purchase transfer',()=>{
-  const approved=normalizeTransaction({attributes:{operation_type:'approve',approvals:[{spender:'0xspender',quantity:{numeric:'147.5'},fungible_info:{id:'usdt0',symbol:'USDT0',flags:{verified:true},icon:{url:'/logos/token-usdt0.png'},implementations:[{chain_id:'arbitrum',address:usdt0}]}}]},relationships:{chain:{data:{id:'arbitrum'}}}});
+  const approved=normalizeTransaction({attributes:{operation_type:'approve',approvals:[{spender:'0xspender',quantity:{numeric:'147.5'},fungible_info:{id:'usdt0',symbol:'USDT0',flags:{verified:true},icon:{url:'/logos/token-usdt0.svg'},implementations:[{chain_id:'arbitrum',address:usdt0}]}}]},relationships:{chain:{data:{id:'arbitrum'}}}});
   expect(approved.transfers).toEqual([]);expect(approved.approvals?.[0].address).toBe('0xspender');expect(visibleTransaction(approved)).toBe(true);
  });
  it('searches addresses and filters types/assets in received history without guessing unreceived pages',()=>{

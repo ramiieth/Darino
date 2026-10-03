@@ -154,7 +154,7 @@ export function App() {
               </Lazy>
             }
           />
-          <Route path="/wallets" element={<Private label="کیف پول‌های متصل"><ConnectedPage /></Private>} />
+          <Route path="/wallets" element={<Private label="مدیریت کیف پول‌ها"><ConnectedPage /></Private>} />
           <Route path="/assistant" element={<Private label="دستیار پرتفولیو"><AssistantPage /></Private>} />
           <Route path="*" element={<MarketsHomePage />} />
         </Routes>
