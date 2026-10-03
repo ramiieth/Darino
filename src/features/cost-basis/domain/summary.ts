@@ -34,9 +34,11 @@ export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | unde
   const pending = !!current?.pendingBalanceConfirmation;
   const pnl = ready && !stale && !pending && !issues.length ? valuation.pnl ?? valuation.partialPnl : null;
   const matchesPending=pending&&new Decimal(current!.quantity).eq(a.quantity);
+  // A snapshot estimate is separate from transaction-reconciled PnL. Never release pending costs.
+  const estimatedPnl=pnl===null&&!pending&&!issues.length&&a.priced&&valuation.unknown==='0'&&valuation.excess==='0'&&((ready&&stale)||(!!current&&new Decimal(current.quantity).eq(a.quantity)&&holdingSources.every(w=>w.state?.data?.complete))) ? (current?a.value.minus(current.total).toNumber():valuation.pnl??valuation.partialPnl) : null;
   const basis = matchesPending ? Number(current!.total) : known ? valuation.basis : null;
   const status = pending ? (matchesPending?'confirmation':'mismatch') : !known ? 'missing' : valuation.excess !== '0' ? 'mismatch' : issues.length ? 'review' : !ready ? 'history' : stale ? 'stale' : valuation.unknown !== '0' ? 'partial' : 'ready';
-  return { ...a, current, price, sources, holdingSources, ready:ready&&!pending, stale, issues, valuation, basis, pnl, status, avgCost: basis !== null ? new Decimal(basis).div(matchesPending?a.quantity:valuation.covered).toNumber() : null, pnlPct: pnl !== null && basis !== null && basis > 0 ? pnl / basis * 100 : null, share: !portfolio.partial && !portfolio.stale && portfolio.total != null && portfolio.total > 0 && a.priced ? a.value.toNumber() / portfolio.total * 100 : null };
+  return { ...a, current, price, sources, holdingSources, ready:ready&&!pending, stale, issues, valuation, basis, pnl, estimatedPnl, status, avgCost: basis !== null ? new Decimal(basis).div(matchesPending?a.quantity:valuation.covered).toNumber() : null, pnlPct: pnl !== null && basis !== null && basis > 0 ? pnl / basis * 100 : null, share: !portfolio.partial && !portfolio.stale && portfolio.total != null && portfolio.total > 0 && a.priced ? a.value.toNumber() / portfolio.total * 100 : null };
  });
  return { rows, result, walletCovered };
 }

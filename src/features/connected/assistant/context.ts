@@ -121,7 +121,7 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
       const scoped=published.scopes[key];
       if(scoped&&scoped!==currentScope)continue;
       if(['borosOfficialPreview','borosVerifiedCandidates'].includes(key)&&!scoped)continue;
-      borosRows.push(...(published.rows[key]??[]).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>(key==='borosOfficialPreview'||key==='borosVerifiedCandidates'?60000:180000)?'stale' as const:r.status})));
+      borosRows.unshift(...(published.rows[key]??[]).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>(key==='borosOfficialPreview'||key==='borosVerifiedCandidates'?60000:180000)?'stale' as const:r.status})));
     }
     const accountState=useBorosAccount.getState(); const account=accountState.data;
     const realRows:InsightRow[]=[];

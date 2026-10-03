@@ -1,4 +1,4 @@
-import { zerionBudget,type ZerionBudget } from './_zerionPolicy.js';
+import { quotaNumber,zerionBudget,type ZerionBudget } from './_zerionPolicy.js';
 import { Decimal } from 'decimal.js';
 import { readProviderCache,writeProviderCache,providerCacheKey,walletSnapshotKey,reserveProviderSlot } from './_providerCache.js';
 import { arr, obj, str, normalizePosition, normalizeTransaction, deduplicatePositions, addressKey, type WalletSnapshot, type ChainInfo, type TransactionPage } from '../src/features/connected/domain/model.js';
@@ -16,7 +16,7 @@ const responseAt=new WeakMap<Record<string,unknown>,number>();
 const requests=new Map<string,Promise<Record<string,unknown>>>();
 export function zerionThrottle(headers:Headers,now=Date.now()) {
  const seconds=(name:string)=>{const n=Number(headers.get(name));return Number.isFinite(n)&&n>0?n:0;};
- const empty=(name:string)=>headers.has(name)&&Number(headers.get(name))===0;
+ const empty=(name:string)=>quotaNumber(headers,name)===0;
  const retry=headers.get('Retry-After');const retrySeconds=retry?Number(retry):0;
  const explicit=Number.isFinite(retrySeconds)?retrySeconds:Math.max(0,(Date.parse(retry??'')-now)/1000)||0;
  const month=empty('RateLimit-Org-Month-Remaining'),day=empty('RateLimit-Org-Day-Remaining');
@@ -47,10 +47,13 @@ async function cachedGet(path: string, deadline: number,force:boolean): Promise<
     const apiKey = process.env.ZERION_API_KEY;
     if (!apiKey) throw new ProviderError(503, 'کلید زریون هنوز در سرور تنظیم نشده است');
     const r = await fetch(BASE + path, { headers: { Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`, accept: 'application/json' }, signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline-Date.now()))) });
-    const budget=zerionBudget(r.headers);await writeProviderCache(providerCacheKey('quota'),budget,86400000);
+    const observed=zerionBudget(r.headers);
+    const previousBudget=await zerionQuota();
+    const budget=observed.dayRemaining!==null||observed.monthRemaining!==null?observed:previousBudget??observed;
+    if(budget===observed)await writeProviderCache(providerCacheKey('quota'),budget,86400000);
     if(r.status===429){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);throw new ProviderError(429,throttle.message,throttle.retryAfter);}
     if (!r.ok) throw new ProviderError(r.status === 401 ? 503 : r.status, r.status === 400 ? 'این آدرس یا شبکه برای این داده پشتیبانی نمی‌شود' : 'دریافت داده از زریون انجام نشد');
-    if(['Day','Month'].some(period=>r.headers.has('RateLimit-Org-'+period+'-Remaining')&&Number(r.headers.get('RateLimit-Org-'+period+'-Remaining'))===0)){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);}
+    if(['Day','Month'].some(period=>quotaNumber(r.headers,'RateLimit-Org-'+period+'-Remaining')===0)){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);}
     const data=obj(await r.json());const ttl=path.includes('/chains/')?86400000:path.includes('/charts/')?budget.chartMs:path.includes('/transactions/')?budget.historyMs:budget.walletMs;
     const at=Date.now();responseAt.set(data,at);await writeProviderCache(key,{at,data},ttl);return data;
   });

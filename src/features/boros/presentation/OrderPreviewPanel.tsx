@@ -1,6 +1,7 @@
+import { previewBudgetRemaining } from '../domain/recommendations';
 import { useBorosAccount,refreshBorosAccount,accountIsStale } from '../data/useBorosAccount';
 import { accountBudget,sameCollateralMarkets,type CapitalMode } from '../domain/accountBudget';
-import { VerifiedOpportunities } from './VerifiedOpportunities';
+import { VerifiedOpportunities,type EntrySelection } from './VerifiedOpportunities';
 import type { OfficialPreview } from '@/shared/boros/account';
 import { OfficialPreviewPanel } from './OfficialPreviewPanel';
 import { usePublishInsight } from '@/shared/assistant/insights';
@@ -22,30 +23,33 @@ import type { BorosDirection, BorosMarket } from '../domain/types';
 const optionalNumber = (s: string) => /^\d+(?:\.\d*)?$|^\.\d+$/.test(s) ? Number(s) : null;
 const STATE_FA = { unavailable: 'داده تازه یا بازار فعال در دسترس نیست', incomplete: 'هزینه‌ها را تکمیل کنید', underfunded: 'سرمایه کافی نیست', negative: 'سود پایه مثبت نیست', positive: 'سناریوهای بررسی‌شده مثبت‌اند', conditional: 'فرصت مشروط' };
 
-export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket, initial }: {
+export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket, initial,entry }: {
   market: BorosMarket; direction: BorosDirection; fixedRate: number | null; underlyingApr: number; collateralPriceUsd: number;
+  entry?:EntrySelection;
   initial?: { sizeYu: number; capitalUsd: number; feesUsd: number; gasUsd: number; slippageUsd: number };
   markets?: BorosMarket[];
-  onSelectMarket?: (marketId: number, direction: BorosDirection) => void;
+  onSelectMarket?: (marketId: number, direction: BorosDirection,entry?:EntrySelection) => void;
 }) {
   const account=useBorosAccount();
-  const [mode,setMode]=useState<CapitalMode>(!initial&&account.root?'real':'hypothetical');const [marginMode,setMarginMode]=useState('cross');const [risk,setRisk]=useState('10');
+  const [mode,setMode]=useState<CapitalMode>(!initial&&account.root?'real':'hypothetical');const [marginMode,setMarginMode]=useState(entry?.marginMode??'cross');const [risk,setRisk]=useState('10');
   const budget=accountBudget(account.data,accountIsStale(account),market,marginMode);
   useEffect(()=>{if(mode!=='real')return;const refresh=()=>{if(document.visibilityState==='visible')void refreshBorosAccount();};refresh();const t=setInterval(refresh,30000);return()=>clearInterval(t);},[mode]);
-  const [notional, setNotional] = useState(initial ? String(initial.sizeYu) : '2');
-  const [quote,setQuote]=useState<OfficialPreview|null>(null);
-  const quoteScope=useRef('');
+  const [notional, setNotional] = useState(entry?String(entry.sizeYu):initial ? String(initial.sizeYu) : '2');
+  const [quote,setQuote]=useState<OfficialPreview|null>(entry?.quote??null);
+  const quoteScope=useRef(entry?entry.identity+':'+entry.marginMode:'');
   const quoted=quoteScope.current===budget.identity+':'+marginMode&&budget.available&&quote&&quote.marketId===market.marketId&&quote.side===direction&&quote.matchedSize===Number(notional)&&Date.now()-quote.fetchedAt<60000?quote:null;
   const effectiveRate=quoted?.matchedApr??fixedRate;
+  const officialMarginUsd=quoted?.margin!=null&&budget.currentMargin!==null&&budget.price!==null?Math.max(0,quoted.margin-budget.currentMargin)*budget.price:null;
   useEffect(()=>{if(!quote)return;const t=setTimeout(()=>setQuote(null),Math.max(0,60000-(Date.now()-quote.fetchedAt)));return()=>clearTimeout(t);},[quote]);
   const [collateral, setCollateral] = useState(initial ? String(initial.capitalUsd) : '');
   const [capitalUnit, setCapitalUnit] = useState(initial ? 'usd' : 'asset');
-  const [gas, setGas] = useState(initial ? String(initial.gasUsd) : '');
-  const [slippage, setSlippage] = useState(initial ? String(initial.slippageUsd) : '');
-  const [fees, setFees] = useState(initial ? String(initial.feesUsd) : '');
+  const [gas, setGas] = useState(entry?String(entry.costs.gasUsd??''):initial ? String(initial.gasUsd) : '');
+  const [slippage, setSlippage] = useState(entry?String(entry.costs.slippageUsd??''):initial ? String(initial.slippageUsd) : '');
+  const [fees, setFees] = useState(entry?String(entry.costs.feesUsd??''):initial ? String(initial.feesUsd) : '');
   const [margin, setMargin] = useState('');
   const [allocation, setAllocation] = useState('50');
   const [floating, setFloating] = useState('');
+  useEffect(()=>{if(!entry)return;setMode('real');setMarginMode(entry.marginMode);setNotional(String(entry.sizeYu));quoteScope.current=entry.identity+':'+entry.marginMode;setQuote(entry.quote);setGas(String(entry.costs.gasUsd??''));setFees(String(entry.costs.feesUsd??''));setSlippage(String(entry.costs.slippageUsd??''));},[entry]);
   const collateralName = assetDisplayName(market.collateralSymbol ?? market.asset).name;
   const manualCapitalUsd = (optionalNumber(collateral) ?? 0) * (capitalUnit === 'asset' ? collateralPriceUsd : 1);
   const capitalUsd=mode==='real'?(budget.budgetUsd??0):manualCapitalUsd;
@@ -57,9 +61,11 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const costInputs = { gasUsd: optionalNumber(gas), feesUsd: optionalNumber(fees), slippageUsd: optionalNumber(slippage) };
   const completeCosts = Object.values(costInputs).every(v => v !== null);
   const costsSum = Object.values(costInputs).reduce<number>((a, v) => a + (v ?? 0), 0);
+
   const assumedFloating = floating.trim() === '' ? underlyingApr : /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(floating) ? Number(floating) / 100 : NaN;
   const analysis = useMemo(() => analyzeEntry({ m: market, direction, sizeYu: optionalNumber(notional) ?? 0, capitalUsd, entryRate: effectiveRate ?? market.markApr, floatingRate: assumedFloating, ...costInputs, marginUsd: mode==='real'||margin === '' ? null : optionalNumber(margin) ?? NaN }), [market, direction, notional, capitalUsd, effectiveRate, assumedFloating, gas, fees, slippage, margin, mode]);
-  usePublishInsight('borosEntry', `${mode==='real'?'بودجهٔ واقعی':'سرمایهٔ فرضی'} · ${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { realAccountBudget:Number(mode==='real'), marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: effectiveRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: analysis.margin, feesUsd: costInputs.feesUsd, gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready',mode==='real'?account.data?.syncedAt??undefined:undefined,mode==='real'?budget.scope:undefined);
+  const officialRemaining=officialMarginUsd!==null&&completeCosts&&analysis?previewBudgetRemaining(capitalUsd,officialMarginUsd,costsSum,analysis.preview.expectedMtm):null;
+  usePublishInsight('borosEntry', `${mode==='real'?'بودجهٔ واقعی':'سرمایهٔ فرضی'} · ${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { realAccountBudget:Number(mode==='real'), marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: effectiveRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: officialMarginUsd??analysis.margin, feesUsd: costInputs.feesUsd, gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: officialRemaining??analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready',mode==='real'?account.data?.syncedAt??undefined:undefined,mode==='real'?budget.scope:undefined);
   const candidates = useMemo(() => scanEntries(sameCollateralMarkets(markets,market,mode).filter(m=>marginMode==='cross'||mode==='hypothetical'||m.marketId===market.marketId), capitalUsd, optionalNumber(allocation) ?? 0, costInputs), [markets, market, mode, marginMode, capitalUsd, allocation, gas, fees, slippage]);
   const autoSize = () => {
     const size = sizeFromBudget(market, capitalUsd, optionalNumber(allocation) ?? 0, costsSum, Math.floor(Date.now() / 1000), effectiveRate ?? market.markApr);
@@ -102,11 +108,11 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
       <Surface variant="focal" className="p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-xs font-semibold text-muted">{mode==='real'?'برآورد با بودجهٔ واقعی':'خالص سناریوی فرضی'} تا سررسید</p><p className="mt-2 text-3xl font-bold"><MoneyValue value={analysis.net} signed tone="auto" /></p></div>
-          <Badge tone={analysis.state === 'positive' ? 'gain' : analysis.state === 'negative' || analysis.state === 'underfunded' ? 'loss' : 'neutral'}>{STATE_FA[analysis.state]}</Badge>
+          <Badge tone={analysis.state === 'positive' ? 'gain' : analysis.state === 'negative' || analysis.state === 'underfunded' ? 'loss' : 'neutral'}>{quoted?'نرخ اجرا از پیش‌نمایش رسمی':STATE_FA[analysis.state]}</Badge>
         </div>
         <MetricGrid cols={3} className="mt-5 border-t border-divider pt-4">
-          <Metric label={margin === '' ? "مارجین موردنیاز" : "مارجین واردشده"} value={<MoneyValue value={analysis.margin} />} sub={<QuantityValue value={analysis.margin / collateralPriceUsd} unit={collateralName} />} />
-          <Metric label={mode==='real'?'ماندهٔ بودجهٔ برآوردی':'مارجین آزاد فرضی'} value={<MoneyValue value={analysis.capitalRemaining} signed tone="auto" />} />
+          <Metric label={officialMarginUsd!==null?"مارجین افزوده · API":margin === '' ? "مارجین تخمینی" : "مارجین واردشده"} value={<MoneyValue value={officialMarginUsd??analysis.margin} />} sub={<QuantityValue value={(officialMarginUsd??analysis.margin) / collateralPriceUsd} unit={collateralName} />} />
+          <Metric label={mode==='real'?'ماندهٔ بودجهٔ برآوردی':'مارجین آزاد فرضی'} value={<MoneyValue value={officialRemaining??analysis.capitalRemaining} signed tone="auto" />} />
           <Metric label="بازده کل سرمایه" value={<PercentValue value={analysis.roiCapital} />} />
         </MetricGrid>
       </Surface>
@@ -126,7 +132,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
       {mode==='hypothetical'&&analysis.threshold.state === 'unsafe' && <Notice tone="warn">در فرض فعلی، ارزش پوزیشن از مارجین نگهداری کمتر است.</Notice>}
     </>}
 
-    {mode==='real'?<VerifiedOpportunities candidates={candidates.filter(c=>c.result.scenarioMin!==null&&c.result.scenarioMin>= -capitalUsd*(optionalNumber(risk)??-1)/100)} market={market} marginMode={marginMode} capitalUsd={capitalUsd} riskPct={optionalNumber(risk)??NaN} costs={costInputs} onSelect={(m,d,size,p)=>{quoteScope.current=budget.identity+':'+marginMode;setNotional(String(size));setQuote(p);onSelectMarket?.(m.marketId,d);}}/>:<Surface className="p-4 md:p-5">
+    {mode==='real'?<VerifiedOpportunities candidates={candidates.filter(c=>c.result.scenarioMin!==null&&c.result.scenarioMin>= -capitalUsd*(optionalNumber(risk)??-1)/100)} market={market} marginMode={marginMode} capitalUsd={capitalUsd} riskPct={optionalNumber(risk)??NaN} costs={costInputs} onSelect={selected=>{if(onSelectMarket)onSelectMarket(selected.marketId,selected.direction,selected);else if(selected.marketId===market.marketId&&selected.direction===direction){quoteScope.current=selected.identity+':'+selected.marginMode;setNotional(String(selected.sizeYu));setQuote(selected.quote);}}}/>:<Surface className="p-4 md:p-5">
       <h3 className="text-sm font-bold">فرصت‌ها با این سرمایه</h3>
       <p className="mt-1 text-xs text-muted">مقایسه با نرخ مارک و هزینه‌های یکسانِ واردشده؛ پیش از ورود، هزینه هر بازار را جدا بررسی کنید.</p>
       {candidates.length === 0 ? <p className="py-4 text-sm text-muted">{completeCosts ? 'فرصت مثبت با داده تازه و سرمایه کافی یافت نشد.' : 'سرمایه، تخصیص و هر سه هزینه را وارد کنید؛ صفر باید صریح وارد شود.'}</p> : <div className="mt-3 divide-y divide-divider">

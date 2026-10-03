@@ -514,11 +514,27 @@
 }
 @media (prefers-reduced-motion: reduce) { .boros-market-card { transition: none; } }
 
-.cost-summary .data-table { table-layout: fixed; }
-.cost-summary .data-table th:first-child { width: 20%; }
-.cost-summary .data-table td, .cost-summary .data-table th { white-space: normal; overflow-wrap: anywhere; padding-inline: 10px; }
-.cost-summary .persian-amount { max-width: 100%; }
-.cost-summary .persian-amount bdi { min-width: 0; overflow-wrap: anywhere; }
+/* Cost table: number and unit stay together, missing results have one clear state. */
+.cost-summary .cost-table { table-layout: fixed; }
+.cost-summary .cost-table td, .cost-summary .cost-table th { padding-inline: 8px; vertical-align: middle; }
+.cost-summary .cost-table td:first-child { white-space: normal; overflow-wrap: break-word; }
+.cost-summary .cost-table td:not(:first-child) { white-space: nowrap; }
+.cost-summary .cost-table th { white-space: normal; }
+.cost-summary .cost-table th:nth-child(7), .cost-summary .cost-table td:nth-child(7),
+.cost-summary .cost-table th:nth-child(8), .cost-summary .cost-table td:nth-child(8) { text-align: center; }
+.cost-summary .cost-table td:nth-child(7) > div { align-items: center; }
+.cost-summary .persian-amount { max-width: 100%; flex-wrap: nowrap; white-space: nowrap; align-items: baseline; gap: .3rem; }
+.cost-summary .persian-amount bdi { flex-shrink: 0; overflow-wrap: normal; word-break: normal; }
+.cost-summary .persian-amount > span { line-height: 1; }
+.cost-summary .cost-unavailable { display: inline-block; font-size: 11px; color: rgb(var(--c-muted)); }
+.cost-summary .cost-table .asset-value { gap: .3rem; }
+@media (min-width: 1280px) and (max-width: 1535px) {
+ .cost-summary .cost-table td { font-size: 13px; }
+}
+@media (max-width: 1279px) {
+ .cost-summary .persian-amount { flex-wrap: wrap; }
+ .cost-summary .persian-amount bdi { max-width: 100%; }
+}
 
 /* Read-only Boros portfolio: compact web tabs and touch-friendly PWA panels. */
 .boros-account { min-width: 0; }

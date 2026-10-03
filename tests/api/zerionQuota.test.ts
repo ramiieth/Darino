@@ -22,3 +22,14 @@ it('honors quota exhaustion on a successful final response without discarding th
  const {getTransactions}=await import('../../api/_zerion');expect((await getTransactions('0x'+'fa'.repeat(20))).rows).toEqual([]);
  await expect(getTransactions('0x'+'fb'.repeat(20))).rejects.toMatchObject({status:429});expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('does not mistake blank or malformed quota headers for exhaustion',async()=>{
+ const {zerionThrottle,getTransactions}=await import('../../api/_zerion');
+ expect(zerionThrottle(new Headers({'RateLimit-Org-Day-Remaining':'','RateLimit-Org-Month-Remaining':' '})).message).toContain('موقتاً');
+ const f=vi.fn(async()=>new Response(JSON.stringify({data:[]}),{headers:{'RateLimit-Org-Day-Remaining':''}}));vi.stubGlobal('fetch',f);
+ await getTransactions('0x'+'ab'.repeat(20));await getTransactions('0x'+'ac'.repeat(20));expect(f).toHaveBeenCalledTimes(2);
+});
+it('preserves observed budget when a later response omits quota headers',async()=>{
+ const f=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({data:[]}),{headers:{'RateLimit-Org-Day-Limit':'300','RateLimit-Org-Day-Remaining':'44'}})).mockResolvedValueOnce(new Response(JSON.stringify({data:[]})));vi.stubGlobal('fetch',f);
+ const {getTransactions,zerionQuota}=await import('../../api/_zerion');await getTransactions('0x'+'ba'.repeat(20));const before=await zerionQuota();await getTransactions('0x'+'bb'.repeat(20));expect(await zerionQuota()).toEqual(before);expect(before).toMatchObject({dayRemaining:44,dayLimit:300,level:'limited'});
+});

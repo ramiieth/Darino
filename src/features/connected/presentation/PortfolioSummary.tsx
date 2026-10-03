@@ -1,3 +1,4 @@
+import { ZerionQuotaStatus } from './ZerionQuotaStatus';
 import { CostSummaryPanel } from '@/features/cost-basis/presentation/CostSummaryPanel';
 import { NetworkPicker } from './NetworkPicker';
 import { AssetValue } from './AssetValue';
@@ -22,6 +23,7 @@ import { useActivity } from '../data/useActivity';
 import type { ConnectedPortfolio } from '../data/useConnectedPortfolio';
 import type { LivePosition } from '../domain/model';
 export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
+ const [syncOpen,setSyncOpen]=useState(false);
  const [params,setParams]=useSearchParams();const tab=params.get('view')==='activity'?'activity':'assets';const setTab=(value:'assets'|'activity')=>setParams(previous=>{const next=new URLSearchParams(previous);if(value==='activity')next.set('view','activity');else next.delete('view');return next;},{replace:true,preventScrollReset:true});const [network,setNetwork]=useState('all'),[group,setGroup]=useState<'token'|'platform'>('token');const activity=useActivity(p);
  const chains=[...new Map(p.wallets.flatMap(w=>w.state?.data?.chains??[]).map(c=>[c.id,c])).values()];
  const grouped=new Map<string,LivePosition>();
@@ -34,7 +36,7 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
  const walletValue=p.wallets.some(w=>w.value!==null)?p.wallets.reduce((s,w)=>s.plus(w.value??0),new Decimal(0)).toNumber():null;
  const realArcus=p.arcus.filter(s=>s.holding.arcus!.env==='mainnet');const arcusValue=realArcus.some(s=>s.value!==null)?realArcus.reduce((s,a)=>s.plus(a.value??0),new Decimal(0)).toNumber():null;
  const filteredActivity=activity.rows.filter(r=>(network==='all'||r.tx?.chain===network)&&(!r.tx||visibleTransaction(r.tx)));
- const walletError=p.wallets.map(w=>w.state?.error).find(Boolean);
+ const walletError=p.wallets.map(w=>w.state?.error??w.state?.data?.detailsError).find(Boolean);
  const activityError=p.wallets.map(w=>w.state?.historyError).find(Boolean);
  const activityBusy=p.wallets.some(w=>!w.state?.historyLoaded&&!w.state?.historyError);
  const platformGroups=new Map<string,LivePosition[]>();
@@ -46,7 +48,7 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
  </div>
  <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-4"><div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted"><span className="inline-flex flex-wrap items-baseline gap-2">کیف پول‌ها<MoneyValue value={walletValue}/></span>{realArcus.length>0&&<span className="inline-flex flex-wrap items-baseline gap-2">پرپچوال آرکوس<MoneyValue value={arcusValue}/></span>}</div><nav aria-label="دسترسی‌های پرتفولیو" className="flex flex-wrap gap-2"><Link to="/wallets" className={buttonClass('outline','sm')}><Wallet/>مدیریت کیف پول‌ها</Link><Link to="/assistant" className={buttonClass('outline','sm')}><Sparkles/>دستیار</Link></nav></div>
  </Surface>
- {(p.stale||p.partial||walletError)&&<details className="rounded-xl border border-divider bg-card px-4 py-3 text-xs"><summary className="cursor-pointer text-muted">{p.total===null?'در انتظار دریافت موجودی':p.partial?'برخی موجودی‌ها هنوز دریافت نشده‌اند':'وضعیت همگام‌سازی'}</summary><div className="mt-3 space-y-2 leading-6" role="status">{walletError&&<p className="text-warn">{walletError}</p>}{zerionRetryAt()&&<p>تلاش بعدی: {new Date(zerionRetryAt()!).toLocaleString('fa-IR')}</p>}{p.wallets.map(w=><p key={w.holding.id}>{w.holding.label} · {w.state?.data?`آخرین دریافت: ${new Date(w.state.data.fetchedAt).toLocaleString('fa-IR')}`:'موجودی هنوز دریافت نشده است'}</p>)}{p.partial&&<p>مجموع فقط شامل موجودی‌های دریافت‌شده و قیمت‌گذاری‌شده است.</p>}</div></details>}{!p.wallets.length&&!p.arcus.length&&<Notice>یک کیف پول یا حساب آرکوس اضافه کنید.</Notice>}
+ {(p.stale||p.partial||walletError)&&<details onToggle={e=>setSyncOpen(e.currentTarget.open)} className="rounded-xl border border-divider bg-card px-4 py-3 text-xs"><summary className="cursor-pointer text-muted">{p.total===null?'در انتظار دریافت موجودی':p.partial?'برخی موجودی‌ها هنوز دریافت نشده‌اند':'وضعیت همگام‌سازی'}</summary><div className="mt-3 space-y-2 leading-6" role="status">{syncOpen&&<ZerionQuotaStatus refreshKey={p.loading}/>}{walletError&&<p className="text-warn">{walletError}</p>}{zerionRetryAt()&&<p>تلاش بعدی: {new Date(zerionRetryAt()!).toLocaleString('fa-IR')}</p>}{p.wallets.map(w=><p key={w.holding.id}>{w.holding.label} · {w.state?.data?`آخرین دریافت: ${new Date(w.state.data.fetchedAt).toLocaleString('fa-IR')}`:'موجودی هنوز دریافت نشده است'}</p>)}{p.partial&&<p>مجموع فقط شامل موجودی‌های دریافت‌شده و قیمت‌گذاری‌شده است.</p>}</div></details>}{!p.wallets.length&&!p.arcus.length&&<Notice>یک کیف پول یا حساب آرکوس اضافه کنید.</Notice>}
 
  <section aria-label="پرتفولیو" id="portfolio-assets" className="min-w-0 space-y-5">
  <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-divider pb-3"><div role="tablist" aria-label="نمای پرتفولیو" className="flex gap-5">{([['assets','دارایی‌ها'],['activity','تراکنش‌ها']] as const).map(([id,label])=><button key={id} type="button" role="tab" id={`portfolio-tab-${id}`} aria-selected={tab===id} aria-controls={`portfolio-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?'assets':e.key==='End'?'activity':tab==='assets'?'activity':'assets';setTab(next);document.getElementById('portfolio-tab-'+next)?.focus();}}} onClick={()=>setTab(id)} className={`min-h-11 border-b-2 px-1 py-3 text-sm font-semibold ${tab===id?'border-accent text-accent':'border-transparent text-muted'}`}>{label}</button>)}</div><div className="w-full sm:w-56"><NetworkPicker value={network} onChange={setNetwork} chains={chains} ids={networks}/></div></div>
