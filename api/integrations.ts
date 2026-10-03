@@ -1,3 +1,4 @@
+import { getDirectory } from './_directory.js';
 /** One authenticated read-only endpoint for wallet data and Gemini analysis. No credentials reach the client. */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireSession } from './_authCore.js';
@@ -27,6 +28,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       json(res,200,{ answer: await analyze(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
     }
     if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
+    if(op==='directory' && req.method==='GET'){json(res,200,await getDirectory());return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';
@@ -36,6 +38,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   } catch (e) {
     const status = e instanceof ProviderError ? e.status : 502;
     if (e instanceof ProviderError && e.retryAfter) res.setHeader('Retry-After',String(e.retryAfter));
-    json(res,status,{ error:e instanceof ProviderError ? e.message : 'ارتباط با سرویس برقرار نشد؛ آخرین دادهٔ موفق حفظ شده است' });
+    json(res,status,{ error:e instanceof ProviderError ? e.message : 'ارتباط با سرویس برقرار نشد' });
   }
 }

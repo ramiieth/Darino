@@ -387,6 +387,12 @@ export async function settingSet(key: string, value: unknown): Promise<void> {
   }
 }
 
+/** Remove a specific private-cache namespace from persistent and fallback settings. */
+export async function settingDeletePrefix(prefix:string):Promise<void>{
+ for(const key of memorySettings.keys())if(key.startsWith(prefix))memorySettings.delete(key);
+ const db=await getDb();if(db){const keys=await db.settings.where('key').startsWith(prefix).primaryKeys();await db.settings.bulkDelete(keys);}
+}
+
 /* ---------------- Watchlist ---------------- */
 
 let memoryWatch = new Map<string, WatchItemRecord>();

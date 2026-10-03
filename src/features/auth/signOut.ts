@@ -54,6 +54,7 @@ export async function wipeFinancialData(): Promise<void> {
   clearArcusMemory();
   const { clearConnectedMemory } = await import('@/features/connected/data/store');
   clearConnectedMemory();
+  await (await import('@/features/connected/data/snapshotCache')).clearWalletSnapshots();
   const db = (await getDb()) as unknown as Record<string, { clear(): Promise<unknown> } | undefined> | null;
   if (db) {
     for (const t of ['portfolioAssets', 'dashboardSnapshots']) {

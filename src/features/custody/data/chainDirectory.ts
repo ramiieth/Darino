@@ -7,6 +7,7 @@
  *  • شبکه‌ای که در کاتالوگ تأییدشده هست، از این‌جا دوباره اضافه نمی‌شود.
  *  • کش: حافظه + تنظیمات IndexedDB به مدت ۲۴ ساعت.
  * ============================================================ */
+import { retiredChains,identityKey } from '@/features/connected/domain/directory/names';
 import { NETWORKS } from '../domain/catalog';
 
 export interface DirectoryChain {
@@ -128,7 +129,7 @@ interface RawChain {
   tokenSymbol?: unknown;
   gasTokenGeckoId?: unknown;
   gecko_id?: unknown;
-  tvl?: unknown;
+  tvl?: unknown; deadFrom?: unknown; disabled?:unknown; deprecated?:unknown; status?:unknown;
 }
 
 export function normalizeDirectory(raw: unknown): DirectoryChain[] {
@@ -137,6 +138,7 @@ export function normalizeDirectory(raw: unknown): DirectoryChain[] {
   for (const r of raw as RawChain[]) {
     if (typeof r?.name !== 'string' || !r.name.trim() || r.name.length > 60) continue;
     const name = r.name.trim();
+    if(retiredChains.has(identityKey(name))||r.deadFrom||r.disabled===true||r.deprecated===true||['shutdown','sunset','inactive','discontinued'].includes(String(r.status??'').toLowerCase()))continue;
     const chainId = typeof r.chainId === 'number' && Number.isSafeInteger(r.chainId) && r.chainId > 0 ? r.chainId : null;
     const sym = typeof r.tokenSymbol === 'string' && /^[A-Za-z0-9.$₮-]{1,12}$/.test(r.tokenSymbol) ? r.tokenSymbol : null;
     const gas = typeof r.gasTokenGeckoId === 'string' ? r.gasTokenGeckoId : typeof r.gecko_id === 'string' ? r.gecko_id : null;
@@ -166,7 +168,7 @@ export async function loadChainDirectory(fetchImpl: typeof fetch = fetch): Promi
     const res = await fetchImpl('https://api.llama.fi/v2/chains', { credentials: 'omit', referrerPolicy: 'no-referrer' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = await res.json();
-    const slim = Array.isArray(raw) ? raw.map((r: RawChain) => ({ name: r.name, chainId: r.chainId, tokenSymbol: r.tokenSymbol, gasTokenGeckoId: r.gasTokenGeckoId, gecko_id: r.gecko_id, tvl: r.tvl })) : [];
+    const slim = Array.isArray(raw) ? raw.map((r: RawChain) => ({ name: r.name, chainId: r.chainId, tokenSymbol: r.tokenSymbol, gasTokenGeckoId: r.gasTokenGeckoId, gecko_id: r.gecko_id, tvl: r.tvl,deadFrom:r.deadFrom,disabled:r.disabled,deprecated:r.deprecated,status:r.status })) : [];
     await settingSet(CACHE_KEY, { at: Date.now(), raw: slim });
     mem = { at: Date.now(), list: normalizeDirectory(slim) };
     return mem.list;
