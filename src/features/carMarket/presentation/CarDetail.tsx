@@ -24,9 +24,9 @@ type Unit = 'toman' | 'usd';
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-field bg-surface-2 px-3 py-2.5">
+    <div className="min-w-0 rounded-field bg-surface-2 px-2.5 py-2.5 sm:px-3">
       <p className="text-2xs text-muted">{label}</p>
-      <p className="mt-0.5 text-sm font-bold text-ink">{value}</p>
+      <p className="mt-0.5 truncate text-xs font-bold text-ink sm:text-sm">{value}</p>
       {sub && <p className="text-2xs text-subtle">{sub}</p>}
     </div>
   );
@@ -79,10 +79,10 @@ export function CarDetail({ model: m, snapshots, daily }: { model: CarModelView;
             این خودرو دیگر در فهرست car.ir نیست — آخرین قیمت ثبت‌شده در {m.lastSeenTs ? formatJalali(m.lastSeenTs) : '—'}.
           </p>
         )}
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Stat label="قیمت کارخانه / نمایندگی" value={r.dealer ? fmtCarToman(r.dealer) : 'اعلام نشده'} />
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Stat label="قیمت کارخانه" value={r.dealer ? fmtCarToman(r.dealer) : 'اعلام نشده'} />
           <Stat label="حباب بازار" value={m.basis.gapPct !== null ? fmtCarPct(m.basis.gapPct) : '—'} />
-          <Stat label="به‌روزرسانی منبع" value={r.marketUpdatedAt ? formatJalali(r.marketUpdatedAt) : '—'} sub={m.basis.stale ? 'قدیمی' : undefined} />
+          <Stat label="به‌روزرسانی" value={r.marketUpdatedAt ? formatJalali(r.marketUpdatedAt) : '—'} sub={m.basis.stale ? 'قدیمی' : undefined} />
         </div>
       </div>
 
@@ -90,14 +90,14 @@ export function CarDetail({ model: m, snapshots, daily }: { model: CarModelView;
         <div>
           <h3 className="mb-2 text-sm font-bold text-ink">همه سال‌های ساخت ({toFaDigits(m.trims.length)})</h3>
           <div className="overflow-x-auto rounded-field border border-divider">
-            <table className="data-table is-compact min-w-[460px]">
+            <table className="data-table is-compact">
               <caption className="sr-only">قیمت سال‌های ساخت</caption>
               <thead>
                 <tr>
                   <th scope="col" className="!ps-4">مدل</th>
                   <th scope="col" className="col-num">بازار</th>
                   <th scope="col" className="col-num">کارخانه</th>
-                  <th scope="col" className="col-num !pe-4">به‌روزرسانی</th>
+                  <th scope="col" className="col-num hidden !pe-4 sm:table-cell">به‌روزرسانی</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,10 +107,11 @@ export function CarDetail({ model: m, snapshots, daily }: { model: CarModelView;
                       <span className="font-semibold text-ink">{toFaDigits(t.row.year)}</span>
                       {t.row.option && <span className="text-2xs text-muted"> · {t.row.option}</span>}
                       {t.row.id === r.id && <span className="ms-1 text-2xs text-accent">مبنا</span>}
+                      {t.stale && <span className="block text-2xs text-warn sm:hidden">قیمت {t.row.marketUpdatedAt ? formatJalali(t.row.marketUpdatedAt) : 'قدیمی'}</span>}
                     </td>
                     <td className="col-num">{fmtCarToman(t.row.market)}</td>
-                    <td className="col-num text-muted">{fmtCarToman(t.row.dealer)}</td>
-                    <td className={`col-num !pe-4 text-2xs ${t.stale ? 'text-warn' : 'text-muted'}`}>{t.row.marketUpdatedAt ? formatJalali(t.row.marketUpdatedAt) : '—'}</td>
+                    <td className="col-num text-muted sm:!pe-0">{fmtCarToman(t.row.dealer)}</td>
+                    <td className={`col-num hidden !pe-4 text-2xs sm:table-cell ${t.stale ? 'text-warn' : 'text-muted'}`}>{t.row.marketUpdatedAt ? formatJalali(t.row.marketUpdatedAt) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
