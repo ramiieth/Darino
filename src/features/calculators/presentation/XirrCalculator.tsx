@@ -1,3 +1,4 @@
+import { usePublishInsight } from '@/shared/assistant/insights';
 /**
  * ④ XIRR — annualised return of cash flows on irregular dates.
  * Newton-Raphson with bisection fallback (domain/xirr).
@@ -46,6 +47,8 @@ export function XirrCalculator() {
 
   // pure derivation — no state updates during render
   const result = useMemo(() => (nonZero.length < 2 ? null : calcXirr(nonZero)), [nonZero]);
+  usePublishInsight('calculatorXirr', 'بازده جریان نقدی', result ? { ...result } : null);
+
   const diverged = result !== null && result.xirr === null;
 
   const inputs = (

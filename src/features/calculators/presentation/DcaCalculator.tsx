@@ -1,3 +1,5 @@
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
+import { usePublishInsight } from '@/shared/assistant/insights';
 /**
  * ② DCA — periodic investing.
  * INPUT (asset · amount · frequency · dates · fee) → RESULT (profit) → SECONDARY →
@@ -86,6 +88,8 @@ export function DcaCalculator() {
       feePerPurchase: Number(fee) || 0
     });
   }, [asset, amount, freq, startTs, endTs, pricesForChart, currentPrice, fee, badRange]);
+
+  usePublishInsight('calculatorDca', asset ? `خرید دوره‌ای ${persianAssetName(asset.symbol)}` : 'خرید دوره‌ای', result ? { purchaseCount: result.purchaseCount, totalInvested: result.totalInvested, totalUnits: result.totalUnits, averageCost: result.averageCost, currentValue: result.currentValue, profit: result.profit, returnPct: result.returnPct, startTs, endTs } : null, 'simulation', pricesForChart ? 'ready' : 'reference');
 
   const valueSeries = useMemo(() => {
     if (!asset || !result || !pricesForChart || badRange) return null;

@@ -1,3 +1,4 @@
+import { usePublishInsight } from '@/shared/assistant/insights';
 /** Manual pre-entry assumptions; no signing, trading or account connection. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
@@ -42,6 +43,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const costsSum = Object.values(costInputs).reduce<number>((a, v) => a + (v ?? 0), 0);
   const assumedFloating = floating.trim() === '' ? underlyingApr : /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(floating) ? Number(floating) / 100 : NaN;
   const analysis = useMemo(() => analyzeEntry({ m: market, direction, sizeYu: optionalNumber(notional) ?? 0, capitalUsd, entryRate: fixedRate ?? market.markApr, floatingRate: assumedFloating, ...costInputs, marginUsd: margin === '' ? null : optionalNumber(margin) ?? NaN }), [market, direction, notional, capitalUsd, fixedRate, assumedFloating, gas, fees, slippage, margin]);
+  usePublishInsight('borosEntry', `${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: fixedRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: analysis.margin, feesUsd: costInputs.feesUsd, gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready');
   const candidates = useMemo(() => scanEntries(markets, capitalUsd, optionalNumber(allocation) ?? 0, costInputs), [markets, capitalUsd, allocation, gas, fees, slippage]);
   const autoSize = () => {
     const size = sizeFromBudget(market, capitalUsd, optionalNumber(allocation) ?? 0, costsSum, Math.floor(Date.now() / 1000), fixedRate ?? market.markApr);

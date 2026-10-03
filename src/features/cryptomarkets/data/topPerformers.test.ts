@@ -63,8 +63,15 @@ describe('returnsFromChart — بازده ۶۰/۹۰ روزه', () => {
     expect(r.ret30).toBeNull();
     expect(r.ret60).toBeNull();
     expect(r.ret90).toBeNull();
-    // ret1 با سری ۲نقطه‌ای: نزدیک‌ترین نقطه به ۱ روز پیش = خود نقطه آخر → ۰٪
-    expect(r.ret1).toBe(0);
+    // نبود قیمت روز قبل، بازده صفر ساختگی تولید نمی‌کند.
+    expect(r.ret1).toBeNull();
+  });
+
+  it('anchors a delayed series to its actual last observation, and excludes future observations', () => {
+    const delayed = dailySeries().map(p => ({ ...p, timestamp: p.timestamp - 2 * DAY }));
+    expect(returnsFromChart(delayed, NOW).ret90).toBeCloseTo((Math.pow(1.001, 90)-1)*100, 8);
+    const future = { timestamp: NOW + DAY, price: 999999 };
+    expect(returnsFromChart([...dailySeries(), future], NOW)).toEqual(returnsFromChart(dailySeries(), NOW));
   });
 
   it('سری نامرتب را مرتب میکند', () => {

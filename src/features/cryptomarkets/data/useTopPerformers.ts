@@ -85,15 +85,19 @@ export function returnsFromChart(
 ): { ret1: number | null; ret7: number | null; ret30: number | null; ret60: number | null; ret90: number | null } {
   if (!points || points.length < 2)
     return { ret1: null, ret7: null, ret30: null, ret60: null, ret90: null };
-  const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = points.filter(p => Number.isFinite(p.timestamp) && p.timestamp <= now).sort((a, b) => a.timestamp - b.timestamp);
+  if (sorted.length < 2) return { ret1: null, ret7: null, ret30: null, ret60: null, ret90: null };
   const cur = sorted[sorted.length - 1].price;
   if (!Number.isFinite(cur) || cur <= 0)
     return { ret1: null, ret7: null, ret30: null, ret60: null, ret90: null };
-  const p1 = priceAt(sorted, now - 1 * DAY_MS);
-  const p7 = priceAt(sorted, now - 7 * DAY_MS);
-  const p30 = priceAt(sorted, now - 30 * DAY_MS);
-  const p60 = priceAt(sorted, now - 60 * DAY_MS);
-  const p90 = priceAt(sorted, now - 90 * DAY_MS);
+  // The period ends at the actual last observation, not the time a cached series is read.
+  const end = sorted[sorted.length - 1].timestamp;
+  const previous = sorted.slice(0,-1);
+  const p1 = priceAt(previous.filter(p => Math.abs(p.timestamp-(end-DAY_MS)) <= DAY_MS/2),end-DAY_MS);
+  const p7 = priceAt(previous, end - 7 * DAY_MS);
+  const p30 = priceAt(previous, end - 30 * DAY_MS);
+  const p60 = priceAt(previous, end - 60 * DAY_MS);
+  const p90 = priceAt(previous, end - 90 * DAY_MS);
   const ret = (base: number | null): number | null =>
     base !== null && Number.isFinite(base) && base > 0 ? (cur / base - 1) * 100 : null;
   return { ret1: ret(p1), ret7: ret(p7), ret30: ret(p30), ret60: ret(p60), ret90: ret(p90) };
@@ -165,6 +169,8 @@ interface PerfState {
   /** پیشرفت همگام‌سازی سهام سنتی (فاز آلفا وانتج) */
   stockSync: { done: number; total: number } | null;
   loadedAt: number | null;
+  returnAsOf: Partial<Record<PerfPeriod, Record<string, number | null>>>;
+  setReturnAsOf: (v: Partial<Record<PerfPeriod, Record<string, number | null>>>) => void;
   setCoins: (c: PerfCoin[]) => void;
   setPerf1d: (p: Record<string, number | null>) => void;
   setPerf7d: (p: Record<string, number | null>) => void;
@@ -192,6 +198,8 @@ export const usePerfStore = create<PerfState>((set) => ({
   stale: false,
   stockSync: null,
   loadedAt: null,
+  returnAsOf: {},
+  setReturnAsOf: (v) => set({ returnAsOf: v }),
   setCoins: (c) => set({ coins: c }),
   setPerf1d: (p) => set({ perf1d: p }),
   setPerf7d: (p) => set({ perf7d: p }),
@@ -234,7 +242,8 @@ export async function mapLimit<T, R>(
 /** ادغام بازده یک دارایی در استور (پیش‌رونده) — فقط بازه‌های خالی پر می‌شوند */
 export function applyReturns(
   symbol: string,
-  r: { ret1: number | null; ret7: number | null; ret30: number | null; ret60: number | null; ret90: number | null }
+  r: { ret1: number | null; ret7: number | null; ret30: number | null; ret60: number | null; ret90: number | null },
+  asOf: number | null = null
 ): void {
   const st = usePerfStore.getState();
   const p1 = { ...st.perf1d };
@@ -245,8 +254,14 @@ export function applyReturns(
   if (p1[symbol] === undefined || p1[symbol] === null) p1[symbol] = r.ret1;
   if (p7[symbol] === undefined || p7[symbol] === null) p7[symbol] = r.ret7;
   if (p30[symbol] === undefined || p30[symbol] === null) p30[symbol] = r.ret30;
-  if (p60[symbol] === undefined || p60[symbol] === null) p60[symbol] = r.ret60;
-  if (p90[symbol] === undefined || p90[symbol] === null) p90[symbol] = r.ret90;
+  p60[symbol] = r.ret60;
+  p90[symbol] = r.ret90;
+  const returnAsOf = { ...st.returnAsOf };
+  for (const period of ['1d','7d','30d','60d','90d'] as const) {
+    const prior = period === '1d' ? st.perf1d : period === '7d' ? st.perf7d : period === '30d' ? st.perf30 : null;
+    if (prior === null || prior[symbol] == null) returnAsOf[period] = { ...returnAsOf[period], [symbol]: asOf };
+  }
+  st.setReturnAsOf(returnAsOf);
   st.setPerf1d(p1);
   st.setPerf7d(p7);
   st.setPerf30(p30);
@@ -471,7 +486,8 @@ async function loadTradFiStocks(coins: PerfCoin[]): Promise<void> {
       if (points && points.length > 1) {
         applyReturns(
           c.symbol,
-          returnsFromChart(points.map((p) => ({ timestamp: p.t, price: p.price })))
+          returnsFromChart(points.map((p) => ({ timestamp: p.t, price: p.price }))),
+          Math.max(...points.map(p=>p.t))
         );
       }
     } catch {
@@ -511,8 +527,10 @@ export function loadTopPerformers(): Promise<void> {
       const crypto7d: Record<string, number | null> = {};
       const crypto30: Record<string, number | null> = {};
       let stale = false;
+      let cryptoAsOf: number | null = null;
       try {
-        const { data, stale: isStale } = await fetchTopMarketsOnce();
+        const { data, stale: isStale, fetchedAt } = await fetchTopMarketsOnce();
+        cryptoAsOf = fetchedAt;
         stale = isStale;
         cryptoCoins = data.map((c) => ({
           symbol: c.symbol.toUpperCase(),
@@ -580,6 +598,8 @@ export function loadTopPerformers(): Promise<void> {
       st.setPerf1d({ ...crypto1d, ...tk1d });
       st.setPerf7d({ ...crypto7d, ...tk7d });
       st.setPerf30({ ...crypto30, ...tk30 });
+      const oldMeta=usePerfStore.getState().returnAsOf;
+      st.setReturnAsOf({ ...oldMeta, ...Object.fromEntries((['1d','7d','30d'] as const).map(period => [period, { ...oldMeta[period], ...Object.fromEntries(cryptoCoins.map(c=>[c.symbol,cryptoAsOf])), ...Object.fromEntries(tkCoins.map(c=>[c.symbol,null])) }])) });
       // زمان همگام‌سازی اولیه بلافاصله ثبت می‌شود (فازهای بعدی پیش‌رونده‌اند)
       st.setLoadedAt(Date.now());
 
@@ -594,7 +614,8 @@ export function loadTopPerformers(): Promise<void> {
         for (const c of chartCoins) {
           const rec = cached.get(chartKey(c.id));
           if (rec && now - rec.fetchedAt < CHART_CACHE_MS) {
-            applyReturns(c.symbol, returnsFromChart(rec.price as unknown as ChartPoint[]));
+            const pts=rec.price as unknown as ChartPoint[];
+            applyReturns(c.symbol, returnsFromChart(pts), Math.max(...pts.map(p=>p.timestamp)));
           } else {
             need.push(c);
           }
@@ -611,7 +632,7 @@ export function loadTopPerformers(): Promise<void> {
             } catch {
               /* خاموش */
             }
-            applyReturns(c.symbol, returnsFromChart(points));
+            applyReturns(c.symbol, returnsFromChart(points), Math.max(...points.map(p=>p.timestamp)));
           }
         });
       })();
