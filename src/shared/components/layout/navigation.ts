@@ -146,8 +146,8 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'vehicle',
         to: '/vehicle',
         label: 'خودرو',
-        title: 'سرمایه‌گذاری خودرو',
-        description: 'خودرو به‌عنوان یک دارایی',
+        title: 'بازار خودرو',
+        description: 'قیمت روز و رشد خودروهای داخلی، مونتاژی و وارداتی',
         icon: Car
       },
       {
