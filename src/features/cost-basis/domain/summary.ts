@@ -1,3 +1,4 @@
+import { validCurrentBasis } from './currentBasis';
 import Decimal from 'decimal.js';
 import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
 import type { ActivityLink } from '@/features/connected/domain/activity';
@@ -14,18 +15,23 @@ export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | unde
   else grouped.set(key, { asset: { ...costAsset(pos), icon: tokenLogo(pos) }, quantity: new Decimal(pos.quantity), value: new Decimal(pos.value ?? 0), priced: pos.value !== null, chains: new Set([pos.chain]), sources: new Set([index]) });
  }));
  const rows = [...grouped.values()].map(a => {
+  const storedCurrent=book?.currentBasis?.[a.asset.key];
+  const current = validCurrentBasis(storedCurrent,a.asset.key) ? storedCurrent : undefined;
+  const effectiveBook = current && book ? { ...book, asOf: current.at, lots: [{ id: 'current:'+a.asset.key, asset: current.asset, quantity: current.quantity, unitCost: new Decimal(current.total).div(current.quantity).toString(), fee: '0', at: current.at, source: 'current-balance-confirmed' }, ...book.lots.filter(l => l.asset.key !== a.asset.key)] } : book;
+  const localResult = current && effectiveBook ? replayCost(effectiveBook, portfolio.wallets.flatMap(w => w.state?.history ?? []), links, portfolio.wallets.map(w => w.holding.address!)) : result;
   const sources = portfolio.wallets.filter((w, index) => a.sources.has(index) || w.state?.history.some(tx => tx.transfers.some(t => t.tokenId && `fungible:${t.tokenId}` === a.asset.key)));
-  const ready = !!book && sources.length > 0 && sources.every(w => !!w.state?.data?.complete && walletCovered(w));
+  const ready = !!book && sources.length > 0 && sources.every(w => !!w.state?.data?.complete && (current ? (w.state.data.fetchedAt <= current.at && new Decimal(current.quantity).eq(a.quantity)) || (!!w.state.historyLoaded && !w.state.historyError && (!w.state.next || w.state.history.some(tx => Date.parse(tx.minedAt) <= current.at))) : walletCovered(w)));
   const stale = sources.some(w => w.stale);
   const price = a.priced ? a.value.div(a.quantity).toNumber() : null;
   const allQuantity = portfolio.wallets.flatMap(w => w.state?.data?.positions ?? []).filter(pos => pos.type === 'wallet' && trustedToken(pos) && assetKey(pos) === a.asset.key && pos.quantity && decimalPositive(pos.quantity)).reduce((sum, pos) => sum.plus(pos.quantity!), new Decimal(0)).toString();
-  const valuation = valueCost(result?.lots.filter(l => l.asset.key === a.asset.key) ?? [], a.quantity.toString(), price, allQuantity);
-  const issues = result?.issues.filter(i => (!i.assetKeys || i.assetKeys.includes(a.asset.key)) && (!i.key.startsWith('opening-fees:') || result.lots.some(l => `opening-fees:${l.id}` === i.key && decimalPositive(l.quantity)))) ?? [];
+  const valuation = valueCost(localResult?.lots.filter(l => l.asset.key === a.asset.key) ?? [], a.quantity.toString(), price, allQuantity);
+  const issues = localResult?.issues.filter(i => (!i.assetKeys || i.assetKeys.includes(a.asset.key)) && (!i.key.startsWith('opening-fees:') || localResult.lots.some(l => `opening-fees:${l.id}` === i.key && decimalPositive(l.quantity)))) ?? [];
+  if(storedCurrent&&!current)issues.push({key:'invalid-current:'+a.asset.key,reason:'بهای تطبیق‌شده معتبر نیست',assetKeys:[a.asset.key]});
   const known = valuation.covered !== '0';
   const pnl = ready && !stale && !issues.length ? valuation.pnl ?? valuation.partialPnl : null;
   const basis = known ? valuation.basis : null;
   const status = !known ? 'missing' : valuation.excess !== '0' ? 'mismatch' : issues.length ? 'review' : !ready ? 'history' : stale ? 'stale' : valuation.unknown !== '0' ? 'partial' : 'ready';
-  return { ...a, price, sources, ready, stale, issues, valuation, basis, pnl, status, avgCost: basis !== null ? new Decimal(basis).div(valuation.covered).toNumber() : null, pnlPct: pnl !== null && basis !== null && basis > 0 ? pnl / basis * 100 : null, share: !portfolio.partial && !portfolio.stale && portfolio.total != null && portfolio.total > 0 && a.priced ? a.value.toNumber() / portfolio.total * 100 : null };
+  return { ...a, current, price, sources, ready, stale, issues, valuation, basis, pnl, status, avgCost: basis !== null ? new Decimal(basis).div(valuation.covered).toNumber() : null, pnlPct: pnl !== null && basis !== null && basis > 0 ? pnl / basis * 100 : null, share: !portfolio.partial && !portfolio.stale && portfolio.total != null && portfolio.total > 0 && a.priced ? a.value.toNumber() / portfolio.total * 100 : null };
  });
  return { rows, result, walletCovered };
 }

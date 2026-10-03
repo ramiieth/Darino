@@ -91,14 +91,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'wallets', to: '/wallets', label: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
       { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
       {
-        id: 'accounting',
-        to: '/accounting',
-        label: 'خرید و سود و زیان',
-        description: 'هزینهٔ خرید رمزارزها و FIFO',
-        icon: BookOpenText,
-        primary: true
-      },
-      {
         id: 'arcus',
         to: '/arcus',
         label: 'آرکوس',
@@ -183,7 +175,7 @@ export const DESIGN_SYSTEM_ITEM: NavItem = {
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), DESIGN_SYSTEM_ITEM];
 
 /** Bottom bar order — home first, then the portfolio */
-export const PRIMARY_MOBILE: NavItem[] = ['market', 'dashboard', 'defi', 'accounting']
+export const PRIMARY_MOBILE: NavItem[] = ['market', 'dashboard', 'defi', 'wallets']
   .map((id) => ALL_NAV_ITEMS.find((i) => i.id === id))
   .filter((i): i is NavItem => !!i);
 

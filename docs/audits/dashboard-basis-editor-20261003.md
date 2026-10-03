@@ -1,0 +1,12 @@
+# Dashboard current-balance basis editor — 2026-10-03
+
+- Removed the standalone accounting page from web navigation and PWA primary navigation. The old /accounting URL redirects to /dashboard. Historical source files/data remain; no database retirement or deletion is performed.
+- A Persian token identity opens a contextual native Sheet. API quantity/current price/value are read-only. The only editable field is total remaining acquisition cost in USD, including known purchase fees. Persian fractional input supported; weighted average is computed automatically as total divided by current API balance.
+- Saved current-balance reconciliation is a separate per-asset snapshot, not a fictional historic purchase. Original FIFO lots and previous cost snapshots are retained. It does not write to API holdings or modify another asset's baseline.
+- Valuation uses the asset's reconciliation timestamp for subsequent known activity. Current matched snapshots can show immediate PnL without requiring pre-baseline transaction history. Subsequent changes still require covered history; unknown added quantity, missing transaction costs and mismatched quantities are not fabricated.
+- Current-balance average reconciliation cannot reconstruct old FIFO purchases or historic sale profit. The expandable realized-sale section and assistant withhold the aggregate historic sale total after reconciliation instead of treating the confirmed current cost as original historic purchase cost. Pre-existing lot-backed history remains visible in the token's preserved-record disclosure. Cross-asset swaps requiring an unavailable outgoing historical basis remain flagged for review.
+- Dashboard, assistant and preserved accounting view share cost valuation. API credentials, wallet signing and provider requests are unaffected. No new dependency, migration or schema change.
+
+Validation: production frontend/server TypeScript, Vite/PWA passed; 102 files / 1,184 tests passed. Added tests verify exact 0.65 ETH / 1,625 USD -> 2,500 USD average and 325 USD open PnL at 3,000 USD price, preserving old lots/revisions, no invented costs after balance growth, and corrupt saved snapshot handling.
+
+Isolated mocked browser verifies one editable field, Persian input/live average, persisted total and quantity, preserved old lots, responsive editor/cards/table at 320/390/768/1280/1440 in light/dark/touch. No actual wallet/API account or installed-device PWA test; no deployment.

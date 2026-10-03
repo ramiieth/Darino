@@ -11,7 +11,7 @@ try {
  await page.evaluate(async () => {
   const React = (await import('/node_modules/.vite/deps/react.js')).default;
   const { createRoot } = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
-  const source = await (await fetch('/src/features/cost-basis/presentation/CostSummaryPanel.tsx')).text();
+  const source = await (await fetch('/src/app/App.tsx')).text();
   const routerPath = source.match(/from ["']([^"']*react-router-dom[^"']*)["']/)[1];
   const { MemoryRouter } = await import(routerPath);
   const { CostSummaryPanel } = await import('/src/features/cost-basis/presentation/CostSummaryPanel.tsx');
@@ -44,6 +44,19 @@ try {
  await host.getByText('تاریخچه ناقص',{exact:true}).last().waitFor();
  assert(!(await host.innerText()).includes('۶۵۰'));
  await host.getByText('بهای خرید و جزئیات',{exact:true}).click(); assert((await host.innerText()).includes('۱,۳۰۰'));
+ await page.evaluate(()=>{const q=window.costQA;q.p.wallets[0].state.historyLoaded=true;q.p.wallets[0].state.data.fetchedAt=Date.now();q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));});
+ await host.evaluate(el=>el.style.zIndex='1');
+ await host.getByRole('button',{name:'بهای خرید اتریوم',exact:true}).last().click();
+ const dialog=page.getByRole('dialog',{name:'بهای تمام‌شده',exact:true});await dialog.waitFor();
+ assert.equal(await dialog.getByRole('textbox').count(),1);
+ await dialog.getByLabel('بهای تمام‌شده · دلار',{exact:true}).fill('۱۶۲۵');
+ assert((await dialog.innerText()).includes('۲,۵۰۰'));
+ for(const width of [320,390,1440]) {await page.setViewportSize({width,height:900});assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),`editor overflow ${width}`);}
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(400);await page.screenshot({path:'/tmp/darino-basis-editor-mobile.png'});
+ await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ assert((await host.innerText()).includes('۳۲۵'));
+ const preserved=await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');const b=getPref('cost-basis-v1').value;return {lots:b.lots.length,total:b.currentBasis['fungible:ethereum'].total,qty:b.currentBasis['fungible:ethereum'].quantity};});
+ assert.deepEqual(preserved,{lots:1,total:'1625',qty:'0.65'});
  assert.deepEqual(errors,[]);
- console.log('PASS: dashboard cost rows, Persian figures, 320/390/768/1280/1440 light/dark/touch, disclosure, reactive purchase update and history gating. No live provider or installed-PWA test.');
+ console.log('PASS: dashboard cost rows, Persian figures, 320/390/768/1280/1440 light/dark/touch, disclosure, reactive purchase update, one-field total-basis editor, automatic average, saved old-lot preservation and history gating. No live provider or installed-PWA test.');
 } finally {await browser.close();}

@@ -8,7 +8,7 @@ export const COST_PREF='cost-basis-v1';
 export interface CostAsset { key:string;tokenId:string;symbol:string;name:string;chain:string;contract:string|null;icon:string|null }
 export interface CostLot { id:string;asset:CostAsset;quantity:string;unitCost:string;fee:string|null;at:number;source:string }
 export interface ArchivedPurchase {id:string;symbol:string;quantity:string;unitCost:string;fee:string|null;at:number}
-export interface CostBook {archivedPurchases?:ArchivedPurchase[];version:1;asOf:number;lots:CostLot[];migrationConfirmed:boolean;legacyRetired:boolean}
+export interface CostBook {currentBasis?:Record<string,import('./currentBasis').CurrentBasis>;basisHistory?:import('./currentBasis').CurrentBasis[];archivedPurchases?:ArchivedPurchase[];version:1;asOf:number;lots:CostLot[];migrationConfirmed:boolean;legacyRetired:boolean}
 const CASH_SYMBOLS=new Set(['USDT','USDC','DAI','USDG','USD₮0','USDT0']);
 const CASH_IDS=new Set(['tether','usdt','usdt0','usd-coin','usdc','dai','global-dollar','usdg']);
 export function verifiedCash(chain:string,contract:string|null|undefined,token?:{verified?:boolean;tokenId?:string;symbol:string}) {
