@@ -1,3 +1,4 @@
+import { refreshBorosAccount } from '@/features/boros/data/useBorosAccount';
 import { loadAssistantStablecoins } from './stablecoins';
 import { loadBoros, useBorosStore } from '@/features/boros/data/useBoros';
 import { loadTopPerformers, usePerfStore } from '@/features/cryptomarkets/data/useTopPerformers';
@@ -12,7 +13,7 @@ import { useUsdtStore, usdtIsStale } from '@/shared/store/usdtStore';
 export function prepareAssistantData(force = false): Promise<PromiseSettledResult<void>[]> {
     const now = Date.now();
     const due = (at: number | null, ttl: number) => force || at === null || now - at > ttl;
-    const tasks: Promise<void>[] = [loadAssistantStablecoins(), useSettingsStore.getState().hydrate(), useWatchlistStore.getState().hydrate(), useVehicleStore.getState().hydrate(), usePropertyMarketStore.getState().hydrate()];
+    const tasks: Promise<void>[] = [refreshBorosAccount(force), loadAssistantStablecoins(), useSettingsStore.getState().hydrate(), useWatchlistStore.getState().hydrate(), useVehicleStore.getState().hydrate(), usePropertyMarketStore.getState().hydrate()];
     if (due(useBorosStore.getState().loadedAt, 120000))
         tasks.push(loadBoros());
     if (due(usePerfStore.getState().loadedAt, 300000))

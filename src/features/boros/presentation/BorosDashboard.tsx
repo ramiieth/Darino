@@ -17,11 +17,13 @@ import { OpportunitiesTab } from './OpportunitiesTab';
 import { ComparisonTab } from './ComparisonTab';
 import { SimulatorTab } from './SimulatorTab';
 import { RiskMonitorTab } from './RiskMonitorTab';
+import { AccountTab } from './AccountTab';
 import { AuditTab } from './AuditTab';
 
-type Tab = 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
+type Tab = 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'account', label: 'حساب من' },
   { value: 'opp', label: 'فرصت‌ها' },
   { value: 'compare', label: 'مقایسه' },
   { value: 'sim', label: 'شبیه‌ساز' },
@@ -64,22 +66,6 @@ export default function BorosDashboard() {
     />
   );
 
-  if (loading && markets.length === 0) {
-    return (
-      <Page>
-        {header}
-        <PageSkeleton />
-      </Page>
-    );
-  }
-  if (error && markets.length === 0) {
-    return (
-      <Page>
-        {header}
-        <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />
-      </Page>
-    );
-  }
 
   return (
     <Page>
@@ -117,6 +103,9 @@ export default function BorosDashboard() {
 
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
+        {tab === 'account' && <AccountTab markets={markets} />}
+        {tab !== 'account' && loading && markets.length === 0 && <PageSkeleton />}
+        {tab !== 'account' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
         {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
         {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
         {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}

@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
+import { useBorosAccount } from '@/features/boros/data/useBorosAccount';
+import { packAccount, CROSS } from '@/shared/boros/account';
 import { buildAppContext, performanceRankings } from './context';
 import { appContextSchema, sectionKeys } from '@/shared/assistant/schema';
 import { useBorosStore } from '@/features/boros/data/useBoros';
@@ -19,6 +21,7 @@ const NOW = 1800000000000;
 const empty = () => ({ wallets: [], arcus: [], total: null, partial: false, stale: false }) as unknown as ConnectedPortfolio;
 const coin = (symbol: string): PerfCoin => ({ symbol, id: symbol, nameFa: symbol, kind: 'crypto', price: 10, marketCap: 100 });
 beforeEach(() => {
+    useBorosAccount.setState({root:'',accountId:0,data:null,loading:false,error:null});
     useBorosStore.setState({ markets: [], loadedAt: null, loading: false, stale: false });
     usePerfStore.setState({ coins: [], perf1d: {}, perf7d: {}, perf30: {}, perf60: {}, perf90: {}, returnAsOf: {}, loadedAt: null, loading: false, historyDone: false, stale: false });
     useAssistantInsights.setState({ rows: {} });
@@ -108,4 +111,16 @@ describe('all-app financial context', () => {
         expect(json).not.toContain('private-wallet-address');
         expect(json).not.toContain('private-account-name');
     });
+});
+
+it('sends actual Boros PnL and preview without identifiers or double-counting dashboard',()=>{
+ const root='0x1111111111111111111111111111111111111111';const handle=packAccount(root,0,2,CROSS);
+ useBorosAccount.setState({root,data:{root,accountId:0,fetchedAt:NOW,syncedAt:NOW,assets:[{tokenId:2,symbol:'WETH',priceUsd:2000,logo:null}],balances:[{handle,tokenId:2,marketId:CROSS,cash:1,equity:1.1,margin:.2,freeMargin:.9,maintenanceBuffer:1}],positions:[{handle,marketId:1,tokenId:2,side:'long',size:2,fixedApr:.05,unrealized:.02,realizedTrade:.01,settlement:.03,liquidationApr:.15,matured:false}],settlements:[],transfers:[],orders:[],historyComplete:true,partial:false,errors:[]}});
+ useAssistantInsights.setState({rows:{borosOfficialPreview:[{name:'پیش‌نمایش رسمی بوروس',kind:'borosOfficialPreview',source:'simulation',status:'partial',asOf:NOW,metrics:{marginCollateral:.02,matchedApr:.08}}]}});
+ const context=appContextSchema.parse(buildAppContext(empty(),NOW));const rows=context.sections.find(s=>s.key==='boros')!.rows;
+ expect(rows.find(r=>r.name==='حساب واقعی بوروس')!.metrics.equityUsd).toBe(2200);
+ expect(rows.find(r=>r.kind==='پوزیشن واقعی لانگ فاندینگ')!.metrics).toMatchObject({unrealizedPnlUsd:40,allTimeTradePnlUsd:20,allTimeSettlementPnlUsd:60});
+ expect(rows.some(r=>r.kind==='borosOfficialPreview'&&r.source==='simulation')).toBe(true);
+ expect(context.sections.find(s=>s.key==='dashboard')!.rows[0].metrics.totalUsd).toBeNull();
+ expect(JSON.stringify(context)).not.toContain(root);expect(JSON.stringify(context)).not.toContain(handle);
 });

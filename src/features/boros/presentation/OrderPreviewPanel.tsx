@@ -1,3 +1,5 @@
+import type { OfficialPreview } from '@/shared/boros/account';
+import { OfficialPreviewPanel } from './OfficialPreviewPanel';
 import { usePublishInsight } from '@/shared/assistant/insights';
 /** Manual pre-entry assumptions; no signing, trading or account connection. */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,6 +25,10 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   onSelectMarket?: (marketId: number, direction: BorosDirection) => void;
 }) {
   const [notional, setNotional] = useState('2');
+  const [quote,setQuote]=useState<OfficialPreview|null>(null);
+  const quoted=quote&&quote.marketId===market.marketId&&quote.side===direction&&quote.matchedSize===Number(notional)&&Date.now()-quote.fetchedAt<180000?quote:null;
+  const effectiveRate=quoted?.matchedApr??fixedRate;
+  useEffect(()=>{if(!quote)return;const t=setTimeout(()=>setQuote(null),Math.max(0,180000-(Date.now()-quote.fetchedAt)));return()=>clearTimeout(t);},[quote]);
   const [collateral, setCollateral] = useState('');
   const [capitalUnit, setCapitalUnit] = useState('asset');
   const [gas, setGas] = useState('');
@@ -42,11 +48,11 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
   const completeCosts = Object.values(costInputs).every(v => v !== null);
   const costsSum = Object.values(costInputs).reduce<number>((a, v) => a + (v ?? 0), 0);
   const assumedFloating = floating.trim() === '' ? underlyingApr : /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(floating) ? Number(floating) / 100 : NaN;
-  const analysis = useMemo(() => analyzeEntry({ m: market, direction, sizeYu: optionalNumber(notional) ?? 0, capitalUsd, entryRate: fixedRate ?? market.markApr, floatingRate: assumedFloating, ...costInputs, marginUsd: margin === '' ? null : optionalNumber(margin) ?? NaN }), [market, direction, notional, capitalUsd, fixedRate, assumedFloating, gas, fees, slippage, margin]);
-  usePublishInsight('borosEntry', `${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: fixedRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: analysis.margin, feesUsd: costInputs.feesUsd, gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready');
+  const analysis = useMemo(() => analyzeEntry({ m: market, direction, sizeYu: optionalNumber(notional) ?? 0, capitalUsd, entryRate: effectiveRate ?? market.markApr, floatingRate: assumedFloating, ...costInputs, marginUsd: margin === '' ? null : optionalNumber(margin) ?? NaN }), [market, direction, notional, capitalUsd, effectiveRate, assumedFloating, gas, fees, slippage, margin]);
+  usePublishInsight('borosEntry', `${borosAssetName(market.asset)} · ${borosVenueName(market.venue)} · ${direction === 'long' ? 'لانگ' : 'شورت'}`, analysis ? { marketId: market.marketId, capitalUsd, sizeYu: optionalNumber(notional), entryApr: effectiveRate ?? market.markApr, floatingApr: assumedFloating, marginRequiredUsd: analysis.margin, feesUsd: costInputs.feesUsd, gasUsd: costInputs.gasUsd, slippageUsd: costInputs.slippageUsd, projectedNetUsd: analysis.net, capitalRemainingUsd: analysis.capitalRemaining, adverseNetUsd: analysis.scenarioMin, favorableNetUsd: analysis.scenarioMax, breakEvenFloatingApr: analysis.breakEvenFloating, roiCapitalPct: analysis.roiCapital } : null, 'simulation', analysis?.state === 'unavailable' ? 'stale' : analysis?.state === 'incomplete' ? 'partial' : 'ready');
   const candidates = useMemo(() => scanEntries(markets, capitalUsd, optionalNumber(allocation) ?? 0, costInputs), [markets, capitalUsd, allocation, gas, fees, slippage]);
   const autoSize = () => {
-    const size = sizeFromBudget(market, capitalUsd, optionalNumber(allocation) ?? 0, costsSum, Math.floor(Date.now() / 1000), fixedRate ?? market.markApr);
+    const size = sizeFromBudget(market, capitalUsd, optionalNumber(allocation) ?? 0, costsSum, Math.floor(Date.now() / 1000), effectiveRate ?? market.markApr);
     if (size != null && size > 0) { setNotional(String(Number(size.toFixed(8)))); setMargin(''); }
   };
   const field = (label: string, value: string, setValue: (v: string) => void, suffix: string, placeholder?: string) => <Field label={label}><Input dir="ltr" inputMode="decimal" value={value} onChange={e => setValue(normalizeDecimalInput(e.target.value))} suffix={suffix} placeholder={placeholder} /></Field>;
@@ -61,7 +67,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
         {field('تخصیص مارجین', allocation, setAllocation, '٪')}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs text-muted">{direction === 'long' ? 'لانگ' : 'شورت'} · نرخ ورود <PercentValue value={(fixedRate ?? market.markApr) * 100} signed={false} tone="none" /></span>
+        <span className="text-xs text-muted">{direction === 'long' ? 'لانگ' : 'شورت'} · نرخ ورود <PercentValue value={(effectiveRate ?? market.markApr) * 100} signed={false} tone="none" /></span>
         <Button size="sm" variant="outline" onClick={autoSize} disabled={!completeCosts || capitalUsd <= 0}>محاسبه حجم با سرمایه</Button>
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -77,6 +83,9 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
         <p className="pb-2 text-xs text-muted">واحد بازده، حجم قرارداد است؛ وثیقه توکن جدا می‌ماند. کارمزدها برای کل دوره‌اند؛ گس و لغزش جدا حساب می‌شوند. لغزشِ لحاظ‌شده در نرخ ورود را دوباره وارد نکنید.</p>
       </Disclosure>
     </Surface>
+
+    <OfficialPreviewPanel market={market} direction={direction} size={notional} onApply={p=>{setQuote(p);setNotional(String(p.matchedSize));setSlippage('0');}} />
+    {quoted&&<Notice tone="info">حجم و نرخ اجرای پیش‌نمایش در سناریو استفاده شد؛ لغزش در نرخ لحاظ شده و هزینه کامل همچنان باید مشخص باشد.</Notice>}
 
     {!analysis ? <EmptyState message="سرمایه و حجم معتبر وارد کنید." /> : <>
       <Surface variant="focal" className="p-4 md:p-5">

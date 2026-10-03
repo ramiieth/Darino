@@ -4,6 +4,8 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
   "functions": {
+    "api/boros.ts": { "includeFiles": "db/schema.sql" },
+    "api/borosAccount.ts": { "includeFiles": "db/schema.sql", "maxDuration": 60 },
     "api/health.ts": {
       "includeFiles": "db/schema.sql"
     },

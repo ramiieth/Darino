@@ -1,3 +1,5 @@
+import { useBorosAccount, accountIsStale } from '@/features/boros/data/useBorosAccount';
+import { accountTotals } from '@/shared/boros/account';
 import Decimal from 'decimal.js';
 import { usToMsNumber } from '@/features/arcus/api/types';
 import type { AppContext, AssistantSection, InsightRow } from '@/shared/assistant/schema';
@@ -116,8 +118,21 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
             return insight(`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`, `${direction === 'long' ? 'لانگ' : 'شورت'} · ${direction === 'long' ? a.statusLong : a.statusShort} · وثیقه ${tokenName(m.collateralSymbol ?? '')}`, metrics, 'api', boros.stale || a.freshness.stale ? 'stale' : !a.valid || m.status !== 'GOOD' ? 'unavailable' : 'partial', m.snapshotAt ?? boros.loadedAt);
         });
     });
-    borosRows.push(...(useAssistantInsights.getState().rows.borosEntry ?? []));
-    sections.push(section('boros', 'بوروس', borosRows, boros.loadedAt, boros.stale ? 'stale' : boros.loading ? 'loading' : borosRows.length ? 'partial' : 'unavailable', 'مقایسه با اندازه اسمی استاندارد ۱۰۰۰ دلار، نه سرمایه مارجین کاربر. سود فرضی تا سررسید با نرخ شناور و قیمت وثیقه فعلی است. لغزش، گس واقعی و هزینه ورود اولیه نامشخص‌اند؛ خالص هزینه‌های معلوم سود خالص اجرای واقعی نیست. Liquidation APR بدون حساب و پوزیشن نامشخص است؛ تاریخچه نرخ شناور سود تاریخی پوزیشن نیست.'));
+    borosRows.push(...(useAssistantInsights.getState().rows.borosEntry ?? []), ...(useAssistantInsights.getState().rows.borosOfficialPreview ?? []).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>180000?'stale' as const:r.status})));
+    const accountState=useBorosAccount.getState(); const account=accountState.data;
+    const realRows:InsightRow[]=[];
+    if(account){
+      const at=account.syncedAt;const status=accountIsStale(accountState,now)?'stale':account.partial?'partial':'ready';
+      const prices=new Map(account.assets.map(a=>[a.tokenId,a.priceUsd]));
+      const usd=(v:number|null,id:number)=>v!==null&&prices.get(id)!=null&&prices.get(id)!>0?v*prices.get(id)!:null;
+      realRows.push(insight('حساب واقعی بوروس','حساب نرخ فاندینگ؛ جدا از مجموع داشبورد',{...accountTotals(account),accountId:account.accountId,positionCount:account.positions.length,historyComplete:Number(account.historyComplete)},'api',status,at));
+      realRows.push(...account.positions.map(p=>{const m=boros.markets.find(m=>m.marketId===p.marketId);return insight(m?`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`:'بوروس',p.side==='long'?'پوزیشن واقعی لانگ فاندینگ':'پوزیشن واقعی شورت فاندینگ',{marketId:p.marketId,sizeYu:p.size,fixedApr:p.fixedApr,unrealizedPnlUsd:usd(p.unrealized,p.tokenId),allTimeTradePnlUsd:usd(p.realizedTrade,p.tokenId),allTimeSettlementPnlUsd:usd(p.settlement,p.tokenId),liquidationApr:p.liquidationApr,matured:Number(p.matured),remainingGrossSettlementUsd:status==='ready'&&m?.snapshotAt&&now-m.snapshotAt<180000&&p.size!==null&&p.fixedApr!==null&&Number.isFinite(m.floatingApr)?usd((p.side==='long'?1:-1)*p.size*(m.floatingApr-p.fixedApr)*Math.max(0,m.maturity-now/1000)/(365*86400),p.tokenId):null},'api',status,at); }));
+      realRows.push(...account.settlements.map(e=>insight('تسویه واقعی بوروس','تسویه خالص؛ هزینه در مبلغ کسر شده',{marketId:e.marketId,netCollateral:e.amount,feeCollateral:e.fee,settlementApr:e.rate,currentEquivalentUsd:usd(e.amount,e.tokenId)},'api',status,e.at)));
+      realRows.push(...account.orders.map(o=>insight('سفارش باز بوروس',o.side==='long'?'لانگ فاندینگ':'شورت فاندینگ',{marketId:o.marketId,sizeYu:o.size,apr:o.rate,marginCollateral:o.margin},'api',status,at)));
+      realRows.push(...account.transfers.map(e=>insight('انتقال وثیقه بوروس',e.kind,{quantity:e.amount,currentEquivalentUsd:usd(e.amount,e.tokenId)},'api',status,e.at)));
+    }else if(accountState.root)realRows.push(insight('حساب واقعی بوروس','حساب ثبت‌شده؛ داده دریافت نشده',{},'api',accountState.loading?'loading':'unavailable',null));
+    borosRows.unshift(...realRows);
+    sections.push(section('boros', 'بوروس', borosRows, boros.loadedAt, boros.stale ? 'stale' : boros.loading ? 'loading' : borosRows.length ? 'partial' : 'unavailable', 'عمومی: اندازه اسمی ۱۰۰۰ دلار، نه سرمایه کاربر؛ برآورد سررسید و هزینه‌های معلوم، سود اجرای واقعی نیست. واقعی: داده حساب جدا از مجموع داشبورد است؛ هم‌پوشانی زریون بررسی نشده. سود معامله و تسویه از ابتدا برای همان بازار است، نه فقط ورود فعلی یا همه بازارهای بسته‌شده. معادل دلار با قیمت فعلی وثیقه است، نه دلار تاریخی. تسویه خالص شامل هزینه است؛ دوباره کسر نشود. تاریخچه با خلاصه دوباره جمع نشود. تسویه باقی‌مانده فرض ثبات نرخ، پیش از هزینه است. پیش‌نمایش رسمی سفارش اجراشده نیست؛ هزینه کامل و سود آینده را نمی‌دهد.'));
     const defi = useTvlFlowStore.getState();
     const defiRows = [...(useAssistantInsights.getState().rows.stablecoins ?? []), ...defi.chains.map(c => insight(chainIdentity(c.name).name, 'شبکه', { tvlUsd: c.tvl, ...Object.fromEntries(Object.entries(c.changes).map(([d, v]) => [`tvlChange${d}dPct`, v?.pct ?? null])) }, 'api', c.history ? 'ready' : 'partial', defi.loadedAt)), ...defi.protocols.slice().sort((a, b) => b.t - a.t).slice(0, 80).map(c => insight(c.n, `${c.cat} · ${chainIdentity(c.ch).name}`, { tvlUsd: c.t, change1dPct: c.c1, change7dPct: c.c7 }, 'api', ageStatus(defi.loadedAt, now, 3600000), defi.loadedAt))];
     sections.push(section('defi', 'دیفای', defiRows, defi.loadedAt, defi.error ? 'stale' : defi.loading ? 'loading' : defiRows.length ? 'partial' : 'unavailable', 'تغییر TVL سود سرمایه‌گذاری نیست؛ پروتکل‌ها نماینده ۸۰ مورد با بیشترین TVL هستند، نه همه پروتکل‌های جهان.'));
