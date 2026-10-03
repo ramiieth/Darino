@@ -12,7 +12,7 @@ let retryAt=0;
 let manualProbeAt=0;
 try{const stored=Number(localStorage.getItem(COOLDOWN_KEY));retryAt=Number.isFinite(stored)&&stored>Date.now()?stored:0;}catch{/* Storage can be unavailable. */}
 function setRetry(at:number){retryAt=Math.max(retryAt,at);try{localStorage.setItem(COOLDOWN_KEY,String(retryAt));}catch{/* Keep memory cooldown. */}}
-function cooldown(e:unknown,address:string){if(!isBitcoinAddress(address)&&e instanceof HttpError&&e.status===429)setRetry(Date.now()+Math.max(e.retryAfter,60)*1000);}
+function cooldown(e:unknown,address:string){if(!isBitcoinAddress(address)&&e instanceof HttpError&&e.status===429)setRetry(Date.now()+(e.retryAfter>0?e.retryAfter:60)*1000);}
 function patch(address: string, changes: Partial<WalletState>) { const k = addressKey(address); useConnectedStore.setState(s => ({ wallets: { ...s.wallets, [k]: { ...(s.wallets[k] ?? empty()), ...changes } } })); }
 function errorText(e: unknown): string { return e instanceof HttpError ? e.code ?? 'خطای اتصال به سرور' : e instanceof Error ? e.message : 'دریافت داده انجام نشد'; }
 export async function refreshWallet(address: string, force = false): Promise<void> {

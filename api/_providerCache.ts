@@ -13,3 +13,21 @@ export async function writeProviderCache(key:string,payload:unknown,ttl:number) 
  const expiresAt=Date.now()+ttl;remember(key,{payload,expiresAt});if(!isDbConfigured())return;
  try {await db()`INSERT INTO "providerCache" ("key","payload","expiresAt") VALUES (${key},${JSON.stringify(payload)}::jsonb,${expiresAt}) ON CONFLICT ("key") DO UPDATE SET "payload"=EXCLUDED."payload", "expiresAt"=EXCLUDED."expiresAt"`;if(Date.now()-cleanupAt>300000){cleanupAt=Date.now();await db()`DELETE FROM "providerCache" WHERE "expiresAt"<${Date.now()}`;}}catch{/* Cache failure must not replace valid provider data. */}
 }
+
+// Successful wallet snapshots survive credential rotation; raw quota/cache stays key-scoped.
+export function walletSnapshotKey(userId:string,address:string) {
+ return createHash('sha256').update('zerion-wallet-v2\0'+userId+'\0'+address).digest('hex');
+}
+// Atomically reserve a request slot across Vercel instances using the existing cache table.
+// No table migration, credentials or wallet data are stored in the lease payload.
+export async function reserveProviderSlot(key:string,now:number,deadline:number,spacing=550):Promise<number|null> {
+ if(!isDbConfigured())return now;
+ try {
+  const rows=await db()`INSERT INTO "providerCache" ("key","payload","expiresAt")
+   SELECT ${key}, '{"lease":true}'::jsonb, ${now+spacing} WHERE ${now+spacing}<=${deadline}
+   ON CONFLICT ("key") DO UPDATE SET "expiresAt"=GREATEST("providerCache"."expiresAt",${now})+${spacing}
+   WHERE GREATEST("providerCache"."expiresAt",${now})+${spacing}<=${deadline}
+   RETURNING "expiresAt"`;
+  return rows[0]?Number(rows[0].expiresAt)-spacing:null;
+ }catch{return now;} // Existing in-instance queue remains the fallback when storage is unavailable.
+}

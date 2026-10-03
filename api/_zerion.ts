@@ -1,12 +1,12 @@
 import { Decimal } from 'decimal.js';
-import { readProviderCache,writeProviderCache,providerCacheKey } from './_providerCache.js';
+import { readProviderCache,writeProviderCache,providerCacheKey,walletSnapshotKey,reserveProviderSlot } from './_providerCache.js';
 import { arr, obj, str, normalizePosition, normalizeTransaction, deduplicatePositions, addressKey, type WalletSnapshot, type ChainInfo, type TransactionPage } from '../src/features/connected/domain/model.js';
 export class ProviderError extends Error { constructor(public status: number, message: string, public retryAfter = 0) { super(message); } }
 const BASE = 'https://api.zerion.io';
 const cache = new Map<string, { at: number; value: WalletSnapshot }>();
 const running = new Map<string, Promise<WalletSnapshot>>();
 let chainsCache: { at: number; data: ChainInfo[] } | null = null;
-// Queue within this server instance, leaving room under the free plan's 3 RPS.
+// Local queue plus a persistent slot reservation coordinates serverless instances.
 let tail: Promise<unknown> = Promise.resolve();
 let lastCall = 0;
 const responseAt=new WeakMap<Record<string,unknown>,number>();
@@ -30,9 +30,15 @@ async function cachedGet(path: string, deadline: number,force:boolean): Promise<
  const run = tail.catch(() => undefined).then(async () => {
     const cooldown=await readProviderCache<{until:number;message:string}>(cooldownKey);
     if(cooldown&&cooldown.until>Date.now())throw new ProviderError(429,cooldown.message,Math.ceil((cooldown.until-Date.now())/1000));
-    const delay = Math.max(0, 360 - (Date.now() - lastCall));
+    const delay = Math.max(0, 550 - (Date.now() - lastCall));
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     if(Date.now() >= deadline) throw new ProviderError(504, 'زمان دریافت داده تمام شد');
+    const slot=await reserveProviderSlot(providerCacheKey('request-slots'),Date.now(),deadline);
+    if(slot===null)throw new ProviderError(429,'درخواست‌های زریون در صف هستند',1);
+    if(slot>Date.now())await new Promise(resolve=>setTimeout(resolve,slot-Date.now()));
+    const latestCooldown=await readProviderCache<{until:number;message:string}>(cooldownKey);
+    if(latestCooldown&&latestCooldown.until>Date.now())throw new ProviderError(429,latestCooldown.message,Math.ceil((latestCooldown.until-Date.now())/1000));
+    if(Date.now()>=deadline)throw new ProviderError(504,'زمان دریافت داده تمام شد');
     lastCall = Date.now();
     const apiKey = process.env.ZERION_API_KEY;
     if (!apiKey) throw new ProviderError(503, 'کلید زریون هنوز در سرور تنظیم نشده است');
@@ -65,8 +71,9 @@ export async function getWallet(address: string, userId: string, force = false):
   const key = `${userId}:${addressKey(address)}`;
   const hit = cache.get(key); if (hit && Date.now() - hit.at < (force || !hit.value.complete ? 60000 : 1800000)) return hit.value;
   if (running.has(key)) return running.get(key)!;
-  const lastKey=providerCacheKey('last-wallet:'+userId+':'+addressKey(address));
-  const previous=await readProviderCache<WalletSnapshot>(lastKey);
+  const lastKey=walletSnapshotKey(userId,addressKey(address));
+  const previous=await readProviderCache<WalletSnapshot>(lastKey)??await readProviderCache<WalletSnapshot>(providerCacheKey('last-wallet:'+userId+':'+addressKey(address)));
+  if(previous?.complete)await writeProviderCache(lastKey,previous,30*86400000);
   const work = (async () => {
     const deadline = Date.now() + 48000;
     const chains = await getChains().catch(() => chainsCache?.data ?? []);
