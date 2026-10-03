@@ -117,7 +117,7 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
     });
     const published=useAssistantInsights.getState();
     const currentScope=accountAnalysisScope(useBorosAccount.getState().data);
-    for(const key of ['borosCapitalPlan','borosEntry','borosOfficialPreview','borosVerifiedCandidates']){
+    for(const key of ['borosCapitalPlan','borosComparison','borosEntry','borosOfficialPreview','borosVerifiedCandidates']){
       const scoped=published.scopes[key];
       if(scoped&&scoped!==currentScope)continue;
       if(['borosOfficialPreview','borosVerifiedCandidates'].includes(key)&&!scoped)continue;

@@ -1,35 +1,24 @@
-import { useState } from 'react';
+import {useBorosAccount} from '../data/useBorosAccount';
+import {accountAnalysisScope} from '../domain/accountBudget';
+import {useAssistantInsights} from '@/shared/assistant/insights';
+import { useEffect, useState } from 'react';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { Metric, MetricGrid, MoneyValue, PercentValue,QuantityValue } from '@/shared/components/ui/FinancialValue';
 import { Button } from '@/shared/components/ui/Button';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Disclosure } from '@/shared/components/ui/Disclosure';
-import { EmptyState } from '@/shared/components/ui/StateViews';
-import { normalizeDecimalInput } from '@/features/cost-basis/presentation/decimalInput';
-import { MarginCalculator } from '../domain/engine/margin';
-import { FeeCalculator } from '../domain/engine/fees';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { compareWithBudget,type PreviewDraft } from '../domain/workflow';
+import type { EntryCosts } from '../domain/recommendations';
 import type { BorosDirection, BorosMarket } from '../domain/types';
-import { borosAssetName } from './borosLabels';
+import { borosAssetName, borosVenueName } from './borosLabels';
 import { MarketIdentity } from './MarketIdentity';
-export function ComparisonTab({ markets,onInspect }: { markets: BorosMarket[];onInspect?:(marketId:number,direction:BorosDirection)=>void }) {
-  const [asset, setAsset] = useState('ETH');
-  const [direction,setDirection]=useState<BorosDirection>('long');
-  const [size, setSize] = useState('1000');
-  const assets = [...new Set(markets.map(m => m.asset))];
-  const current = assets.includes(asset) ? asset : assets[0];
-  const valid = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(size) && Number(size) > 0 && Number.isFinite(Number(size));
-  const now = Math.floor(Date.now() / 1000);
-  return <div className="space-y-5">
-    <Surface className="p-4 md:p-5 space-y-4"><div><h2 className="text-base font-bold">مقایسهٔ فرضی با حجم قرارداد یکسان</h2><p className="text-xs leading-6 text-muted mt-2">مقایسهٔ اولیهٔ نرخ، مارجین و بازده تا سررسید؛ هر بازار به‌صورت مستقل و بدون استفاده از موجودی حساب شما.</p></div><SegmentedControl label="جهت مقایسه" fill value={direction} onChange={setDirection} options={[{value:'long',label:'لانگ نرخ'},{value:'short',label:'شورت نرخ'}]}/><div className="grid gap-4 sm:grid-cols-2"><Field label="دارایی"><Select value={current} onChange={e => setAsset(e.target.value)}>{assets.map(a => <option key={a} value={a}>{borosAssetName(a)}</option>)}</Select></Field><Field label="ارزش دلاری قرارداد"><Input inputMode="decimal" dir="ltr" suffix="دلار" value={size} onChange={e => setSize(normalizeDecimalInput(e.target.value))} /></Field></div><p className="mt-3 text-xs text-muted">مثلاً قرارداد ۱۰۰۰ دلاری به معنای واریز ۱۰۰۰ دلار نیست؛ مارجین موردنیاز هر بازار جدا نشان داده می‌شود.</p></Surface>
-    {!valid ? <EmptyState message="ارزش اسمی معتبر وارد کنید" /> : <div className="grid gap-4 lg:grid-cols-2">{markets.filter(m => m.asset === current).map(m => {
-      const price = m.collateralPriceUsd;
-      const yu = price && price > 0 ? Number(size) / price : null;
-      const fees = yu != null ? FeeCalculator.calc({ m, size: yu, unitPriceUsd: price, nowSec: now }) : null;
-      const margin = yu != null && price ? MarginCalculator.calcMarket(m, yu, m.markApr, now) * price : null;
-      const gross = Number(size) * (m.floatingApr - m.markApr) * Math.max(0, m.maturity - now) / (365 * 86400);
-      const settlement=direction==='long'?gross:-gross;
-      return <Surface key={m.marketId} className="p-4 md:p-5 space-y-4"><MarketIdentity market={m} /><MetricGrid cols={2}><Metric size="sm" label="تا سررسید" value={<QuantityValue value={Math.max(0,m.maturity-now)/86400} digits={1} unit="روز"/>}/><Metric size="sm" label="نرخ مرجع · مارک" value={<PercentValue value={m.markApr * 100} signed={false} tone="none" />} /><Metric size="sm" label="نرخ پایه · شناور" value={<PercentValue value={m.floatingApr * 100} signed={false} tone="none" />} /><Metric size="sm" label="مارجین تخمینی" value={<MoneyValue value={margin} />} /><Metric size="sm" label="کارمزد پروتکل" value={<MoneyValue value={fees?.total} />} /><Metric size="sm" label="تسویهٔ فرضی تا سررسید" value={<MoneyValue value={settlement} signed tone="auto" />} /><Metric size="sm" label="پس از کارمزد پروتکل" value={<MoneyValue value={fees?settlement-fees.total:null} signed tone="auto" />} /></MetricGrid><Disclosure summary="فرض‌های این مقایسه"><p className="py-3 text-xs leading-6 text-muted">نرخ پایه تا سررسید ثابت و ورود در مارک فرض شده است. گس، هزینه ورود و لغزش لحاظ نشده‌اند؛ بنابراین نتیجه سود خالص نهایی نیست. سررسیدها و دارایی وثیقه ممکن است متفاوت باشند.</p></Disclosure><Button size="sm" variant="outline" className="w-full" onClick={()=>onInspect?.(m.marketId,direction)}>بررسی این بازار با حساب من</Button></Surface>;
-    })}</div>}
-  </div>;
+import { MarketWarnings } from './MarketWarnings';
+export function ComparisonTab({markets,capitalUsd,allocationPct,costs,mode,onInspect,active=true}:{markets:BorosMarket[];capitalUsd:number;allocationPct:number;costs:EntryCosts;mode:'real'|'hypothetical';active?:boolean;onInspect:(marketId:number,direction:BorosDirection,draft:PreviewDraft)=>void}){
+ const account=useBorosAccount();
+ const [direction,setDirection]=useState<BorosDirection>('long');
+ const packed=JSON.stringify(markets.map(m=>{const r=compareWithBudget(m,direction,capitalUsd,allocationPct,costs);return {name:`مقایسه · ${borosAssetName(m.asset)} · ${borosVenueName(m.venue)} · ${direction==='long'?'لانگ':'شورت'}`,kind:'borosComparison',source:'simulation' as const,status:!r||r.result.state==='unavailable'?'stale' as const:'partial' as const,asOf:m.snapshotAt??null,metrics:{marketId:m.marketId,realAccountBudget:Number(mode==='real'),capitalUsd,sizeYu:r?.sizeYu??null,quoteVerified:0,entryApr:m.markApr,floatingApr:m.floatingApr,projectedNetUsd:r?.result.net??null,adverseNetUsd:r?.result.scenarioMin??null,marginUsd:r?.result.margin??null,costsUsd:r?.result.costs??null,daysToMaturity:r?.result.preview.daysToMaturity??null,alternatives:1}};}));
+ const scope=mode==='real'?accountAnalysisScope(account.data):undefined;
+ useEffect(()=>{if(active)useAssistantInsights.getState().put('borosComparison',JSON.parse(packed),scope);},[packed,scope,active]);
+ return <Surface className="p-4 space-y-4"><h3 className="font-bold">مقایسهٔ گزینه‌های انتخاب‌شده</h3><p className="text-xs leading-6 text-muted">بودجه و هزینه‌ها یکسان‌اند؛ حجم قرارداد هر بازار جدا محاسبه می‌شود. نرخ ورود فعلاً مارک است؛ قیمت رسمی نیست.</p><SegmentedControl label="جهت مقایسه" fill value={direction} onChange={setDirection} options={[{value:'long',label:'لانگ نرخ'},{value:'short',label:'شورت نرخ'}]}/>
+ <div className="grid gap-3 xl:grid-cols-3">{markets.map(m=>{const row=compareWithBudget(m,direction,capitalUsd,allocationPct,costs);return <article key={m.marketId} className="min-w-0 rounded-2xl border border-divider p-3 space-y-3"><MarketIdentity market={m} compact/><MarketWarnings market={m}/>{!row?<Notice tone="warn">بودجه و هزینه‌های معتبر یا دادهٔ کافی برای این بازار لازم است.</Notice>:<><MetricGrid cols={2}><Metric size="sm" label="تا سررسید" value={<QuantityValue value={row.result.preview.daysToMaturity} digits={1} unit="روز"/>}/><Metric size="sm" label="حجم قرارداد" value={<QuantityValue value={row.sizeYu} digits={4} unit="واحد بازده"/>}/><Metric size="sm" label="پرداخت" value={<PercentValue value={(direction==='long'?m.markApr:m.floatingApr)*100} tone="none"/>}/><Metric size="sm" label="دریافت" value={<PercentValue value={(direction==='long'?m.floatingApr:m.markApr)*100} tone="none"/>}/><Metric size="sm" label="مارجین تخمینی" value={<MoneyValue value={row.result.margin}/>}/><Metric size="sm" label="هزینهٔ تخمینی کل" value={<MoneyValue value={row.result.costs}/>}/><Metric size="sm" label="خالص تخمینی تا سررسید" value={<MoneyValue value={row.result.net} signed tone="auto"/>}/><Metric size="sm" label="سناریوی نامساعد" value={<MoneyValue value={row.result.scenarioMin} signed tone="auto"/>}/></MetricGrid><p className="text-xs text-muted">با فرض ثابت‌ماندن نرخ شناور و قیمت وثیقه؛ آستانهٔ رسمی لیکوییدشدن هنوز دریافت نشده است.</p><Button size="sm" variant="outline" className="w-full" disabled={row.result.state==='unavailable'} onClick={()=>onInspect(m.marketId,direction,{mode,capitalUsd,sizeYu:row.sizeYu,costs})}>پیش‌نمایش همین حجم</Button></>}</article>;})}</div></Surface>;
 }
