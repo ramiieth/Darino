@@ -1,9 +1,11 @@
+import { isBitcoinAddress } from '../src/features/connected/domain/bitcoinAddress.js';
+import { getBitcoinWallet,getBitcoinTransactions } from './_bitcoin.js';
 import { getDirectory } from './_directory.js';
 /** One authenticated read-only endpoint for wallet data and Gemini analysis. No credentials reach the client. */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireSession } from './_authCore.js';
 import { json, readBody } from './_neon.js';
-import { validAddress } from '../src/features/connected/domain/model.js';
+import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
 import { getSpotTokens } from './_arcusSpot.js';
@@ -32,7 +34,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';
-    if (!validAddress(address)) { json(res,400,{ error:'آدرس عمومی EVM یا سولانا معتبر نیست' }); return; }
+    if (!await validPublicAddress(address)) { json(res,400,{ error:'آدرس عمومی معتبر نیست' }); return; }
+    if(isBitcoinAddress(address)){if(op==='wallet')json(res,200,await getBitcoinWallet(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,auth.userId,u.searchParams.get('refresh')==='1'));else if(op==='transactions')json(res,200,await getBitcoinTransactions(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,u.searchParams.get('next')??undefined));else json(res,400,{error:'این داده برای بیت‌کوین در دسترس نیست'});return;}
     const data = op === 'chart' ? await getBalanceChart(address,auth.userId,u.searchParams.get('period')??'day',(u.searchParams.get('ids')??'').split(',').filter(Boolean),u.searchParams.get('chain')??'') : op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined);
     json(res,200,data);
   } catch (e) {

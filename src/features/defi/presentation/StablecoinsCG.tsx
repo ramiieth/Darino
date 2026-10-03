@@ -193,7 +193,7 @@ export function StablecoinsCG() {
           </tbody>
         </table>
       </Surface>
-      <p className="text-xs text-muted">انحراف بیش از ۰٫۵٪ از ۱ دلار برجسته می‌شود. این فهرست توصیه سرمایه‌گذاری نیست.</p>
+
     </div>
   );
 }

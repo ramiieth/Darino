@@ -11,6 +11,9 @@ export const APPROVED_NETWORKS = [
  {id:'arc',name:'آرک',llama:'Arc',logo:'/logos/chain-5042.svg'},
  {id:'monad',name:'موناد',llama:'Monad',logo:'/logos/chain-monad.jpg'},
  {id:'plasma',name:'پلاسما',llama:'Plasma',logo:'/logos/chain-plasma.jpg'},
+ {id:'solana',name:'سولانا',llama:'Solana',logo:'/logos/chain-solana.svg'},
+ {id:'bitcoin',name:'بیت‌کوین',llama:'Bitcoin',logo:'/logos/token-btc.png'},
+ {id:'avalanche',name:'اولانچ',llama:'Avalanche',logo:'/logos/chain-avalanche.svg'},
  {id:'hyperliquid',name:'هایپرلیکوئید',llama:'Hyperliquid L1',logo:'/logos/chain-999.png'}
 ] as const;
 export function approvedNetwork(value:string){const direct=APPROVED_NETWORKS.find(n=>n.id===value);if(direct)return direct;const key=value.toLowerCase();return APPROVED_NETWORKS.find(n=>n.id===key||n.llama.toLowerCase()===key||(n.id==='optimism'&&key==='optimism'));}

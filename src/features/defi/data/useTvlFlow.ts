@@ -117,7 +117,7 @@ export function loadTvlFlow(): Promise<void> {
         flowChains.map((c) => ({ name: c.name, tvl: c.tvl })),
         {
           limit: 4,
-          sessionCap: 12,
+          sessionCap: 15,
           onProgress: (done, total) => st.setSyncProgress({ done, total })
         }
       );

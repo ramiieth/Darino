@@ -102,6 +102,6 @@ describe('دارایی‌های کاتالوگ', () => {
 
   it('هر دارایی شبکه، لوگوی محلی دارد و هر شبکه لوگوی محلی', () => {
     for (const a of ASSETS) expect(a.logo).toMatch(/^\/logos\/[a-z0-9-]+\.(?:png|svg)$/);
-    for (const n of NETWORKS) expect(n.logo).toMatch(/^\/logos\/chain-\d+\.(?:png|svg)$/);
+    for (const n of NETWORKS) expect(n.logo).toMatch(/^\/logos\/(?:chain|token)-[a-z0-9-]+\.(?:png|svg)$/);
   });
 });

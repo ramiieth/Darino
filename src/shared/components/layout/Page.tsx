@@ -17,7 +17,6 @@ import { useShellStore } from '@/shared/store/shellStore';
  */
 export function PageHeader({
   title,
-  subtitle,
   actions,
   className,
   eyebrow,
@@ -59,7 +58,7 @@ export function PageHeader({
           <h1 ref={ref} className="text-2xl font-extrabold tracking-tight text-ink md:text-3xl">
             {title}
           </h1>
-          {subtitle && <p className="mt-1.5 max-w-prose text-sm text-muted">{subtitle}</p>}
+
         </div>
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>

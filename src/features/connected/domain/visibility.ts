@@ -6,9 +6,9 @@ import type { LivePosition, TransactionTransfer, WalletSnapshot, WalletTransacti
 /** Display policy only. Raw history remains available to FIFO and bridge reconciliation. */
 type Token = { tokenId?:string;chain:string;contract?:string|null;symbol:string;icon?:string|null;verified?:boolean;spam?:boolean };
 export function catalogToken(t:Token) {
- const contract=t.contract?.toLowerCase();
+ const contract=t.chain==='solana'?t.contract:t.contract?.toLowerCase();
  const native=!contract||/^0x0{40}$/.test(contract)||/^0xe{40}$/.test(contract);
- return ASSETS.find(a=>a.networkId===t.chain&&(native?!a.contract&&a.symbol===t.symbol&&(t.verified===true||t.tokenId===a.coingeckoId||t.tokenId===a.id||t.tokenId===a.symbol.toLowerCase()):a.contract?.toLowerCase()===contract));
+ return ASSETS.find(a=>a.networkId===t.chain&&(native?!a.contract&&a.symbol===t.symbol&&(t.verified===true||t.tokenId===a.coingeckoId||t.tokenId===a.id||t.tokenId===a.symbol.toLowerCase()):(t.chain==='solana'?a.contract:a.contract?.toLowerCase())===contract));
 }
 const reviewedTokens:Record<string,string>={bitcoin:'/logos/token-btc.png',btc:'/logos/token-btc.png',weth:'/logos/token-weth.png',hyperliquid:'/logos/token-hype.jpg',hype:'/logos/token-hype.jpg','global-dollar':'/logos/token-usdg.png'};
 export function tokenLogo(t:Token):string|null {return safeLogoSrc(catalogToken(t)?.logo ?? (t.verified===true&&t.tokenId?reviewedTokens[t.tokenId]:null) ?? t.icon);}
@@ -20,8 +20,10 @@ export function visiblePosition(p:LivePosition):boolean {
  return robinhoodGas(p)||(p.value!==null&&Number.isFinite(p.value)&&Math.abs(p.value)>=2);
 }
 export function visiblePositions(positions:LivePosition[]):LivePosition[] {return positions.filter(visiblePosition).sort((a,b)=>Math.abs(b.value??0)-Math.abs(a.value??0));}
+function positiveQuantity(quantity:string):boolean {try{const value=new Decimal(quantity);return value.isFinite()&&value.gt(0);}catch{return false;}}
 export function visibleWalletValue(data:WalletSnapshot):number|null {
  const rows=visiblePositions(data.positions);
+ if(data.positions.some(p=>(p.chain==='bitcoin'||robinhoodGas(p))&&p.displayable&&trustedToken(p)&&p.value===null&&p.quantity&&positiveQuantity(p.quantity)))return null;
  if(!data.complete&&!rows.length)return null;
  return rows.reduce((sum,p)=>sum.plus(p.value??0),new Decimal(0)).toNumber();
 }
