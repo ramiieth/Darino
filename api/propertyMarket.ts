@@ -7,6 +7,12 @@
  * POST persist        → پشتیبان اختیاری در Neon (آگهی‌ها + Snapshot) — best-effort
  * GET                 → آگهی/Snapshotهای پشتیبان Neon (اگر تنظیم شده باشد)
  *
+ * بازار خودرو (car.ir) — همین فانکشن (سقف ۱۲ فانکشن پلن Hobby):
+ * POST carPrices          → فهرست قیمت روز car.ir (فالبک وقتی مرورگر مستقیم نتوانست)
+ * POST carPersist         → ذخیره Snapshot روزانه خودرو در Neon (best-effort)
+ * GET  ?market=car        → Snapshotهای روزانه خودرو از Neon
+ * GET  ?market=car&cron=1 → Cron روزانه Vercel: واکشی + ذخیره Snapshot امروز
+ *
  * طراحی (بازطراحی ۲۰۲۶-۰۹):
  *  - اپ تک‌کاربره است؛ پاک‌سازی، حذف تکراری و Snapshot سمت کلاینت (IndexedDB)
  *    انجام می‌شود. این فانکشن فقط «پراکسی واکشی» است و هیچ وابستگی‌ای به
@@ -26,6 +32,10 @@ import type {
   PropertyMarketListing,
   PropertyMarketSnapshot
 } from '../src/features/propertyMarket/domain/types.js';
+import { fetchCarIrPrices } from '../src/features/carMarket/collector/carIr.js';
+import { buildCarSnapshot, isCarSnapshot } from '../src/features/carMarket/domain/snapshot.js';
+import type { CarSnapshot } from '../src/features/carMarket/domain/types.js';
+import { fetchUsdtDirect, type UsdtSource } from '../src/shared/fx/usdtRate.js';
 
 /** سقف زمان هر تکه — زیر maxDuration=60 در vercel.json */
 const CHUNK_TIME_BUDGET_MS = 38_000;
@@ -71,8 +81,93 @@ async function probeDivar(): Promise<{ ok: boolean; ms: number; listings: number
   }
 }
 
+/* ---------------- بازار خودرو ---------------- */
+
+/** حداکثر روزهای تاریخچه خودرو در پاسخ GET */
+const CAR_HISTORY_LIMIT = 400;
+
+function queryOf(req: IncomingMessage): URLSearchParams {
+  const raw = typeof req.url === 'string' ? req.url : '';
+  const i = raw.indexOf('?');
+  return new URLSearchParams(i >= 0 ? raw.slice(i + 1) : '');
+}
+
+/** درخواست واقعاً از Cron ورسل است؟ (CRON_SECRET اگر تنظیم شده؛ وگرنه User-Agent) */
+function isCronRequest(req: IncomingMessage): boolean {
+  const secret = process.env.CRON_SECRET;
+  const auth = req.headers?.authorization;
+  if (secret) return auth === `Bearer ${secret}`;
+  const ua = req.headers?.['user-agent'];
+  return typeof ua === 'string' && ua.startsWith('vercel-cron/');
+}
+
+/** نرخ زنده تتر سمت سرور (والکس → بیت‌پین) */
+async function serverUsdt(): Promise<{ rateToman: number; source: UsdtSource } | null> {
+  for (const s of ['wallex', 'bitpin'] as const) {
+    try {
+      const q = await fetchUsdtDirect(s);
+      return { rateToman: q.priceToman, source: s };
+    } catch {
+      /* منبع بعدی */
+    }
+  }
+  return null;
+}
+
+/** درج/جایگزینی Snapshot روز — نسخه قدیمی‌تر روی جدیدتر نمی‌نشیند */
+async function upsertCarSnapshot(s: CarSnapshot): Promise<void> {
+  await db()`
+    INSERT INTO "carPriceSnapshots" (id, "dateTs", payload, "createdAt")
+    VALUES (${s.id}, ${s.dateTs}, ${JSON.stringify(s)}::jsonb, ${s.createdAt ?? Date.now()})
+    ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, "dateTs" = EXCLUDED."dateTs"
+    WHERE "carPriceSnapshots"."dateTs" < EXCLUDED."dateTs"
+  `;
+}
+
+async function handleCarGet(req: IncomingMessage, res: ServerResponse, q: URLSearchParams): Promise<void> {
+  if (q.get('cron') === '1') {
+    if (!isCronRequest(req)) {
+      json(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    if (!(await isDbUsable())) {
+      json(res, 200, { ok: true, persisted: false, reason: 'no database' });
+      return;
+    }
+    try {
+      const snap = buildCarSnapshot(await fetchCarIrPrices(), await serverUsdt());
+      await upsertCarSnapshot(snap);
+      json(res, 200, { ok: true, persisted: true, day: snap.day, rows: snap.rows.length, usdt: snap.usdtRate });
+    } catch (e) {
+      json(res, 200, { ok: false, error: netError(e) });
+    }
+    return;
+  }
+  if (!(await isDbUsable())) {
+    json(res, 200, { configured: false, snapshots: [] });
+    return;
+  }
+  const auth = await requireSession(req, res);
+  if (!auth) return;
+  try {
+    const rows = (await db()`
+      SELECT payload FROM "carPriceSnapshots" ORDER BY "dateTs" DESC LIMIT ${CAR_HISTORY_LIMIT}
+    `) as unknown as { payload: CarSnapshot | string }[];
+    json(res, 200, { configured: true, snapshots: rows.map((r) => fromJsonb(r.payload)).reverse() });
+  } catch {
+    json(res, 200, { configured: false, snapshots: [] });
+  }
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
+    /* ---------- GET ?market=car: تاریخچه/Cron بازار خودرو ---------- */
+    const query = queryOf(req);
+    if (req.method === 'GET' && query.get('market') === 'car') {
+      await handleCarGet(req, res, query);
+      return;
+    }
+
     /* ---------- GET: پشتیبان Neon (اختیاری) — فقط با نشست معتبر ---------- */
     if (req.method === 'GET') {
       if (!(await isDbUsable())) {
@@ -188,6 +283,35 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         `;
       }
       json(res, 200, { ok: true, persisted: true, listings: listings.length });
+      return;
+    }
+
+    /* ---------- carPrices: قیمت روز خودرو (بدون دیتابیس) ---------- */
+    if (action === 'carPrices') {
+      try {
+        const parsed = await fetchCarIrPrices();
+        json(res, 200, { ok: true, ...parsed });
+      } catch (e) {
+        json(res, 200, { ok: false, error: netError(e) });
+      }
+      return;
+    }
+
+    /* ---------- carPersist: Snapshot روزانه خودرو → Neon ---------- */
+    if (action === 'carPersist') {
+      if (!(await isDbUsable())) {
+        json(res, 200, { ok: true, persisted: false });
+        return;
+      }
+      const auth = await requireSession(req, res);
+      if (!auth) return;
+      const snap = body.snapshot;
+      if (!isCarSnapshot(snap) || !/^car-\d{4}-\d{2}-\d{2}$/.test(snap.id) || snap.rows.length === 0 || snap.rows.length > 5000) {
+        json(res, 400, { ok: false, error: 'invalid snapshot' });
+        return;
+      }
+      await upsertCarSnapshot(snap);
+      json(res, 200, { ok: true, persisted: true });
       return;
     }
 

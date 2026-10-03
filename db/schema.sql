@@ -134,6 +134,19 @@ CREATE TABLE IF NOT EXISTS "pmSnapshots" (
 CREATE INDEX IF NOT EXISTS idx_pmSnapshots_date ON "pmSnapshots" ("userId", "dateTs");
 
 -- ------------------------------------------------------------
+-- بازار خودرو (car.ir) — یک Snapshot قیمت برای هر روز تهران (داده عمومی بازار)
+--   * کلید = روز (car-YYYY-MM-DD)؛ واکشی دوباره همان روز → نسخه جدیدتر می‌ماند
+--   * نویسنده: Cron روزانه Vercel + اپ (پس از هر به‌روزرسانی)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "carPriceSnapshots" (
+  id          TEXT PRIMARY KEY,
+  "dateTs"    BIGINT NOT NULL,
+  payload     JSONB NOT NULL,             -- CarSnapshot
+  "createdAt" BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_carPriceSnapshots_date ON "carPriceSnapshots" ("dateTs");
+
+-- ------------------------------------------------------------
 -- احراز هویت با Passkey (WebAuthn) — تک‌کاربره، چنددستگاهی
 --   * فقط کلید عمومی passkey ذخیره می‌شود (هیچ کلید خصوصی/رمز)
 --   * از توکن نشست فقط هش SHA-256 ذخیره می‌شود

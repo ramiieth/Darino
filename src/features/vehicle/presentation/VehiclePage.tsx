@@ -9,7 +9,7 @@
  * ⚠️ این قیمت‌ها بر اساس میانگین قیمت پیشنهادی فروشندگان و نمایشگاه‌داران
  *    جمع‌آوری شده و لزوماً به معنای قیمت معامله‌شده نیست.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { History, Plus } from 'lucide-react';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { Sheet } from '@/shared/components/ui/Sheet';
@@ -48,7 +48,13 @@ function ReturnBadge({ pct }: { pct: number | null }) {
   return <PercentValue value={pct} digits={1} className="font-semibold" />;
 }
 
-export function VehiclePage() {
+/** داخل صفحه «بازار خودرو» (تب سرمایه‌گذاری): بدون Page/PageHeader خودش */
+function EmbeddedShell({ children }: { children: ReactNode }) {
+  return <div className="space-y-6">{children}</div>;
+}
+
+export function VehiclePage({ embedded = false }: { embedded?: boolean } = {}) {
+  const Shell = embedded ? EmbeddedShell : Page;
   const { vehicles, snapshots, loading } = useVehicles();
   const fxRate = useUsdRate().rate;
   const [startIdx, setStartIdx] = useState(0);
@@ -81,29 +87,31 @@ export function VehiclePage() {
   );
   const stats = useMemo(() => (rangeValid ? vehicleStats(vehicles, startSnap, endSnap) : null), [vehicles, startSnap, endSnap, rangeValid]);
 
-  const header = (
-    <PageHeader
-      title="سرمایه‌گذاری خودرو"
-      subtitle="قیمت و بازده خودروها"
-      actions={
-        <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
-          ثبت قیمت جدید
-        </Button>
-      }
-    />
+  const newSnapshotButton = (
+    <Button size="sm" icon={<Plus />} onClick={() => setShowNewSnapshot(true)}>
+      ثبت قیمت جدید
+    </Button>
+  );
+  const header = embedded ? (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm text-muted">Snapshotهای دستی قیمت و بازده خودروها</p>
+      {newSnapshotButton}
+    </div>
+  ) : (
+    <PageHeader title="سرمایه‌گذاری خودرو" subtitle="قیمت و بازده خودروها" actions={newSnapshotButton} />
   );
 
   if (loading && snapshots.length === 0) {
     return (
-      <Page>
+      <Shell>
         {header}
         <PageSkeleton />
-      </Page>
+      </Shell>
     );
   }
 
   return (
-    <Page>
+    <Shell>
       {header}
 
       <Notice tone="neutral">
@@ -293,7 +301,7 @@ export function VehiclePage() {
       <p className="text-xs text-muted">
         {toFaDigits(vehicles.length)} خودرو · {toFaDigits(snapshots.length)} ثبت تاریخی
       </p>
-    </Page>
+    </Shell>
   );
 }
 
