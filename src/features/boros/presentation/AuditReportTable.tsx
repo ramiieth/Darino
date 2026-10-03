@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Audit Report نهایی — جدول کامل برای N بازار (Part 9 اسپک)
  * ستون‌ها: Market / Venue / Maturity / Capital / Notional / Exposure / Margin /
@@ -180,8 +181,8 @@ export function AuditReportTable({ markets }: { markets: BorosMarket[] }) {
                   <tr key={i}>
                     <td className="num-ltr !ps-5 text-xs text-subtle">{r.rank || '—'}</td>
                     <td className="sticky start-0 z-10 bg-card">
-                      <p className="font-semibold text-ink"><bdi dir="ltr">{r.market}</bdi></p>
-                      <p className="text-xs text-muted">{r.venue}</p>
+                      <p className="font-semibold text-ink"><bdi dir="ltr">{borosAssetName(r.market)}</bdi></p>
+                      <p className="text-xs text-muted">{borosVenueName(r.venue)}</p>
                     </td>
                     <td className="col-num num-ltr text-muted">{r.maturityDays}</td>
                     <td className="col-num"><PercentValue value={r.fixedApr * 100} signed={false} tone="none" /></td>

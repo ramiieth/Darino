@@ -79,6 +79,10 @@ const M: BorosMarket = {
   }))
 };
 
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+M.fundingHistory = M.ohlcv;
+M.snapshotAt = NOW * 1000;
 describe('Test 1-3: Liquidation APR در Preview', () => {
   it('Test 1 — Preview: Liquidation Implied APR = N/A', () => {
     const p = projectCapital({ m: M, capitalUsd: 1000, direction: 'long', nowSec: NOW });
@@ -233,7 +237,7 @@ describe('Test 11: بدون داده تاریخی → سناریو N/A (بدون
   });
 
   it('Projection روی بازار بدون تاریخچه → سناریوها null (نه عدد ساختگی)', () => {
-    const noHist: BorosMarket = { ...M, ohlcv: [] };
+    const noHist: BorosMarket = { ...M, ohlcv: [], fundingHistory: [] };
     const p = projectCapital({ m: noHist, capitalUsd: 1000, direction: 'long', nowSec: NOW });
     expect(p!.scenarios.bear).toBeNull();
     expect(p!.scenarios.base).toBeNull();
@@ -243,7 +247,7 @@ describe('Test 11: بدون داده تاریخی → سناریو N/A (بدون
   });
 
   it('Stress با داده ناکافی → N/A (تست موجود stressScenario)', () => {
-    const noHist: BorosMarket = { ...M, ohlcv: [] };
+    const noHist: BorosMarket = { ...M, ohlcv: [], fundingHistory: [] };
     const a = BorosCalculationEngine.analyze({ m: noHist, size: 10, nowSec: NOW });
     expect(a.stress.available).toBe(false);
     expect(a.bearLongPnl).toBeNull(); // سناریوی percentiles هم N/A

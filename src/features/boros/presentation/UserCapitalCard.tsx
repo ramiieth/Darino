@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * UserCapitalCard — one opportunity evaluated with the user's simulation collateral
  * ("if I put X collateral into Boros, how does this market look?").
@@ -23,13 +24,13 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
           <span className="num-ltr text-sm font-bold text-subtle">#{rank}</span>
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-1.5 text-base font-bold text-ink">
-              <bdi dir="ltr">{o.asset}</bdi>
-              <span className="text-sm font-normal text-muted">· {o.venue}</span>
+              <bdi dir="ltr">{borosAssetName(o.asset)}</bdi>
+              <span className="text-sm font-normal text-muted">· {borosVenueName(o.venue)}</span>
               <Badge tone={long ? 'gain' : 'loss'}>{long ? 'لانگ' : 'شورت'}</Badge>
-              <Badge tone={o.executable ? 'neutral' : 'warn'}>{o.executable ? 'قابل اجرا' : 'غیرقابل اجرا'}</Badge>
+              <Badge tone={o.executable ? 'neutral' : 'warn'}>{o.executable ? 'حجم تخمینی کافی' : 'حجم تخمینی کم'}</Badge>
             </p>
             <p className="text-xs text-muted">
-              سررسید {new Date(o.maturity * 1000).toLocaleDateString('fa-IR')} · {toFaDigits(o.daysToMaturity)} روز
+              سررسید {new Date(o.maturity * 1000).toLocaleDateString('fa-IR')} · {toFaDigits(Math.ceil(o.daysToMaturity))} روز
             </p>
           </div>
         </div>
@@ -42,7 +43,7 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
       <div className="mt-4 grid grid-cols-3 gap-4 border-t border-divider pt-4">
         <Metric
           size="md"
-          label={<span className="inline-flex items-center gap-1">سود خالص <ProvenanceBadge kind="simulated" /></span>}
+          label={<span className="inline-flex items-center gap-1">خالص سناریوی سررسید <ProvenanceBadge kind="simulated" /></span>}
           value={<MoneyValue value={o.netPnl} signed tone="auto" />}
         />
         <Metric size="md" label="بازده روی مارجین" value={<PercentValue value={o.roiOnMargin} />} />
@@ -53,7 +54,7 @@ export function UserCapitalCard({ o, rank }: { o: UserCapitalOpportunity; rank: 
         <KeyValueList
           dense
           rows={[
-            { label: 'وثیقه شبیه‌سازی', value: <span className="num-ltr">{o.simulationCollateral.toFixed(3)} ETH</span> },
+            { label: 'وثیقه فقط برای مارجین', value: <span className="num-ltr">{o.simulationCollateral.toFixed(3)} اتریوم</span> },
             { label: 'حداکثر ارزش اسمی', value: <MoneyValue value={o.notional} compact /> },
             { label: 'مارجین', value: <span><MoneyValue value={o.marginUsd} compact /> <span className="text-muted">({toFaDigits(o.marginUtilizationPct.toFixed(0))}٪ collateral)</span></span> },
             { label: 'نرخ ثابت (سرویس)', value: <PercentValue value={o.fixedApr * 100} signed={false} tone="none" /> },

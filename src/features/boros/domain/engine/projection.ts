@@ -156,6 +156,7 @@ export interface CapitalProjectionInput {
   m: BorosMarket;
   capitalUsd: number;
   direction: 'long' | 'short';
+  fixedApr?: number;
   nowSec?: number;
   gasUsd?: number;
   slippageRate?: number | null;
@@ -232,8 +233,9 @@ export function projectCapital(input: CapitalProjectionInput): CapitalProjection
   const days = daysToMaturity(m, nowSec);
   if (days <= 0) return null;
 
-  const fixed = m.markApr;
+  const fixed = input.fixedApr ?? m.markApr;
   const floating = m.floatingApr;
+  if (![fixed, floating, m.kIM, m.marginFloor].every(Number.isFinite) || m.kIM <= 0) return null;
   const ytm = Math.max(0, (m.maturity - nowSec) / 86_400 / 365);
   const ytmFloor = m.ytmFloor ?? 0.014;
 
@@ -284,7 +286,7 @@ export function projectCapital(input: CapitalProjectionInput): CapitalProjection
     gasUsd: input.gasUsd ?? 0
   });
 
-  const expectedNetPnl = grossSettlement + mtm - fees.total;
+  const expectedNetPnl = grossSettlement - fees.total;
   const roiOnMargin = capitalUsd > 0 ? (expectedNetPnl / capitalUsd) * 100 : 0;
   const roiOnNotional = notional > 0 ? (expectedNetPnl / notional) * 100 : 0;
   const theoreticalAnnualizedRoi =
@@ -295,7 +297,7 @@ export function projectCapital(input: CapitalProjectionInput): CapitalProjection
     sensitivity > 0 ? capitalUsd / sensitivity : null;
 
   // سناریوها — Ordering تضمین‌شده + نقش اقتصادی بر اساس جهت
-  const hist = historicalAprOf(m);
+  const hist = (m.fundingHistory ?? []).map((p) => p.c).filter(Number.isFinite);
   const rates = buildScenarioRates(hist, floating);
   const roleFor = (r: 'bear' | 'bull'): ScenarioRole => {
     if (direction === 'long') return r === 'bear' ? 'adverse' : 'favorable';

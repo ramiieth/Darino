@@ -14,11 +14,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     const { path, search } = resolveProxyTarget(req.url, PREFIX);
 
+    if ((req.method ?? 'GET') !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('Allow', 'GET');
+      res.end(JSON.stringify({ error: 'method_not_allowed' }));
+      return;
+    }
+    if (!['/markets', '/markets/ohlcv', '/assets', '/indicators'].includes(path)) {
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: 'unsupported_readonly_endpoint' }));
+      return;
+    }
     const upstream = new URL(`${UPSTREAM}/apis/v1${path}`);
     search.forEach((v: string, k: string) => upstream.searchParams.set(k, v));
 
     const upstreamRes = await fetch(upstream.toString(), {
-      headers: { accept: 'application/json' }
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(20000)
     });
     const body = await upstreamRes.text();
     res.setHeader('Content-Type', 'application/json');

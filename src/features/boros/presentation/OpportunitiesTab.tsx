@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Boros opportunities — Long and Short computed separately (never the same PnL)
  *  - Best Long / Best Short only with expected Net PnL > 0 (status = potential)
@@ -84,13 +85,13 @@ function OppCard({ rank, a, side }: { rank: number; a: MarketAnalysis; side: 'lo
           <span className="num-ltr text-sm font-bold text-subtle">#{rank}</span>
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-1.5 text-base font-bold text-ink">
-              <bdi dir="ltr">{a.asset}</bdi>
-              <span className="text-sm font-normal text-muted">· {a.venue}</span>
+              <bdi dir="ltr">{borosAssetName(a.asset)}</bdi>
+              <span className="text-sm font-normal text-muted">· {borosVenueName(a.venue)}</span>
               <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>
               {a.anomaly.detected && <Badge tone="loss">{ANOMALY_FA[a.anomaly.kind ?? ''] ?? 'داده کهنه'}</Badge>}
             </p>
             <p className="text-xs text-muted">
-              سررسید {new Date(a.maturity * 1000).toLocaleDateString('fa-IR')} · {toFaDigits(a.daysToMaturity)} روز
+              سررسید {new Date(a.maturity * 1000).toLocaleDateString('fa-IR')} · {toFaDigits(Math.ceil(a.daysToMaturity))} روز
             </p>
           </div>
         </div>
@@ -141,7 +142,7 @@ function OppCard({ rank, a, side }: { rank: number; a: MarketAnalysis; side: 'lo
           </div>
         )}
         {!a.liquidity.executable && a.liquidity.available && (
-          <Notice tone="warn" className="mt-3">با حجم فعلی بازار قابل اجرا نیست.</Notice>
+          <Notice tone="warn" className="mt-3">حجم موردنظر از ظرفیت تخمینی بازار بیشتر است.</Notice>
         )}
         {a.anomaly.detected && a.anomaly.reasons.length > 0 && (
           <Notice tone="error" className="mt-3" title="ناهنجاری">
@@ -165,11 +166,11 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
   /** simulation collateral (ETH) — simulation only, never shown as real */
   const [simCollateral, setSimCollateral] = useState(DEFAULT_SIMULATION_COLLATERAL_ETH);
   const [userDir, setUserDir] = useState<'long' | 'short' | 'both'>('both');
-  const ethPrice = markets.find((m) => m.asset === 'ETH')?.assetMarkPrice ?? 0;
+  const ethPrice = markets.find((m) => m.collateralSymbol === 'ETH')?.collateralPriceUsd ?? 0;
 
   const userOpps = useMemo(() => {
     if (!(simCollateral > 0) || !(ethPrice > 0)) return [];
-    return rankUserCapitalOpportunities(markets, simCollateral, ethPrice, {
+    return rankUserCapitalOpportunities(markets.filter((m) => m.collateralSymbol === 'ETH' && m.status === 'GOOD'), simCollateral, ethPrice, {
       direction: userDir === 'both' ? undefined : userDir
     });
   }, [markets, simCollateral, ethPrice, userDir]);
@@ -209,7 +210,7 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
               min="0"
               value={simCollateral}
               onChange={(e) => setSimCollateral(Number(e.target.value) || 0)}
-              suffix="ETH"
+              suffix="اتریوم"
             />
           </Field>
           <div>
@@ -229,14 +230,14 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
           <Field label="دارایی">
             <Select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)}>
               {assets.map((a) => (
-                <option key={a}>{a}</option>
+                <option key={a} value={a}>{borosAssetName(a)}</option>
               ))}
             </Select>
           </Field>
           <Field label="صرافی">
             <Select value={venueFilter} onChange={(e) => setVenueFilter(e.target.value)}>
               {venues.map((v) => (
-                <option key={v}>{v}</option>
+                <option key={v} value={v}>{borosVenueName(v)}</option>
               ))}
             </Select>
           </Field>
@@ -317,8 +318,8 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
                   {rows.slice(0, 40).map((a) => (
                     <tr key={a.marketId}>
                       <td className="sticky start-0 z-10 bg-card !ps-5">
-                        <p className="font-semibold text-ink"><bdi dir="ltr">{a.asset}</bdi> · {a.venue}</p>
-                        <p className="text-xs text-muted">{toFaDigits(a.daysToMaturity)} روز</p>
+                        <p className="font-semibold text-ink"><bdi dir="ltr">{borosAssetName(a.asset)}</bdi> · {borosVenueName(a.venue)}</p>
+                        <p className="text-xs text-muted">{toFaDigits(Math.ceil(a.daysToMaturity))} روز</p>
                       </td>
                       <td className="col-num"><PercentValue value={a.impliedApr * 100} signed={false} tone="none" /></td>
                       <td className="col-num"><PercentValue value={a.underlyingApr * 100} signed={false} tone="none" /></td>
@@ -347,7 +348,7 @@ export function OpportunitiesTab({ markets }: { markets: BorosMarket[] }) {
             .map((a) => (
               <Surface key={a.marketId} className="p-4">
                 <p className="mb-2 flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink">
-                  <bdi dir="ltr">{a.asset}</bdi> · {a.venue}
+                  <bdi dir="ltr">{borosAssetName(a.asset)}</bdi> · {borosVenueName(a.venue)}
                   <Badge tone={STATUS_TONE[a.statusLong]}>{STATUS_LABEL[a.statusLong]}</Badge>
                 </p>
                 <Reasons a={a} limit={2} />

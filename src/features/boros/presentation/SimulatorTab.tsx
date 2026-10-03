@@ -1,3 +1,5 @@
+import { normalizeDecimalInput } from '@/features/cost-basis/presentation/decimalInput';
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Boros simulator — Input → BorosCalculationEngine → Output
  *
@@ -29,10 +31,13 @@ const LIVE_POSITION_NA_REASON =
 export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
   const [marketId, setMarketId] = useState(markets[0]?.marketId ?? 0);
   const [direction, setDirection] = useState<BorosDirection>('long');
-  const [size, setSize] = useState(222);
-  const [fixedRate, setFixedRate] = useState<number | null>(null);
-  const [gasUsd, setGasUsd] = useState(0);
-  const [capitalUsd, setCapitalUsd] = useState(1000);
+  const [size, setSize] = useState('222');
+  const [fixedRateInput, setFixedRateInput] = useState('');
+  const fixedRate = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(fixedRateInput) ? Number(fixedRateInput) / 100 : null;
+  const [gasInput, setGasInput] = useState('0');
+  const gasUsd = Number(gasInput);
+  const [capitalInput, setCapitalInput] = useState('1000');
+  const capitalUsd = Number(capitalInput) || 0;
   /** MODE B = simulation (hypothetical capital) · MODE C = order preview */
   const [previewMode, setPreviewMode] = useState<'sim' | 'preview'>('sim');
 
@@ -41,11 +46,13 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
   const rate = fixedRate ?? market?.markApr ?? 0;
 
   const sim = useMemo(() => {
-    if (!market || size <= 0) return null;
+    if (!market || !Number.isFinite(Number(size)) || !(Number(size) > 0) || !Number.isFinite(gasUsd) || gasUsd < 0) return null;
     const sizeN = Number(size) || 0;
     const analysis = BorosCalculationEngine.analyze({
       m: market,
+      direction,
       size: sizeN,
+      fixedApr: fixedRate ?? undefined,
       gasUsd,
       slippageRate: null // no public order book → N/A (never guessed)
     });
@@ -54,7 +61,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
     const currentPnl = isLong ? analysis.grossLongPnl : analysis.grossShortPnl;
     const netCurrent = isLong ? analysis.totalLongPnl : analysis.totalShortPnl;
     const mtm = isLong ? analysis.mtmLongPnl : analysis.mtmShortPnl;
-    const proj = projectCapital({ m: market, capitalUsd: Number(capitalUsd) || 0, direction, gasUsd });
+    const proj = projectCapital({ m: market, capitalUsd: Number(capitalUsd) || 0, direction, gasUsd, fixedApr: fixedRate ?? undefined });
     return { analysis, sensitivity, currentPnl, netCurrent, mtm, isLong, proj };
   }, [market, size, fixedRate, days, gasUsd, direction, capitalUsd]);
 
@@ -75,7 +82,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
             <Select value={market.marketId} onChange={(e) => setMarketId(Number(e.target.value))}>
               {markets.map((m) => (
                 <option key={m.marketId} value={m.marketId}>
-                  {m.name} — {fmtPct(m.markApr * 100)}
+                  {`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`} — {fmtPct(m.markApr * 100)}
                 </option>
               ))}
             </Select>
@@ -93,33 +100,32 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
               ]}
             />
           </div>
-          <Field label="حجم" className="md:col-span-3">
-            <Input dir="ltr" type="number" value={size} onChange={(e) => setSize(Number(e.target.value) || 0)} suffix="YU" />
-          </Field>
+          {previewMode === 'sim' && <Field label="حجم" className="md:col-span-3">
+            <Input dir="ltr" inputMode="decimal" value={size} onChange={(e) => setSize(normalizeDecimalInput(e.target.value))} suffix="دلار" />
+          </Field>}
           <Field label="نرخ ثابت" hint={`پیش‌فرض: مارک ${fmtPct(market.markApr * 100)}`} className="md:col-span-3">
             <Input
               dir="ltr"
-              type="number"
-              step="0.01"
-              value={fixedRate === null ? '' : fixedRate * 100}
-              onChange={(e) => setFixedRate(e.target.value === '' ? null : Number(e.target.value) / 100)}
+              inputMode="decimal"
+              value={fixedRateInput}
+              onChange={(e) => setFixedRateInput(normalizeDecimalInput(e.target.value))}
               placeholder={(market.markApr * 100).toFixed(2)}
               suffix="%"
             />
           </Field>
-          <Field label="گس" className="md:col-span-3">
-            <Input dir="ltr" type="number" value={gasUsd} onChange={(e) => setGasUsd(Number(e.target.value) || 0)} suffix="دلار" />
-          </Field>
-          <Field label="سرمایه" hint="فقط مارجین اولیه" className="md:col-span-3">
-            <Input dir="ltr" type="number" value={capitalUsd} onChange={(e) => setCapitalUsd(Number(e.target.value) || 0)} suffix="دلار" />
-          </Field>
+          {previewMode === 'sim' && <Field label="گس" className="md:col-span-3">
+            <Input dir="ltr" inputMode="decimal" value={gasInput} onChange={(e) => setGasInput(normalizeDecimalInput(e.target.value))} suffix="دلار" />
+          </Field>}
+          {previewMode === 'sim' && <Field label="سرمایه مارجین" hint="فقط مارجین اولیه" className="md:col-span-3">
+            <Input dir="ltr" inputMode="decimal" value={capitalInput} onChange={(e) => setCapitalInput(normalizeDecimalInput(e.target.value))} suffix="دلار" />
+          </Field>}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-divider pt-4 text-xs text-muted">
-          <span>{toFaDigits(days)} روز تا سررسید</span>
-          <span className="inline-flex items-center gap-1">نرخ ثابت <PercentValue value={rate * 100} signed={false} tone="none" className="font-semibold text-ink" /> <ProvenanceBadge kind="boros" label="LIVE" /></span>
+          <span>{toFaDigits(Math.ceil(days))} روز تا سررسید</span>
+          <span className="inline-flex items-center gap-1">نرخ ثابت <PercentValue value={rate * 100} signed={false} tone="none" className="font-semibold text-ink" /> <ProvenanceBadge kind={fixedRate === null ? "boros" : "simulated"} /></span>
           <span className="inline-flex items-center gap-1">مارک <PercentValue value={market.markApr * 100} signed={false} tone="none" className="font-semibold text-ink" /></span>
           <span className="inline-flex items-center gap-1">شناور <PercentValue value={market.floatingApr * 100} signed={false} tone="none" className="font-semibold text-ink" /></span>
-          <span>میانگین ۷ روزه {a && a.avg7d !== null ? <PercentValue value={a.avg7d * 100} signed={false} tone="none" /> : '—'}</span>
+          <span>میانگین ضمنی ۷ روزه {a && a.avg7d !== null ? <PercentValue value={a.avg7d * 100} signed={false} tone="none" /> : '—'}</span>
         </div>
       </Surface>
 
@@ -139,7 +145,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
           direction={direction}
           fixedRate={fixedRate}
           underlyingApr={market.floatingApr}
-          collateralPriceUsd={market.assetMarkPrice > 0 ? market.assetMarkPrice : 0}
+          collateralPriceUsd={market.collateralPriceUsd ?? 0}
         />
       )}
 
@@ -150,7 +156,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted">
-                  سود خالص موردانتظار — اگر <span className="num-ltr">{fmtUSD(proj.capital)}</span> وارد شود ({dirFa})
+                  خالص سناریوی سررسید — اگر <span className="num-ltr">{fmtUSD(proj.capital)}</span> صرف مارجین اولیه شود ({dirFa})
                 </p>
                 <p className="mt-1 text-4xl font-extrabold tracking-tight">
                   <MoneyValue value={proj.expectedNetPnl} signed tone="auto" />
@@ -309,7 +315,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                   rows={[
                     { label: 'مارجین موردنیاز (فرمول رسمی)', value: <MoneyValue value={a.marginRequired} /> },
                     { label: 'حساسیت نرخ (۱٪)', value: <MoneyValue value={sim.sensitivity} /> },
-                    { label: 'سود تسویه‌شده', value: <MoneyValue value={sim.currentPnl} signed tone="auto" /> },
+                    { label: 'تسویه فرضی تا سررسید', value: <MoneyValue value={sim.currentPnl} signed tone="auto" /> },
                     { label: 'ارزش روز (هنوز بسته نشده)', value: <MoneyValue value={sim.mtm} signed tone="auto" /> },
                     { label: 'سود خالص کل (پایه)', emphasis: true, value: <MoneyValue value={sim.netCurrent} signed tone="auto" /> },
                     { label: 'بازده روی مارجین', value: <PercentValue value={sim.isLong ? a.roiLongMargin : a.roiShortMargin} /> },
@@ -354,8 +360,8 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                   <KeyValueList
                     dense
                     rows={[
-                      { label: 'بازار', value: `${market.asset} · ${market.venue}` },
-                      { label: 'سررسید', value: `${new Date(market.maturity * 1000).toLocaleDateString('fa-IR')} (${toFaDigits(proj.daysToMaturity)} روز)` },
+                      { label: 'بازار', value: `${borosAssetName(market.asset)} · ${borosVenueName(market.venue)}` },
+                      { label: 'سررسید', value: `${new Date(market.maturity * 1000).toLocaleDateString('fa-IR')} (${toFaDigits(Math.ceil(proj.daysToMaturity))} روز)` },
                       { label: 'سرمایه', value: <span><MoneyValue value={proj.capital} /> ({proj.capitalMode})</span> }
                     ]}
                   />
@@ -377,7 +383,7 @@ export function SimulatorTab({ markets }: { markets: BorosMarket[] }) {
                   <h4 className="text-xs font-semibold text-muted">سود و زیان</h4>
                   <p className="py-2 text-xs leading-5 text-muted">
                     تسویه = {direction === 'long' ? 'ارزش اسمی × (شناور − ثابت) × روز/۳۶۵' : 'ارزش اسمی × (ثابت − شناور) × روز/۳۶۵'} ·
-                    MTM پایه = حساسیت × (Mark − ورود)/۱٪ — {proj.mtmReason} · خالص = تسویه + MTM − هزینه‌ها
+                    MTM پایه = حساسیت × (Mark − ورود)/۱٪ — {proj.mtmReason} · خالص سررسید = تسویه − هزینه‌های مشخص
                   </p>
                 </div>
               </div>

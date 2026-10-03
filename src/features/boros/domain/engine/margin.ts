@@ -7,7 +7,7 @@ import type { BorosMarket } from '../types';
 import { daysToMaturity, ytmOf } from './pnl';
 
 /**
- * YTMFloor: پارامتر پروتکل. API عمومی Boros آن را expose نمی‌کند؛
+ * YTMFloor: پارامتر پروتکل. API عمومی Boros آن را در config.tThresh (ثانیه) ارائه می‌کند؛
  * به‌صورت پارامتر بازار (قابل‌جایگزینی وقتی API ارائه دهد) تعریف شده است.
  */
 export const YTM_FLOOR_DEFAULT = 0.014; // مطابق مثال رسمی اسپک (≈ ۵ روز)
@@ -24,9 +24,10 @@ export interface MarginParams {
 export class MarginCalculator {
   /** فرمول خالص — برای تست با پارامترهای صریح */
   static calc(p: MarginParams): number {
+    if (p.ytm <= 0) return 0;
     return (
-      p.size *
-      Math.max(p.rate, p.rateFloor) *
+      Math.abs(p.size) *
+      Math.max(Math.abs(p.rate), p.rateFloor) *
       Math.max(p.ytm, p.ytmFloor) *
       p.imRatio
     );

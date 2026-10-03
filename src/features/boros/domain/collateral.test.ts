@@ -68,6 +68,10 @@ const M: BorosMarket = {
 };
 
 /* ================= Test A-E حیاتی Liquidation (§49) ================= */
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+M.fundingHistory = M.ohlcv;
+M.snapshotAt = NOW * 1000;
 describe('Liquidation — Test A تا E (§49)', () => {
   it('Test A — بدون Deposit/Position → liquidationAPR = null', () => {
     const a = BorosCalculationEngine.analyze({ m: M, size: 1000, nowSec: NOW });
@@ -180,7 +184,7 @@ describe('Rate Edge + Settlement — Long/Short جهت‌دار', () => {
 
   it('Settlement = Notional × Edge × YTM (Long)', () => {
     const o = userCapitalOpportunity({ m: M, direction: 'long', collateralAsset: 0.102, collateralPriceUsd: 2820, nowSec: NOW });
-    expect(o!.settlementPnl).toBeCloseTo(o!.notional * 0.0433 * (19 / 365), 6);
+    expect(o!.settlementPnl).toBeCloseTo(o!.notional * 0.0433 * (19 / 365) * 2820, 6);
   });
 });
 

@@ -108,12 +108,10 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
     ytmFloor,
     imRatio: m.kIM
   });
-  const marginRequiredUsd = marginPerUnit * input.notional;
-
-  /* تبدیل به واحد Collateral — فقط اگر قیمت موجود باشد */
+  const marginRequiredAsset = marginPerUnit * input.notional;
   const price = input.collateralPriceUsd;
-  const marginRequiredAsset =
-    price && price > 0 ? marginRequiredUsd / price : null;
+  if (price === null || !Number.isFinite(price) || price <= 0 || !Number.isFinite(input.underlyingApr)) return null;
+  const marginRequiredUsd = marginRequiredAsset * price;
   const availableMarginAsset =
     marginRequiredAsset !== null && input.availableCollateral !== null
       ? input.availableCollateral - marginRequiredAsset
@@ -122,14 +120,14 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
     availableMarginAsset !== null ? availableMarginAsset >= 0 : null;
 
   /* ---------- Rate Sensitivity ---------- */
-  const rateSensitivityUsd = calcRateSensitivity(input.notional, days);
-  const rateSensitivityAsset =
-    price && price > 0 ? rateSensitivityUsd / price : null;
+  const rateSensitivityAsset = calcRateSensitivity(input.notional, days);
+  const rateSensitivityUsd = rateSensitivityAsset * price;
 
   /* ---------- Fees (مستندات رسمی — بدون double-count) ---------- */
   const fees = FeeCalculator.calc({
     m,
     size: input.notional,
+    unitPriceUsd: price,
     nowSec,
     slippageRate: null, // سلیپج جدا محاسبه می‌شود (نه داخل fee)
     gasUsd: input.gasUsd ?? 0
@@ -138,11 +136,11 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
   /* ---------- Slippage (سه حالت: Actual/Estimated/Unavailable) ---------- */
   const slippageUsd =
     input.slippageRate !== null && input.slippageRate !== undefined
-      ? input.notional * input.slippageRate
+      ? input.notional * Math.abs(input.slippageRate) * ytm * price
       : null;
   const maxSlippageUsd =
     input.maxSlippageRate !== null && input.maxSlippageRate !== undefined
-      ? input.notional * input.maxSlippageRate
+      ? input.notional * Math.abs(input.maxSlippageRate) * ytm * price
       : null;
 
   const totalCostUsd =
@@ -151,8 +149,8 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
   /* ---------- Settlement PnL (Underlying vs Fixed) ---------- */
   const expectedSettlementPnl =
     input.direction === 'long'
-      ? LongPnLCalculator.gross(input.notional, input.fixedApr, input.underlyingApr, days)
-      : ShortPnLCalculator.gross(input.notional, input.fixedApr, input.underlyingApr, days);
+      ? LongPnLCalculator.gross(input.notional, input.fixedApr, input.underlyingApr, days) * price
+      : ShortPnLCalculator.gross(input.notional, input.fixedApr, input.underlyingApr, days) * price;
 
   /* ---------- MTM پایه (Mark فعلی vs Entry) — CALCULATED ---------- */
   const expectedMtm =
@@ -161,7 +159,7 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
       : -rateSensitivityUsd * ((m.markApr - input.fixedApr) / 0.01);
 
   const expectedNetPnl =
-    totalCostUsd !== null ? expectedSettlementPnl + expectedMtm - totalCostUsd : null;
+    totalCostUsd !== null ? expectedSettlementPnl - totalCostUsd : null;
   const roiOnMargin =
     marginRequiredUsd > 0 && expectedNetPnl !== null
       ? (expectedNetPnl / marginRequiredUsd) * 100
@@ -199,7 +197,7 @@ export function orderPreview(input: OrderPreviewInput): OrderPreviewResult | nul
     availableMarginAsset,
     rateSensitivityUsd,
     rateSensitivityAsset,
-    effectiveExposure: marginRequiredUsd > 0 ? input.notional / marginRequiredUsd : 0,
+    effectiveExposure: marginRequiredUsd > 0 ? input.notional * price / marginRequiredUsd : 0,
     fees,
     slippageUsd,
     maxSlippageUsd,

@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Cross-market comparison — the same asset across venues:
  * expected return · margin · net APR · PnL for your collateral · liquidity · risk · score
@@ -16,10 +17,11 @@ import type { BorosMarket } from '@/features/boros/domain/types';
 export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
   const [asset, setAsset] = useState('ETH');
   const [size, setSize] = useState(1000);
-  const [simCollateral, setSimCollateral] = useState(DEFAULT_SIMULATION_COLLATERAL_ETH);
+  const [simCollateral, setSimCollateral] = useState(300); // USD margin budget, comparable across collateral zones
 
   const assets = useMemo(() => [...new Set(markets.map((m) => m.asset))], [markets]);
-  const ethPrice = markets.find((m) => m.asset === 'ETH')?.assetMarkPrice ?? 0;
+  const collateralSymbol = markets.find((m) => m.asset === asset)?.collateralSymbol;
+  const ethPrice = markets.find((m) => m.asset === asset)?.collateralPriceUsd ?? 0;
 
   const rows = useMemo(() => {
     const filtered = markets.filter((m) => m.asset === asset);
@@ -31,7 +33,7 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
     const map = new Map<number, number>();
     if (!(simCollateral > 0) || !(ethPrice > 0)) return map;
     for (const m of markets.filter((x) => x.asset === asset)) {
-      const o = userCapitalOpportunity({ m, direction: 'long', collateralAsset: simCollateral, collateralPriceUsd: ethPrice });
+      const o = userCapitalOpportunity({ m, direction: 'long', collateralAsset: simCollateral / (m.collateralPriceUsd ?? 0), collateralPriceUsd: m.collateralPriceUsd ?? 0 });
       if (o && o.netPnl !== null) map.set(m.marketId, o.netPnl);
     }
     return map;
@@ -44,22 +46,22 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
           <Field label="دارایی">
             <Select value={asset} onChange={(e) => setAsset(e.target.value)}>
               {assets.map((a) => (
-                <option key={a}>{a}</option>
+                <option key={a} value={a}>{borosAssetName(a)}</option>
               ))}
             </Select>
           </Field>
           <Field label="حجم" hint="بر حسب واحد بازده">
-            <Input dir="ltr" type="number" value={size} onChange={(e) => setSize(Number(e.target.value) || 0)} suffix="YU" />
+            <Input dir="ltr" type="number" step="any" value={size} onChange={(e) => setSize(Number(e.target.value) || 0)} suffix="دلار" />
           </Field>
-          <Field label={<span className="inline-flex items-center gap-1.5">وثیقه مقایسه <ProvenanceBadge kind="simulated" /></span>}>
+          <Field label={<span className="inline-flex items-center gap-1.5">مارجین مقایسه <ProvenanceBadge kind="simulated" /></span>}>
             <Input
               dir="ltr"
               type="number"
-              step="0.001"
+              step="any"
               min="0"
               value={simCollateral}
               onChange={(e) => setSimCollateral(Number(e.target.value) || 0)}
-              suffix="ETH"
+              suffix="دلار"
             />
           </Field>
         </div>
@@ -77,8 +79,8 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
                   <th scope="col" className="sticky start-0 z-20 !ps-5">بازار</th>
                   <th scope="col" className="col-num">بازده موردانتظار</th>
                   <th scope="col" className="col-num">مارجین</th>
-                  <th scope="col" className="col-num">نرخ خالص سالانه</th>
-                  <th scope="col" className="col-num">PnL برای {simCollateral.toFixed(2)} ETH</th>
+                  <th scope="col" className="col-num">نرخ خالص سناریو</th>
+                  <th scope="col" className="col-num">خالص برای {simCollateral.toLocaleString('fa-IR')} دلار</th>
                   <th scope="col" className="col-num">نقدشوندگی</th>
                   <th scope="col">ریسک</th>
                   <th scope="col" className="col-num !pe-5">امتیاز</th>
@@ -88,9 +90,9 @@ export function ComparisonTab({ markets }: { markets: BorosMarket[] }) {
                 {rows.map((r) => (
                   <tr key={r.m.marketId}>
                     <td className="sticky start-0 z-10 bg-card !ps-5">
-                      <p className="font-semibold text-ink">{r.m.venue}</p>
+                      <p className="font-semibold text-ink">{borosVenueName(r.m.venue)}</p>
                       <p className="text-xs text-muted">
-                        <bdi dir="ltr">{r.m.fundingRateSymbol}</bdi> · {new Date(r.m.maturity * 1000).toLocaleDateString('fa-IR')}
+                        {new Date(r.m.maturity * 1000).toLocaleDateString('fa-IR')}
                       </p>
                     </td>
                     <td className="col-num"><MoneyValue value={r.expectedReturn} signed tone="auto" /></td>

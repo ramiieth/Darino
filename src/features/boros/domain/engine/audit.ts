@@ -110,43 +110,13 @@ export function auditMarket(input: AuditInput): MarketAuditBreakdown {
 
   /* ---------- هزینه‌ها با Source (فرمول‌های مستندات رسمی Boros) ---------- */
   const lines: FeeLine[] = [];
-  const hasTaker = m.takerFee > 0;
-  const hasSettle = m.settleFeeRate > 0;
-  const hasGas = (input.gasUsd ?? 0) > 0;
-  const hasSlippage = (input.slippageRate ?? 0) > 0;
-  const nSettle = FeeCalculator.settlementsCount(m, nowSec);
-
-  // Entry Fee — فرمول رسمی: |Size| × takerFee × YTM (docs/Mechanics/Fees)
-  const entryFee = hasTaker ? FeeCalculator.openingFee(size, m.takerFee, ytm) : 0;
-  lines.push(
-    feeLine('ورود', entryFee, hasTaker ? 'api' : 'na', hasTaker ? '|اندازه| × کارمزد تیکر × زمان تا سررسید (مستند رسمی بوروس)' : 'در بازار داده نشده → ۰')
-  );
-  // Exit Fee — همان فرمول برای خروج
-  const exitFee = hasTaker ? FeeCalculator.openingFee(size, m.takerFee, ytm) : 0;
-  lines.push(
-    feeLine('خروج', exitFee, hasTaker ? 'api' : 'na', hasTaker ? '|اندازه| × کارمزد تیکر × زمان تا سررسید (خروج)' : 'در بازار داده نشده → ۰')
-  );
-  // Settlement Fee — فرمول رسمی: |Size| × settleFeeRate × Period × تعداد تسویه
-  const settlementFee = hasSettle
-    ? FeeCalculator.settlementFee(size, m.settleFeeRate, periodYears(m), nSettle)
-    : 0;
-  lines.push(
-    feeLine('تسویه', settlementFee, hasSettle ? 'api' : 'na', hasSettle ? '|اندازه| × نرخ کارمزد تسویه × دوره × تعداد (مستند رسمی بوروس)' : 'در بازار داده نشده → ۰')
-  );
-  // Market Entrance Fee — در API عمومی نیست
-  lines.push(
-    feeLine('ورود به بازار', 0, 'na', 'از سرویس عمومی در دسترس نیست → نامشخص')
-  );
-  // Gas — فقط User Input
-  const gas = hasGas ? (input.gasUsd ?? 0) : 0;
-  lines.push(
-    feeLine('کارمزد شبکه', gas, hasGas ? 'user-input' : 'na', hasGas ? 'ورودی کاربر' : 'داده نشده → ۰ (هرگز حدس نمی‌زنیم)')
-  );
-  // Slippage — فقط با داده واقعی
-  const slippage = hasSlippage ? FeeCalculator.slippageCost(size, input.slippageRate ?? null, m.markApr) : 0;
-  lines.push(
-    feeLine('لغزش قیمت', slippage, hasSlippage ? 'market-data' : 'na', hasSlippage ? 'از دفتر سفارش/شبیه‌سازی' : 'داده دفتر سفارش عمومی نیست → ۰')
-  );
+  const fees = FeeCalculator.calc({ m, size, nowSec, gasUsd: input.gasUsd, slippageRate: input.slippageRate });
+  lines.push(feeLine('ورود', fees.entryFee, Number.isFinite(m.takerFee) ? 'api' : 'na', 'کارمزد تیکر × اندازه × زمان باقی‌مانده'));
+  lines.push(feeLine('خروج در سررسید', fees.exitFee, 'api', 'زمان باقی‌مانده در سررسید صفر است'));
+  lines.push(feeLine('تسویه', fees.settlementCost, Number.isFinite(m.settleFeeRate) ? 'api' : 'na', 'کارمزد تسویه × اندازه × مدت نگهداری'));
+  lines.push(feeLine('ورود به بازار', 0, 'na', 'وضعیت ورود قبلی به بازار مشخص نیست'));
+  lines.push(feeLine('کارمزد شبکه', fees.gasFee, input.gasUsd !== undefined ? 'user-input' : 'na', 'ورودی کاربر'));
+  lines.push(feeLine('لغزش قیمت', fees.slippageCost, input.slippageRate != null ? 'user-input' : 'na', 'اثر نرخ فرضی؛ اجرای واقعی تأیید نشده است'));
 
   const totalCosts = lines.reduce((s, l) => s + l.amount, 0);
 
@@ -180,8 +150,8 @@ export function auditMarket(input: AuditInput): MarketAuditBreakdown {
     markApr: mark,
     grossSettlementLong,
     grossSettlementShort,
-    realizedLong: grossSettlementLong,
-    realizedShort: grossSettlementShort,
+    realizedLong: 0,
+    realizedShort: 0,
     unrealizedMtmLong: mtmLong,
     unrealizedMtmShort: mtmShort,
     totalGrossLong,
@@ -215,8 +185,8 @@ export function auditMarkets(markets: BorosMarket[], size = 1000): MarketAuditBr
  */
 export function verifyNoDoubleCounting(b: MarketAuditBreakdown): boolean {
   const grossOk =
-    Math.abs(b.totalGrossLong - (b.realizedLong + b.unrealizedMtmLong)) < 1e-9 &&
-    Math.abs(b.totalGrossShort - (b.realizedShort + b.unrealizedMtmShort)) < 1e-9;
+    Math.abs(b.totalGrossLong - b.grossSettlementLong) < 1e-9 &&
+    Math.abs(b.totalGrossShort - b.grossSettlementShort) < 1e-9;
   const netOk =
     Math.abs(b.netLong - (b.totalGrossLong - b.totalCostsLong)) < 1e-9 &&
     Math.abs(b.netShort - (b.totalGrossShort - b.totalCostsShort)) < 1e-9;

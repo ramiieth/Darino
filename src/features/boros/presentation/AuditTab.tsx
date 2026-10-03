@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Boros audit — full per-market breakdown (complete transparency)
  *  - PnL split: gross settlement / unrealized MTM / total gross / net
@@ -31,8 +32,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
         summary={
           <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-ink">
             <span className="font-semibold">
-              <bdi dir="ltr">{b.asset}</bdi> · {b.venue}{' '}
-              <span className="text-xs font-normal text-muted">({toFaDigits(b.daysToMaturity)} روز)</span>
+              <bdi dir="ltr">{borosAssetName(b.asset)}</bdi> · {borosVenueName(b.venue)}{' '}
+              <span className="text-xs font-normal text-muted">({toFaDigits(Math.ceil(b.daysToMaturity))} روز)</span>
             </span>
             <span className="flex items-center gap-3 text-xs font-normal text-muted">
               <span>خالص لانگ <MoneyValue value={b.netLong} signed tone="auto" className="font-semibold" /></span>
@@ -49,8 +50,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
               rows={[
                 { label: 'تسویه ناخالص لانگ', value: <MoneyValue value={b.grossSettlementLong} signed tone="auto" /> },
                 { label: 'تسویه ناخالص شورت', value: <MoneyValue value={b.grossSettlementShort} signed tone="auto" /> },
-                { label: 'ارزش روز لانگ (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
-                { label: 'ارزش روز شورت (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
+                { label: 'ارزش روز فرضی لانگ', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
+                { label: 'ارزش روز فرضی شورت', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
                 { label: 'ناخالص کل لانگ', value: <MoneyValue value={b.totalGrossLong} signed tone="auto" /> },
                 { label: 'ناخالص کل شورت', value: <MoneyValue value={b.totalGrossShort} signed tone="auto" /> },
                 { label: 'خالص لانگ', emphasis: true, value: <MoneyValue value={b.netLong} signed tone="auto" /> },

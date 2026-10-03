@@ -61,7 +61,7 @@ const m: BorosMarket = {
   bestBid: 0.03148,
   bestAsk: 0.03355,
   assetMarkPrice: 3100,
-  ohlcv: []
+  ohlcv: [], fundingHistory: []
 };
 const mHist: BorosMarket = {
   ...m,
@@ -72,6 +72,12 @@ const mHist: BorosMarket = {
 };
 
 /* ---------- 1) verifyLongShortSymmetry ---------- */
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+m.fundingHistory = m.ohlcv;
+m.snapshotAt = NOW * 1000;
+mHist.fundingHistory = mHist.ohlcv;
+mHist.snapshotAt = NOW * 1000;
 describe('verifyLongShortSymmetry', () => {
   it('Long Gross = −Short Gross برای بازار یکسان', () => {
     const b = auditMarket({ m: mHist, size: 1000, nowSec: NOW });
@@ -238,7 +244,7 @@ describe('verifyLiquidityFilter', () => {
   });
 
   it('Notional بزرگتر از ظرفیت اجرا → executable=false', () => {
-    const l = assessLiquidity({ ...mHist, notionalOI: 1000, volume24h: 20 }, 1000);
+    const l = assessLiquidity({ ...mHist, notionalOI: 1000, volume24h: 20 / mHist.assetMarkPrice }, 1000);
     // ظرفیت تخمینی = 20 × 0.05 = 1 → 1000 > 1
     expect(l.executable).toBe(false);
     expect(l.reasons.some((r) => r.includes('بیشتر است'))).toBe(true);
@@ -248,7 +254,7 @@ describe('verifyLiquidityFilter', () => {
 /* ---------- 13) verifyDataFreshness ---------- */
 describe('verifyDataFreshness', () => {
   it('داده کهنه → stale + confidence پایین', () => {
-    const old: BorosMarket = { ...mHist, ohlcv: [{ ts: NOW - 5 * 3600, c: 0.05 }] };
+    const old: BorosMarket = { ...mHist, snapshotAt: (NOW - 5 * 3600) * 1000, ohlcv: [{ ts: NOW - 5 * 3600, c: 0.05 }] };
     const a = BorosCalculationEngine.analyze({ m: old, size: 1000, nowSec: NOW });
     expect(a.freshness.stale).toBe(true);
     expect(a.freshness.confidenceFactor).toBeLessThan(0.6);
@@ -348,7 +354,7 @@ describe('Edge Cases — Zero/Missing/Extreme', () => {
   });
 
   it('Missing Historical Data → سناریوهای Mean-Reversion و Stress = N/A', () => {
-    const noHist: BorosMarket = { ...m, ohlcv: [] };
+    const noHist: BorosMarket = { ...m, ohlcv: [], fundingHistory: [] };
     const a = BorosCalculationEngine.analyze({ m: noHist, size: 1000, nowSec: NOW });
     expect(a.meanReversion.available).toBe(false);
     expect(a.meanReversion.netPnl).toBeNull();
@@ -360,7 +366,7 @@ describe('Edge Cases — Zero/Missing/Extreme', () => {
     const noFee: BorosMarket = { ...mHist, takerFee: 0, settleFeeRate: 0 };
     const b = auditMarket({ m: noFee, size: 1000, nowSec: NOW, gasUsd: 0, slippageRate: null });
     const entry = b.feeLines.find((l) => l.label.includes('ورود'))!;
-    expect(entry.source).toBe('na');
+    expect(entry.source).toBe('api');
     expect(entry.amount).toBe(0);
   });
 
@@ -368,7 +374,7 @@ describe('Edge Cases — Zero/Missing/Extreme', () => {
     const b = auditMarket({ m: mHist, size: 1000, nowSec: NOW, gasUsd: 0 });
     const gas = b.feeLines.find((l) => l.label.includes('کارمزد شبکه'))!;
     expect(gas.amount).toBe(0);
-    expect(gas.source).toBe('na');
+    expect(gas.source).toBe('user-input');
   });
 
   it('Extreme Spread → anomaly-detected (نه فرصت طلایی)', () => {
@@ -379,14 +385,14 @@ describe('Edge Cases — Zero/Missing/Extreme', () => {
   });
 
   it('Low Liquidity → در Best قرار نمیگیرد (حتی با Edge)', () => {
-    const thin: BorosMarket = { ...mHist, notionalOI: 10, volume24h: 1, markApr: 0.03, floatingApr: 0.10 };
+    const thin: BorosMarket = { ...mHist, notionalOI: 10 / mHist.assetMarkPrice, volume24h: 1 / mHist.assetMarkPrice, markApr: 0.03, floatingApr: 0.10 };
     const a = BorosCalculationEngine.analyze({ m: thin, size: 1000, nowSec: NOW });
     // نقدشوندگی پایین → score پایین یا status محافظهکارانه
     expect(a.liquidity.score).toBeLessThan(0.4);
   });
 
   it('Stale Data → confidence پایین و هشدار freshness', () => {
-    const stale: BorosMarket = { ...mHist, ohlcv: [{ ts: NOW - 10 * 3600, c: 0.05 }] };
+    const stale: BorosMarket = { ...mHist, snapshotAt: (NOW - 10 * 3600) * 1000, ohlcv: [{ ts: NOW - 10 * 3600, c: 0.05 }] };
     const a = BorosCalculationEngine.analyze({ m: stale, size: 1000, nowSec: NOW });
     expect(a.freshness.stale).toBe(true);
     expect(a.confidence).toBeLessThan(60);

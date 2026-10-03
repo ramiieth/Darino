@@ -5,6 +5,8 @@
  *  Liquidation APR = N/A (needs a real position) unless Boros returns an official preview value
  */
 import { useMemo, useState } from 'react';
+import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
+import { normalizeDecimalInput } from '@/features/cost-basis/presentation/decimalInput';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -28,14 +30,15 @@ export function OrderPreviewPanel({
   underlyingApr: number;
   collateralPriceUsd: number;
 }) {
-  const [notional, setNotional] = useState(2); // YU
-  const [collateral, setCollateral] = useState('0.102'); // ETH
+  const [notional, setNotional] = useState('2'); // native YU
+  const [collateral, setCollateral] = useState('');
+  const collateralName = assetDisplayName(market.collateralSymbol ?? market.asset).name;
 
   const preview = useMemo(() => {
     const collN = Number(collateral);
     return orderPreview({
       m: market,
-      availableCollateral: Number.isFinite(collN) && collN > 0 ? collN : null,
+      availableCollateral: collateral !== '' && Number.isFinite(collN) && collN >= 0 ? collN : null,
       collateralPriceUsd,
       direction,
       notional: Number(notional) || 0,
@@ -51,10 +54,10 @@ export function OrderPreviewPanel({
     <Surface className="p-4 md:p-5">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label="حجم">
-          <Input dir="ltr" type="number" value={notional} onChange={(e) => setNotional(Number(e.target.value) || 0)} suffix="YU" />
+          <Input dir="ltr" inputMode="decimal" value={notional} onChange={(e) => setNotional(normalizeDecimalInput(e.target.value))} suffix="بازده" />
         </Field>
         <Field label="وثیقه موجود">
-          <Input dir="ltr" value={collateral} onChange={(e) => setCollateral(e.target.value)} suffix="ETH" />
+          <Input dir="ltr" inputMode="decimal" value={collateral} onChange={(e) => setCollateral(normalizeDecimalInput(e.target.value))} suffix={collateralName} />
         </Field>
         <div>
           <p className="mb-1.5 text-xs font-semibold text-muted">جهت</p>
@@ -75,6 +78,7 @@ export function OrderPreviewPanel({
   if (!preview) {
     return (
       <div className="space-y-5">
+        <Notice tone="info">پیش‌نمایش محاسبات؛ سفارش اجرا نمی‌شود.</Notice>
         {inputs}
         <EmptyState message="برای پیش‌نمایش، حجم معتبر (واحد بازده) وارد کنید." />
       </div>
@@ -91,7 +95,7 @@ export function OrderPreviewPanel({
       <Surface variant="focal" className="p-5 md:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-muted">سود خالص موردانتظار</p>
+            <p className="text-sm font-semibold text-muted">خالص سناریوی سررسید</p>
             <p className="mt-1 text-4xl font-extrabold tracking-tight">
               <MoneyValue value={preview.expectedNetPnl} signed tone="auto" />
             </p>
@@ -105,12 +109,12 @@ export function OrderPreviewPanel({
           <Metric
             label="مارجین موردنیاز"
             value={<MoneyValue value={preview.marginRequiredUsd} />}
-            sub={<QuantityValue value={preview.marginRequiredAsset} unit="ETH" />}
+            sub={<QuantityValue value={preview.marginRequiredAsset} unit={collateralName} />}
           />
           <Metric
             label="حساسیت به ۱٪ نرخ"
             value={<MoneyValue value={preview.rateSensitivityUsd} />}
-            sub={<QuantityValue value={preview.rateSensitivityAsset} unit="ETH" />}
+            sub={<QuantityValue value={preview.rateSensitivityAsset} unit={collateralName} />}
           />
           <Metric label="ارزش اسمی / وثیقه" value={<span className="num-ltr">{preview.effectiveExposure.toFixed(1)}x</span>} sub="لوریج متعارف نیست" />
         </MetricGrid>
@@ -121,11 +125,11 @@ export function OrderPreviewPanel({
           rows={[
             {
               label: 'مارجین در دسترس',
-              value: <QuantityValue value={preview.availableMarginAsset} unit="ETH" className={(preview.availableMarginAsset ?? -1) >= 0 ? '' : 'text-negative'} />
+              value: <QuantityValue value={preview.availableMarginAsset} unit={collateralName} className={(preview.availableMarginAsset ?? -1) >= 0 ? '' : 'text-negative'} />
             },
-            { label: 'کارمزدها (مستندات بوروس)', value: <MoneyValue value={preview.fees.total} /> },
+            { label: 'هزینه‌های محاسبه‌شده', value: <MoneyValue value={preview.fees.total} /> },
             { label: 'لغزش', hint: 'بدون دفتر سفارش عمومی → نامشخص', value: <MoneyValue value={preview.slippageUsd} /> },
-            { label: 'سود تسویه', value: <MoneyValue value={preview.expectedSettlementPnl} signed tone="auto" /> },
+            { label: 'تسویه تا سررسید (فرض نرخ ثابت)', value: <MoneyValue value={preview.expectedSettlementPnl} signed tone="auto" /> },
             { label: 'ارزش روز (مارک در برابر ورود)', value: <MoneyValue value={preview.expectedMtm} signed tone="auto" /> },
             {
               label: (
@@ -148,7 +152,7 @@ export function OrderPreviewPanel({
       {preview.collateralSufficient === null ? (
         <Notice tone="neutral">کفایت وثیقه: نامشخص — وثیقه یا قیمت وارد نشده است.</Notice>
       ) : preview.collateralSufficient ? (
-        <Notice tone="success">وثیقه برای مارجین محاسبه‌شده کافی است؛ تضمین جلوگیری از لیکوئیدشدن نیست.</Notice>
+        <Notice tone="neutral">مارجین اولیه پوشش داده می‌شود؛ هزینه ورود و حاشیه ریسک جداست.</Notice>
       ) : (
         <Notice tone="warn">وثیقه واردشده کمتر از مارجین موردنیاز است.</Notice>
       )}

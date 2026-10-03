@@ -77,6 +77,10 @@ const M: BorosMarket = {
   }))
 };
 
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+M.fundingHistory = M.ohlcv;
+M.snapshotAt = NOW * 1000;
 describe('1) verifyPreviewDoesNotPretendToBePosition (MODE C)', () => {
   it('Order Preview بدون Position واقعی → hasLivePosition=false و Liquidation APR = N/A', () => {
     const pv = orderPreview({
@@ -159,7 +163,7 @@ describe('3) verifyNoDoubleCounting (Fees)', () => {
       slippageRate: 0.001121, // 0.1121%
       nowSec: NOW
     });
-    expect(pv!.slippageUsd).toBeCloseTo(10 * 0.001121, 9);
+    expect(pv!.slippageUsd).toBeCloseTo(10 * 0.001121 * (19 / 365) * 2820, 9);
     expect(pv!.totalCostUsd).toBeCloseTo(pv!.fees.total + pv!.slippageUsd!, 9);
   });
 });
@@ -178,7 +182,7 @@ describe('4) verifyLiquidityFilter', () => {
     expect(liq.available).toBe(true);
     expect(liq.executable).toBe(true);
     // target بزرگ‌تر از ظرفیت → غیرقابل اجرا
-    const big = assessLiquidity(M, 1000);
+    const big = assessLiquidity(M, 1000000);
     expect(big.executable).toBe(false);
   });
 });
@@ -271,7 +275,7 @@ describe('8) مثال §4 — Short 2 YU · Collateral 0.102 ETH', () => {
       direction: 'short', notional: 2, fixedApr: 0.0662, underlyingApr: 0.1095,
       nowSec: NOW
     });
-    expect(pv!.marginRequiredUsd).toBeCloseTo(2 * 0.0662 * (19 / 365) * 0.577, 6);
+    expect(pv!.marginRequiredUsd).toBeCloseTo(2 * 0.0662 * (19 / 365) * 0.577 * 2820, 6);
     // Margin به واحد ETH (با قیمت Collateral)
     expect(pv!.marginRequiredAsset).toBeCloseTo(pv!.marginRequiredUsd / 2820, 9);
     // Collateral 0.102 از مارجین بیشتر است → کفایت ریاضی
@@ -284,7 +288,7 @@ describe('8) مثال §4 — Short 2 YU · Collateral 0.102 ETH', () => {
       direction: 'short', notional: 2, fixedApr: 0.0662, underlyingApr: 0.1095,
       nowSec: NOW
     });
-    const expected = 2 * (0.0662 - 0.1095) * (19 / 365);
+    const expected = 2 * (0.0662 - 0.1095) * (19 / 365) * 2820;
     expect(pv!.expectedSettlementPnl).toBeCloseTo(expected, 9);
     expect(pv!.expectedSettlementPnl).toBeLessThan(0);
     // Long همان Position → قرینه
@@ -303,9 +307,9 @@ describe('8) مثال §4 — Short 2 YU · Collateral 0.102 ETH', () => {
       slippageRate: 0.001121, maxSlippageRate: 0.01,
       nowSec: NOW
     });
-    expect(pv!.fees.entryFee).toBeCloseTo(2 * M.takerFee * (19 / 365), 9); // |Size|×Rate×YTM
-    expect(pv!.slippageUsd).toBeCloseTo(2 * 0.001121, 9); // تخمینی
-    expect(pv!.maxSlippageUsd).toBeCloseTo(2 * 0.01, 9); // حداکثر
+    expect(pv!.fees.entryFee).toBeCloseTo(2 * M.takerFee * (19 / 365) * 2820, 9); // |Size|×Rate×YTM
+    expect(pv!.slippageUsd).toBeCloseTo(2 * 0.001121 * (19 / 365) * 2820, 9); // تخمینی
+    expect(pv!.maxSlippageUsd).toBeCloseTo(2 * 0.01 * (19 / 365) * 2820, 9); // حداکثر
     expect(pv!.totalCostUsd).toBeCloseTo(pv!.fees.total + pv!.slippageUsd!, 9);
   });
 

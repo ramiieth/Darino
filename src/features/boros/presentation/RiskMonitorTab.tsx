@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Risk monitor — market-level alerts (not position liquidation risk)
  *  - extreme funding (deviation from the 7-day mean / z-score)
@@ -32,7 +33,7 @@ const SEVERITY: Record<AlertRow['severity'], { label: string; tone: Tone }> = {
 };
 
 const TYPE_META = {
-  extreme: { label: 'تأمین مالی افراطی', icon: AlertTriangle },
+  extreme: { label: 'انحراف نرخ ضمنی', icon: AlertTriangle },
   liquidity: { label: 'نقدشوندگی پایین', icon: Droplets },
   volatility: { label: 'نوسان بالا', icon: Activity }
 };
@@ -64,7 +65,7 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
         out.push({
           ...base,
           type: 'liquidity',
-          message: `تعهدات باز ${fmtUSD(m.notionalOI, true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h, true)}`,
+          message: `تعهدات باز ${fmtUSD(m.notionalOI * (m.collateralPriceUsd ?? m.assetMarkPrice), true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h * (m.collateralPriceUsd ?? m.assetMarkPrice), true)}`,
           severity: a.liquidityScore < 0.15 ? 'high' : 'medium'
         });
       }
@@ -115,7 +116,7 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
-                        <bdi dir="ltr" className="truncate">{a.m.name}</bdi>
+                        <bdi dir="ltr" className="truncate">{`${borosAssetName(a.m.asset)} · ${borosVenueName(a.m.venue)}`}</bdi>
                         <Badge tone={sev.tone}>{sev.label}</Badge>
                       </p>
                       <p className="text-sm text-muted">

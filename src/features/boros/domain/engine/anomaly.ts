@@ -72,7 +72,7 @@ export function detectAnomaly(input: AnomalyInput): AnomalyInfo {
   // نزدیک سررسید
   const days = daysToMaturity(m, nowSec);
   if (days > 0 && days <= cfg.nearExpiryDays) {
-    reasons.push(`نزدیک سررسید (${days} روز) — نرخ ممکن است غیرعادی باشد`);
+    reasons.push(`نزدیک سررسید (${Math.ceil(days)} روز) — نرخ ممکن است غیرعادی باشد`);
     confidencePenalty += 0.15;
     if (kind === 'none') kind = 'near-expiry';
   }
@@ -122,11 +122,12 @@ export interface LiquidityReality {
  */
 export function assessLiquidity(m: BorosMarket, targetNotional: number): LiquidityReality {
   const reasons: string[] = [];
-  const oi = m.notionalOI;
-  const vol = m.volume24h;
+  const price = m.collateralPriceUsd ?? m.assetMarkPrice;
+  const oi = m.notionalOI * price;
+  const vol = m.volume24h * price;
   const spread =
-    m.bestAsk > 0 && m.bestBid > 0 && m.midApr > 0
-      ? (m.bestAsk - m.bestBid) / Math.max(0.005, m.midApr)
+    Number.isFinite(m.bestAsk) && Number.isFinite(m.bestBid) && m.bestAsk >= m.bestBid && Number.isFinite(m.midApr)
+      ? (m.bestAsk - m.bestBid) / Math.max(0.005, Math.abs(m.midApr))
       : null;
 
   if (oi <= 0 && vol <= 0) {
@@ -173,15 +174,11 @@ export interface DataFreshness {
 
 /** تازگی داده — timestamp منبع (ohlcv آخرین نقطه یا الآن) */
 export function assessFreshness(m: BorosMarket, nowSec: number): DataFreshness {
-  let ageMs: number | null = null;
-  if (m.ohlcv.length > 0) {
-    const lastTs = m.ohlcv[m.ohlcv.length - 1].ts;
-    ageMs = (nowSec - lastTs) * 1000;
-  }
+  const ageMs = m.snapshotAt !== undefined ? Math.max(0, nowSec * 1000 - m.snapshotAt) : null;
   const stale = ageMs !== null && ageMs > 30 * 60_000;
   return {
     ageMs,
-    source: m.ohlcv.length > 0 ? 'historical-ohlcv' : 'api-snapshot',
+    source: 'api-snapshot',
     stale,
     confidenceFactor: ageMs === null ? 0.6 : stale ? 0.5 : 0.95
   };

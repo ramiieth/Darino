@@ -4,9 +4,9 @@
  */
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { fetchBorosMarkets, syncBorosOhlcv, simulateBorosOrder } from './borosService';
+import { fetchBorosMarkets, syncBorosOhlcv } from './borosService';
 import { useAutoSync } from '@/shared/hooks/useAutoSync';
-import type { BorosMarket, BorosSimResult } from '../domain/types';
+import type { BorosMarket } from '../domain/types';
 
 interface BorosState {
   markets: BorosMarket[];
@@ -55,14 +55,17 @@ export function loadBoros(): Promise<void> {
     st.setLoading(true);
     st.setError(false);
     try {
-      const { markets, stale } = await fetchBorosMarkets();
+      const { markets, stale, fetchedAt } = await fetchBorosMarkets();
       st.setMarkets(markets);
       st.setStale(stale);
-      st.setLoadedAt(Date.now());
+      st.setLoadedAt(fetchedAt);
       // همگام‌سازی تاریخچه APR (پیش‌رونده — بدون بلاک UI)
-      await syncBorosOhlcv(markets, (done, total) => st.setSyncProgress({ done, total }));
+      const enriched = markets.map((m) => ({ ...m }));
+      await syncBorosOhlcv(enriched, (done, total) => st.setSyncProgress({ done, total }));
+      st.setMarkets(enriched);
       st.setSyncProgress(null);
     } catch {
+      st.setStale(true);
       // اگر داده قبلی داریم، خطا نمایش نده (داده قبلی باقی می‌ماند)
       if (useBorosStore.getState().markets.length === 0) {
         st.setError(true);
@@ -107,14 +110,4 @@ export function useBoros() {
   );
 
   return st;
-}
-
-/** شبیه‌سازی سفارش (همان API) */
-export async function runBorosSim(
-  marketId: number,
-  side: 0 | 1,
-  size: number,
-  rate: number
-): Promise<BorosSimResult | null> {
-  return simulateBorosOrder(marketId, side, size, rate);
 }

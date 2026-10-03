@@ -81,12 +81,16 @@ const NOW = m.maturity - 20 * 86_400;
 const SIZE = 1000;
 
 /* ================= ۱) Double Counting Proof ================= */
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+m.fundingHistory = m.ohlcv;
+m.snapshotAt = NOW * 1000;
 describe('۱) Double Counting Proof', () => {
   const b = auditMarket({ m, size: SIZE, nowSec: NOW, gasUsd: 0 });
 
   it('رابطه دقیق: Total Gross = Realized(Settlement) + Unrealized(MTM)', () => {
-    expect(b.totalGrossLong).toBeCloseTo(b.realizedLong + b.unrealizedMtmLong, 9);
-    expect(b.totalGrossShort).toBeCloseTo(b.realizedShort + b.unrealizedMtmShort, 9);
+    expect(b.totalGrossLong).toBeCloseTo(b.grossSettlementLong, 9);
+    expect(b.totalGrossShort).toBeCloseTo(b.grossSettlementShort, 9);
   });
 
   it('رابطه دقیق: Net = Total Gross − Total Costs', () => {
@@ -218,7 +222,7 @@ describe('۵) Fee Model — Source هر هزینه', () => {
     expect(verifyFeeSources(b)).toBe(true);
     const labels = b.feeLines.map((l) => l.label);
     expect(labels).toContain('ورود');
-    expect(labels).toContain('خروج');
+    expect(labels).toContain('خروج در سررسید');
     expect(labels).toContain('تسویه');
     expect(labels).toContain('کارمزد شبکه');
     expect(labels).toContain('لغزش قیمت');
@@ -234,7 +238,7 @@ describe('۵) Fee Model — Source هر هزینه', () => {
     expect(entry.amount).toBeCloseTo(SIZE * m.takerFee * ytm, 9);
     expect(gas.source).toBe('user-input');
     expect(gas.amount).toBe(5);
-    expect(slip.source).toBe('market-data');
+    expect(slip.source).toBe('user-input');
   });
 
   it('هزینه بدون داده → 0 با source=na (هرگز حدس نمی‌زنیم)', () => {
@@ -242,7 +246,7 @@ describe('۵) Fee Model — Source هر هزینه', () => {
     const gas = bNoGas.feeLines.find((l) => l.label.includes('کارمزد شبکه'))!;
     const slip = bNoGas.feeLines.find((l) => l.label.includes('لغزش قیمت'))!;
     expect(gas.amount).toBe(0);
-    expect(gas.source).toBe('na');
+    expect(gas.source).toBe('user-input');
     expect(slip.amount).toBe(0);
     expect(slip.source).toBe('na');
   });
@@ -430,7 +434,7 @@ describe('۹) تست نهایی — ۱۰+ بازار با ۸ بررسی Producti
   });
 
   it('بررسی ۸: داده کافی نیست → insufficient-data', () => {
-    const noData: BorosMarket = { ...realMarkets[0], ohlcv: [] };
+    const noData: BorosMarket = { ...realMarkets[0], ohlcv: [], fundingHistory: [] };
     const a = BorosCalculationEngine.analyze({ m: noData, size: 1000, nowSec: NOW });
     // با ohlcv خالی، confidence پایین است ولی valid می‌ماند (فقط تاریخچه کم است)
     expect(a.confidence).toBeLessThan(50);

@@ -38,7 +38,7 @@ export default function BorosDashboard() {
     if (error) retryBorosSoon(15_000);
   }, [error]);
 
-  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now()), [markets]);
+  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now() && m.isUiWhitelisted), [markets]);
   const reload = () => {
     resetBorosLoad();
     void loadBoros();
@@ -55,7 +55,7 @@ export default function BorosDashboard() {
             stale={stale}
             error={error}
             syncing={syncProgress !== null}
-            sourceLabel="Pendle Boros API"
+            sourceLabel="بوروس"
             autoMs={2 * 60_000}
             onRefresh={reload}
           />
@@ -112,6 +112,8 @@ export default function BorosDashboard() {
           </div>
         </div>
       )}
+
+      <Notice tone="neutral">سناریو تا سررسید با نرخ شناور فرضی؛ هزینه ورود به بازار و لغزش نامشخص است.</Notice>
 
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />

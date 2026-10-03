@@ -70,6 +70,10 @@ const m: BorosMarket = {
 const NOW = m.maturity - 20 * 86_400; // ۲۰ روز مانده
 
 /* ================= ۱) Margin Calculator (مثال اجباری) ================= */
+
+// Independent oracle observations and API snapshot are explicit fixtures.
+m.fundingHistory = m.ohlcv;
+m.snapshotAt = NOW * 1000;
 describe('MarginCalculator — مثال رسمی اسپک', () => {
   it('222 × max(6.32%, 8%) × max(0.055, 0.014) × 0.476 ≈ 0.465569 (اسپک: تقریبی)', () => {
     const margin = MarginCalculator.calc({
@@ -172,7 +176,7 @@ describe('FeeCalculator — مطابق docs.pendle.finance/boros-dev/Mechanics/F
     const fees = FeeCalculator.calc({ m: m90, size: 1000, nowSec: NOW, gasUsd: 0 });
     const ytm = 90 / 365;
     expect(fees.entryFee).toBeCloseTo(1000 * m.takerFee * ytm, 9);
-    expect(fees.exitFee).toBeCloseTo(1000 * m.takerFee * ytm, 9);
+    expect(fees.exitFee).toBe(0); // holding until maturity
   });
 
   it('Settlement = |Size| × settleFeeRate × Period × تعداد تسویه (پایه: Size نه Gross)', () => {
@@ -183,7 +187,7 @@ describe('FeeCalculator — مطابق docs.pendle.finance/boros-dev/Mechanics/F
 
   it('با داده Order Book → Slippage = Notional × |exec − ref|', () => {
     const f2 = FeeCalculator.calc({ m: m90, size: 1000, nowSec: NOW, slippageRate: 0.052 });
-    expect(f2.slippageCost).toBeCloseTo(1000 * Math.abs(0.052 - m.markApr), 6);
+    expect(f2.slippageCost).toBeCloseTo(1000 * 0.052 * (90 / 365), 6);
   });
 
   it('نرخ‌های صفر → هزینه صفر', () => {
@@ -371,7 +375,7 @@ describe('BorosCalculationEngine.analyze — خروجی کامل (نسخه مم�
     expect(Math.abs(a.mtmLongPnl)).toBeLessThan(1e-6);
     expect(a.mtmShortPnl).toBeCloseTo(-a.mtmLongPnl, 10);
     // Total = Realized + Unrealized − Costs
-    expect(a.totalLongPnl).toBeCloseTo(a.realizedLongPnl + a.unrealizedLongPnl - (a.fees?.total ?? 0), 6);
+    expect(a.totalLongPnl).toBeCloseTo(a.grossLongPnl - (a.fees?.total ?? 0), 6);
   });
 
   it('daysToMaturity و YTM دقیق از timestamp', () => {
@@ -435,9 +439,9 @@ describe('تست نمونه HYPE — Implied 7.91٪ / Underlying 10.95٪ / 19 Da
     }
   });
 
-  it('Status Long = potential (Net > 0) — Short = not-attractive', () => {
+  it('Status Long = conditional (execution costs unknown) — Short = not-attractive', () => {
     const a = BorosCalculationEngine.analyze({ m: hype, size: 1000, nowSec: NOW_H, gasUsd: 0 });
-    expect(a.statusLong).toBe('potential');
+    expect(a.statusLong).toBe('conditional');
     expect(a.statusShort).toBe('not-attractive');
   });
 });
