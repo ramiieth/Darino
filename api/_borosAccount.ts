@@ -7,9 +7,8 @@ const syncAt = (v: unknown) => { const s = n((v as any)?.syncStatus?.timestamp);
 const page = z.object({ results: z.array(z.record(z.unknown())).max(2000), resumeToken: z.string().nullable().optional(), syncStatus: z.object({ timestamp: z.number().finite(), blockNumber: z.number().finite() }).optional() });
 export class BorosReadError extends Error { constructor(public status: number, message: string) { super(message); } }
 export async function borosRead(path: string, body?: unknown) {
- const key = process.env.BOROS_API_KEY?.trim();
- const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { accept:'application/json', ...(body ? {'content-type':'application/json'} : {}), ...(key ? {Authorization:`Bearer ${key}`} : {}) }, ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(15000) });
- if(r.status===401||r.status===403)throw new BorosReadError(502,'دسترسی API بوروس پذیرفته نشد؛ تنظیمات کلید سرور را بررسی کنید');
+ const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { accept:'application/json', ...(body ? {'content-type':'application/json'} : {}) }, ...(body ? {body:JSON.stringify(body)} : {}), signal:AbortSignal.timeout(15000) });
+ if(r.status===401||r.status===403)throw new BorosReadError(502,'دسترسی به دادهٔ عمومی بوروس پذیرفته نشد؛ اتصال سرویس را بررسی کنید');
  if (!r.ok) throw new BorosReadError(r.status===429 ? 429 : 502, r.status===429 ? 'سهمیه بوروس محدود است؛ آخرین داده حفظ شد' : 'دریافت داده بوروس انجام نشد');
  return r.json();
 }

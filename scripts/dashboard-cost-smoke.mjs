@@ -57,6 +57,26 @@ try {
  assert((await host.innerText()).includes('۳۲۵'));
  const preserved=await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');const b=getPref('cost-basis-v1').value;return {lots:b.lots.length,total:b.currentBasis['fungible:ethereum'].total,qty:b.currentBasis['fungible:ethereum'].quantity};});
  assert.deepEqual(preserved,{lots:1,total:'1625',qty:'0.65'});
+ // All sources are editable as holdings; derivative API entries remain separate.
+ await page.evaluate(async()=>{
+  const q=window.costQA;const {useBorosAccount}=await import('/src/features/boros/data/useBorosAccount.ts');const now=Date.now(),address=q.p.wallets[0].holding.address,handle=address+'000002ffffff';
+  q.p.arcus=[{holding:{label:'اصلی',arcus:{address,accountIndex:0,env:'mainnet'}},state:{account:{data:{netQuoteBalance:'100',equity:'150'},fetchedAt:now,error:null},positions:{data:[{marketId:1,marketDisplayName:'ETH-USD',side:'LONG',size:'2',averageEntryPrice:'2500',markPx:'3000',unrealizedPnl:'50',marginUsed:'30'}],fetchedAt:now,error:null}},stale:false}];
+  useBorosAccount.setState({hydrated:true,root:'',data:{root:address,accountId:0,fetchedAt:now,syncedAt:now,assets:[{tokenId:2,symbol:'WETH',priceUsd:3000,logo:'/logos/token-eth.svg'}],balances:[{handle,tokenId:2,marketId:0xffffff,cash:.65,equity:.85,margin:.1,freeMargin:.75,maintenanceBuffer:.8}],positions:[{handle,marketId:128,tokenId:2,side:'long',size:20,fixedApr:.08,unrealized:.01,realizedTrade:.02,settlement:.03,liquidationApr:.12,matured:false}],orders:[],settlements:[],transfers:[],partial:false,historyComplete:true,errors:[]},error:null});
+  q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));
+ });
+ await host.getByRole('button',{name:'ویرایش بهای خرید اتر رپ شده · وثیقه بوروس · مشترک',exact:true}).last().waitFor();
+ for(const width of [320,390,768,1280,1440]){await page.setViewportSize({width,height:950});assert(await host.evaluate(el=>el.scrollWidth<=el.clientWidth+1),`all-source overflow ${width}`);}
+ await page.setViewportSize({width:390,height:950});
+ await host.getByRole('button',{name:'ویرایش بهای خرید اتر رپ شده · وثیقه بوروس · مشترک',exact:true}).last().click();await dialog.waitFor();assert((await dialog.innerText()).includes('۰.۶۵'));
+ await dialog.getByLabel('بهای تمام‌شده · دلار',{exact:true}).fill('۱۶۲۵');assert((await dialog.innerText()).includes('۲,۵۰۰'));await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ const scopes=await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');const b=getPref('cost-basis-v1').value;return Object.keys(b.currentBasis);});assert(scopes.includes('fungible:ethereum'));assert(scopes.some(k=>k.startsWith('boros:')));
+ await host.getByRole('button',{name:'ویرایش بهای خرید یو اس دی جی · اعتبار آرکوس · اصلی',exact:true}).last().click();await dialog.waitFor();await dialog.getByLabel('بهای تمام‌شده · دلار',{exact:true}).fill('۹۰');await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ await host.evaluate(el=>el.style.zIndex='9999');await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:'/tmp/darino-all-source-cost-desktop.png'});await page.setViewportSize({width:390,height:950});await host.getByRole('button',{name:'ویرایش بهای خرید اتر رپ شده · وثیقه بوروس · مشترک',exact:true}).last().scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/darino-all-source-cost-mobile.png'});
+ await host.evaluate(el=>el.style.zIndex='1');
+ // Avoid silently saving a typed total against a changed API quantity.
+ await host.getByRole('button',{name:'ویرایش بهای خرید اتر رپ شده · وثیقه بوروس · مشترک',exact:true}).last().click();await dialog.waitFor();
+ await page.evaluate(async()=>{const {useBorosAccount}=await import('/src/features/boros/data/useBorosAccount.ts');const s=useBorosAccount.getState();useBorosAccount.setState({data:{...s.data,balances:s.data.balances.map(b=>({...b,cash:1}))}});});
+ await dialog.getByText('موجودی تغییر کرده است؛ پنل را ببندید و دوباره باز کنید.',{exact:true}).waitFor();assert(await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).isDisabled());
  assert.deepEqual(errors,[]);
- console.log('PASS: dashboard cost rows, Persian figures, 320/390/768/1280/1440 light/dark/touch, disclosure, reactive purchase update, one-field total-basis editor, automatic average, saved old-lot preservation and history gating. No live provider or installed-PWA test.');
+ console.log('PASS: dashboard cost rows, Persian figures, 320/390/768/1280/1440 light/dark/touch, disclosure, reactive purchase update, one-field total-basis editor, automatic average, saved old-lot preservation, history gating, scoped Arcus/Boros edits, derivative separation and balance-change guard. No live provider or installed-PWA test.');
 } finally {await browser.close();}
