@@ -143,3 +143,16 @@ it('withdrawal excludes prior account previews while preserving explicitly hypot
  expect(rows.find(r=>r.kind==='وثیقه مشترک بوروس')?.metrics).toMatchObject({cashCollateral:0,freeMarginUsd:0});
  expect(rows.find(r=>r.name==='حساب واقعی بوروس')?.metrics.gasCreditUsd).toBe(1.3);
 });
+
+it('keeps all three verified alternatives ahead of generic market rows and invalidates them after withdrawal',()=>{
+ const root='0x'+'22'.repeat(20),handle=packAccount(root,0,2,CROSS);
+ const account={root,accountId:0,fetchedAt:NOW,syncedAt:NOW,assets:[{tokenId:2,symbol:'WETH',priceUsd:2000,logo:null}],balances:[{handle,tokenId:2,marketId:CROSS,cash:1,equity:1,margin:0,freeMargin:1,maintenanceBuffer:1}],positions:[],settlements:[],transfers:[],orders:[],historyComplete:true,partial:false,errors:[]};
+ useBorosAccount.setState({root,data:account});
+ const m={...mapMarket(borosRaw,NOW),maturity:NOW/1000+30*86400};useBorosStore.setState({markets:Array.from({length:201},(_,i)=>({...m,marketId:i+1})),loadedAt:NOW});
+ useAssistantInsights.setState({scopes:{borosVerifiedCandidates:accountAnalysisScope(account)},rows:{borosVerifiedCandidates:[1,2,3].map(rank=>({name:'پیشنهاد '+rank,kind:'borosVerifiedCandidates',source:'simulation',status:'partial',asOf:NOW,metrics:{rank,marketId:rank,projectedNetUsd:40-rank,daysToMaturity:30,alternatives:1}}))}});
+ const section=appContextSchema.parse(buildAppContext(empty(),NOW)).sections.find(s=>s.key==='boros')!;expect(section.truncated).toBe(true);expect(section.rows.filter(r=>r.kind==='borosVerifiedCandidates')).toHaveLength(3);
+ expect(JSON.stringify(section)).not.toContain(root);
+ const expired=buildAppContext(empty(),NOW+61000).sections.find(s=>s.key==='boros')!.rows.filter(r=>r.kind==='borosVerifiedCandidates');expect(expired.every(r=>r.status==='stale')).toBe(true);
+ useBorosAccount.setState({data:{...account,balances:account.balances.map(b=>({...b,cash:0,equity:0,freeMargin:0}))}});
+ expect(buildAppContext(empty(),NOW).sections.find(s=>s.key==='boros')!.rows.some(r=>r.kind==='borosVerifiedCandidates')).toBe(false);
+});

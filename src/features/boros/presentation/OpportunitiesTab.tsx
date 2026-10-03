@@ -12,10 +12,10 @@ import { MarketIdentity } from './MarketIdentity';
 import { borosAssetName } from './borosLabels';
 export const STATUS_LABEL: Record<string, string> = { potential: 'فرصت بالقوه', conditional: 'فرصت مشروط', 'not-attractive': 'جذاب نیست', 'insufficient-data': 'داده ناکافی', 'anomaly-detected': 'ناهنجاری نرخ' };
 export const STATUS_TONE: Record<string, Tone> = { potential: 'gain', conditional: 'info', 'not-attractive': 'warn', 'insufficient-data': 'neutral', 'anomaly-detected': 'loss' };
-export function OpportunitiesTab({ markets,onInspect }: { markets: BorosMarket[];onInspect?:(marketId:number,direction?:BorosDirection)=>void }) {
+export function OpportunitiesTab({ markets,onInspect,onRecommend }: { markets: BorosMarket[];onInspect?:(marketId:number,direction?:BorosDirection)=>void;onRecommend?:()=>void }) {
   const [asset, setAsset] = useState('all');
   return <div className="space-y-6">
-    <Surface variant="focal" className="p-4 md:p-5 space-y-2"><h2 className="text-base font-bold">یک بازار را برای بررسی انتخاب کنید</h2><p className="text-xs leading-6 text-muted">دارایی، پلتفرم و سررسید را مقایسه کنید؛ سپس نرخ اجرا و مارجین را با حساب خودتان پیش‌نمایش بگیرید. اختلاف نرخ به‌تنهایی فرصت قطعی نیست.</p></Surface>
+    <Surface variant="focal" className="p-4 md:p-5 space-y-2"><h2 className="text-base font-bold">فهرست بازارهای بوروس</h2><p className="text-xs leading-6 text-muted">دارایی، پلتفرم و سررسید را مقایسه کنید؛ سپس نرخ اجرا و مارجین را با حساب خودتان پیش‌نمایش بگیرید. اختلاف نرخ به‌تنهایی فرصت قطعی نیست.</p>{onRecommend&&<Button size="sm" variant="outline" onClick={onRecommend}>پیشنهاد با موجودی حساب من</Button>}</Surface>
     <section className="space-y-4" aria-label="بازارهای بوروس">
       <div className="flex flex-wrap items-end justify-between gap-4"><h2 className="text-base font-bold">بازارها</h2><Field label="دارایی"><Select value={asset} onChange={e => setAsset(e.target.value)}><option value="all">همه دارایی‌ها</option>{[...new Set(markets.map(m => m.asset))].map(value => <option key={value} value={value}>{borosAssetName(value)}</option>)}</Select></Field></div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{markets.filter(m => asset === 'all' || m.asset === asset).map(m => <Surface key={m.marketId} className="boros-market-card p-4 space-y-4">

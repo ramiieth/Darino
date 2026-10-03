@@ -6,7 +6,7 @@ import { AssistantResponse } from './AssistantResponse';
 import { isBitcoinAddress } from '../domain/bitcoinAddress';
 import { visiblePositions } from '../domain/visibility';
 import { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link,useSearchParams } from 'react-router-dom';
 import { Sparkles, Send, RefreshCw } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { Surface, Section } from '@/shared/components/ui/GlassCard';
@@ -26,12 +26,14 @@ const questions = [{label:'فرصت‌های بوروس',text:'حساب واقع
 const dataStatus = {ready:'آماده',partial:'ناقص',stale:'قدیمی',loading:'در حال دریافت',unavailable:'ناموجود',reference:'مرجع',empty:'خالی',interface:'رابط'};
 interface Message { role:'user'|'assistant'; text:string; at:number }
 export default function AssistantPage() {
+  const [search]=useSearchParams();const marketQuery=search.get('borosMarket');
+  const selectedMarket=marketQuery&&/^\d+$/.test(marketQuery)?Number(marketQuery):null;
   useCustodySync(); const p = useConnectedPortfolio();
   const activity = useActivity(p);
   const portfolioRef = useRef(p); portfolioRef.current = p;
   const activityRef = useRef(activity.links); activityRef.current = activity.links;
   const [status,setStatus] = useState<boolean|null>(null), [error,setError] = useState<string|null>(null), [busy,setBusy] = useState(false);
-  const [question,setQuestion] = useState(''), [messages,setMessages] = useState<Message[]>([]);
+  const [question,setQuestion] = useState(selectedMarket!==null?`پیشنهاد ورود بوروس برای بازار شمارهٔ ${new Intl.NumberFormat('fa-IR').format(selectedMarket)} را با داده‌های پیش‌نمایش موجود توضیح بده: سود خالص تخمینی، سررسید، هزینه‌ها، سناریوی نامساعد و نرخ لیکوییدشدن. اگر پیش‌نمایش منقضی یا داده ناقص است، صریح بگو و ورود قطعی پیشنهاد نده. گزینه‌ها مستقل‌اند و قرار نیست هم‌زمان باز شوند.`:''), [messages,setMessages] = useState<Message[]>([]);
   const saved = getPref<{horizon:string;risk:string;liquidity:string}>('ai-profile')?.value;
   const [lastContext,setLastContext] = useState<AppContext|null>(null);
   const [profile,setProfile] = useState(saved ?? { horizon:'',risk:'',liquidity:'' });

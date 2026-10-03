@@ -1,3 +1,5 @@
+import { EntryRecommendations } from './EntryRecommendations';
+import type { EntrySelection } from './VerifiedOpportunities';
 /**
  * Boros intelligence — funding-rate (yield) markets, analysis only
  *   فرصت‌ها · مقایسه · شبیه‌ساز · مانیتور ریسک · ممیزی
@@ -22,9 +24,10 @@ import { BorosGuide } from './BorosGuide';
 import type { BorosDirection } from '../domain/types';
 import { AuditTab } from './AuditTab';
 
-type Tab = 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit' | 'guide';
+type Tab = 'entry' | 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit' | 'guide';
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'entry', label: 'پیشنهاد ورود' },
   { value: 'account', label: 'حساب من' },
   { value: 'opp', label: 'بازارها و فرصت‌ها' },
   { value: 'compare', label: 'مقایسه بازارها' },
@@ -36,8 +39,8 @@ const TABS: { value: Tab; label: string }[] = [
 
 export default function BorosDashboard() {
   const { markets, loading, error, stale, syncProgress, loadedAt } = useBoros();
-  const [tab, setTab] = useState<Tab>('opp');
-  const [target,setTarget]=useState<{marketId:number;direction:BorosDirection}|undefined>();
+  const [tab, setTab] = useState<Tab>('entry');
+  const [target,setTarget]=useState<{marketId:number;direction:BorosDirection;entry?:EntrySelection}|undefined>();
   const inspect=(marketId:number,direction:BorosDirection='long')=>{setTarget({marketId,direction});setTab('sim');};
 
   // automatic retry after an error (temporary rate limit — no user action needed)
@@ -112,7 +115,8 @@ export default function BorosDashboard() {
         {tab === 'account' && <AccountTab markets={markets} />}
         {tab !== 'account' && tab !== 'guide' && loading && markets.length === 0 && <PageSkeleton />}
         {tab !== 'account' && tab !== 'guide' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
-        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} onInspect={inspect} />}
+        {tab === 'entry' && <EntryRecommendations markets={activeMarkets} onAccount={()=>setTab('account')} onSelect={entry=>{setTarget({marketId:entry.marketId,direction:entry.direction,entry});setTab('sim');}}/>}
+        {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} onInspect={inspect} onRecommend={()=>setTab('entry')} />}
         {tab === 'compare' && <ComparisonTab markets={activeMarkets} onInspect={inspect} />}
         {tab === 'sim' && <SimulatorTab key={target?.marketId+':'+target?.direction} markets={activeMarkets} initial={target} />}
         {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
