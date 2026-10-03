@@ -1,0 +1,12 @@
+import {it,expect} from 'vitest';
+import {accountBudget,accountAnalysisScope,sameCollateralMarkets} from './accountBudget';
+import {accountSnapshotSchema,packAccount,CROSS} from '@/shared/boros/account';
+import {mapMarket} from '../data/borosService';
+import {borosRaw} from '../../../../tests/fixtures/boros';
+const root='0x1111111111111111111111111111111111111111';
+const m={...mapMarket(borosRaw,Date.now()),tokenId:2};
+const data=()=>accountSnapshotSchema.parse({root,accountId:0,fetchedAt:Date.now(),syncedAt:Date.now(),assets:[{tokenId:2,symbol:'WETH',priceUsd:2000,logo:null},{tokenId:1,symbol:'WBTC',priceUsd:60000,logo:null}],balances:[{handle:packAccount(root,0,2,CROSS),tokenId:2,marketId:CROSS,cash:.021,equity:.021,freeMargin:.015,margin:.006,maintenanceBuffer:.02},{handle:packAccount(root,0,1,CROSS),tokenId:1,marketId:CROSS,cash:1,equity:1,freeMargin:1,margin:0,maintenanceBuffer:1}],positions:[],orders:[],settlements:[],transfers:[],partial:false,historyComplete:true,errors:[]});
+it('uses only same collateral free margin, not cash, equity or other collateral',()=>{expect(accountBudget(data(),false,m)).toMatchObject({budgetUsd:30,freeCollateral:.015,cash:.021});expect(accountBudget(data(),false,m,'isolated').available).toBe(false);});
+it('withdrawals change live budget and invalidate saved account analysis identity',()=>{const before=data(),after=data();after.balances[0].freeMargin=0;after.balances[0].cash=0;expect(accountBudget(after,false,m).budgetUsd).toBe(0);expect(accountAnalysisScope(before)).not.toBe(accountAnalysisScope(after));});
+it('keeps unknown or stale balances unavailable rather than filling with hypothetical capital',()=>{expect(accountBudget(data(),true,m).budgetUsd).toBeNull();const d=data();d.balances[0].freeMargin=null;expect(accountBudget(d,false,m).available).toBe(false);expect(accountBudget(null,false,m).available).toBe(false);});
+it('real candidates never spend one collateral zone in another market; hypothetical keeps both',()=>{const markets=[m,{...m,marketId:9,tokenId:1}];expect(sameCollateralMarkets(markets,m,'real')).toEqual([m]);expect(sameCollateralMarkets(markets,m,'hypothetical')).toHaveLength(2);});

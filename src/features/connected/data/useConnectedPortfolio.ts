@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useCustody } from '@/features/custody/data/useCustody';
 import { getPref } from '@/features/custody/data/repository';
 import { accountKey, getArcusState, refreshSummary, isStale, useArcusStoreVersion } from '@/features/arcus/data/useArcusAccount';
-import { useConnectedStore, refreshWallet, refreshTransactions } from './store';
+import { useConnectedStore, refreshWallet, refreshWalletEvents } from './store';
 import { addressKey } from '../domain/model';
 import { visibleWalletValue,visiblePositions } from '../domain/visibility';
 export const CONNECTED_PREF = 'zerion-wallets';
@@ -27,7 +27,8 @@ export function useConnectedPortfolio() {
     let cancelled = false;
     async function update(force = false) {
       if(cancelled || document.visibilityState !== 'visible') return;
-      for(const h of wallets) { if(cancelled) return; await refreshWallet(h.address!,force); const state = useConnectedStore.getState().wallets[addressKey(h.address!)]; if(state?.historyLoaded && (force || Date.now()-(state.historyAt ?? 0) > 900000)) await refreshTransactions(h.address!); }
+      await refreshWalletEvents(wallets.map(h=>h.address!));
+      for(const h of wallets) { if(cancelled) return; await refreshWallet(h.address!,force); }
       for(const h of arcus) { if(cancelled) return; await refreshSummary(h.arcus!); }
     }
     void update(); const timer = window.setInterval(() => void update(),60000);

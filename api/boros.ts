@@ -5,7 +5,6 @@
  * Dev (Vite):    /boros-api/...  (پروکسی vite.config.ts)
  * ============================================================ */
 import type { ServerResponse, IncomingMessage } from 'node:http';
-import { requireSession } from './_authCore.js';
 import { resolveProxyTarget } from './_proxyPath.js';
 
 const UPSTREAM = 'https://api-boros.pendle.finance';
@@ -26,13 +25,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       res.end(JSON.stringify({ error: 'unsupported_readonly_endpoint' }));
       return;
     }
-    const key = process.env.BOROS_API_KEY?.trim();
-    if (key && !await requireSession(req, res)) return;
     const upstream = new URL(`${UPSTREAM}/apis/v1${path}`);
     search.forEach((v: string, k: string) => upstream.searchParams.set(k, v));
 
     const upstreamRes = await fetch(upstream.toString(), {
-      headers: { accept: 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+      headers: { accept: 'application/json' },
       signal: AbortSignal.timeout(20000)
     });
     const body = await upstreamRes.text();

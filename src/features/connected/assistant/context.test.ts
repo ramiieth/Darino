@@ -1,3 +1,4 @@
+import { accountAnalysisScope } from '@/features/boros/domain/accountBudget';
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useBorosAccount } from '@/features/boros/data/useBorosAccount';
@@ -116,7 +117,7 @@ describe('all-app financial context', () => {
 it('sends actual Boros PnL and preview without identifiers or double-counting dashboard',()=>{
  const root='0x1111111111111111111111111111111111111111';const handle=packAccount(root,0,2,CROSS);
  useBorosAccount.setState({root,data:{root,accountId:0,fetchedAt:NOW,syncedAt:NOW,assets:[{tokenId:2,symbol:'WETH',priceUsd:2000,logo:null}],balances:[{handle,tokenId:2,marketId:CROSS,cash:1,equity:1.1,margin:.2,freeMargin:.9,maintenanceBuffer:1}],positions:[{handle,marketId:1,tokenId:2,side:'long',size:2,fixedApr:.05,unrealized:.02,realizedTrade:.01,settlement:.03,liquidationApr:.15,matured:false}],settlements:[],transfers:[],orders:[],historyComplete:true,partial:false,errors:[]}});
- useAssistantInsights.setState({rows:{borosOfficialPreview:[{name:'پیش‌نمایش رسمی بوروس',kind:'borosOfficialPreview',source:'simulation',status:'partial',asOf:NOW,metrics:{marginCollateral:.02,matchedApr:.08}}]}});
+ useAssistantInsights.setState({scopes:{borosOfficialPreview:accountAnalysisScope(useBorosAccount.getState().data)},rows:{borosOfficialPreview:[{name:'پیش‌نمایش رسمی بوروس',kind:'borosOfficialPreview',source:'simulation',status:'partial',asOf:NOW,metrics:{marginCollateral:.02,matchedApr:.08}}]}});
  const context=appContextSchema.parse(buildAppContext(empty(),NOW));const rows=context.sections.find(s=>s.key==='boros')!.rows;
  expect(rows.find(r=>r.name==='حساب واقعی بوروس')!.metrics.equityUsd).toBe(2200);
  expect(rows.find(r=>r.kind==='پوزیشن واقعی لانگ فاندینگ')!.metrics).toMatchObject({unrealizedPnlUsd:40,allTimeTradePnlUsd:20,allTimeSettlementPnlUsd:60});
@@ -129,4 +130,16 @@ it('exports capital plan as hypothetical and expires its execution assumptions',
  useAssistantInsights.setState({ rows: { borosCapitalPlan: [{ name: 'بیشترین خالص تخمینی', kind: 'borosCapitalPlan', source: 'simulation', status: 'ready', asOf: NOW - 181000, metrics: { capitalUsd: 300, projectedNetUsd: 25, assumedExecutionApr: .0862, estimatedLiquidationApr: .01 } }] } });
  const rows = appContextSchema.parse(buildAppContext(empty(), NOW)).sections.find(s => s.key === 'boros')!.rows;
  expect(rows.find(r => r.kind === 'borosCapitalPlan')).toMatchObject({ source: 'simulation', status: 'stale', metrics: { capitalUsd: 300, projectedNetUsd: 25, assumedExecutionApr: .0862 } });
+});
+
+it('withdrawal excludes prior account previews while preserving explicitly hypothetical scenarios',()=>{
+ const root='0x1111111111111111111111111111111111111111';const handle=packAccount(root,0,2,CROSS);
+ const account={root,accountId:0,fetchedAt:NOW,syncedAt:NOW,assets:[{tokenId:2,symbol:'WETH',priceUsd:2000,logo:null}],balances:[{handle,tokenId:2,marketId:CROSS,cash:1,equity:1,margin:0,freeMargin:1,maintenanceBuffer:1}],positions:[],settlements:[],transfers:[],orders:[],historyComplete:true,partial:false,errors:[],gasBalanceUsd:1.3};
+ useBorosAccount.setState({root,data:account});const scope=accountAnalysisScope(account);
+ useAssistantInsights.setState({scopes:{borosOfficialPreview:scope,borosEntry:undefined},rows:{borosOfficialPreview:[{name:'قدیمی',kind:'borosOfficialPreview',source:'simulation',status:'partial',asOf:NOW,metrics:{matchedApr:.08}}],borosEntry:[{name:'سرمایهٔ فرضی',kind:'borosEntry',source:'simulation',status:'ready',asOf:NOW,metrics:{realAccountBudget:0,capitalUsd:100}}]}});
+ useBorosAccount.setState({data:{...account,balances:account.balances.map(b=>({...b,cash:0,equity:0,freeMargin:0}))}});
+ const rows=buildAppContext(empty(),NOW).sections.find(s=>s.key==='boros')!.rows;
+ expect(rows.some(r=>r.kind==='borosOfficialPreview')).toBe(false);expect(rows.find(r=>r.kind==='borosEntry')?.metrics.capitalUsd).toBe(100);
+ expect(rows.find(r=>r.kind==='وثیقه مشترک بوروس')?.metrics).toMatchObject({cashCollateral:0,freeMarginUsd:0});
+ expect(rows.find(r=>r.name==='حساب واقعی بوروس')?.metrics.gasCreditUsd).toBe(1.3);
 });

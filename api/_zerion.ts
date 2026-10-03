@@ -1,12 +1,15 @@
+import { zerionBudget,type ZerionBudget } from './_zerionPolicy.js';
 import { Decimal } from 'decimal.js';
-import { readProviderCache,writeProviderCache,providerCacheKey } from './_providerCache.js';
+import { readProviderCache,writeProviderCache,providerCacheKey,walletSnapshotKey,reserveProviderSlot } from './_providerCache.js';
 import { arr, obj, str, normalizePosition, normalizeTransaction, deduplicatePositions, addressKey, type WalletSnapshot, type ChainInfo, type TransactionPage } from '../src/features/connected/domain/model.js';
+export async function zerionQuota(){return readProviderCache<ZerionBudget>(providerCacheKey('quota'),true);}
+export async function walletActivityAt(address:string){return (await readProviderCache<{at:number}>(providerCacheKey('activity:'+addressKey(address)),true))?.at??0;}
 export class ProviderError extends Error { constructor(public status: number, message: string, public retryAfter = 0) { super(message); } }
 const BASE = 'https://api.zerion.io';
 const cache = new Map<string, { at: number; value: WalletSnapshot }>();
 const running = new Map<string, Promise<WalletSnapshot>>();
 let chainsCache: { at: number; data: ChainInfo[] } | null = null;
-// Queue within this server instance, leaving room under the free plan's 3 RPS.
+// Local queue plus a persistent slot reservation coordinates serverless instances.
 let tail: Promise<unknown> = Promise.resolve();
 let lastCall = 0;
 const responseAt=new WeakMap<Record<string,unknown>,number>();
@@ -25,22 +28,30 @@ async function get(path:string,deadline=Date.now()+18000,force=false):Promise<Re
  const work=cachedGet(path,deadline,force);requests.set(path,work);try{return await work;}finally{requests.delete(path);}
 }
 async function cachedGet(path: string, deadline: number,force:boolean): Promise<Record<string, unknown>> {
- const key=providerCacheKey(path),hit=await readProviderCache<{at:number;data:Record<string,unknown>}>(key);if(hit&&(!force||Date.now()-hit.at<60000)){responseAt.set(hit.data,hit.at);return hit.data;}
+ const walletMatch=path.match(/^\/v1\/wallets\/([^/]+)\//);const invalidatedAt=walletMatch?await walletActivityAt(walletMatch[1]):0;
+ const key=providerCacheKey(path),hit=await readProviderCache<{at:number;data:Record<string,unknown>}>(key);if(hit&&hit.at>=invalidatedAt&&(!force||Date.now()-hit.at<60000)){responseAt.set(hit.data,hit.at);return hit.data;}
  const cooldownKey=providerCacheKey('cooldown');
  const run = tail.catch(() => undefined).then(async () => {
-    const cooldown=await readProviderCache<{until:number;message:string}>(cooldownKey);
+    const cooldown=await readProviderCache<{until:number;message:string}>(cooldownKey,true);
     if(cooldown&&cooldown.until>Date.now())throw new ProviderError(429,cooldown.message,Math.ceil((cooldown.until-Date.now())/1000));
-    const delay = Math.max(0, 360 - (Date.now() - lastCall));
+    const delay = Math.max(0, 550 - (Date.now() - lastCall));
     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     if(Date.now() >= deadline) throw new ProviderError(504, 'زمان دریافت داده تمام شد');
+    const slot=await reserveProviderSlot(providerCacheKey('request-slots'),Date.now(),deadline);
+    if(slot===null)throw new ProviderError(429,'درخواست‌های زریون در صف هستند',1);
+    if(slot>Date.now())await new Promise(resolve=>setTimeout(resolve,slot-Date.now()));
+    const latestCooldown=await readProviderCache<{until:number;message:string}>(cooldownKey,true);
+    if(latestCooldown&&latestCooldown.until>Date.now())throw new ProviderError(429,latestCooldown.message,Math.ceil((latestCooldown.until-Date.now())/1000));
+    if(Date.now()>=deadline)throw new ProviderError(504,'زمان دریافت داده تمام شد');
     lastCall = Date.now();
     const apiKey = process.env.ZERION_API_KEY;
     if (!apiKey) throw new ProviderError(503, 'کلید زریون هنوز در سرور تنظیم نشده است');
     const r = await fetch(BASE + path, { headers: { Authorization: `Basic ${Buffer.from(apiKey + ':').toString('base64')}`, accept: 'application/json' }, signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline-Date.now()))) });
+    const budget=zerionBudget(r.headers);await writeProviderCache(providerCacheKey('quota'),budget,86400000);
     if(r.status===429){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);throw new ProviderError(429,throttle.message,throttle.retryAfter);}
     if (!r.ok) throw new ProviderError(r.status === 401 ? 503 : r.status, r.status === 400 ? 'این آدرس یا شبکه برای این داده پشتیبانی نمی‌شود' : 'دریافت داده از زریون انجام نشد');
     if(['Day','Month'].some(period=>r.headers.has('RateLimit-Org-'+period+'-Remaining')&&Number(r.headers.get('RateLimit-Org-'+period+'-Remaining'))===0)){const throttle=zerionThrottle(r.headers);await writeProviderCache(cooldownKey,throttle,throttle.retryAfter*1000);}
-    const data=obj(await r.json());const ttl=path.includes('/chains/')?86400000:path.includes('/charts/')?1800000:path.includes('/transactions/')?900000:1800000;
+    const data=obj(await r.json());const ttl=path.includes('/chains/')?86400000:path.includes('/charts/')?budget.chartMs:path.includes('/transactions/')?budget.historyMs:budget.walletMs;
     const at=Date.now();responseAt.set(data,at);await writeProviderCache(key,{at,data},ttl);return data;
   });
   tail = run;
@@ -63,10 +74,12 @@ export async function getChains(): Promise<ChainInfo[]> {
 }
 export async function getWallet(address: string, userId: string, force = false): Promise<WalletSnapshot> {
   const key = `${userId}:${addressKey(address)}`;
-  const hit = cache.get(key); if (hit && Date.now() - hit.at < (force || !hit.value.complete ? 60000 : 1800000)) return hit.value;
+  const invalidatedAt=await walletActivityAt(address);
+  const hit = cache.get(key); if (hit && hit.at>=invalidatedAt&&Date.now() - hit.at < (force || !hit.value.complete ? 60000 : (hit.value.refreshAfterMs??1800000))) return hit.value;
   if (running.has(key)) return running.get(key)!;
-  const lastKey=providerCacheKey('last-wallet:'+userId+':'+addressKey(address));
-  const previous=await readProviderCache<WalletSnapshot>(lastKey);
+  const lastKey=walletSnapshotKey(userId,addressKey(address));
+  const previous=await readProviderCache<WalletSnapshot>(lastKey)??await readProviderCache<WalletSnapshot>(providerCacheKey('last-wallet:'+userId+':'+addressKey(address)));
+  if(previous?.complete)await writeProviderCache(lastKey,previous,30*86400000);
   const work = (async () => {
     const deadline = Date.now() + 48000;
     const chains = await getChains().catch(() => chainsCache?.data ?? []);
@@ -81,7 +94,8 @@ export async function getWallet(address: string, userId: string, force = false):
     }
     } catch(e) {if(e instanceof ProviderError&&e.retryAfter)retryAt=Date.now()+e.retryAfter*1000; detailsError = e instanceof ProviderError ? e.message : 'جزئیات دارایی‌ها دریافت نشد؛ دوباره تلاش کنید'; }
     const positions = deduplicatePositions(rows);
-    const value: WalletSnapshot = { address, fetchedAt, total: !next&&!detailsError?positions.reduce((sum,p)=>sum.plus(p.value??0),new Decimal(0)).toNumber():null, change: null, positions, chains, complete: !next && !detailsError, detailsError, retryAt, unpriced: positions.filter(p => p.value === null).length };
+    const quota=await zerionQuota();
+    const value: WalletSnapshot = { address, fetchedAt,refreshAfterMs:quota?.walletMs??1800000, total: !next&&!detailsError?positions.reduce((sum,p)=>sum.plus(p.value??0),new Decimal(0)).toNumber():null, change: null, positions, chains, complete: !next && !detailsError, detailsError, retryAt, unpriced: positions.filter(p => p.value === null).length };
     if (cache.size > 200) cache.delete(cache.keys().next().value!);
     if(value.complete){await writeProviderCache(lastKey,value,30*86400000);cache.set(key, { at: fetchedAt, value });return value;}
     if(previous?.complete)return {...previous,stale:true,detailsError:detailsError??'جزئیات کامل دریافت نشد',retryAt};
@@ -103,8 +117,9 @@ export async function getBalanceChart(address:string,userId:string,period:string
  if(!CHART_PERIODS.includes(period as never)||!ids.length||ids.length>25||ids.some(id=>!/^[-a-zA-Z0-9_:]{1,44}$/.test(id))||(chain&&!/^[-a-z0-9]{1,60}$/.test(chain)))throw new ProviderError(400,'پارامتر نمودار معتبر نیست');
  const params=new URLSearchParams({currency:'usd','filter[fungible_ids]':[...new Set(ids)].sort().join(',')});
  if(chain)params.set('filter[chain_ids]',chain);
+ const invalidatedAt=await walletActivityAt(address);
  const path=`/v1/wallets/${address}/charts/${period}?${params}`,key=userId+':'+path,hit=chartCache.get(key);
- if(hit&&Date.now()-hit.at<1800000)return hit.value;
+ if(hit&&hit.at>=invalidatedAt&&Date.now()-hit.at<1800000)return hit.value;
  const response=await get(path);const value={...normalizeChart(response),fetchedAt:responseAt.get(response)??Date.now()};
  if(chartCache.size>=200)chartCache.delete(chartCache.keys().next().value!);
  chartCache.set(key,{at:value.fetchedAt,value});return value;

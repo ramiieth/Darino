@@ -1,4 +1,7 @@
-import { costSummary } from '@/features/cost-basis/domain/summary';
+import { accountAnalysisScope } from '@/features/boros/domain/accountBudget';
+import { allSourceCostSummary } from '@/features/cost-basis/domain/allSources';
+import { costWalletExtras } from '@/features/cost-basis/data';
+import { useConnectedStore } from '../data/store';
 import { useBorosAccount, accountIsStale } from '@/features/boros/data/useBorosAccount';
 import { accountTotals } from '@/shared/boros/account';
 import Decimal from 'decimal.js';
@@ -79,15 +82,16 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
     const book = getPref<CostBook>(COST_PREF)?.value;
     let costRows: InsightRow[] = [];
     if (book) {
-        const summary = costSummary(p, book, activityLinks);
+        const basisAccount=useBorosAccount.getState();
+        const summary = allSourceCostSummary(p,book,activityLinks,{data:basisAccount.data,stale:accountIsStale(basisAccount)},costWalletExtras(p,useConnectedStore.getState().wallets));
         const result = summary.result!;
         const historyCovered = p.wallets.length > 0 && p.wallets.every(summary.walletCovered);
-        costRows = summary.rows.map(row => insight(tokenName(row.asset.symbol, row.asset.name), row.current ? 'تطبیق بهای موجودی فعلی' : 'FIFO', { basisUsd: row.basis, avgCostUsd: row.avgCost, unrealizedPnlUsd: row.pnl, unrealizedPnlPct: row.pnlPct, coveredQuantity: number(row.valuation.covered), unknownQuantity: number(row.valuation.unknown), quantity: row.quantity.toNumber(), valueUsd: row.priced ? row.value.toNumber() : null }, 'saved', row.status === 'ready' && row.pnl !== null ? 'ready' : 'partial', row.current?.at ?? book.asOf, row.asset.symbol));
+        costRows = summary.rows.map(row => insight(tokenName(row.asset.symbol, row.asset.name), row.sourceLabel+' · '+(row.current ? 'تطبیق بهای موجودی فعلی' : 'FIFO'), { basisUsd: row.basis, avgCostUsd: row.avgCost, unrealizedPnlUsd: row.pnl, unrealizedPnlPct: row.pnlPct, coveredQuantity: number(row.valuation.covered), unknownQuantity: number(row.valuation.unknown), quantity: row.quantity.toNumber(), valueUsd: row.priced ? row.value.toNumber() : null }, 'saved', row.status === 'ready' && row.pnl !== null ? 'ready' : 'partial', row.current?.at ?? book.asOf, row.asset.symbol));
         costRows.unshift(insight('فروش‌های محاسبه‌شده', 'FIFO', { realizedPnlUsd: historyCovered && !p.stale && !result.issues.length && !Object.keys(book.currentBasis ?? {}).length ? number(result.realized) : null, issueCount: result.issues.length, baselineTs: book.asOf, recordedPurchases: book.lots.length, archivedPurchases: book.archivedPurchases?.length ?? 0 }, 'saved', historyCovered && !result.issues.length && !p.stale ? 'ready' : 'partial', book.asOf));
     }
     if (book)
         costRows.push(...book.lots.map(l => insight(tokenName(l.asset.symbol, l.asset.name), 'خرید ثبت‌شده؛ مبنای هزینه', { quantity: number(l.quantity), unitCostUsd: number(l.unitCost), feeUsd: number(l.fee) }, 'saved', 'reference', l.at, l.asset.symbol)), ...(book.archivedPurchases ?? []).map(l => insight(tokenName(l.symbol), 'خرید بایگانی‌شده؛ موجودی واقعی نیست', { quantity: number(l.quantity), unitCostUsd: number(l.unitCost), feeUsd: number(l.fee) }, 'saved', 'reference', l.at, l.symbol)));
-    sections.push(section('costBasis', 'خرید و سود و زیان', costRows, book?.asOf ?? null, !book ? 'unavailable' : costRows.some(r => r.status === 'partial') ? 'partial' : 'ready', 'خریدهای ثبت‌شده مبنای هزینه هستند؛ موجودی واقعی از API است. بهای خرید یا تاریخچه ناقص، سود قطعی تولید نمی‌کند. ردیف‌های خرید اولیه و بایگانی، موجودی فعلی نیستند و با خلاصه FIFO دوباره جمع نشوند.'));
+    sections.push(section('costBasis', 'خرید و سود و زیان', costRows, book?.asOf ?? null, !book ? 'unavailable' : costRows.some(r => r.status === 'partial') ? 'partial' : 'ready', 'خریدهای ثبت‌شده مبنای هزینه هستند؛ موجودی واقعی از API است. بهای خرید یا تاریخچه ناقص، سود قطعی تولید نمی‌کند. اعتبار آرکوس و وثیقه بوروس به تفکیک حساب‌اند؛ حجم قراردادها دارایی خریداری‌شده نیست و سود پوزیشن با سود تغییر قیمت وثیقه جمع نشود. ردیف‌های خرید اولیه و بایگانی، موجودی فعلی نیستند و با خلاصه FIFO دوباره جمع نشوند.'));
     const perf = usePerfStore.getState();
     const maps: Record<PerfPeriod, Record<string, number | null>> = { '1d': perf.perf1d, '7d': perf.perf7d, '30d': perf.perf30, '60d': perf.perf60, '90d': perf.perf90 };
     const duplicates = new Set(perf.coins.filter((c, i, all) => all.findIndex(x => x.symbol === c.symbol) !== i).map(c => c.symbol));
@@ -102,7 +106,7 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
         const funding = (m.fundingHistory ?? []).filter(x => Number.isFinite(x.c)).sort((a, b) => a.ts - b.ts);
         return (['long', 'short'] as const).map(direction => {
             const a = BorosCalculationEngine.analyze({ m, size: 1000, direction, nowSec: Math.floor(now / 1000) });
-            const metrics: Record<string, number | null> = { marketId: m.marketId, maturityTs: m.maturity * 1000, collateralPriceUsd: m.collateralPriceUsd ?? null, standardNotionalUsd: 1000, fixedApr: m.markApr, floatingApr: m.floatingApr, marginRequiredUsd: a.marginRequired, daysToMaturity: a.daysToMaturity, projectedGrossUsd: direction === 'long' ? a.grossLongPnl : a.grossShortPnl, projectedNetKnownCostsUsd: direction === 'long' ? a.totalLongPnl : a.totalShortPnl, knownFeesUsd: a.fees?.total ?? null, stressAdverseUsd: a.stress.bearNet, stressBaseUsd: a.stress.baseNet, stressFavorableUsd: a.stress.bullNet, meanReversionNetUsd: a.meanReversion.netPnl, fundingPoints: funding.length, confidencePct: a.confidence, rank: direction === 'long' ? a.rankLong : a.rankShort, liquidationApr: null, slippageUsd: null, entranceFeeUsd: null };
+            const metrics: Record<string, number | null> = { marketId: m.marketId, tokenId:m.tokenId??null, maturityTs: m.maturity * 1000, collateralPriceUsd: m.collateralPriceUsd ?? null, standardNotionalUsd: 1000, fixedApr: m.markApr, floatingApr: m.floatingApr, marginRequiredUsd: a.marginRequired, daysToMaturity: a.daysToMaturity, projectedGrossUsd: direction === 'long' ? a.grossLongPnl : a.grossShortPnl, projectedNetKnownCostsUsd: direction === 'long' ? a.totalLongPnl : a.totalShortPnl, knownFeesUsd: a.fees?.total ?? null, stressAdverseUsd: a.stress.bearNet, stressBaseUsd: a.stress.baseNet, stressFavorableUsd: a.stress.bullNet, meanReversionNetUsd: a.meanReversion.netPnl, fundingPoints: funding.length, confidencePct: a.confidence, rank: direction === 'long' ? a.rankLong : a.rankShort, liquidationApr: null, slippageUsd: null, entranceFeeUsd: null };
             for (const d of [1, 7, 30, 60, 90]) {
                 const points = funding.filter(x => x.ts >= now / 1000 - d * 86400 && x.ts <= now / 1000);
                 const covered = points.length >= d && points[0].ts <= now / 1000 - (d - 1) * 86400;
@@ -111,14 +115,22 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
             return insight(`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`, `${direction === 'long' ? 'لانگ' : 'شورت'} · ${direction === 'long' ? a.statusLong : a.statusShort} · وثیقه ${tokenName(m.collateralSymbol ?? '')}`, metrics, 'api', boros.stale || a.freshness.stale ? 'stale' : !a.valid || m.status !== 'GOOD' ? 'unavailable' : 'partial', m.snapshotAt ?? boros.loadedAt);
         });
     });
-    borosRows.push(...(useAssistantInsights.getState().rows.borosCapitalPlan ?? []).map(r => ({ ...r, status: r.asOf !== null && now - r.asOf > 180000 ? 'stale' as const : r.status })), ...(useAssistantInsights.getState().rows.borosEntry ?? []), ...(useAssistantInsights.getState().rows.borosOfficialPreview ?? []).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>180000?'stale' as const:r.status})));
+    const published=useAssistantInsights.getState();
+    const currentScope=accountAnalysisScope(useBorosAccount.getState().data);
+    for(const key of ['borosCapitalPlan','borosEntry','borosOfficialPreview','borosVerifiedCandidates']){
+      const scoped=published.scopes[key];
+      if(scoped&&scoped!==currentScope)continue;
+      if(['borosOfficialPreview','borosVerifiedCandidates'].includes(key)&&!scoped)continue;
+      borosRows.push(...(published.rows[key]??[]).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>(key==='borosOfficialPreview'||key==='borosVerifiedCandidates'?60000:180000)?'stale' as const:r.status})));
+    }
     const accountState=useBorosAccount.getState(); const account=accountState.data;
     const realRows:InsightRow[]=[];
     if(account){
       const at=account.syncedAt;const status=accountIsStale(accountState,now)?'stale':account.partial?'partial':'ready';
       const prices=new Map(account.assets.map(a=>[a.tokenId,a.priceUsd]));
       const usd=(v:number|null,id:number)=>v!==null&&prices.get(id)!=null&&prices.get(id)!>0?v*prices.get(id)!:null;
-      realRows.push(insight('حساب واقعی بوروس','حساب نرخ فاندینگ؛ جدا از مجموع داشبورد',{...accountTotals(account),accountId:account.accountId,positionCount:account.positions.length,historyComplete:Number(account.historyComplete)},'api',status,at));
+      realRows.push(insight('حساب واقعی بوروس','حساب نرخ فاندینگ؛ جدا از مجموع داشبورد',{...accountTotals(account),gasCreditUsd:account.gasBalanceUsd??null,accountId:account.accountId,positionCount:account.positions.length,historyComplete:Number(account.historyComplete)},'api',status,at));
+      realRows.push(...account.balances.map(b=>{const a=account.assets.find(a=>a.tokenId===b.tokenId);return insight(tokenName(a?.symbol??''),b.marketId===0xffffff?'وثیقه مشترک بوروس':'وثیقه جدا بوروس',{tokenId:b.tokenId,marketId:b.marketId,cashCollateral:b.cash,equityCollateral:b.equity,freeMarginCollateral:b.freeMargin,marginCollateral:b.margin,maintenanceBufferCollateral:b.maintenanceBuffer,collateralPriceUsd:a?.priceUsd??null,freeMarginUsd:usd(b.freeMargin,b.tokenId)},'api',status,at);}));
       realRows.push(...account.positions.map(p=>{const m=boros.markets.find(m=>m.marketId===p.marketId);return insight(m?`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`:'بوروس',p.side==='long'?'پوزیشن واقعی لانگ فاندینگ':'پوزیشن واقعی شورت فاندینگ',{marketId:p.marketId,sizeYu:p.size,fixedApr:p.fixedApr,unrealizedPnlUsd:usd(p.unrealized,p.tokenId),allTimeTradePnlUsd:usd(p.realizedTrade,p.tokenId),allTimeSettlementPnlUsd:usd(p.settlement,p.tokenId),liquidationApr:p.liquidationApr,matured:Number(p.matured),remainingGrossSettlementUsd:status==='ready'&&m?.snapshotAt&&now-m.snapshotAt<180000&&p.size!==null&&p.fixedApr!==null&&Number.isFinite(m.floatingApr)?usd((p.side==='long'?1:-1)*p.size*(m.floatingApr-p.fixedApr)*Math.max(0,m.maturity-now/1000)/(365*86400),p.tokenId):null},'api',status,at); }));
       realRows.push(...account.settlements.map(e=>insight('تسویه واقعی بوروس','تسویه خالص؛ هزینه در مبلغ کسر شده',{marketId:e.marketId,netCollateral:e.amount,feeCollateral:e.fee,settlementApr:e.rate,currentEquivalentUsd:usd(e.amount,e.tokenId)},'api',status,e.at)));
       realRows.push(...account.orders.map(o=>insight('سفارش باز بوروس',o.side==='long'?'لانگ فاندینگ':'شورت فاندینگ',{marketId:o.marketId,sizeYu:o.size,apr:o.rate,marginCollateral:o.margin},'api',status,at)));
