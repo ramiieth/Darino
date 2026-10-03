@@ -39,3 +39,14 @@ describe('shared dashboard cost valuation', () => {
   expect(rows).toHaveLength(1);
  });
 });
+
+ describe('native holdings and cached reconciliation',()=>{
+ it('includes catalog native ETH with no provider ID or contract, without admitting fake native tokens',()=>{
+  const native={...position,tokenId:''};
+  const rows=costSummary(portfolio([wallet([native,{...native,id:'fake',symbol:'FAKE',spam:true}])]),undefined).rows;
+  expect(rows).toHaveLength(1);expect(rows[0].asset.key).toBe('fungible:ethereum');expect(rows[0].quantity.toString()).toBe('0.65');
+  expect(costSummary(portfolio([wallet([native])]),book).rows[0].pnl).toBe(325);
+  const combined=costSummary(portfolio([wallet([{...native,quantity:'.3',value:900},{...native,chain:'base',quantity:'.35',value:1050}])]),book).rows[0];
+  expect(combined.quantity.toString()).toBe('0.65');expect(combined.pnl).toBe(325);
+ });
+ });

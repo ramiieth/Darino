@@ -14,14 +14,14 @@ export function allSourceCostSummary(portfolio:ConnectedPortfolio,book:CostBook|
  const seen=new Set(portfolio.wallets.map(w=>w.holding.address?addressKey(w.holding.address):undefined));
  const extras=extraWallets.filter(w=>{const k=w.holding.address?addressKey(w.holding.address):undefined;if(!k||seen.has(k))return false;seen.add(k);return true;});
  const walletSummary=costSummary({...portfolio,wallets:[...portfolio.wallets,...extras]},book,links,true);
- const rows:BasisRow[]=walletSummary.rows.map(r=>({...r,sourceLabel:r.sources.some(w=>extras.includes(w))?'کیف پول آرکوس':'کیف پول',provider:'wallet',snapshotComplete:r.sources.every(w=>!!w.state?.data?.complete)}));
+ const rows:BasisRow[]=walletSummary.rows.map(r=>({...r,sourceLabel:r.sources.some(w=>extras.includes(w))?'کیف پول آرکوس':'کیف پول',provider:'wallet',snapshotComplete:r.holdingSources.every(w=>!!w.state?.data?.complete)}));
  function add(asset:CostAsset,quantity:Decimal,price:number|null,label:string,stale:boolean,complete:boolean,provider:'arcus'|'boros'){
   const stored=book?.currentBasis?.[asset.key];const current=validCurrentBasis(stored,asset.key)?stored:undefined;
   const matches=!!current&&new Decimal(current.quantity).eq(quantity);
   const basis=matches?Number(current.total):null;const value=price!==null?quantity.times(price):new Decimal(0);
-  const pnl=matches&&!stale&&complete&&price!==null?value.minus(current.total).toNumber():null;
-  const status=!current?'missing':!matches?'mismatch':stale?'stale':!complete?'history':'ready';
-  rows.push({asset,quantity,value,priced:price!==null,chains:new Set([asset.chain]),sources:[],current,price,ready:matches&&complete,stale,issues:stored&&!current?[{key:'invalid-current:'+asset.key,reason:'بهای تطبیق‌شده معتبر نیست',assetKeys:[asset.key]}]:[],valuation:{covered:matches?quantity.toString():'0',unknown:matches?'0':quantity.toString(),excess:'0',basis:basis??0,pnl,partialPnl:pnl},basis,pnl,status,avgCost:basis!==null?new Decimal(basis).div(quantity).toNumber():null,pnlPct:pnl!==null&&basis!==null&&basis>0?pnl/basis*100:null,share:null,sourceLabel:label,snapshotComplete:complete,provider});
+  const pnl=matches&&!current?.pendingBalanceConfirmation&&!stale&&complete&&price!==null?value.minus(current.total).toNumber():null;
+  const status=!current?'missing':!matches?'mismatch':current.pendingBalanceConfirmation?'confirmation':stale?'stale':!complete?'history':'ready';
+  rows.push({asset,quantity,value,priced:price!==null,chains:new Set([asset.chain]),sources:[],holdingSources:[],current,price,ready:matches&&complete&&!current?.pendingBalanceConfirmation,stale,issues:stored&&!current?[{key:'invalid-current:'+asset.key,reason:'بهای تطبیق‌شده معتبر نیست',assetKeys:[asset.key]}]:[],valuation:{covered:matches?quantity.toString():'0',unknown:matches?'0':quantity.toString(),excess:'0',basis:basis??0,pnl,partialPnl:pnl},basis,pnl,status,avgCost:basis!==null?new Decimal(basis).div(quantity).toNumber():null,pnlPct:pnl!==null&&basis!==null&&basis>0?pnl/basis*100:null,share:null,sourceLabel:label,snapshotComplete:complete,provider});
  }
  for(const a of portfolio.arcus.filter(a=>a.holding.arcus?.env==='mainnet')){
   const quantity=positive(a.state?.account.data?.netQuoteBalance);if(!quantity)continue;

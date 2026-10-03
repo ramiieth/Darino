@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { catalogToken } from '@/features/connected/domain/visibility';
 import { ASSETS } from '@/features/custody/domain/catalog';
 import { addressKey } from '@/features/connected/domain/model';
 import type { LivePosition, WalletTransaction } from '@/features/connected/domain/model';
@@ -17,8 +18,12 @@ export function verifiedCash(chain:string,contract:string|null|undefined,token?:
 }
 
 export interface CostResult {lots:CostLot[];realized:string;issues:{key:string;reason:string;assetKeys?:string[]}[];processed:string[]}
-export const assetKey=(p:Pick<LivePosition,'chain'|'contract'|'tokenId'>)=>p.tokenId ? `fungible:${p.tokenId}` : `${p.chain}:${(p.chain==='solana'?p.contract:p.contract?.toLowerCase()) ?? 'native'}`;
-export const costAsset=(p:LivePosition):CostAsset=>({key:assetKey(p),tokenId:p.tokenId,symbol:p.symbol,name:p.name,chain:p.chain,contract:p.contract,icon:p.icon});
+export const assetKey=(p:Pick<LivePosition,'chain'|'contract'|'tokenId'> & Partial<Pick<LivePosition,'symbol'|'verified'>>)=>{
+ const native=p.symbol?catalogToken({...p,symbol:p.symbol}):undefined;
+ const id=p.tokenId||(!p.contract&&native?.isNative?native.coingeckoId:undefined);
+ return id?`fungible:${id}`:`${p.chain}:${(p.chain==='solana'?p.contract:p.contract?.toLowerCase())??'native'}`;
+};
+export const costAsset=(p:LivePosition):CostAsset=>({key:assetKey(p),tokenId:p.tokenId||(!p.contract&&catalogToken(p)?.isNative?catalogToken(p)?.coingeckoId:'')||'',symbol:p.symbol,name:p.name,chain:p.chain,contract:p.contract,icon:p.icon});
 export function decimalPositive(s:string):boolean {try{return new Decimal(s).isFinite() && new Decimal(s).gt(0);}catch{return false;}}
 export function replayCost(book:CostBook, transactions:WalletTransaction[],links:ActivityLink[]=[],ownedAddresses:string[]=[]):CostResult {
  const issues:CostResult['issues']=[];

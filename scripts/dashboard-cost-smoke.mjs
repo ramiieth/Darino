@@ -1,7 +1,7 @@
 /** Isolated native dashboard cost-basis QA; synthetic data, no provider/key calls. */
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-const base = 'http://127.0.0.1:5173';
+const base = process.env.BASE_URL??'http://127.0.0.1:5173';
 const browser = await chromium.launch({ channel: 'chrome' });
 try {
  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -34,7 +34,7 @@ try {
    if(width<1280) { await host.getByText('بهای خرید و جزئیات',{exact:true}).click(); assert(await host.evaluate(el=>el.scrollWidth<=el.clientWidth+1), `expanded overflow ${width}`); await host.getByText('بهای خرید و جزئیات',{exact:true}).click(); }
   }
  }
- assert((await host.innerText()).includes('۳۲۵')); assert((await host.innerText()).includes('۲۰'));
+ assert((await host.innerText()).includes('۳۲۵'),await host.innerText()); assert((await host.innerText()).includes('۲۰'));
  await page.screenshot({path:'/tmp/darino-cost-desktop.png'});
  await page.setViewportSize({width:390,height:844}); await page.screenshot({path:'/tmp/darino-cost-mobile.png'});
  // Purchase updates must reflect immediately without page refresh.
@@ -57,6 +57,17 @@ try {
  assert((await host.innerText()).includes('۳۲۵'));
  const preserved=await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');const b=getPref('cost-basis-v1').value;return {lots:b.lots.length,total:b.currentBasis['fungible:ethereum'].total,qty:b.currentBasis['fungible:ethereum'].quantity};});
  assert.deepEqual(preserved,{lots:1,total:'1625',qty:'0.65'});
+ // Verified native ETH without provider ID remains in the dashboard, and stale data can be saved explicitly.
+ await page.evaluate(()=>{const q=window.costQA;q.p.wallets[0].state.data.positions[0].tokenId='';q.p.wallets[0].stale=true;q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));});
+ await host.getByRole('button',{name:'بهای خرید اتریوم',exact:true}).last().click();await dialog.waitFor();
+ await dialog.getByLabel('بهای تمام‌شده · دلار',{exact:true}).fill('۱۶۰۰٫۵');
+ assert(await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).isDisabled());
+ await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ await host.getByText('تأیید موجودی به‌روز لازم است',{exact:true}).last().waitFor();
+ assert.equal(await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');return getPref('cost-basis-v1').value.currentBasis['fungible:ethereum'].total;}),'1600.5');
+ await page.evaluate(()=>{const q=window.costQA;q.p.wallets[0].stale=false;q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));});
+ await host.getByRole('button',{name:'بهای خرید اتریوم',exact:true}).last().click();await dialog.waitFor();await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ assert.equal(await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');return !!getPref('cost-basis-v1').value.currentBasis['fungible:ethereum'].pendingBalanceConfirmation;}),false);
  // All sources are editable as holdings; derivative API entries remain separate.
  await page.evaluate(async()=>{
   const q=window.costQA;const {useBorosAccount}=await import('/src/features/boros/data/useBorosAccount.ts');const now=Date.now(),address=q.p.wallets[0].holding.address,handle=address+'000002ffffff';

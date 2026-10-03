@@ -13,7 +13,7 @@ try{
   if(u.pathname==='/api/borosAccount'){
    if(u.searchParams.has('view'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({root,accountId:0,kind:u.searchParams.get('view'),fetchedAt:Date.now(),complete:false,rows:[{id:'history1',handle,marketId:128,tokenId:2,at:now,side:'long',size:.65,rate:.08,status:'انجام‌شده',pnl:-.01,fee:.001}]})});
    if(route.request().method()==='POST'){previewBody=route.request().postDataJSON();return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({fetchedAt:Date.now(),handle,marketId:128,side:'long',requestedSize:.65,matchedSize:.65,matchedApr:.08,margin:.02,liquidationApr:.12,priceImpact:.001,status:'FILLED',success:true})});}
-   return route.fulfill({status:quota?429:200,contentType:'application/json',body:JSON.stringify(quota?{error:'سهمیه بوروس محدود است'}:snapshot)});
+   return route.fulfill({status:quota?429:200,contentType:'application/json',body:JSON.stringify(quota?{error:'سهمیه بوروس محدود است'}:Number(u.searchParams.get('accountId'))===0?snapshot:{...snapshot,accountId:1,balances:snapshot.balances.map(b=>({...b,handle:b.handle.replace('00000','01000'),cash:0,equity:0,margin:0,freeMargin:0,maintenanceBuffer:0})),positions:[],transfers:[],orders:[],settlements:[],partial:true,errors:['وثیقه جدا بدون پوزیشن در حساب فرعی ممکن است در فهرست نباشد']})});
   }
   if(u.pathname.startsWith('/api/')||u.pathname.includes('-api'))return route.fulfill({status:503,contentType:'application/json',body:'{}'});
   return route.continue();
@@ -37,6 +37,10 @@ try{
  await host.getByRole('button',{name:'به‌روزرسانی',exact:true}).click();await host.getByText('به‌روز',{exact:true}).waitFor();assert((await host.innerText()).includes('۱,۳۰۰'));assert((await host.innerText()).includes('۰.۶۵'));assert(!(await host.innerText()).includes('ا ت ر'));
  await host.getByRole('tab',{name:/پوزیشن‌ها/}).click();await host.getByText('پوزیشن باز ندارید؛ وثیقه در زبانهٔ «وثیقه» نمایش داده می‌شود.',{exact:true}).waitFor();
  await host.getByRole('tab',{name:'وثیقه',exact:true}).click();await host.getByText('موجودی وثیقه',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/darino-boros-collateral-mobile.png'});
+ await host.getByText('مدیریت حساب',{exact:true}).click();await host.getByLabel('شماره حساب',{exact:true}).fill('1');await host.getByRole('button',{name:'مشاهده حساب',exact:true}).click();await host.getByRole('button',{name:'مشاهده حساب اصلی',exact:true}).waitFor();
+ await host.getByText('پرتفولیوی بوروس · حساب ۱',{exact:true}).waitFor();
+ await host.getByRole('button',{name:'مشاهده حساب اصلی',exact:true}).click();await host.getByText('پرتفولیوی بوروس · حساب اصلی',{exact:true}).waitFor();await host.getByText('۰.۶۵',{exact:true}).last().waitFor();
+ assert.equal(await page.evaluate(async()=>{const {useBorosAccount}=await import('/src/features/boros/data/useBorosAccount.ts');return useBorosAccount.getState().accountId;}),0);
  await page.evaluate(async()=>{
   const React=(await import('/node_modules/.vite/deps/react.js')).default;const {createRoot}=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const {OfficialPreviewPanel}=await import('/src/features/boros/presentation/OfficialPreviewPanel.tsx');const host=document.createElement('div');host.id='official-preview-qa';host.dir='rtl';host.style.cssText='position:fixed;inset:0;z-index:10000;background:rgb(var(--c-canvas));padding:20px;overflow:auto';document.body.append(host);createRoot(host).render(React.createElement(OfficialPreviewPanel,{market:window.__qaMarket,direction:'long',size:'0.65'}));
  });
