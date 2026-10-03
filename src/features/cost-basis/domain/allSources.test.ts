@@ -39,3 +39,27 @@ describe('editable cost basis across real account sources',()=>{
   const rows=platformPositions(portfolio(),{data:boros,stale:false},[]);expect(rows[0]).toMatchObject({size:2,entry:2500,pnl:50,rate:false});expect(rows[1]).toMatchObject({size:20,entry:8,pnl:30,rate:true});
  });
 });
+
+describe('cached and source-local purchase cost confirmation',()=>{
+ it('does not let a historical empty wallet block editing the current holding',()=>{
+  const p=portfolio();p.wallets.push({...wallet,state:{...wallet.state,data:{...wallet.state.data,positions:[],complete:false},history:[{transfers:[{tokenId:'ethereum'}]}]},stale:true} as unknown as typeof p.wallets[number]);
+  const r=allSourceCostSummary(p,undefined,[],{data:null,stale:false}).rows[0];
+  expect(r.sources).toHaveLength(2);expect(r.holdingSources).toHaveLength(1);expect(r.snapshotComplete).toBe(true);
+ });
+ it('persists cached costs but does not release live PnL until explicitly reconfirmed',()=>{
+  const p=portfolio();p.wallets[0].stale=true;
+  const r=allSourceCostSummary(p,undefined,[],{data:null,stale:false}).rows[0];
+  let book=reconcileBasis(undefined,r.asset,'0.65','1625',now,true);
+  expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0]).toMatchObject({basis:1625,avgCost:2500,pnl:null,status:'confirmation',ready:false});
+  p.wallets[0].stale=false;
+  expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0].pnl).toBeNull();
+  book=reconcileBasis(book,r.asset,'0.65','1625',now);
+  expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0].pnl).toBe(325);
+  expect(book.basisHistory?.[0].pendingBalanceConfirmation).toBe(true);
+ });
+ it('also keeps cached Boros basis separate from live PnL',()=>{
+  const r=allSourceCostSummary(portfolio(),undefined,[],{data:boros,stale:false}).rows.find(r=>r.provider==='boros')!;
+  const book=reconcileBasis(undefined,r.asset,'.65','1625',now,true);
+  expect(allSourceCostSummary(portfolio(),book,[],{data:boros,stale:false}).rows.find(r=>r.provider==='boros')).toMatchObject({basis:1625,pnl:null,status:'confirmation',ready:false});
+ });
+});
