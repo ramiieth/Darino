@@ -39,7 +39,7 @@ try {
    await page.evaluate(theme => document.documentElement.classList.toggle('dark', theme === 'dark'), theme);
    for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const tab of ['فرصت‌ها', 'مقایسه', 'شبیه‌ساز', 'مانیتور ریسک', 'بررسی محاسبات']) {
+    for (const tab of ['بازارها و فرصت‌ها', 'مقایسه بازارها', 'پیش‌نمایش', 'مانیتور ریسک', 'بررسی محاسبات']) {
      await host.getByRole('tab', { name: tab, exact: true }).click();
      const fit = await host.evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }));
      if (fit.scroll > fit.client + 1) { console.log(JSON.stringify(await host.evaluate(el => [...el.querySelectorAll('*')].filter(x => {const r=x.getBoundingClientRect();return r.right>innerWidth+1 || r.left< -1}).slice(0,18).map(x=>({tag:x.tagName,cls:x.className,text:x.textContent.slice(0,70),width:x.getBoundingClientRect().width,left:x.getBoundingClientRect().left})) )));await page.screenshot({path:'/tmp/darino-boros-overflow.png'}); }
@@ -48,13 +48,14 @@ try {
    }
   }
  }
- await host.getByRole('tab', { name: 'فرصت‌ها', exact: true }).click();
+ await host.getByRole('tab', { name: 'بازارها و فرصت‌ها', exact: true }).click();
+ await host.getByText('برآورد فرضی با سرمایه دلاری',{exact:true}).click();
  await host.getByLabel('سرمایه دلاری', { exact: true }).fill('۳۰۰');
  await host.getByLabel('گس کل دوره', { exact: true }).fill('۰٫۵');
  await host.getByLabel('ورود به بازار', { exact: true }).fill('۱');
  assert((await host.innerText()).includes('سرمایه و هزینه‌ها را وارد کنید'));
- await host.getByLabel('اثر نامطلوب اجرای نرخ', { exact: true }).fill('۰٫۲۲');
- assert.equal(await host.getByLabel('اثر نامطلوب اجرای نرخ', { exact: true }).inputValue(), '0.22');
+ await host.getByLabel('اختلاف نرخ ورود فرضی و مارک', { exact: true }).fill('۰٫۲۲');
+ assert.equal(await host.getByLabel('اختلاف نرخ ورود فرضی و مارک', { exact: true }).inputValue(), '0.22');
  await host.getByRole('button', { name: 'بررسی این سناریو', exact: true }).waitFor();
  for (const width of [320, 390, 1440]) {
   await page.setViewportSize({ width, height: 900 });
@@ -71,7 +72,7 @@ try {
  assert.equal(await host.getByLabel('سرمایه', { exact: true }).inputValue(), '300');
  await host.getByRole('button', { name: 'بستن', exact: true }).click();
  await page.setViewportSize({ width: 390, height: 844 });
- await host.getByRole('tab', { name: 'شبیه‌ساز', exact: true }).click();
+ await host.getByRole('tab', { name: 'پیش‌نمایش', exact: true }).click();
  const quantity = host.getByLabel('حجم واحد بازده', { exact: true });
  await quantity.fill(''); await quantity.pressSequentially('0.65', { delay: 40 });
  await page.waitForTimeout(100);
@@ -80,7 +81,7 @@ try {
  await host.getByLabel('وثیقه موجود', { exact: true }).fill('۰٫۱');
  assert.equal(await host.getByLabel('وثیقه موجود', { exact: true }).inputValue(), '0.1');
  await host.getByLabel('مجموع کارمزدها', { exact: true }).fill('۰٫۲');
- await host.getByLabel('هزینه لغزش', { exact: true }).fill('۰٫۱');
+ await host.getByLabel('لغزش خارج از نرخ ورود', { exact: true }).fill('۰٫۱');
  await host.getByLabel('گس', { exact: true }).fill('۰٫۰۵');
  assert((await host.innerText()).includes('نرخ ضمنی لیکوییدشدن'));
  assert((await host.innerText()).includes('سناریوی بدبینانه'));
@@ -95,7 +96,7 @@ try {
  }
  await host.getByRole('button', { name: 'محاسبه حجم با سرمایه', exact: true }).click();
  assert(Number(await quantity.inputValue()) > 0);
- await host.getByRole('radio', { name: 'شورت', exact: true }).click();
+ await host.getByRole('radio', { name: 'شورت نرخ', exact: true }).click();
  await page.setViewportSize({ width: 390, height: 844 });
  await page.screenshot({ path: '/tmp/darino-boros-preview-mobile.png' });
  assert.deepEqual(errors, []);

@@ -40,7 +40,7 @@ export async function refreshBorosAccount(force=false):Promise<void>{
  }catch(e){if(gen===generation)useBorosAccount.setState({loading:false,error:e instanceof HttpError?e.code??'دریافت داده انجام نشد':'پاسخ حساب معتبر نیست',retryAt:e instanceof HttpError&&e.status===429?Date.now()+Math.max(60,e.retryAfter)*1000:0});}
 }
 export async function previewBorosOrder(body:z.infer<typeof previewRequestSchema>):Promise<OfficialPreview>{
- return officialPreviewSchema.parse(await fetchJson('/api/borosAccount',{method:'POST',body,timeoutMs:22000}));
+ return officialPreviewSchema.parse(await fetchJson('/api/borosAccount',{method:'POST',body,timeoutMs:45000}));
 }
 export function accountIsStale(s:ReturnType<typeof useBorosAccount.getState>,now=Date.now()) {return !!s.data && (!!s.error||now-s.data.fetchedAt>180000||s.data.fetchedAt-now>60000||s.data.syncedAt===null||now-s.data.syncedAt>180000||s.data.syncedAt-now>60000);}
 export async function clearBorosAccount(){generation++;useBorosAccount.setState({root:'',accountId:0,hydrated:true,data:null,loading:false,error:null,retryAt:0});await Promise.allSettled([...writes]);await settingDeletePrefix(PREFIX);}

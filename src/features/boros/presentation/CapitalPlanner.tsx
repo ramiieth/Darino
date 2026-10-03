@@ -27,21 +27,21 @@ export function CapitalPlanner({ markets }: { markets: BorosMarket[] }) {
   const rows = useMemo(() => planCapital(markets, input, now), [markets, capital, allocation, gas, entrance, impact, now]);
   const best = recommendCapital(rows);
   const detail = rows.find(row => `${row.m.marketId}:${row.direction}` === selected);
-  usePublishInsight('borosCapitalPlan', best ? `بیشترین خالص تخمینی · ${borosAssetName(best.m.asset)} · ${borosVenueName(best.m.venue)} · ${best.direction === 'long' ? 'لانگ' : 'شورت'}` : 'برنامه سرمایه بوروس', best ? { marketId: best.m.marketId, capitalUsd: input.capitalUsd, allocationPct: input.allocationPct, directionSign: best.direction === 'long' ? 1 : -1, sizeYu: best.sizeYu, markApr: best.m.markApr, assumedExecutionApr: best.entryRate, floatingApr: best.m.floatingApr, impactPoints: best.impactPoints, projectedNetUsd: best.result.net, costsUsd: best.result.costs, marginUsd: best.result.margin, adverseNetUsd: best.result.scenarioMin, estimatedLiquidationApr: best.result.threshold.rate, daysToMaturity: best.result.preview.daysToMaturity } : null, 'simulation');
+  usePublishInsight('borosCapitalPlan', best ? `بیشترین خالص تخمینی · ${borosAssetName(best.m.asset)} · ${borosVenueName(best.m.venue)} · ${best.direction === 'long' ? 'لانگ' : 'شورت'}` : 'برنامهٔ سرمایه فرضی بوروس', best ? { marketId: best.m.marketId, capitalUsd: input.capitalUsd, allocationPct: input.allocationPct, directionSign: best.direction === 'long' ? 1 : -1, sizeYu: best.sizeYu, markApr: best.m.markApr, assumedExecutionApr: best.entryRate, floatingApr: best.m.floatingApr, impactPoints: best.impactPoints, projectedNetUsd: best.result.net, costsUsd: best.result.costs, marginUsd: best.result.margin, adverseNetUsd: best.result.scenarioMin, estimatedLiquidationApr: best.result.threshold.rate, daysToMaturity: best.result.preview.daysToMaturity } : null, 'simulation');
   const field = (label: string, value: string, setter: (s: string) => void, suffix: string, placeholder = '') => <Field label={label}><Input dir="ltr" inputMode="decimal" value={value} onChange={e => setter(normalizeDecimalInput(e.target.value))} suffix={suffix} placeholder={placeholder} /></Field>;
   const complete = input.capitalUsd > 0 && input.allocationPct > 0 && input.allocationPct <= 100 && input.gasUsd != null && input.entranceUsd != null && input.impactPoints != null;
   return <div className="space-y-5">
     <div className="boros-planner-grid">
       <Surface className="boros-plan-input p-4 md:p-5 space-y-5">
-        <div><h2 className="text-base font-bold">برنامه سرمایه</h2><p className="mt-1 text-xs text-muted">مقایسهٔ مستقل بازارها تا سررسید</p></div>
+        <div><h2 className="text-base font-bold">برنامهٔ سرمایه فرضی</h2><p className="mt-1 text-xs text-muted">سرمایه دستی؛ مستقل از موجودی حساب واقعی</p></div>
         <div className="grid grid-cols-2 gap-4">
           {field('سرمایه دلاری', capital, setCapital, 'دلار')}
           {field('تخصیص مارجین', allocation, setAllocation, '٪')}
           {field('گس کل دوره', gas, setGas, 'دلار', 'صفر یا هزینه موردنظر')}
           {field('ورود به بازار', entrance, setEntrance, 'دلار', 'صفر یا هزینه موردنظر')}
         </div>
-        {field('اثر نامطلوب اجرای نرخ', impact, setImpact, '', 'واحد درصد؛ مثلاً ۰.۲۲')}
-        <p className="text-xs leading-6 text-muted">هزینهٔ نامعلوم را صفر فرض نمی‌کنیم. نرخ ورود فرضی از مارک و اثر اجرای واردشده ساخته می‌شود؛ قیمت قطعی سفارش نیست.</p>
+        {field('اختلاف نرخ ورود فرضی و مارک', impact, setImpact, '', 'واحد درصد؛ مثلاً ۰.۲۲')}
+        <p className="text-xs leading-6 text-muted">این بخش فقط سناریوی فرضی است. برای نرخ اجرا و مارجین حساب خودتان، از «پیش‌نمایش» استفاده کنید.</p>
       </Surface>
       <Surface variant="focal" className="boros-best-card p-5 md:p-6">
         <div className="flex items-center gap-2 text-sm font-bold text-accent"><Sparkles size={18} />بیشترین خالص تخمینی</div>

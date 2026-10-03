@@ -63,7 +63,7 @@ try {
  await dialog.getByLabel('بهای تمام‌شده · دلار',{exact:true}).fill('۱۶۰۰٫۵');
  assert(await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).isDisabled());
  await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
- await host.getByText('تأیید موجودی به‌روز لازم است',{exact:true}).last().waitFor();
+ await host.getByText('بهای ذخیره‌شده',{exact:true}).last().waitFor();
  assert.equal(await page.evaluate(async()=>{const {getPref}=await import('/src/features/custody/data/repository.ts');return getPref('cost-basis-v1').value.currentBasis['fungible:ethereum'].total;}),'1600.5');
  await page.evaluate(()=>{const q=window.costQA;q.p.wallets[0].stale=false;q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));});
  await host.getByRole('button',{name:'بهای خرید اتریوم',exact:true}).last().click();await dialog.waitFor();await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).click();await dialog.waitFor({state:'hidden'});
