@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, useState } from 'react';
 import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
@@ -13,7 +13,6 @@ const DeFiPage = lazy(() => import('@/features/defi/presentation/DeFiPage').then
 const VehiclePage = lazy(() => import('@/features/vehicle/presentation/VehiclePage').then((m) => ({ default: m.VehiclePage })));
 const PropertyMarketPage = lazy(() => import('@/features/propertyMarket/presentation/PropertyMarketPage').then((m) => ({ default: m.PropertyMarketPage })));
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
-const AccountingPage = lazy(() => import('@/features/accounting/presentation/AccountingPage'));
 const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
 const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
 const ConnectedPage = lazy(() => import('@/features/connected/presentation/ConnectedPage'));
@@ -84,11 +83,7 @@ export function App() {
           />
           <Route
             path="/accounting"
-            element={
-              <Private label="حسابداری">
-                <AccountingPage />
-              </Private>
-            }
+            element={<Navigate to="/dashboard" replace/>}
           />
           <Route
             path="/holdings"
