@@ -126,7 +126,10 @@ try {
  await picker.getByRole('searchbox',{name:'جستجوی رمزارز'}).fill('');
  await page.screenshot({path:'/tmp/darino-asset-picker.png',fullPage:true});
  await picker.getByRole('button',{name:'انتخاب اتریوم',exact:true}).click();
- await costSection.locator('input').nth(0).fill('0.300000000000000001');
+ const quantityInput=costSection.getByRole('textbox',{name:'مقدار خرید',exact:true});
+ for(const value of ['۰.۶۵','۰٫۶۵','٠٫٦٥','0,65']){await quantityInput.fill(value);assert.equal(await quantityInput.inputValue(),'0.65');}
+ await quantityInput.fill('');await quantityInput.pressSequentially('۰.۶۵');assert.equal(await quantityInput.inputValue(),'0.65');
+ await quantityInput.fill('0.300000000000000001');
  await costSection.locator('input').nth(1).fill('2000');
  await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
  const calendar=page.getByRole('dialog',{name:'تاریخ خرید',exact:true});
@@ -135,6 +138,10 @@ try {
  await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
  await page.getByRole('dialog',{name:'تاریخ خرید',exact:true}).getByRole('button',{name:'امروز',exact:true}).click();
  await costSection.getByRole('button',{name:'ثبت خرید',exact:true}).click();await page.locator('summary').filter({hasText:'خریدها'}).first().waitFor();
+ await page.locator('summary').filter({hasText:'خریدها'}).first().click();await page.getByRole('button',{name:'اصلاح',exact:true}).first().click();
+ const editCost=page.getByRole('dialog',{name:'اصلاح خرید',exact:true});assert.equal(await editCost.getByRole('textbox',{name:'مقدار خرید',exact:true}).inputValue(),'0.300000000000000001');
+ await editCost.getByRole('textbox',{name:'مقدار خرید',exact:true}).fill('۰٫۶۵');await editCost.getByRole('button',{name:'ذخیرهٔ اصلاح',exact:true}).click();
+ await page.getByRole('button',{name:'اصلاح',exact:true}).first().click();assert.equal(await page.getByRole('dialog',{name:'اصلاح خرید',exact:true}).getByRole('textbox',{name:'مقدار خرید',exact:true}).inputValue(),'0.65');await page.keyboard.press('Escape');
  await fits();await page.screenshot({path:'/tmp/darino-cost-mobile.png',fullPage:true});
  await page.evaluate(()=>location.hash='#/holdings');await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await page.getByRole('link',{name:'دارایی و فعالیت شبکه‌ای',exact:true}).count(),0);await page.getByText('تطبیق انتقال‌های نیازمند بررسی',{exact:true}).waitFor();await fits();
  await page.getByRole('tab',{name:'دارایی‌ها',exact:true}).click();await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
