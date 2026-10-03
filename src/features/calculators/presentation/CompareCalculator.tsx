@@ -1,3 +1,4 @@
+import { useAssistantInsights } from '@/shared/assistant/insights';
 import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * ⑤ Market comparison — the same capital in several assets over one period.
@@ -92,6 +93,8 @@ export function CompareCalculator() {
       }),
     [selected, hist, prices, invest, startTs, years]
   );
+
+  useEffect(() => { useAssistantInsights.getState().put('calculatorCompare', results.slice(0, 20).map(r => ({ name: r.nameFa, symbol: r.symbol, kind: 'مقایسه فرضی', source: 'simulation', status: 'ready', asOf: Date.now(), metrics: { investment: r.investment, historicalPrice: r.historicalPrice, currentPrice: r.currentPrice, returnPct: r.returnPct, profit: r.profit, currentValue: r.currentValue, startTs, endTs } }))); }, [results, startTs, endTs]);
 
   const ranked = useMemo(() => {
     const q = filterQ.trim().toLowerCase();

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkedNext, getWallet, getBalanceChart, ProviderError } from '../../api/_zerion';
+import { appContextSchema } from '../../src/shared/assistant/schema';
 import { analysisSchema, analyze } from '../../api/_assistant';
 const address = '0x' + 'ab'.repeat(20);
 beforeEach(() => { vi.stubEnv('ZERION_API_KEY','test-zerion-'+expect.getState().currentTestName); vi.stubEnv('GEMINI_API_KEY','test-gemini'); });
@@ -44,4 +45,29 @@ describe('سرور اتصال‌های دارینو', () => {
     expect(await analyze(parsed)).toBe('تحلیل فارسی');
     expect(analysisSchema.safeParse({...parsed,question:'x'.repeat(2001)}).success).toBe(false);
   });
+});
+
+
+describe('extended assistant context',()=>{
+ it('passes Boros and historical rankings to Gemini rather than dropping them at validation',async()=>{
+  const app=appContextSchema.parse({version:1,generatedAt:1800000000000,cash:{walletStableUsd:100,walletPartial:false,arcusFreeCollateralUsd:20,arcusPartial:false},sections:[{key:'boros',name:'بوروس',status:'partial',fetchedAt:1800000000000,totalRows:1,truncated:false,note:'خالص هزینه‌های معلوم، نه اجرای قطعی',rows:[{name:'اتریوم',kind:'لانگ',source:'api',status:'partial',asOf:1800000000000,metrics:{projectedGrossUsd:20,slippageUsd:null}}]}],rankings:[{period:'90d',universe:'crypto',available:2,total:100,mostProfit:[{name:'اتریوم',symbol:'ETH',kind:'crypto',returnPct:10}],leastProfit:[],leastLoss:[],mostLoss:[]}]});
+  const parsed=analysisSchema.parse({question:'بوروس و عملکرد بازارها؟',context:{total:100,partial:false,sources:[],positions:[],arcus:[],profile:{horizon:'',risk:'',liquidity:''},app}});
+  vi.stubGlobal('fetch',vi.fn(async(_url:string,init:RequestInit)=>{
+   const body=JSON.parse(init.body as string);const prompt=JSON.parse(body.contents.at(-1).parts[0].text);
+   expect(prompt.context.app.sections[0].rows[0].metrics.projectedGrossUsd).toBe(20);
+   expect(prompt.context.app.rankings[0].period).toBe('90d');
+   expect(body.systemInstruction.parts[0].text).toContain('وجود داده را انکار نکن');
+   expect(body.systemInstruction.parts[0].text).toContain('مقادیر null نامشخص‌اند');
+   return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'داده بوروس دریافت شد'}]}}]}));
+  }));
+  expect(await analyze(parsed)).toBe('داده بوروس دریافت شد');
+ });
+ it('rejects nonfinite metrics, duplicate sections and oversized summaries',()=>{
+  const base={version:1,generatedAt:1,cash:{walletStableUsd:null,walletPartial:true,arcusFreeCollateralUsd:null,arcusPartial:true},sections:[],rankings:[]};
+  const row={name:'دارایی',kind:'بازار',source:'api',status:'ready',asOf:null,metrics:{priceUsd:Infinity}};
+  const section={key:'markets',name:'بازارها',status:'ready',fetchedAt:null,totalRows:1,truncated:false,note:'',rows:[row]};
+  expect(appContextSchema.safeParse({...base,sections:[section]}).success).toBe(false);
+  expect(appContextSchema.safeParse({...base,sections:[{...section,rows:[]},{...section,rows:[]}]}).success).toBe(false);
+  expect(appContextSchema.safeParse({...base,sections:[{...section,rows:Array.from({length:501},()=>({...row,metrics:{priceUsd:1}}))}]}).success).toBe(false);
+ });
 });

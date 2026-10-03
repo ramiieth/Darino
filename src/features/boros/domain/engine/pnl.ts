@@ -10,9 +10,9 @@ export function ytmOf(m: BorosMarket, nowSec = Math.floor(Date.now() / 1000)): n
   return Math.max(0, (m.maturity - nowSec) / 86_400 / DAYS_PER_YEAR);
 }
 
-/** روز تا سررسید — فقط برای نمایش گرد می‌شود؛ محاسبات با YTM دقیق */
+/** روز دقیق تا سررسید؛ گرد کردن فقط در رابط انجام می‌شود */
 export function daysToMaturity(m: BorosMarket, nowSec = Math.floor(Date.now() / 1000)): number {
-  return Math.max(0, Math.floor((m.maturity - nowSec) / 86_400));
+  return Math.max(0, (m.maturity - nowSec) / 86_400);
 }
 
 /** Time Fraction = Days / 365 */

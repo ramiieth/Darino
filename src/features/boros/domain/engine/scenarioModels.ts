@@ -167,7 +167,7 @@ export function stressScenario(input: {
   config?: StressConfig;
 }): StressScenario | null {
   const cfg = input.config ?? DEFAULT_STRESS_CONFIG;
-  const hist = (input.historicalApr ?? []).filter((c) => c > 0);
+  const hist = (input.historicalApr ?? []).filter(Number.isFinite);
   if (hist.length < 10) return null; // داده کافی نیست → N/A
 
   const vol = sampleStdDev(hist);
@@ -189,7 +189,7 @@ export function stressScenario(input: {
   }
   stress = Math.min(stress, cfg.maxStress);
 
-  const bearRate = Math.max(0, input.currentFloating - stress);
+  const bearRate = input.currentFloating - stress;
   const bullRate = input.currentFloating + stress;
   const mk = (rate: number) => {
     const diff =
@@ -222,7 +222,7 @@ export type Robustness = 'robust' | 'conditional' | 'not-attractive' | 'na';
 /** برچسب فارسی Robustness */
 export const ROBUSTNESS_LABEL: Record<Robustness, string> = {
   robust: 'فرصت پایدار (تمام سناریوها مثبت)',
-  conditional: 'فرصت مشروط (پایه مثبت، نزولی منفی)',
+  conditional: 'فرصت مشروط (پایه مثبت، احتمال زیان در تنش)',
   'not-attractive': 'جذاب نیست (پایه منفی)',
   na: 'داده ناکافی'
 };
@@ -242,6 +242,6 @@ export function classifyRobustness(input: {
   const { bearNet, baseNet, bullNet } = input;
   if (bearNet === null || baseNet === null || bullNet === null) return 'na';
   if (baseNet <= 0) return 'not-attractive';
-  if (bearNet > 0) return 'robust';
+  if (bearNet > 0 && bullNet > 0) return 'robust';
   return 'conditional';
 }

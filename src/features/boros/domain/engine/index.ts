@@ -194,7 +194,9 @@ export function minEconomicEdge(size: number, config: EconomicEdgeConfig = DEFAU
 
 export interface AnalyzeInput {
   m: BorosMarket;
-  size: number;
+  size: number; // USD-equivalent notional for cross-market analysis
+  fixedApr?: number;
+  direction?: BorosDirection;
   nowSec?: number;
   /** گس — فقط اگر داده واقعی دارید؛ پیش‌فرض ۰ (هرگز حدس نمی‌زنیم) */
   gasUsd?: number;
@@ -206,7 +208,7 @@ export interface AnalyzeInput {
 
 /** سری APR تاریخی بازار (از OHLCV) — Decimal Rate */
 export function historicalAprOf(m: BorosMarket): number[] {
-  return (m.ohlcv ?? []).map((p) => p.c).filter((c) => c > 0);
+  return (m.ohlcv ?? []).map((p) => p.c).filter(Number.isFinite);
 }
 
 /** Sanity Check ها (Part 15) */
@@ -224,11 +226,12 @@ export function sanityChecks(
   // Check 6: Days <= 0 → حذف
   if (days <= 0) return { valid: false, reason: 'سررسید گذشته ' };
   // Check 5: Notional = 0 → PnL صفر (ولی valid است — فقط صفر)
-  if (size <= 0) return { valid: false, reason: 'حجم نامعتبر' };
+  if (!Number.isFinite(size) || size <= 0) return { valid: false, reason: 'حجم نامعتبر' };
   // Check 1: Fees <= Notional (اگر fee معتبر است)
   if (feesTotal !== null && feesTotal > size) {
     return { valid: false, reason: `INVALID_COST_MODEL (Fees ${feesTotal.toFixed(2)} > Notional ${size})` };
   }
+  if (![m.kIM, m.kMM, m.marginFloor, m.takerFee, m.settleFeeRate].every(Number.isFinite) || m.kIM <= 0 || m.kMM <= 0 || m.marginFloor < 0 || m.takerFee < 0 || m.settleFeeRate < 0) return { valid: false, reason: 'پارامترهای بازار نامعتبر' };
   // APR معتبر
   if (!Number.isFinite(m.markApr) || !Number.isFinite(m.floatingApr)) {
     return { valid: false, reason: 'نرخ سالانه نامعتبر' };
@@ -250,11 +253,11 @@ export class BorosCalculationEngine {
     const days = daysToMaturity(m, nowSec);
     const ytm = ytmOf(m, nowSec);
     const hist = historicalAprOf(m);
-    const nSettle = Math.max(1, Math.floor(days / (m.paymentPeriod / 86_400)));
+    const fundingHist = (m.fundingHistory ?? []).map((p) => p.c).filter(Number.isFinite);
 
     /* ---------- نرخ‌ها (Decimal) ---------- */
     const underlying = m.floatingApr; // Underlying APR — برای Settlement/Scenario
-    const implied = m.markApr; // Mark APR — برای MTM/Liquidation
+    const implied = input.fixedApr ?? m.markApr; // hypothetical entry rate
 
     /* ---------- هزینه‌ها: فرمول‌های مستندات رسمی Boros (docs/Mechanics/Fees) ---------- */
     // گس پیش‌فرض ۰ — هرگز هزینه را حدس نمی‌زنیم
@@ -267,12 +270,12 @@ export class BorosCalculationEngine {
     });
     // اگر همه نرخ‌ها صفر و gas=0 → داده fee واقعی نیست → N/A
     const feesNa =
-      m.takerFee <= 0 && m.settleFeeRate <= 0 && (input.gasUsd ?? 0) <= 0 && (input.slippageRate ?? 0) <= 0;
+      !Number.isFinite(m.takerFee) || !Number.isFinite(m.settleFeeRate);
     const feesOut: FeeBreakdown | null = feesNa ? null : fees;
     const totalCosts = feesOut?.total ?? 0;
 
     /* ---------- Sanity Checks ---------- */
-    const sanity = sanityChecks(m, size, days, feesOut?.total ?? null);
+    const sanity = Number.isFinite(implied) ? sanityChecks(m, size, days, feesOut?.total ?? null) : { valid: false, reason: 'نرخ ورود نامعتبر' };
     const invalidReason = sanity.valid ? null : sanity.reason;
 
     /* ---------- Settlement PnL (Part 2/3) — Long و Short با جهت مخالف ---------- */
@@ -296,22 +299,22 @@ export class BorosCalculationEngine {
 
     /* ---------- Net PnL = Gross Settlement + MTM − Costs (بدون Double Counting) ---------- */
     // برای سادگی و شفافیت: Settlement PnL به‌عنوان Realized، MTM به‌عنوان Unrealized
-    const realizedLongPnl = grossLongPnl;
+    const realizedLongPnl = 0; // no live position/settlement journal
     const unrealizedLongPnl = mtmLongPnl;
-    const totalLongPnl = realizedLongPnl + unrealizedLongPnl - totalCosts;
-    const realizedShortPnl = grossShortPnl;
+    const totalLongPnl = grossLongPnl - totalCosts;
+    const realizedShortPnl = 0;
     const unrealizedShortPnl = mtmShortPnl;
-    const totalShortPnl = realizedShortPnl + unrealizedShortPnl - totalCosts;
+    const totalShortPnl = grossShortPnl - totalCosts;
 
     /* ---------- Break-Even (Part 14) — با Sanity ---------- */
     const rawBeLong = LongPnLCalculator.breakEven(implied, totalCosts, size, days);
     const rawBeShort = ShortPnLCalculator.breakEven(implied, totalCosts, size, days);
-    const beValid = (be: number) => Number.isFinite(be) && Math.abs(be) <= 1; // حداکثر ±۱۰۰٪
+    const beValid = (be: number) => sanity.valid && Number.isFinite(be); // APR has no arbitrary ±100% ceiling
     const breakEvenLong = beValid(rawBeLong) ? rawBeLong : null;
     const breakEvenShort = beValid(rawBeShort) ? rawBeShort : null;
 
     /* ---------- سناریوها (Part 11) — percentiles تاریخی، جدا Long/Short ---------- */
-    const rates: ScenarioRates | null = buildScenarioRates(hist, underlying);
+    const rates: ScenarioRates | null = buildScenarioRates(fundingHist, underlying);
     const scenLong = ScenarioCalculator.run(
       { direction: 'long', size, fixedRate: implied, days, totalCosts, marginRequired: marginCalc() },
       rates
@@ -326,7 +329,7 @@ export class BorosCalculationEngine {
     const margin = marginCalc();
 
     /* ---------- ریسک و نمره فرصت ---------- */
-    const vol = m.dailyVolatility ?? (hist.length >= 2 ? aprVolatility(hist) : null);
+    const vol = m.dailyVolatility; // official 7DMA range; close standard deviation is a different metric
     const instab = hist.length >= 2 ? sampleStdDev(hist) : 0.01;
     const liq = liquidityEstimate(m);
     const slippageRisk = 0.5; // بدون Order Book → برآورد محافظه‌کارانه (برچسب Estimated)
@@ -369,8 +372,9 @@ export class BorosCalculationEngine {
     const edgeShort = totalShortPnl > edge;
 
     /* ---------- سه مدل سناریو (Master §3-5) ---------- */
+    const direction = input.direction ?? 'long';
     const constScenario = constantRateScenario({
-      direction: 'long',
+      direction,
       size,
       fixedRate: implied,
       currentFloating: underlying,
@@ -379,27 +383,29 @@ export class BorosCalculationEngine {
       margin
     });
     const mr = meanReversionScenario({
-      direction: 'long',
+      direction,
       size,
       fixedRate: implied,
       currentFloating: underlying,
       days,
       totalCosts,
       margin,
-      avg7d: hist.length > 0 ? mean(hist.slice(-7)) : null,
-      avg30d: hist.length > 0 ? mean(hist.slice(-30)) : null,
-      avg90d: hist.length > 7 ? mean(hist.slice(-90)) : null
+      avg7d: fundingHist.length > 0 ? mean(fundingHist.slice(-7)) : null,
+      avg30d: fundingHist.length > 0 ? mean(fundingHist.slice(-30)) : null,
+      avg90d: fundingHist.length > 7 ? mean(fundingHist.slice(-90)) : null
     });
-    const stress = stressScenario({
-      direction: 'long',
+    const stressInput = {
       size,
       fixedRate: implied,
       currentFloating: underlying,
       days,
       totalCosts,
       margin,
-      historicalApr: hist
-    });
+      historicalApr: fundingHist
+    };
+    const stressLong = stressScenario({ ...stressInput, direction: 'long' });
+    const stressShort = stressScenario({ ...stressInput, direction: 'short' });
+    const stress = direction === 'long' ? stressLong : stressShort;
 
     /* ---------- Anomaly / Liquidity / Freshness ---------- */
     const anomaly = detectAnomaly({ m, nowSec });
@@ -421,20 +427,23 @@ export class BorosCalculationEngine {
     };
 
     /* ---------- Status (Part 16/19 + Economic Edge + Anomaly) ---------- */
-    const statusOf = (netPnl: number, score: number, edgeOk: boolean): OpportunityStatus => {
-      if (invalidReason) return 'insufficient-data';
+    const statusOf = (netPnl: number, score: number, edgeOk: boolean, adverseNet: number | null): OpportunityStatus => {
+      if (invalidReason || freshness.ageMs === null || freshness.stale) return 'insufficient-data';
+      if (m.status !== undefined && m.status !== 'GOOD') return 'not-attractive';
       if (anomaly.detected && anomaly.kind === 'extreme-dislocation') return 'anomaly-detected';
       if (netPnl <= 0 || !edgeOk) return 'not-attractive';
       // Conditional: Base مثبت ولی Bear منفی
-      if (stress && stress.bear.netPnl <= 0) return 'conditional';
+      if (adverseNet !== null && adverseNet <= 0) return 'conditional';
+      if (input.slippageRate == null || input.gasUsd === undefined) return 'conditional';
       return score > 0 ? 'potential' : 'not-attractive';
     };
-    const statusLong = statusOf(totalLongPnl, longScore, edgeLong);
-    const statusShort = statusOf(totalShortPnl, shortScore, edgeShort);
+    const statusLong = statusOf(totalLongPnl, longScore, edgeLong, stressLong?.bear.netPnl ?? null);
+    const statusShort = statusOf(totalShortPnl, shortScore, edgeShort, stressShort?.bull.netPnl ?? null);
 
     /* ---------- Stage سه‌مرحله‌ای (Part 6 + Edge) ---------- */
     const stageOf = (status: OpportunityStatus, net: number, score: number, edgeOk: boolean): OpportunityStage => {
       if (!sanity.valid) return 'invalid';
+      if (status === 'insufficient-data' || m.status !== undefined && m.status !== 'GOOD') return 'stage1-valid';
       if (net > 0 && edgeOk) {
         // Stage 3: Attractive — Net > MinEdge + ریسک/نقدشوندگی/هزینه منطقی
         const riskOk = riskScore < 66;
@@ -457,7 +466,7 @@ export class BorosCalculationEngine {
       stabilityScore: stability,
       fees: totalCosts,
       marginEfficiency: margin > 0 ? 1 - Math.min(1, margin / size) : 0,
-      scenarioDownside: scenLong ? Math.abs(scenLong.bear.net) : null
+      scenarioDownside: scenLong ? Math.max(0, -Math.min(scenLong.bear.net, scenLong.base.net, scenLong.bull.net)) : null
     };
     const rankFactorsShort: RankFactors = {
       spread: sSpread,
@@ -467,10 +476,11 @@ export class BorosCalculationEngine {
       stabilityScore: stability,
       fees: totalCosts,
       marginEfficiency: margin > 0 ? 1 - Math.min(1, margin / size) : 0,
-      scenarioDownside: scenShort ? Math.abs(scenShort.bear.net) : null
+      scenarioDownside: scenShort ? Math.max(0, -Math.min(scenShort.bear.net, scenShort.base.net, scenShort.bull.net)) : null
     };
-    const rankLong = sanity.valid ? rankScore(rankFactorsLong) : 0;
-    const rankShort = sanity.valid ? rankScore(rankFactorsShort) : 0;
+    const eligible = sanity.valid && !freshness.stale && freshness.ageMs !== null && (m.status === undefined || m.status === 'GOOD');
+    const rankLong = eligible ? rankScore(rankFactorsLong) : 0;
+    const rankShort = eligible ? rankScore(rankFactorsShort) : 0;
 
     const annualizedLong =
       margin > 0 && days > 0 ? (totalLongPnl / margin) * (365 / days) * 100 : 0;
@@ -486,18 +496,18 @@ export class BorosCalculationEngine {
       underlyingApr: underlying,
       longSpread: lSpread,
       shortSpread: sSpread,
-      openInterest: m.notionalOI,
-      volume24h: m.volume24h,
+      openInterest: m.notionalOI * (m.collateralPriceUsd ?? m.assetMarkPrice),
+      volume24h: m.volume24h * (m.collateralPriceUsd ?? m.assetMarkPrice),
       turnoverRatio: turnoverRatio(m.volume24h, m.notionalOI),
       liquidityScore: liq,
       volatility: vol,
       avg7d: hist.length > 0 ? mean(hist.slice(-7)) : null,
       avg30d: hist.length > 0 ? mean(hist.slice(-30)) : null,
-      dev7d: deviation7d(underlying, hist.length > 0 ? mean(hist.slice(-7)) : null),
-      dev30d: deviation30d(underlying, hist.length > 0 ? mean(hist.slice(-30)) : null),
-      relDev7d: relativeDeviation(underlying, hist.length > 0 ? mean(hist.slice(-7)) : null),
-      zScore: zScore(underlying, hist),
-      extreme: extremeLevel(zScore(underlying, hist)),
+      dev7d: deviation7d(m.markApr, hist.length > 0 ? mean(hist.slice(-7)) : null),
+      dev30d: deviation30d(m.markApr, hist.length > 0 ? mean(hist.slice(-30)) : null),
+      relDev7d: relativeDeviation(m.markApr, hist.length > 0 ? mean(hist.slice(-7)) : null),
+      zScore: zScore(m.markApr, hist),
+      extreme: extremeLevel(zScore(m.markApr, hist)),
       marginRequired: margin,
       fees: feesOut,
       feesSource: feesNa ? 'na' : 'api-config',
@@ -557,9 +567,9 @@ export class BorosCalculationEngine {
         available: stress !== null,
         stressAmount: stress?.stressAmount ?? null,
         stressSource: stress?.stressSource ?? '',
-        bearNet: stress?.bear.netPnl ?? null,
+        bearNet: stress ? Math.min(stress.bear.netPnl, stress.bull.netPnl) : null,
         baseNet: stress?.base.netPnl ?? null,
-        bullNet: stress?.bull.netPnl ?? null
+        bullNet: stress ? Math.max(stress.bear.netPnl, stress.bull.netPnl) : null
       },
       anomaly,
       liquidity,
@@ -581,11 +591,12 @@ export class BorosCalculationEngine {
 
 /** برآورد نقدشوندگی ۰..۱ (Part D-22 — بدون Order Book = Estimated) */
 export function liquidityEstimate(m: BorosMarket): number {
-  const oi = Math.min(1, m.notionalOI / 20_000);
-  const vol = Math.min(1, m.volume24h / 5_000);
+  const price = m.collateralPriceUsd ?? m.assetMarkPrice;
+  const oi = Math.min(1, m.notionalOI * price / 20_000);
+  const vol = Math.min(1, m.volume24h * price / 5_000);
   const spreadScore =
-    m.bestAsk > 0 && m.bestBid > 0 && m.midApr > 0
-      ? Math.max(0, Math.min(1, 1 - (m.bestAsk - m.bestBid) / Math.max(0.005, m.midApr)))
+    Number.isFinite(m.bestAsk) && Number.isFinite(m.bestBid) && m.bestAsk >= m.bestBid && Number.isFinite(m.midApr)
+      ? Math.max(0, Math.min(1, 1 - (m.bestAsk - m.bestBid) / Math.max(0.005, Math.abs(m.midApr))))
       : 0.5;
   return Math.max(0, Math.min(1, oi * 0.4 + vol * 0.3 + spreadScore * 0.3));
 }

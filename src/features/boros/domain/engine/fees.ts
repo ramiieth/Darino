@@ -15,7 +15,6 @@
  *  ۴) Gas: فقط User Input (هرگز حدس نمی‌زنیم)
  *  ۵) Slippage: فقط با داده واقعی Order Book/شبیه‌سازی
  * ============================================================ */
-import { daysToMaturity } from './pnl';
 import type { BorosMarket } from '../types';
 
 /** زمان تا سررسید به سال (برای فرمول‌های زمان‌مقیاس) */
@@ -30,17 +29,21 @@ export function periodYears(m: BorosMarket): number {
 
 export interface FeeInput {
   m: BorosMarket;
-  size: number; // |Position Size| (نotional)
+  size: number; // native YU, or explicitly USD-equivalent when unitPriceUsd=1
   nowSec: number;
-  /** نرخ اسلیپج (نسبتی) — از Order Book/شبیه‌سازی؛ null اگر داده نیست */
+  /** اثر اضافی نرخ بر APR — اعشاری، نه درصد قیمت توکن؛ null اگر داده نیست */
   slippageRate?: number | null;
   gasUsd?: number;
+  /** USD per collateral unit; 1 when size is USD-equivalent. */
+  unitPriceUsd?: number;
+  /** Forecast defaults to holding until maturity; early-close must be explicit. */
+  closeAtSec?: number;
 }
 
 export interface FeeBreakdown {
   /** Entry = |size| × takerFee × YTM (مستندات رسمی) */
   entryFee: number;
-  /** Exit = |size| × takerFee × YTM (همان فرمول خروج) */
+  /** Exit uses remaining YTM at closeAtSec, zero at maturity. */
   exitFee: number;
   /** Settlement = |size| × settleFeeRate × periodYears × تعداد تسویه (مستندات رسمی) */
   settlementCost: number;
@@ -76,31 +79,28 @@ export class FeeCalculator {
 
   /** تعداد تسویه‌ها تا سررسید (از API یا محاسبه از paymentPeriod) */
   static settlementsCount(m: BorosMarket, nowSec: number): number {
-    if (m.settlementsToMaturity > 0) return m.settlementsToMaturity;
-    const days = daysToMaturity(m, nowSec);
-    const periodDays = (m.paymentPeriod || 28800) / 86_400;
-    return Math.max(1, Math.floor(days / periodDays));
+    const remaining = Math.max(0, m.maturity - nowSec);
+    if (!(m.paymentPeriod > 0) || remaining === 0) return 0;
+    return Math.ceil(remaining / m.paymentPeriod);
   }
 
-  static slippageCost(size: number, executionRate: number | null, referenceRate: number): number {
+  static slippageCost(size: number, executionRate: number | null, referenceRate: number, ytm = 1): number {
     if (executionRate === null || !Number.isFinite(executionRate)) return 0;
-    return size * Math.abs(executionRate - referenceRate);
+    return Math.abs(size) * Math.abs(executionRate - referenceRate) * Math.max(0, ytm);
   }
 
   static calc(f: FeeInput): FeeBreakdown {
     const ytm = ytmYears(f.m, f.nowSec);
-    const nSettle = FeeCalculator.settlementsCount(f.m, f.nowSec);
-
-    const entryFee = FeeCalculator.openingFee(f.size, f.m.takerFee, ytm);
-    const exitFee = FeeCalculator.openingFee(f.size, f.m.takerFee, ytm);
-    const settlementCost = FeeCalculator.settlementFee(
-      f.size,
-      f.m.settleFeeRate,
-      periodYears(f.m),
-      nSettle
-    );
+    const closeAt = Math.max(f.nowSec, Math.min(f.closeAtSec ?? f.m.maturity, f.m.maturity));
+    const holdingYears = Math.max(0, closeAt - f.nowSec) / (365 * 86400);
+    const price = f.unitPriceUsd ?? 1;
+    const entryFee = FeeCalculator.openingFee(f.size, f.m.takerFee, ytm) * price;
+    const exitFee = FeeCalculator.openingFee(f.size, f.m.takerFee, ytmYears(f.m, closeAt)) * price;
+    // Continuous carrying-cost projection; actual debits depend on settlement fee-index events.
+    const settlementCost = Math.abs(f.size) * f.m.settleFeeRate * holdingYears * price;
     const gasFee = f.gasUsd ?? 0;
-    const slippageCost = FeeCalculator.slippageCost(f.size, f.slippageRate ?? null, f.m.markApr);
+    // slippageRate is an absolute APR impact (0.01 = one percentage point), not a token-price ratio.
+    const slippageCost = FeeCalculator.slippageCost(f.size, f.slippageRate ?? null, 0, ytm) * price;
     const entranceFee = 0; // از API عمومی در دسترس نیست → N/A (منبع: na)
 
     return {

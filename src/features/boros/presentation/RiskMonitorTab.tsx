@@ -1,3 +1,6 @@
+import { MarketIdentity } from './MarketIdentity';
+import { useBorosAccount } from '../data/useBorosAccount';
+import { accountIsStale } from '../data/useBorosAccount';
 /**
  * Risk monitor — market-level alerts (not position liquidation risk)
  *  - extreme funding (deviation from the 7-day mean / z-score)
@@ -9,7 +12,7 @@ import { useMemo } from 'react';
 import { Activity, AlertTriangle, Droplets, ShieldCheck } from 'lucide-react';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { Badge, type Tone } from '@/shared/components/ui/Badge';
-import { KeyValueList, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { Metric, MetricGrid, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { fmtPct, fmtUSD, toFaDigits } from '@/shared/utils/formatters';
 import { BorosCalculationEngine } from '@/features/boros/domain/calc';
@@ -32,12 +35,15 @@ const SEVERITY: Record<AlertRow['severity'], { label: string; tone: Tone }> = {
 };
 
 const TYPE_META = {
-  extreme: { label: 'تأمین مالی افراطی', icon: AlertTriangle },
+  extreme: { label: 'انحراف نرخ ضمنی', icon: AlertTriangle },
   liquidity: { label: 'نقدشوندگی پایین', icon: Droplets },
   volatility: { label: 'نوسان بالا', icon: Activity }
 };
 
 export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
+  const accountState = useBorosAccount();
+  const account = accountState.data;
+  const accountStale = accountIsStale(accountState);
   const alerts = useMemo<AlertRow[]>(() => {
     const out: AlertRow[] = [];
     for (const m of markets) {
@@ -64,7 +70,7 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
         out.push({
           ...base,
           type: 'liquidity',
-          message: `تعهدات باز ${fmtUSD(m.notionalOI, true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h, true)}`,
+          message: `تعهدات باز ${fmtUSD(m.notionalOI * (m.collateralPriceUsd ?? m.assetMarkPrice), true)} · حجم ۲۴ ساعت ${fmtUSD(m.volume24h * (m.collateralPriceUsd ?? m.assetMarkPrice), true)}`,
           severity: a.liquidityScore < 0.15 ? 'high' : 'medium'
         });
       }
@@ -114,15 +120,12 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
                       <Icon aria-hidden className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
-                        <bdi dir="ltr" className="truncate">{a.m.name}</bdi>
-                        <Badge tone={sev.tone}>{sev.label}</Badge>
-                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2"><MarketIdentity market={a.m} compact /><Badge tone={sev.tone}>{sev.label}</Badge></div>
                       <p className="text-sm text-muted">
                         {TYPE_META[a.type].label}: <span className="num-ltr">{a.message}</span>
                       </p>
                       <p className="mt-0.5 text-xs text-subtle">
-                        ریسک {a.riskLevel} ({toFaDigits(Math.round(a.riskScore))}/۱۰۰) · APR{' '}
+                        ریسک {a.riskLevel} ({toFaDigits(Math.round(a.riskScore))}/۱۰۰) · مارک{' '}
                         <PercentValue value={a.m.markApr * 100} signed={false} tone="none" /> · شناور{' '}
                         <PercentValue value={a.m.floatingApr * 100} signed={false} tone="none" />
                       </p>
@@ -135,24 +138,10 @@ export function RiskMonitorTab({ markets }: { markets: BorosMarket[] }) {
         )}
       </Section>
 
-      <Section
-        id="position-layer"
-        title="ریسک پوزیشن واقعی"
-        description="بدون پوزیشن واقعی در بوروس، این شاخص‌ها از داده بازار حدس زده نمی‌شوند"
-      >
-        <Surface className="px-4 md:px-5">
-          <KeyValueList
-            rows={[
-              { label: 'پوزیشن فعال', value: <Badge tone="neutral">ندارد</Badge> },
-              { label: 'وثیقه واقعی', value: <span className="text-subtle">N/A</span> },
-              { label: 'ارزش اسمی واقعی', value: <span className="text-subtle">N/A</span> },
-              { label: 'نرخ لیکوئید ضمنی', value: <span className="text-subtle">N/A</span> },
-              { label: 'ضریب سلامت', value: <span className="text-subtle">N/A</span> },
-              { label: 'مارجین نگهداری', value: <span className="text-subtle">N/A</span> }
-            ]}
-          />
-        </Surface>
-      </Section>
+      <Surface className="p-4 md:p-5 space-y-4">
+        <h2 className="text-base font-bold">حساب واقعی</h2>
+        {account ? <><Badge tone={accountStale || account.partial ? 'warn' : 'gain'}>{accountStale ? 'داده ذخیره‌شده' : account.partial ? 'داده ناقص' : 'متصل'}</Badge><MetricGrid cols={2}><Metric size="sm" label="پوزیشن فعال" value={toFaDigits(account.positions.filter(p => !p.matured).length)} /><Metric size="sm" label="حساب‌های وثیقه" value={toFaDigits(account.balances.length)} /></MetricGrid><p className="text-xs text-muted">مارجین و آستانهٔ رسمی هر پوزیشن در «حساب من» نمایش داده می‌شود.</p></> : <p className="text-sm text-muted">برای بررسی ریسک حساب، آدرس را در «حساب من» اضافه کنید.</p>}
+      </Surface>
     </div>
   );
 }

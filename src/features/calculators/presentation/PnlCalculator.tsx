@@ -1,3 +1,4 @@
+import { usePublishInsight } from '@/shared/assistant/insights';
 import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * ① Profit & loss — what is my position worth now vs what I paid?
@@ -73,6 +74,8 @@ export function PnlCalculator() {
       sellFee: Number(sellFee) || 0
     });
   }, [asset, qty, buyPrice, buyFee, sellFee, currentPrice]);
+
+  usePublishInsight('calculatorPnl', asset ? `سود و زیان ${persianAssetName(asset.symbol)}` : 'سود و زیان', result ? { ...result, quantity: Number(qty), buyPrice: Number(buyPrice), currentPrice } : null);
 
   const profitSeries = useMemo(() => {
     if (!result || !series) return [];

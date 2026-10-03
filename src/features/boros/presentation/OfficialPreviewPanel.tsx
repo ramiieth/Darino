@@ -1,0 +1,23 @@
+import { useEffect, useState } from 'react';
+import { useBorosAccount, hydrateBorosAccount, previewBorosOrder } from '../data/useBorosAccount';
+import { packAccount, toX18, CROSS, type OfficialPreview } from '@/shared/boros/account';
+import { usePublishInsight } from '@/shared/assistant/insights';
+import { Surface } from '@/shared/components/ui/GlassCard';
+import { Field, Input, Select } from '@/shared/components/ui/Input';
+import { Button } from '@/shared/components/ui/Button';
+import { Metric, MetricGrid, PercentValue, MoneyValue, QuantityValue } from '@/shared/components/ui/FinancialValue';
+import { Notice } from '@/shared/components/ui/StateViews';
+import { normalizeDecimalInput } from '@/features/cost-basis/presentation/decimalInput';
+import type { BorosDirection, BorosMarket } from '../domain/types';
+import { HttpError } from '@/repositories/remoteClient';
+export function OfficialPreviewPanel({market,direction,size,onApply}:{market:BorosMarket;direction:BorosDirection;size:string;onApply?:(preview:OfficialPreview)=>void}) {
+ const s=useBorosAccount();const [mode,setMode]=useState('cross');const [slippage,setSlippage]=useState('0.5');const [result,setResult]=useState<OfficialPreview|null>(null);const [error,setError]=useState<string|null>(null);const [loading,setLoading]=useState(false);
+ const identity=[s.root,s.accountId,market.marketId,market.tokenId,direction,size,mode,slippage].join(':');const [resultIdentity,setResultIdentity]=useState('');const valid=resultIdentity===identity?result:null;
+ useEffect(()=>{void hydrateBorosAccount();},[]);
+ usePublishInsight('borosOfficialPreview','پیش‌نمایش رسمی بوروس',valid?{marketId:valid.marketId,requestedSizeYu:valid.requestedSize,matchedSizeYu:valid.matchedSize,matchedApr:valid.matchedApr,marginCollateral:valid.margin,liquidationApr:valid.liquidationApr,priceImpact:valid.priceImpact,success:Number(valid.success),collateralPriceUsd:market.collateralPriceUsd??null}:null,'simulation','partial');
+ const preview=async()=>{
+  setError(null);setLoading(true);setResult(null);
+  try{if(market.tokenId===undefined)throw new Error('invalid');if(slippage.trim()===''||!Number.isFinite(Number(slippage)))throw new Error('invalid');const p=await previewBorosOrder({marketAcc:packAccount(s.root,s.accountId,market.tokenId,mode==='cross'?CROSS:market.marketId),marketId:market.marketId,side:direction==='long'?0:1,size:toX18(size),tif:2,slippage:Number(slippage)/100});setResult(p);setResultIdentity(identity);}catch(e){setError(e instanceof HttpError?e.code??'پیش‌نمایش دریافت نشد':'مقادیر پیش‌نمایش معتبر نیست');}finally{setLoading(false);}
+ };
+ return <Surface className="p-4 space-y-4"><h3 className="text-sm font-bold">پیش‌نمایش رسمی ورود</h3>{!s.root?<p className="text-xs text-muted">ابتدا آدرس را در «حساب من» ثبت کنید.</p>:<><div className="grid grid-cols-2 gap-3"><Field label="مارجین"><Select value={mode} onChange={e=>setMode(e.target.value)}><option value="cross">مشترک</option><option value="isolated">جدا</option></Select></Field><Field label="حد لغزش نرخ"><Input dir="ltr" inputMode="decimal" value={slippage} suffix="٪" onChange={e=>setSlippage(normalizeDecimalInput(e.target.value))}/></Field></div><Button size="sm" onClick={()=>void preview()} disabled={loading||market.tokenId===undefined||Number(slippage)<0||Number(slippage)>50}>{loading?'در حال بررسی…':'بررسی با حساب واقعی'}</Button></>}{error&&<Notice tone="warn">{error}</Notice>}{valid&&<><Notice tone={valid.success?'info':'warn'}>{valid.success?'پیش‌نمایش پذیرفته شد؛ هیچ سفارشی ارسال نشده است.':'پیش‌نمایش ورود موفق نیست؛ موجودی، مارجین یا نقدشوندگی را بررسی کنید.'}</Notice><MetricGrid cols={2}><Metric label="حجم تطبیق‌یافته" value={<QuantityValue value={valid.matchedSize} unit="واحد بازده"/>}/><Metric label="نرخ اجرای تطبیق‌یافته" value={<PercentValue value={valid.matchedSize&&valid.matchedSize>0&&valid.matchedApr!==null?valid.matchedApr*100:null} tone="none"/>}/><Metric label="مارجین پس از سفارش" value={<MoneyValue value={valid.margin!==null&&market.collateralPriceUsd!=null&&market.collateralPriceUsd>0?valid.margin*market.collateralPriceUsd:null}/>}/><Metric label="نرخ لیکوییدشدن پس از سفارش" value={<PercentValue value={valid.liquidationApr===null?null:valid.liquidationApr*100} tone="none"/>}/></MetricGrid>{onApply&&valid.success&&valid.matchedSize!==null&&valid.matchedSize>0&&valid.matchedApr!==null&&<Button size="sm" variant="outline" onClick={()=>onApply(valid)}>استفاده از حجم و نرخ در سناریو</Button>}<p className="text-xs text-muted">این نتیجه برای حساب فعلی و لحظه پیش‌نمایش است؛ هزینه کامل، گس و سود آینده از آن قابل استخراج نیست. سناریوی سرمایه دستی جدا محاسبه می‌شود.</p></>}</Surface>;
+}

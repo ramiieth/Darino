@@ -139,10 +139,11 @@ export function userCapitalOpportunity(
   const rateEdge =
     direction === 'long' ? underlying - fixed : fixed - underlying;
 
-  const rateSensitivityUsd = calcRateSensitivity(notional, days);
+  const rateSensitivityUsd = calcRateSensitivity(notional, days) * input.collateralPriceUsd;
   const fees = FeeCalculator.calc({
     m,
     size: notional,
+    unitPriceUsd: input.collateralPriceUsd,
     nowSec,
     slippageRate: null,
     gasUsd: input.gasUsd ?? 0
@@ -150,13 +151,13 @@ export function userCapitalOpportunity(
 
   const slippageUsd =
     input.slippageRate !== null && input.slippageRate !== undefined
-      ? notional * input.slippageRate
+      ? notional * Math.abs(input.slippageRate) * (days / 365) * input.collateralPriceUsd
       : null;
 
   const settlementPnl =
     direction === 'long'
-      ? LongPnLCalculator.gross(notional, fixed, underlying, days)
-      : ShortPnLCalculator.gross(notional, fixed, underlying, days);
+      ? LongPnLCalculator.gross(notional, fixed, underlying, days) * input.collateralPriceUsd
+      : ShortPnLCalculator.gross(notional, fixed, underlying, days) * input.collateralPriceUsd;
 
   const mtmPnl =
     direction === 'long'
@@ -167,7 +168,7 @@ export function userCapitalOpportunity(
   const netPnl = totalCosts !== null ? settlementPnl + mtmPnl - totalCosts : null;
   const roiOnMargin = marginUsd > 0 && netPnl !== null ? (netPnl / marginUsd) * 100 : null;
 
-  const analysis = BorosCalculationEngine.analyze({ m, size: notional, nowSec, gasUsd: input.gasUsd ?? 0 });
+  const analysis = BorosCalculationEngine.analyze({ m, direction, size: notional * input.collateralPriceUsd, nowSec, gasUsd: input.gasUsd ?? 0 });
   const minEdge = analysis.minEconomicEdge;
   const economicEdge = netPnl !== null ? netPnl - minEdge : null;
 
@@ -255,12 +256,12 @@ export function rankUserCapitalOpportunities(
   const nowSec = opts?.nowSec ?? Math.floor(Date.now() / 1000);
   const out: UserCapitalOpportunity[] = [];
   for (const m of markets) {
-    if (opts?.direction && opts.direction !== 'long') {
-      const s = userCapitalOpportunity({ m, direction: 'short', collateralAsset, collateralPriceUsd, nowSec, gasUsd: opts.gasUsd ?? 0, slippageRate: opts.slippageRate ?? null });
+    if (!opts?.direction || opts.direction === 'short') {
+      const s = userCapitalOpportunity({ m, direction: 'short', collateralAsset, collateralPriceUsd, nowSec, gasUsd: opts?.gasUsd ?? 0, slippageRate: opts?.slippageRate ?? null });
       if (s) out.push(s);
     }
-    if (opts?.direction && opts.direction !== 'short') {
-      const l = userCapitalOpportunity({ m, direction: 'long', collateralAsset, collateralPriceUsd, nowSec, gasUsd: opts.gasUsd ?? 0, slippageRate: opts.slippageRate ?? null });
+    if (!opts?.direction || opts.direction === 'long') {
+      const l = userCapitalOpportunity({ m, direction: 'long', collateralAsset, collateralPriceUsd, nowSec, gasUsd: opts?.gasUsd ?? 0, slippageRate: opts?.slippageRate ?? null });
       if (l) out.push(l);
     }
   }

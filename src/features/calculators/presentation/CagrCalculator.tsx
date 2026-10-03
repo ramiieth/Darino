@@ -1,3 +1,4 @@
+import { usePublishInsight } from '@/shared/assistant/insights';
 /**
  * ③ CAGR — compound annual growth rate.
  *   CAGR = (final ÷ initial)^(1 ÷ years) − 1   (domain: calcCagrFull)
@@ -43,6 +44,8 @@ export function CagrCalculator() {
     () => calcCagrFull({ initialValue: init, finalValue: fin, startDate: startTs, endDate: endTs }),
     [init, fin, startTs, endTs]
   );
+
+  usePublishInsight('calculatorCagr', 'رشد سالانه', ready ? { ...result, initialUsd: init, finalUsd: fin, startTs, endTs } : null);
 
   const growthCurve = useMemo(() => {
     if (!ready || result.cagr === null) return [];

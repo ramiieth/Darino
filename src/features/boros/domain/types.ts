@@ -4,6 +4,11 @@
 
 export interface BorosMarket {
   marketId: number;
+  tokenId?: number;
+  collateralSymbol?: string;
+  collateralPriceUsd?: number;
+  status?: 'GOOD' | 'CLOSE_ONLY' | 'PAUSED' | 'UNKNOWN';
+  snapshotAt?: number;
   name: string;
   symbol: string;
   venue: string; // Hyperliquid | Binance | OKX | Gate ...
@@ -11,7 +16,7 @@ export interface BorosMarket {
   fundingRateSymbol: string;
   maturity: number; // ثانیه
   marginFloor: number; // rateFloor
-  /** YTMFloor — پارامتر پروتکل (API عمومی expose نمی‌کند؛ در نبودش engine از پیش‌فرض استفاده می‌کند) */
+  /** config.tThresh / seconds-per-year */
   ytmFloor?: number;
   tickStep: number;
   iTickThresh: number;
@@ -45,19 +50,10 @@ export interface BorosMarket {
   bestBid: number;
   bestAsk: number;
   assetMarkPrice: number;
-  /* --- تاریخچه (OHLCV روزانه — c = APR) --- */
+  /** Actual funding/oracle observations only; implied OHLCV cannot substitute. */
+  fundingHistory?: { ts: number; c: number }[];
+  /* --- تاریخچه نرخ ضمنی معامله‌شده --- */
   ohlcv: { ts: number; c: number }[];
-}
-
-/** خروجی شبیه‌سازی سفارش از API */
-export interface BorosSimResult {
-  size: string;
-  cost: string;
-  rate: number;
-  marginRequired: string;
-  priceImpact: number;
-  takerOtcFee: string;
-  actualRate: number;
 }
 
 export type BorosDirection = 'long' | 'short';

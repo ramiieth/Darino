@@ -1,3 +1,4 @@
+import { borosAssetName, borosVenueName } from './borosLabels';
 /**
  * Boros audit — full per-market breakdown (complete transparency)
  *  - PnL split: gross settlement / unrealized MTM / total gross / net
@@ -18,7 +19,7 @@ import type { BorosMarket } from '@/features/boros/domain/types';
 import { fmtPct, toFaDigits } from '@/shared/utils/formatters';
 
 const SOURCE: Record<string, { label: string; tone: Tone }> = {
-  api: { label: 'API', tone: 'brand' },
+  api: { label: 'بوروس', tone: 'brand' },
   'market-data': { label: 'داده بازار', tone: 'info' },
   'user-input': { label: 'ورودی کاربر', tone: 'neutral' },
   na: { label: 'نامشخص', tone: 'neutral' }
@@ -31,8 +32,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
         summary={
           <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-ink">
             <span className="font-semibold">
-              <bdi dir="ltr">{b.asset}</bdi> · {b.venue}{' '}
-              <span className="text-xs font-normal text-muted">({toFaDigits(b.daysToMaturity)} روز)</span>
+              <bdi dir="ltr">{borosAssetName(b.asset)}</bdi> · {borosVenueName(b.venue)}{' '}
+              <span className="text-xs font-normal text-muted">({toFaDigits(Math.ceil(b.daysToMaturity))} روز)</span>
             </span>
             <span className="flex items-center gap-3 text-xs font-normal text-muted">
               <span>خالص لانگ <MoneyValue value={b.netLong} signed tone="auto" className="font-semibold" /></span>
@@ -49,8 +50,8 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
               rows={[
                 { label: 'تسویه ناخالص لانگ', value: <MoneyValue value={b.grossSettlementLong} signed tone="auto" /> },
                 { label: 'تسویه ناخالص شورت', value: <MoneyValue value={b.grossSettlementShort} signed tone="auto" /> },
-                { label: 'ارزش روز لانگ (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
-                { label: 'ارزش روز شورت (هنوز بسته نشده)', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
+                { label: 'ارزش روز فرضی لانگ', value: <MoneyValue value={b.unrealizedMtmLong} signed /> },
+                { label: 'ارزش روز فرضی شورت', value: <MoneyValue value={b.unrealizedMtmShort} signed /> },
                 { label: 'ناخالص کل لانگ', value: <MoneyValue value={b.totalGrossLong} signed tone="auto" /> },
                 { label: 'ناخالص کل شورت', value: <MoneyValue value={b.totalGrossShort} signed tone="auto" /> },
                 { label: 'خالص لانگ', emphasis: true, value: <MoneyValue value={b.netLong} signed tone="auto" /> },
@@ -69,7 +70,7 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
                       {l.label} <Badge tone={SOURCE[l.source]?.tone ?? 'neutral'}>{SOURCE[l.source]?.label ?? l.source}</Badge>
                     </span>
                   ),
-                  value: l.amount === 0 && l.source === 'na' ? <span className="text-subtle">N/A</span> : <MoneyValue value={l.amount} />
+                  value: l.amount === 0 && l.source === 'na' ? <span className="text-subtle">نامشخص</span> : <MoneyValue value={l.amount} />
                 })),
                 { label: 'مجموع هزینه‌ها', emphasis: true, value: <MoneyValue value={b.totalCostsLong} /> }
               ]}
@@ -80,10 +81,10 @@ function AuditRow({ b }: { b: MarketAuditBreakdown }) {
             <KeyValueList
               dense
               rows={[
-                { label: 'Notional', value: <span className="num-ltr">{b.marginParams.size}</span> },
+                { label: 'ارزش اسمی دلاری', value: <span className="num-ltr">{b.marginParams.size}</span> },
                 { label: 'نرخ / کف', value: <span className="num-ltr">{fmtPct(b.marginParams.rate * 100)} / {fmtPct(b.marginParams.rateFloor * 100)}</span> },
                 { label: 'زمان تا سررسید / کف', value: <span className="num-ltr">{b.marginParams.ytm.toFixed(3)} / {b.marginParams.ytmFloor}</span> },
-                { label: 'IM', value: <PercentValue value={b.marginParams.imRatio * 100} signed={false} tone="none" /> },
+                { label: 'ضریب مارجین اولیه', value: <PercentValue value={b.marginParams.imRatio * 100} signed={false} tone="none" /> },
                 { label: 'مارجین', emphasis: true, value: <MoneyValue value={b.marginRequired} /> },
                 { label: 'بازده مارجین لانگ', value: <PercentValue value={b.roiLongMargin} /> },
                 { label: 'بازده ارزش اسمی لانگ', value: <PercentValue value={b.roiLongNotional} /> },
@@ -104,12 +105,12 @@ export function AuditTab({ markets }: { markets: BorosMarket[] }) {
 
   return (
     <div className="space-y-8">
-      <AuditReportTable markets={markets} />
+      <Disclosure summary="جدول بررسی منابع و فرمول‌ها"><div className="py-4"><AuditReportTable markets={markets} /></div></Disclosure>
 
       <Section
         id="engine-audit"
         title="بررسی محاسبات موتور"
-        description="سود و زیان، مارجین و هزینه‌ها"
+        description="مبنای مقایسه: ارزش اسمی ۱٬۰۰۰ دلار؛ هزینه‌های نامشخص در خالص لحاظ نشده‌اند"
       >
         <Surface>
           <ul className="divide-y divide-divider">

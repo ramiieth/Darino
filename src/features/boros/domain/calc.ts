@@ -48,72 +48,8 @@ export function calcGrossProfit(
   days: number,
   paymentPeriodSec: number
 ): number {
-  const nSettle = Math.max(1, Math.floor(days / (paymentPeriodSec / 86_400)));
-  const periodic = nSettle * calcSettlement(direction, size, fixedRate, floatingRate, paymentPeriodSec);
-  const remaining = days - nSettle * (paymentPeriodSec / 86_400);
-  return periodic + calcDirectionalPnl(direction, size, fixedRate, floatingRate, Math.max(0, remaining));
-}
-
-export interface FeeInputCompat {
-  size: number;
-  markApr: number;
-  takerFee: number;
-  settleFeeRate: number;
-  settlementsCount: number;
-  priceImpact: number;
-  gasUsd: number;
-}
-
-export function calcFees(f: FeeInputCompat): FeeBreakdown {
-  // برای سازگاری: تبدیل به بازار حداقلی (اگر m موجود نبود از فیلدها)
-  const m: BorosMarket = {
-    marketId: 0,
-    name: '',
-    symbol: '',
-    venue: '',
-    asset: '',
-    fundingRateSymbol: '',
-    maturity: Math.floor(Date.now() / 1000) + 365 * 86_400,
-    marginFloor: 0,
-    tickStep: 2,
-    iTickThresh: 0,
-    maxLeverage: 1,
-    isUiWhitelisted: true,
-    kIM: 0.5,
-    kMM: 0.25,
-    takerFee: f.takerFee,
-    otcFee: f.takerFee,
-    settleFeeRate: f.settleFeeRate,
-    paymentPeriod: 28800,
-    hardOICap: 0,
-    softOICap: 0,
-    maxRateDeviationFactorBase1e4: 0,
-    liqBase: 0,
-    liqSlope: 0,
-    liqFeeRate: 0,
-    markApr: f.markApr,
-    lastTradedApr: f.markApr,
-    midApr: f.markApr,
-    floatingApr: f.markApr,
-    longYieldApr: 0,
-    notionalOI: 0,
-    volume24h: 0,
-    nextSettlementTime: 0,
-    settlementsToMaturity: f.settlementsCount,
-    rateSensitivity: 0,
-    dailyVolatility: null,
-    bestBid: 0,
-    bestAsk: 0,
-    assetMarkPrice: 0,
-    ohlcv: []
-  };
-  return FeeCalculator.calc({
-    m,
-    size: f.size,
-    nowSec: Math.floor(Date.now() / 1000),
-    slippageRate: f.priceImpact || null,
-    gasUsd: f.gasUsd
-  });
+  if (!Number.isFinite(days) || days <= 0 || paymentPeriodSec <= 0) return 0;
+  return calcDirectionalPnl(direction, size, fixedRate, floatingRate, days);
 }
 
 export const calcNetProfit = (gross: number, totalFees: number) => gross - totalFees;
@@ -146,11 +82,11 @@ export function runScenario(
   label: string,
   floatingRate: number
 ) {
-  const settlements = Math.max(1, Math.floor(days / (m.paymentPeriod / 86_400)));
-  const fees = calcFees({ size, markApr: m.markApr, takerFee: m.takerFee, settleFeeRate: m.settleFeeRate, settlementsCount: settlements, priceImpact, gasUsd });
+  const nowSec = m.maturity - Math.max(0, days) * 86400;
+  const fees = FeeCalculator.calc({ m, size, nowSec, gasUsd, slippageRate: priceImpact || null });
   const gross = calcGrossProfit(direction, size, fixedRate, floatingRate, days, m.paymentPeriod);
   const net = calcNetProfit(gross, fees.total);
-  const margin = calcMarketMargin(m, size, fixedRate);
+  const margin = calcMarketMargin(m, size, fixedRate, nowSec);
   return {
     label,
     floatingRate,
@@ -173,7 +109,7 @@ export function runScenarios(
   gasUsd: number,
   priceImpact: number
 ) {
-  const hist = historicalAprOf(m);
+  const hist = (m.fundingHistory ?? []).map((p) => p.c).filter(Number.isFinite);
   const rates = buildScenarioRates(hist, m.floatingApr);
   if (!rates) {
     // داده تاریخی کافی نیست → فقط سناریوی Base با نرخ فعلی (برچسب «پایه») — بدون Bear/Bull ساختگی
@@ -206,8 +142,8 @@ export function compareMarkets(markets: BorosMarket[], size: number, daysOverrid
       riskScore: a.riskScore,
       risk: a.riskLevel,
       liquidityScore: a.liquidityScore,
-      netApr: a.markApr * 100,
-      opportunity: Math.max(a.longScore, a.shortScore)
+      netApr: size > 0 && a.daysToMaturity > 0 ? (a.totalLongPnl / size) * (365 / a.daysToMaturity) * 100 : 0,
+      opportunity: a.statusLong === 'potential' || a.statusLong === 'conditional' ? a.longScore : 0
     };
   });
 }
@@ -218,7 +154,7 @@ export const stabilityOf = (m: BorosMarket) => {
   const hist = historicalAprOf(m);
   return hist.length >= 2 ? Math.max(0, Math.min(1, 1 - sampleStdDev(hist) / 0.05)) : 0.5;
 };
-export const volumeScoreOf = (m: BorosMarket) => Math.min(1, m.volume24h / 5000);
+export const volumeScoreOf = (m: BorosMarket) => Math.min(1, m.volume24h * (m.collateralPriceUsd ?? m.assetMarkPrice) / 5000);
 export const aprInstabilityOf = (m: BorosMarket) => {
   const hist = historicalAprOf(m);
   return hist.length >= 2 ? sampleStdDev(hist) : 0.01;

@@ -89,7 +89,7 @@ export const NAV_GROUPS: NavGroup[] = [
         primary: true
       },
       { id: 'wallets', to: '/wallets', label: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
-      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل فارسی دارایی‌های زریون و آرکوس', icon: Sparkles },
+      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
       {
         id: 'accounting',
         to: '/accounting',

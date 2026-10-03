@@ -17,11 +17,13 @@ import { OpportunitiesTab } from './OpportunitiesTab';
 import { ComparisonTab } from './ComparisonTab';
 import { SimulatorTab } from './SimulatorTab';
 import { RiskMonitorTab } from './RiskMonitorTab';
+import { AccountTab } from './AccountTab';
 import { AuditTab } from './AuditTab';
 
-type Tab = 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
+type Tab = 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit';
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'account', label: 'حساب من' },
   { value: 'opp', label: 'فرصت‌ها' },
   { value: 'compare', label: 'مقایسه' },
   { value: 'sim', label: 'شبیه‌ساز' },
@@ -38,7 +40,7 @@ export default function BorosDashboard() {
     if (error) retryBorosSoon(15_000);
   }, [error]);
 
-  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now()), [markets]);
+  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now() && m.isUiWhitelisted), [markets]);
   const reload = () => {
     resetBorosLoad();
     void loadBoros();
@@ -47,7 +49,7 @@ export default function BorosDashboard() {
   const header = (
     <PageHeader
       title="تحلیل بوروس"
-      subtitle="تحلیل و شبیه‌سازی نرخ تأمین مالی"
+
       meta={
         markets.length > 0 ? (
           <FreshnessBar
@@ -55,7 +57,7 @@ export default function BorosDashboard() {
             stale={stale}
             error={error}
             syncing={syncProgress !== null}
-            sourceLabel="Pendle Boros API"
+            sourceLabel="بوروس"
             autoMs={2 * 60_000}
             onRefresh={reload}
           />
@@ -64,25 +66,10 @@ export default function BorosDashboard() {
     />
   );
 
-  if (loading && markets.length === 0) {
-    return (
-      <Page>
-        {header}
-        <PageSkeleton />
-      </Page>
-    );
-  }
-  if (error && markets.length === 0) {
-    return (
-      <Page>
-        {header}
-        <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />
-      </Page>
-    );
-  }
 
   return (
     <Page>
+      <div className="boros-workspace space-y-5">
       {header}
 
       {!error && stale && (
@@ -102,7 +89,7 @@ export default function BorosDashboard() {
       {syncProgress && (
         <div className="flex items-center gap-3 text-xs text-muted" role="status">
           <span className="shrink-0">
-            تاریخچه APR {toFaDigits(syncProgress.done)}/{toFaDigits(syncProgress.total)}
+            تاریخچه نرخ {toFaDigits(syncProgress.done)}/{toFaDigits(syncProgress.total)}
           </span>
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div
@@ -113,14 +100,20 @@ export default function BorosDashboard() {
         </div>
       )}
 
+
+
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
+        {tab === 'account' && <AccountTab markets={markets} />}
+        {tab !== 'account' && loading && markets.length === 0 && <PageSkeleton />}
+        {tab !== 'account' && error && markets.length === 0 && <ErrorState message="ارتباط با سرویس بوروس برقرار نشد" onRetry={() => void loadBoros()} />}
         {tab === 'opp' && <OpportunitiesTab markets={activeMarkets} />}
         {tab === 'compare' && <ComparisonTab markets={activeMarkets} />}
         {tab === 'sim' && <SimulatorTab markets={activeMarkets} />}
         {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
         {tab === 'audit' && <AuditTab markets={activeMarkets} />}
       </div>
+    </div>
     </Page>
   );
 }
