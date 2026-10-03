@@ -72,10 +72,11 @@ function signTone(v: number, tone: Tone): string {
 /* ---------------- واحد دلار (کوچک) ---------------- */
 
 /** «۱,۲۳۴.۲۳ دلار» — عدد LTR و واژهٔ «دلار» کوچک (در RTL پس از عدد خوانده می‌شود) */
-export function UsdText({ value, compact = false, signed = false, className }: { value: number; compact?: boolean; signed?: boolean; className?: string }) {
+export function UsdText({ value, compact = false, signed = false, className, digits }: { value: number; compact?: boolean; signed?: boolean; className?: string; digits?: number }) {
   const abs = Math.abs(value);
   const sign = value > 0 ? (signed ? '+' : '') : value < 0 ? '-' : '';
-  const body = signed ? (compact ? fmtCompactFa(abs) : toFaDigits(abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))) : fmtUsdNumber(abs, compact);
+  if(digits!==undefined&&abs>0&&abs<10**-digits)return <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1',className)}><span className="text-xs">{value<0?'بیشتر از':'کمتر از'}</span><bdi dir="ltr">{sign}{toFaDigits((10**-digits).toFixed(digits))}</bdi><span className="text-[0.62em] font-medium opacity-70">دلار</span></span>;
+  const body = digits!==undefined ? toFaDigits(abs.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits})) : signed ? (compact ? fmtCompactFa(abs) : toFaDigits(abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))) : fmtUsdNumber(abs, compact);
   const [number, ...scale] = body.split(' ');
   return (
     <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
@@ -94,7 +95,8 @@ export function MoneyValue({
   tone = 'none',
   state = 'ready',
   className,
-  unavailableLabel
+  unavailableLabel,
+  digits
 }: {
   value: number | null | undefined;
   compact?: boolean;
@@ -104,6 +106,8 @@ export function MoneyValue({
   state?: ValueState;
   className?: string;
   unavailableLabel?: string;
+  /** Optional fixed display precision; calculation data is untouched. */
+  digits?: number;
 }) {
   if (state === 'unavailable' || (state !== 'loading' && !isNum(value))) {
     return <Unavailable className={className} label={unavailableLabel} />;
@@ -111,7 +115,7 @@ export function MoneyValue({
   const v = value as number;
   return (
     <StateShell state={state} className={cn(state !== 'loading' && signTone(v, tone), className)}>
-      <UsdText value={v} compact={compact} signed={signed} />
+      <UsdText value={v} compact={compact} signed={signed} digits={digits} />
     </StateShell>
   );
 }

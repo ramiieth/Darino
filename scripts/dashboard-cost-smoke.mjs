@@ -88,6 +88,14 @@ try {
  await host.getByRole('button',{name:'ویرایش بهای خرید اتر رپ شده · وثیقه بوروس · مشترک',exact:true}).last().click();await dialog.waitFor();
  await page.evaluate(async()=>{const {useBorosAccount}=await import('/src/features/boros/data/useBorosAccount.ts');const s=useBorosAccount.getState();useBorosAccount.setState({data:{...s.data,balances:s.data.balances.map(b=>({...b,cash:1}))}});});
  await dialog.getByText('موجودی تغییر کرده است؛ پنل را ببندید و دوباره باز کنید.',{exact:true}).waitFor();assert(await dialog.getByRole('button',{name:'تأیید بهای تمام‌شده',exact:true}).isDisabled());
+ // Screenshot-sized balances must stay on one line, without changing stored quantities.
+ await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+ await page.evaluate(()=>{const q=window.costQA;q.p.wallets[0].state.data.positions=[{...q.p.wallets[0].state.data.positions[0],quantity:'3.322229',value:8903.88,tokenId:'ethereum'}, {...q.p.wallets[0].state.data.positions[0],id:'usdc',symbol:'USDC',tokenId:'usd-coin',name:'USDC',quantity:'17961.316141',value:17960.77,price:.999969,chain:'base'}];q.root.render(q.React.createElement(q.MemoryRouter,null,q.React.createElement(q.CostSummaryPanel,{portfolio:q.p,links:[]})));});
+ await page.setViewportSize({width:1440,height:1100});await host.getByText('۱۷,۹۶۱.۳۱',{exact:true}).first().waitFor();
+ assert(!(await host.innerText()).includes('۳۱۶۱۴۱'));assert((await host.innerText()).includes('نامشخص'));
+ const alignment=await host.locator('.cost-table .persian-amount').evaluateAll(els=>els.every(el=>{const n=el.querySelector('bdi'),u=[...el.children].find(c=>c.textContent==='دلار');if(!n||!u)return true;const nr=n.getBoundingClientRect(),ur=u.getBoundingClientRect();return ur.top<nr.bottom&&ur.bottom<=nr.bottom+5;}));assert(alignment,'dollar unit wrapped below number');
+ for(const width of [320,390,768,1280,1440]){await page.setViewportSize({width,height:1000});assert(await host.evaluate(el=>el.scrollWidth<=el.clientWidth+1),`compact balances overflow ${width}`);}
+ await host.evaluate(el=>{el.style.zIndex='9999';el.scrollTo(0,0);});await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:'/tmp/darino-cost-compact-desktop.png'});await page.setViewportSize({width:390,height:1000});await page.screenshot({path:'/tmp/darino-cost-compact-mobile.png'});
  assert.deepEqual(errors,[]);
  console.log('PASS: dashboard cost rows, Persian figures, 320/390/768/1280/1440 light/dark/touch, disclosure, reactive purchase update, one-field total-basis editor, automatic average, saved old-lot preservation, history gating, scoped Arcus/Boros edits, derivative separation and balance-change guard. No live provider or installed-PWA test.');
 } finally {await browser.close();}
