@@ -27,6 +27,7 @@ interface NetDef {
 }
 
 const NET_DEFS: NetDef[] = [
+  {id:'avalanche',name:'اولانچ',nameEn:'Avalanche',chainId:43114,explorer:'https://snowtrace.io',native:{symbol:'AVAX',name:'اولانچ',nameEn:'Avalanche',decimals:18,logo:'/logos/chain-avalanche.svg',coingeckoId:'avalanche-2'},reference:'zerion.io/api/chains/avalanche · C-Chain 43114'},
   {
     id: 'ethereum',
     name: 'اتریوم',
@@ -103,7 +104,7 @@ const NET_DEFS: NetDef[] = [
   }
 ];
 
-export const NETWORKS: Network[] = NET_DEFS.map((n) => ({
+export const NETWORKS: Network[] = NET_DEFS.map<Network>((n) => ({
   id: n.id,
   name: n.name,
   nameEn: n.nameEn,
@@ -111,11 +112,14 @@ export const NETWORKS: Network[] = NET_DEFS.map((n) => ({
   chainId: n.chainId,
   isTestnet: false,
   explorerUrl: n.explorer,
-  logo: `/logos/chain-${n.chainId}.png`,
+  logo: n.id==='avalanche'?'/logos/chain-avalanche.svg':`/logos/chain-${n.chainId}.png`,
   nativeAssetId: `${n.id}:native`,
   origin: 'catalog',
   reference: n.reference
-}));
+})).concat([
+ {id:'solana',name:'سولانا',nameEn:'Solana',kind:'other',chainId:null,isTestnet:false,explorerUrl:'https://solscan.io',logo:'/logos/chain-solana.svg',nativeAssetId:'solana:native',origin:'catalog'},
+ {id:'bitcoin',name:'بیت‌کوین',nameEn:'Bitcoin',kind:'other',chainId:null,isTestnet:false,explorerUrl:'https://blockstream.info',logo:'/logos/token-btc.png',nativeAssetId:'bitcoin:native',origin:'catalog'}
+] as Network[]);
 
 const T = {
   USDC: { symbol: 'USDC', name: 'یو‌اس‌دی‌سی', nameEn: 'USD Coin', logo: '/logos/token-usdc.svg', coingeckoId: 'usd-coin', ref: 'developers.circle.com/stablecoins/usdc-contract-addresses' },
@@ -142,10 +146,16 @@ const ERC20: [string, keyof typeof T, string, string?][] = [
   ['hyperevm', 'USDC', '0xb88339cb7199b77e23db6e890353e22632ba630f'],
   ['hyperevm', 'USDT0', '0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb'],
   ['robinhood', 'USDG', '0x5fc5360d0400a0fd4f2af552add042d716f1d168'],
+  ['avalanche', 'USDC', '0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e'],
+  ['avalanche', 'USDT', '0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7'],
+  ['solana', 'USDC', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
+  ['solana', 'USDT', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'],
   ['arc', 'EURC', '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1']
 ];
 
 export const ASSETS: Asset[] = [
+ {id:'solana:native',symbol:'SOL',name:'سولانا',nameEn:'Solana',networkId:'solana',contract:null,decimals:9,isNative:true,logo:'/logos/chain-solana.svg',coingeckoId:'solana',origin:'catalog'},
+ {id:'bitcoin:native',symbol:'BTC',name:'بیت‌کوین',nameEn:'Bitcoin',networkId:'bitcoin',contract:null,decimals:8,isNative:true,logo:'/logos/token-btc.png',coingeckoId:'bitcoin',origin:'catalog'},
   ...NET_DEFS.map((n) => ({
     id: `${n.id}:native`,
     symbol: n.native.symbol,
@@ -174,7 +184,7 @@ export const ASSETS: Asset[] = [
       logo: t.logo,
       coingeckoId: t.coingeckoId,
       origin: 'catalog' as const,
-      reference: `${t.ref} · eth_call decimals()=6`
+      reference: `${t.ref} · ${net==='solana'?'SPL mint':'eth_call decimals()=6'}`
     };
   })
 ];

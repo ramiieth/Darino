@@ -1,3 +1,4 @@
+import { isBitcoinAddress,validBitcoinAddress } from './bitcoinAddress.js';
 /** Read-only provider data; never written into the accounting ledger. */
 export interface ChainInfo { id: string; name: string; icon: string | null; positions: boolean; transactions: boolean }
 export interface LivePosition {
@@ -18,6 +19,7 @@ export const arr = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
 export const str = (v: unknown): string => typeof v === 'string' ? v : '';
 export const finite = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 export function validAddress(v: string): boolean {
+  if (isBitcoinAddress(v))return true;
   if (/^0x[a-fA-F0-9]{40}$/.test(v)) return true;
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v)) return false;
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -26,7 +28,7 @@ export function validAddress(v: string): boolean {
   const zeros = v.match(/^1*/)?.[0].length ?? 0;
   return bytes + zeros === 32;
 }
-export function addressKey(v: string): string { return v.startsWith('0x') ? v.toLowerCase() : v; }
+export function addressKey(v: string): string { return (v.startsWith('0x')||/^bc1/i.test(v)) ? v.toLowerCase() : v; }
 export function normalizePosition(v: unknown): LivePosition {
   const r = obj(v), a = obj(r.attributes), f = obj(a.fungible_info), q = obj(a.quantity);
   const chain = str(obj(obj(obj(r.relationships).chain).data).id);
@@ -68,3 +70,5 @@ export function normalizeTransaction(v: unknown): WalletTransaction {
     acts:arr(a.acts).map(v => {const x=obj(v),m=obj(x.application_metadata);return {id:str(x.id),type:str(x.type),protocol:str(m.name),contract:str(m.contract_address)};}),
     feeToken:Object.keys(fee).length ? transfer(fee) : undefined, approvals:arr(a.approvals).map(transfer), transfers:arr(a.transfers).map(transfer)};
 }
+
+export async function validPublicAddress(v:string){try{return isBitcoinAddress(v)?await validBitcoinAddress(v):validAddress(v);}catch{return false;}}

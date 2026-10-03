@@ -96,7 +96,6 @@ export function Section({
 
 export function SectionHeader({
   title,
-  description,
   action,
   level = 2,
   id,
@@ -118,7 +117,7 @@ export function SectionHeader({
             {title}
           </H>
         )}
-        {description && <p className="mt-0.5 text-xs text-muted md:text-sm">{description}</p>}
+
       </div>
       {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
     </div>

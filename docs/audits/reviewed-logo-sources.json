@@ -79,5 +79,13 @@
     "source": "https://zerion.io/_next/static/media/bnb-chain.9ceddd9b.svg",
     "sha256": "a3989db71e620f836b995a70364d923bcb73e7ba0bdfb0cb0c211f0609f26def",
     "normalization": "Removed XML declaration and external DTD; paths and colors unchanged."
+  },
+  "chain-solana.svg": {
+    "source": "https://zerion.io/_next/static/media/solana.f34fd808.svg",
+    "sha256": "78ad74e085b6aeac1daa9435eee23d1596140b50c2254d250224cab33591fd1e"
+  },
+  "chain-avalanche.svg": {
+    "source": "https://zerion.io/_next/static/media/avalanche.7e25af74.svg",
+    "sha256": "4f7725257dd2eaf99e11365ce60bec9595087bbcf7828c6f22aad7d4cdcb2fd8"
   }
 }

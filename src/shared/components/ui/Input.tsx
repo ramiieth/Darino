@@ -38,7 +38,6 @@ const FieldContext = createContext<FieldCtx | null>(null);
  */
 export function Field({
   label,
-  hint,
   error,
   children,
   className,
@@ -53,9 +52,9 @@ export function Field({
   labelAside?: ReactNode;
 }) {
   const id = useId();
-  const hintId = hint ? `${id}-hint` : undefined;
+
   const errId = error ? `${id}-err` : undefined;
-  const describedBy = [errId, hintId].filter(Boolean).join(' ') || undefined;
+  const describedBy = [errId].filter(Boolean).join(' ') || undefined;
   return (
     <FieldContext.Provider value={{ id, describedBy, invalid: !!error }}>
       <div className={cn('min-w-0', className)}>
@@ -69,10 +68,6 @@ export function Field({
         {error ? (
           <p id={errId} className="mt-1.5 text-xs text-negative">
             {error}
-          </p>
-        ) : hint ? (
-          <p id={hintId} className="mt-1.5 text-xs text-muted">
-            {hint}
           </p>
         ) : null}
       </div>

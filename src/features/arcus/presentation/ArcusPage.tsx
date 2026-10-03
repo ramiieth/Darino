@@ -205,9 +205,7 @@ export default function ArcusPage() {
                 <Metric size="sm" label="واریز در انتظار" value={acc?.data ? <Usd v={acc.data.pendingDeposits} /> : NA} />
                 <Metric size="sm" label="برداشت در انتظار" value={acc?.data ? <Usd v={acc.data.pendingWithdrawals} /> : NA} />
               </MetricGrid>
-              <p className="mt-4 text-xs leading-5 text-muted">
-                مقادیر به دلار (واحد حساب؛ تسویه با USDG) و طبق تعریف رسمی آرکوس است. ارزش اسمی پوزیشن‌های اهرمی دارایی جداگانه نیست و به ارزش حساب اضافه نمی‌شود؛ وثیقه و سود/زیان داخل ارزش حساب هستند.
-              </p>
+
             </Surface></Disclosure></div>
           )}
 
@@ -228,7 +226,7 @@ export default function ArcusPage() {
           {section === 'history' && state && ref && (
             <HistorySection refAcc={ref} state={state} range={range} setRange={setRange} historyRange={historyRange} marketById={marketById} markets={markets.data ?? []} />
           )}
-          {section === 'reconcile' && <Surface className="space-y-3 p-4"><p className="text-sm text-muted">برداشت به کیف پول و بریج بعدی، دو فعالیت مستقل هستند.</p><Link className="text-accent" to="/holdings">واریز، برداشت و تطبیق با کیف پول</Link></Surface>}
+          {section === 'reconcile' && <Surface className="space-y-3 p-4"><Link className="text-accent" to="/holdings">واریز، برداشت و تطبیق با کیف پول</Link></Surface>}
 
           <PrivacyNote />
           </>}
@@ -373,7 +371,7 @@ function OrdersList({ res, marketById }: { res: Res<ArcusOrder[]>; marketById: M
         <h3 className="mb-2 text-sm font-bold text-ink">سفارش‌های در انتظار فعال‌سازی — حد سود و حد ضرر ({untrig.length})</h3>
         {untrig.length ? <ul className="divide-y divide-divider">{untrig.map((o) => <OrderRow key={o.orderId} o={o} m={marketById.get(o.marketId)} />)}</ul> : <p className="text-xs text-muted">ندارد</p>}
       </Surface>
-      <p className="text-xs text-muted">لغو یا تغییر سفارش از دارینو ممکن نیست.</p>
+
     </div>
   );
 }

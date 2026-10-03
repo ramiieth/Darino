@@ -135,9 +135,7 @@ export function HoldingForm({ open, onClose, initial, presetKind, d }: { open: b
             <Field label="شمارهٔ زیرحساب" error={err('accountIndex')} hint="۰ = حساب اصلی · ۱ تا ۹ = زیرحساب‌ها">
               <Input dir="ltr" inputMode="numeric" disabled={lockArcus} value={accountIndex} onChange={(e) => setAccountIndex(e.target.value.replace(/[^\d۰-۹]/g, '').replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))))} />
             </Field>
-            <Notice tone="info" className="sm:col-span-2">
-              اتصال فقط‌خواندنی؛ اطلاعات حساب با آدرس عمومی قابل مشاهده است.
-            </Notice>
+
           </div>
         )}
         <Field label="یادداشت (اختیاری)">
@@ -288,7 +286,7 @@ function NetworkForm({ open, onClose, d }: { open: boolean; onClose: () => void;
                           <bdi dir="ltr">{c.chainId}</bdi>
                         </>
                       ) : (
-                        ' · ناسازگار با اتریوم'
+                        null
                       )}
                       {c.tokenSymbol ? (
                         <>
@@ -331,7 +329,7 @@ function NetworkForm({ open, onClose, d }: { open: boolean; onClose: () => void;
           </div>
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" checked={isEvm} onChange={(e) => setIsEvm(e.target.checked)} />
-            سازگار با اتریوم (آدرس‌های 0x)
+            شبکه دارای شناسه
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             {isEvm && (

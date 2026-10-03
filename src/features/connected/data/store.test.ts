@@ -34,3 +34,8 @@ it('resumes successfully after Retry-After and clears the wallet failure',async(
  vi.setSystemTime(now+121000);vi.mocked(fetchJson).mockResolvedValue({address,fetchedAt:Date.now(),total:12,positions:[],chains:[],complete:true,unpriced:0,change:null});
  await refreshWallet(address,true);expect(fetchJson).toHaveBeenCalledTimes(2);expect(useConnectedStore.getState().wallets[address].error).toBeNull();expect(useConnectedStore.getState().wallets[address].data?.stale).toBeFalsy();
 });
+it('Bitcoin balance requests remain available while Zerion is cooling down',async()=>{
+ vi.mocked(fetchJson).mockRejectedValueOnce(new HttpError(429,'سهمیهٔ روزانه تمام شده',3600));await refreshWallet(address,true);
+ const bitcoin='1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa';vi.mocked(fetchJson).mockResolvedValue({address:bitcoin,fetchedAt:Date.now(),total:60000,positions:[],chains:[],complete:true,unpriced:0,change:null});await refreshWallet(bitcoin);
+ expect(fetchJson).toHaveBeenCalledTimes(2);expect(useConnectedStore.getState().wallets[bitcoin].data?.total).toBe(60000);
+});
