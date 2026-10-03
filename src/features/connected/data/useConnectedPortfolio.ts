@@ -36,7 +36,7 @@ export function useConnectedPortfolio() {
   // Identity changes restart refresh; account responses don't restart the timer.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[key]);
-  const walletSources = wallets.map(h => { const state = walletStore[addressKey(h.address!)]; return { holding:h, state, value:state?.data ? visibleWalletValue(state.data) : null, stale:!!state?.error || (!!state?.data && Date.now()-state.data.fetchedAt > 900000) }; });
+  const walletSources = wallets.map(h => { const state = walletStore[addressKey(h.address!)]; return { holding:h, state, value:state?.data ? visibleWalletValue(state.data) : null, stale:!!state?.data?.stale || !!state?.error || (!!state?.data && Date.now()-state.data.fetchedAt > 900000) }; });
   const arcusSources = arcus.map(h => { const state = getArcusState(accountKey(h.arcus!)); const raw = state?.account.data?.equity; const n = raw === undefined ? null : Number(raw); const value = state?.account.fetchedAt && state.account.data === null ? 0 : n !== null && Number.isFinite(n) ? n : null; return { holding:h, state, value, stale:state ? isStale(state.account) || isStale(state.positions) : false }; });
   const realArcus = arcusSources.filter(s => s.holding.arcus!.env === 'mainnet');
   const sources = [...walletSources,...realArcus];

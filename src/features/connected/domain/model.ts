@@ -6,7 +6,7 @@ export interface LivePosition {
   type: string; protocol: string | null; protocolIcon: string | null; group: string | null;
   receipt: string | null; displayable: boolean; spam: boolean; verified?: boolean;
 }
-export interface WalletSnapshot { address: string; fetchedAt: number; total: number | null; change: number | null; positions: LivePosition[]; chains: ChainInfo[]; complete: boolean; unpriced: number; detailsError?: string }
+export interface WalletSnapshot { address: string; fetchedAt: number; total: number | null; change: number | null; positions: LivePosition[]; chains: ChainInfo[]; complete: boolean; unpriced: number; detailsError?: string; stale?: boolean; retryAt?: number }
 export interface TransactionTransfer {
   direction: string; symbol: string; quantity: string | null; value: number | null; address: string | null; icon: string | null;
   verified?:boolean; spam?:boolean; chain?:string; tokenId?: string; name?: string; contract?: string | null; price?: number | null; sender?: string; recipient?: string; actId?: string;

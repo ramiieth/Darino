@@ -17,3 +17,11 @@ it('another instance also observes daily cooldown and makes no new provider requ
  await expect((await import('../../api/_zerion')).getTransactions('0x'+'bb'.repeat(20))).rejects.toMatchObject({status:429});vi.resetModules();
  await expect((await import('../../api/_zerion')).getTransactions('0x'+'cc'.repeat(20))).rejects.toMatchObject({status:429});expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('a cold instance serves last complete assets after the freshness cache expires and quota is exhausted',async()=>{
+ const address='0x'+'fa'.repeat(20),fetcher=vi.fn(async(url:string)=>url.includes('/chains/')?new Response(JSON.stringify({data:[]})):new Response(JSON.stringify({data:[{id:'p',attributes:{position_type:'wallet',quantity:{numeric:'2'},value:20,price:10,fungible_info:{id:'token',name:'Token',symbol:'TOK',flags:{verified:true}}},relationships:{chain:{data:{id:'ethereum'}}}}]})));vi.stubGlobal('fetch',fetcher);
+ const original=await (await import('../../api/_zerion')).getWallet(address,'owner');expect(original.complete).toBe(true);
+ for(const [key,row]of storage)if(row.payload&&typeof row.payload==='object'&&'data' in row.payload)storage.delete(key);
+ vi.resetModules();fetcher.mockImplementation(async()=>new Response('{}',{status:429,headers:{'RateLimit-Org-Day-Remaining':'0','Retry-After':'3600'}}));
+ const cached=await (await import('../../api/_zerion')).getWallet(address,'owner');expect(cached.positions).toEqual(original.positions);expect(cached.fetchedAt).toBe(original.fetchedAt);expect(cached.stale).toBe(true);expect(cached.retryAt).toBeGreaterThan(Date.now());
+});

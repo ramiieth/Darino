@@ -5,7 +5,7 @@ const base = process.env.BASE_URL ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({channel:'chrome'});
 const page = await browser.newPage({viewport:{width:390,height:844}});
 const errors=[]; page.on('pageerror',e => errors.push({url:page.url(),stack:e.stack}));
-const address = '0x'+'ab'.repeat(20); let failWallet=false; let analysisBody;
+const address = '0x'+'ab'.repeat(20); let failWallet=false;let quotaWallet=false; let analysisBody;
 const snapshot={address,fetchedAt:Date.now(),total:1300,change:20,complete:true,unpriced:0,chains:[{id:'ethereum',name:'Ethereum',icon:null}],positions:[{id:'eth',tokenId:'eth',chain:'ethereum',contract:null,name:'Ether',symbol:'ETH',icon:'/logos/token-eth.png',quantity:'0.300000000000000001',value:1200,price:4000,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false,verified:true},{id:'weth',tokenId:'weth',chain:'robinhood',contract:'0x'+'11'.repeat(20),name:'Wrapped Ether',symbol:'WETH',icon:'/logos/token-eth.png',quantity:'2',value:100,price:50,type:'wallet',protocol:null,protocolIcon:null,group:null,receipt:null,displayable:true,spam:false,verified:true}]};
 snapshot.positions.push(
  {...snapshot.positions[0],id:'dust-base',chain:'base',quantity:'0.0003',value:1.2},
@@ -33,8 +33,8 @@ await page.route('**/*',async route => {
  else if(u.pathname==='/api/custody') body={configured:false,records:[]};
  else if(u.pathname==='/api/integrations') {
   const op=u.searchParams.get('op');
-  if(op==='wallet') {body=failWallet?{error:'خطای آزمایشی اتصال'}:snapshot;status=failWallet?502:200;}
-  else if(op==='transactions') body={rows:[{id:'dust-receipt',hash:'0xdust',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.000001',value:0.004,address:null,icon:'/logos/token-eth.png',verified:true}]},{id:'spam-receipt',hash:'0xspam',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,spam:true,transfers:[]},{id:'stable-dust-1',hash:'0xstable1',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.000014',value:0.000014,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'stable-dust-2',hash:'0xstable2',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.0001',value:0.0001,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'t1',hash:'0xtest',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0.1,transfers:[{direction:'in',symbol:'ETH',quantity:'0.1',value:400,address:'0x'+'cd'.repeat(20),icon:'/logos/token-eth.png',verified:true,tokenId:'ethereum'}]}],next:null,fetchedAt:Date.now()};
+  if(op==='wallet') {body=quotaWallet?{error:'سهمیهٔ روزانهٔ زریون تمام شده'}:failWallet?{error:'خطای آزمایشی اتصال'}:snapshot;status=quotaWallet?429:failWallet?502:200;}
+  else if(op==='transactions') body={rows:[{id:'dust-receipt',hash:'0xdust',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.000001',value:0.004,address:null,icon:'/logos/token-eth.png',verified:true}]},{id:'spam-receipt',hash:'0xspam',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,spam:true,transfers:[]},{id:'stable-dust-1',hash:'0xstable1',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.000014',value:0.000014,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'stable-dust-2',hash:'0xstable2',chain:'arbitrum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0,transfers:[{direction:'in',symbol:'USDT0',tokenId:'usdt0',quantity:'0.0001',value:0.0001,contract:'0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9',address:null,icon:'/logos/token-usdt0.png',verified:true}]},{id:'t1',protocol:'Uniswap V3',protocolIcon:null,hash:'0xtest',chain:'ethereum',type:'receive',status:'confirmed',minedAt:new Date().toISOString(),fee:0.1,transfers:[{direction:'in',symbol:'ETH',quantity:'0.1',value:400,address:'0x'+'cd'.repeat(20),icon:'/logos/token-eth.png',verified:true,tokenId:'ethereum'}]}],next:null,fetchedAt:Date.now()};
   else if(op==='chart') body={points:[[Date.now()-86400000,1310],[Date.now()-72000000,1320],[Date.now()-36000000,1270],[Date.now(),1300.8]],fetchedAt:Date.now()};
   else if(op==='arcus-spot') body={tokens:[{address:'0x'+'11'.repeat(20),wrappedTokenAddress:null,symbol:'WETH',name:'Wrapped Ether',decimals:18,source:'arcus',verified:true}],fetchedAt:Date.now()};
   else if(op==='pnl') body={data:{attributes:{realized_gain:10,unrealized_gain:20,total_fee:1}}};
@@ -65,7 +65,7 @@ try {
  assert.equal(await page.getByText('جعلی آزمایشی',{exact:false}).count(),0);
  await fits();
  failWallet=true; await page.getByRole('button',{name:'به‌روزرسانی',exact:true}).click();
- await page.getByText('خطای آزمایشی اتصال',{exact:true}).first().waitFor();
+ await page.getByText(/خطای آزمایشی اتصال/).first().waitFor();
  assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'last successful balance lost');
  failWallet=false;
  await page.evaluate(()=>location.hash='#/assistant');
@@ -95,7 +95,7 @@ try {
  await page.screenshot({path:'/tmp/darino-reference-portfolio-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).click();
- await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
+ await page.locator('main').getByText('یونی‌سواپ',{exact:true}).first().waitFor();await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
  await page.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).click();
  await page.screenshot({path:'/tmp/darino-native-transaction-sheet.png',fullPage:true});
  await page.keyboard.press('Escape');
@@ -144,6 +144,7 @@ try {
  await page.getByRole('heading',{name:'دارایی‌ها و فعالیت شبکه‌ای',exact:true}).waitFor();await fits();
  await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
  const networkPicker=page.getByRole('dialog',{name:'انتخاب شبکه',exact:true});
+ await networkPicker.getByRole('option',{name:/موناد/}).waitFor();await networkPicker.getByRole('option',{name:/پلاسما/}).waitFor();assert.equal(await networkPicker.getByRole('option',{name:/بلست/}).count(),0);
  await page.waitForTimeout(350);await fits();await page.screenshot({path:'/tmp/darino-network-picker.png'});
  await networkPicker.getByRole('option',{name:/رابین‌هود/}).click();
  await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
@@ -188,6 +189,7 @@ try {
  await page.evaluate(()=>location.hash='#/dashboard');await page.waitForTimeout(450);
  await page.screenshot({path:'/tmp/darino-native-pwa.png',fullPage:true});
  console.log('PASS: iOS standalone PWA layouts at 320/390px.');
+ quotaWallet=true;await page.evaluate(()=>location.hash='#/wallets');await page.reload();await page.getByRole('heading',{name:'دارایی‌های کیف آزمایشی'}).waitFor();await page.getByText(/سهمیهٔ روزانهٔ زریون تمام شده/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'persisted wallet disappeared after reload and quota');await fits();console.log('PASS: cached wallet survives reload and daily quota; Monad/Plasma and Persian protocol identity present.');
  assert.deepEqual(errors,[]);
  console.log('PASS: preview → confirmation → transactions → stale retention → AI privacy → manual simulation → cost migration → purchase cost → network activity → Arcus spot; 14 routes at 320/390/1440px fit in light and dark themes.');
 } finally {await browser.close();}

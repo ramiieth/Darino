@@ -15,18 +15,9 @@ describe('سرور اتصال‌های دارینو', () => {
     expect(u.searchParams.get('currency')).toBe('usd');
     expect(u.searchParams.get('filter[trash]')).toBe('only_non_trash');
   });
-  it('مجموع رسمی با شکست جزئیات به صفر تبدیل نمی‌شود؛ کلید فقط در هدر سرور است', async () => {
-    const fetcher = vi.fn(async (url:string, init:RequestInit) => {
-      expect(init.headers).toMatchObject({Authorization:'Basic '+Buffer.from(process.env.ZERION_API_KEY+':').toString('base64')});
-      if(url.includes('/chains/')) return new Response(JSON.stringify({data:[]}));
-      if(url.includes('/portfolio')) return new Response(JSON.stringify({data:{attributes:{total:{positions:987.65}}}}));
-      return new Response('{}',{status:429});
-    });
-    vi.stubGlobal('fetch',fetcher);
-    const snapshot = await getWallet(address,'test-user');
-    expect(snapshot.total).toBe(987.65);
-    expect(snapshot.complete).toBe(false);
-    expect(JSON.stringify(snapshot)).not.toContain('test-zerion');
+  it('rate limited wallet with no prior snapshot cannot claim a saved balance', async()=>{
+    const fetcher=vi.fn(async(url:string,init:RequestInit)=>{expect(init.headers).toMatchObject({Authorization:'Basic '+Buffer.from(process.env.ZERION_API_KEY+':').toString('base64')});if(url.includes('/chains/'))return new Response(JSON.stringify({data:[]}));return new Response('{}',{status:429,headers:{'RateLimit-Org-Day-Remaining':'0','Retry-After':'60'}});});vi.stubGlobal('fetch',fetcher);
+    await expect(getWallet(address,'test-user')).rejects.toMatchObject({status:429});expect(fetcher.mock.calls.some(([url])=>url.includes('/portfolio'))).toBe(false);
   });
   it('wallet charts only use validated periods and asset IDs on the fixed authenticated provider', async()=>{
     const fetcher=vi.fn(async(url:string)=>{

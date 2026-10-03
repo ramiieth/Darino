@@ -50,6 +50,7 @@ export default function ConnectedPage() {
       await saveHolding({ ...existing, id, kind:'wallet', address:preview.address, label:label.trim() || existing?.label || 'کیف پول من', createdAt:existing?.createdAt ?? now, updatedAt:now, archivedAt:null });
       const enabled = getPref<string[]>(CONNECTED_PREF)?.value ?? [];
       await savePref(CONNECTED_PREF,[...new Set([...enabled,id])]);
+      await (await import('../data/snapshotCache')).saveWalletSnapshot(preview);
       useConnectedStore.setState(s => ({wallets:{...s.wallets,[addressKey(preview.address)]:{data:preview,loading:false,error:null,history:[],historyLoaded:false,historyAt:null,next:null,historyLoading:false,historyError:null}}}));
       setSelected(id); setPreview(null); setAddress(''); setLabel('');
     } catch(e) { setError(providerError(e)); } finally { setBusy(false); }
