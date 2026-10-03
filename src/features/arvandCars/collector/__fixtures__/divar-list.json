@@ -1,0 +1,303 @@
+{
+ "list_widgets": [
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "سانتافه 3.3L شش سیلندر دو دف پلاک اروند",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "gaBvkO5p",
+      "web_info": {
+       "title": "سانتافه 3.3L شش سیلندر دو دف پلاک اروند",
+       "district_persian": "پادادشهر",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_gaBvkO5p_N"
+     }
+    },
+    "image_url": "https://s100.divarcdn.com/static/photo/neda/webp_thumbnail/pMNefziQBCc2QVFGUpJdkQ/d38b01cc-d1ca-4abd-a09a-ada476b94b3b.webp",
+    "bottom_description_text": "۱ ساعت پیش در پادادشهر",
+    "middle_description_text": "۴,۳۵۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 4,
+    "top_description_text": "۱۴۰,۰۰۰ کیلومتر",
+    "image_top_left_tag": {
+     "text": "۴",
+     "icon": {
+      "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/white_primary/v1/camera.png",
+      "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/white_primary/v1/camera.png",
+      "icon_name": "CAMERA",
+      "icon_color": "WHITE_PRIMARY"
+     },
+     "is_icon_left": true
+    },
+    "token": "gaBvkO5p",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_gaBvkO5p_N",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "gaBvkO5p",
+      "index": 0,
+      "post_type": "SEARCH",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "query": "پلاک اروند",
+        "sort": {
+         "value": "sort_date"
+        },
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ],
+        "category": {
+         "value": "light"
+        }
+       },
+       "search_uid": "0bc2ace5-0b34-4689-91c4-c7be93a35d89",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"light\"}}}}",
+        "query": "پلاک اروند",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\",\"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-10-03T18:37:25.103356Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  },
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "توسان ۲۰۱۷",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "gaBjgHnn",
+      "web_info": {
+       "title": "توسان ۲۰۱۷",
+       "district_persian": "اسلام آباد شرقی",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_gaBjgHnn_N"
+     }
+    },
+    "image_url": "https://s100.divarcdn.com/static/photo/neda/webp_thumbnail/78foaOBA1Q5UbLDh1OGr4Q/3926d2ca-2480-4f67-8436-06acf6916d29.webp",
+    "bottom_description_text": "۶ ساعت پیش در اسلام آباد شرقی",
+    "has_chat": true,
+    "middle_description_text": "۴,۶۰۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 4,
+    "top_description_text": "۱۳۰,۰۰۰ کیلومتر",
+    "image_top_left_tag": {
+     "text": "۴",
+     "icon": {
+      "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/white_primary/v1/camera.png",
+      "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/white_primary/v1/camera.png",
+      "icon_name": "CAMERA",
+      "icon_color": "WHITE_PRIMARY"
+     },
+     "is_icon_left": true
+    },
+    "token": "gaBjgHnn",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_gaBjgHnn_N",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "gaBjgHnn",
+      "index": 1,
+      "post_type": "SEARCH",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "query": "پلاک اروند",
+        "sort": {
+         "value": "sort_date"
+        },
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ],
+        "category": {
+         "value": "light"
+        }
+       },
+       "search_uid": "0bc2ace5-0b34-4689-91c4-c7be93a35d89",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"light\"}}}}",
+        "query": "پلاک اروند",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\",\"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-10-03T13:50:58.433156Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  },
+  {
+   "widget_type": "POST_ROW",
+   "data": {
+    "@type": "type.googleapis.com/widgets.PostRowData",
+    "title": "کیا سراتو هاچبک ۲۰۱۶ تمیز",
+    "action": {
+     "type": "VIEW_POST",
+     "payload": {
+      "@type": "type.googleapis.com/widgets.ViewPostPayload",
+      "token": "ga-uo09L",
+      "web_info": {
+       "title": "کیا سراتو هاچبک ۲۰۱۶ تمیز",
+       "district_persian": "کیانپارس ",
+       "city_persian": "اهواز"
+      },
+      "ad_instance_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_ga-uo09L_N"
+     }
+    },
+    "image_url": "https://s100.divarcdn.com/static/photo/neda/webp_thumbnail/HUzqDVOvslkB1CkV0g0qgg/bff6ede9-c4cc-4ea3-a113-6ea121cd5c09.webp",
+    "bottom_description_text": "در کیانپارس",
+    "has_chat": true,
+    "red_text": "نردبان شده",
+    "middle_description_text": "۱,۶۹۰,۰۰۰,۰۰۰ تومان",
+    "has_divider": true,
+    "image_count": 4,
+    "top_description_text": "۹۴,۰۰۰ کیلومتر",
+    "image_top_left_tag": {
+     "text": "۴",
+     "icon": {
+      "image_url_dark": "https://s100.divarcdn.com/static/imgs/widget-icons/dark/white_primary/v1/camera.png",
+      "image_url_light": "https://s100.divarcdn.com/static/imgs/widget-icons/light/white_primary/v1/camera.png",
+      "icon_name": "CAMERA",
+      "icon_color": "WHITE_PRIMARY"
+     },
+     "is_icon_left": true
+    },
+    "token": "ga-uo09L",
+    "should_indicate_seen_status": true,
+    "tracker_session_id": "0bc2ace5-0b34-4689-91c4-c7be93a35d89_ga-uo09L_N",
+    "layout_type": "GRID_ITEM"
+   },
+   "action_log": {
+    "server_side_info": {
+     "info": {
+      "@type": "type.googleapis.com/action_log.PostItemInfo",
+      "post_token": "ga-uo09L",
+      "index": 2,
+      "post_type": "SEARCH",
+      "list_type": "PAGE",
+      "source_page": "POST_LIST_PAGE",
+      "extra_data": {
+       "@type": "type.googleapis.com/action_log.PostItemInfo.SearchExtraData",
+       "jli": {
+        "places": {
+         "value": [
+          "7"
+         ]
+        },
+        "cities": [
+         "7"
+        ],
+        "category": {
+         "value": "light"
+        },
+        "query": "پلاک اروند",
+        "sort": {
+         "value": "sort_date"
+        }
+       },
+       "search_uid": "0bc2ace5-0b34-4689-91c4-c7be93a35d89",
+       "search_data": {
+        "form_data_json": "{\"data\":{\"category\":{\"str\":{\"value\":\"light\"}}}}",
+        "query": "پلاک اروند",
+        "server_payload_json": "{\"@type\":\"type.googleapis.com/widgets.SearchData.ServerPayload\",\"additional_form_data\":{\"data\":{\"sort\":{\"str\":{\"value\":\"sort_date\"}}}}}",
+        "cities": [
+         "7"
+        ],
+        "query_input_type": "TEXT",
+        "user_selected_location": {
+         "@type": "type.googleapis.com/widgets.UserSelectedLocation",
+         "places": [
+          {
+           "place_id": "7"
+          }
+         ]
+        }
+       }
+      },
+      "sort_date": "2026-10-03T11:55:31.579859Z"
+     },
+     "item_type": {
+      "type": "POST_ITEM"
+     }
+    },
+    "enabled": true
+   }
+  },
+  {
+   "widget_type": "DIVIDER_ROW",
+   "data": {}
+  }
+ ],
+ "pagination": {
+  "has_next_page": true,
+  "data": {
+   "page": 1,
+   "search_uid": "x"
+  }
+ }
+}

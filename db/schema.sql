@@ -147,6 +147,26 @@ CREATE TABLE IF NOT EXISTS "carPriceSnapshots" (
 CREATE INDEX IF NOT EXISTS idx_carPriceSnapshots_date ON "carPriceSnapshots" ("dateTs");
 
 -- ------------------------------------------------------------
+-- خودروهای وارداتی پلاک اروند (دیوار: اهواز، آبادان، خرمشهر + مبنای ملی تهران)
+--   * آگهی‌ها با توکن دیوار؛ آگهی حذف‌شده/قدیمی از اپ حذف می‌شود
+--   * Snapshot روزانه میانه قیمت هر مدل/سال برای روند
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "arvandAds" (
+  token        TEXT PRIMARY KEY,
+  region       TEXT NOT NULL,
+  "lastSeenAt" BIGINT NOT NULL,
+  payload      JSONB NOT NULL              -- CarAd
+);
+CREATE INDEX IF NOT EXISTS idx_arvandAds_region ON "arvandAds" (region, "lastSeenAt");
+
+CREATE TABLE IF NOT EXISTS "arvandSnapshots" (
+  id        TEXT PRIMARY KEY,              -- arv-YYYY-MM-DD
+  "dateTs"  BIGINT NOT NULL,
+  payload   JSONB NOT NULL                 -- ArvandSnapshot
+);
+CREATE INDEX IF NOT EXISTS idx_arvandSnapshots_date ON "arvandSnapshots" ("dateTs");
+
+-- ------------------------------------------------------------
 -- احراز هویت با Passkey (WebAuthn) — تک‌کاربره، چنددستگاهی
 --   * فقط کلید عمومی passkey ذخیره می‌شود (هیچ کلید خصوصی/رمز)
 --   * از توکن نشست فقط هش SHA-256 ذخیره می‌شود

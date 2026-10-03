@@ -249,6 +249,36 @@ class AppDatabase extends Dexie {
       custodyPrefs: 'id',
       carSnapshots: 'id, day, dateTs'
     });
+    // v13: خودروهای وارداتی پلاک اروند (آگهی‌های دیوار + Snapshot روزانه) — فقط جدول جدید
+    this.version(13).stores({
+      priceCache: 'key, fetchedAt',
+      assetMeta: 'key, updatedAt',
+      settings: 'key',
+      fxRates: 'id, updatedAt',
+      watchlist: 'symbol, addedAt',
+      accAccounts: 'key',
+      accEntries: '++id, date, createdAt',
+      accLots: '++id, asset, openedAt',
+      accEvents: '++id, at',
+      vehicles: 'id',
+      vehicleSnapshots: 'id, dateTs',
+      realAssets: 'id, neighborhoodId',
+      realEstateSnapshots: 'id, dateTs',
+      tokenizedAssetRegistry: 'key, provider, status, underlyingSymbol, assetType, sourceRank, updatedAt',
+      tokenizedAssetSyncRuns: '++id, provider, sourceCategory, startedAt',
+      portfolioAssets: '++id, assetType, assetId, updatedAt',
+      dashboardSnapshots: '++id, timestamp, createdAt',
+      pmListings: 'token, city, scrapedAt',
+      pmSnapshots: 'id, dateTs, source',
+      custodyHoldings: 'id, kind, updatedAt',
+      custodyOperations: 'id, kind, status, occurredAt, updatedAt',
+      custodyNetworks: 'id',
+      custodyAssets: 'id, networkId',
+      custodyPrefs: 'id',
+      carSnapshots: 'id, day, dateTs',
+      arvandAds: 'token, region, lastSeenAt',
+      arvandSnapshots: 'id, dateTs'
+    });
   }
 }
 
