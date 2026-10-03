@@ -25,7 +25,7 @@ try {
   const { mapMarket } = await import('/src/features/boros/data/borosService.ts');
   const { borosRaw } = await import('/tests/fixtures/boros.ts');
   const now = Math.floor(Date.now() / 1000);
-  const m = { ...mapMarket(borosRaw, Date.now()), maturity: now + 19 * 86400, markApr: .08, floatingApr: .1, collateralSymbol: 'ETH', collateralPriceUsd: 3000, assetMarkPrice: 3000, status: 'GOOD', fundingHistory: Array.from({ length: 30 }, (_, i) => ({ ts: now - (30 - i) * 86400, c: .06 + i * .002 })), ohlcv: Array.from({ length: 30 }, (_, i) => ({ ts: now - (30 - i) * 86400, c: .08 + i * .001 })) };
+  const m = { ...mapMarket(borosRaw, Date.now()), maturity: now + 19 * 86400, markApr: .08, floatingApr: .1, collateralSymbol: 'ETH', collateralPriceUsd: 3000, assetMarkPrice: 3000, status: 'GOOD', volume24h: 100000, notionalOI: 100000, fundingHistory: Array.from({ length: 30 }, (_, i) => ({ ts: now - (30 - i) * 86400, c: .06 + i * .002 })), ohlcv: Array.from({ length: 30 }, (_, i) => ({ ts: now - (30 - i) * 86400, c: .08 + i * .001 })) };
   useBorosStore.setState({ markets: [m, { ...m, marketId: m.marketId + 1, venue: 'Binance' }], loadedAt: Date.now(), loading: true });
   const host = document.createElement('div');
   host.id = 'boros-qa'; host.dir = 'rtl'; host.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgb(var(--c-canvas));padding:20px;overflow:auto';
@@ -48,9 +48,30 @@ try {
    }
   }
  }
+ await host.getByRole('tab', { name: 'فرصت‌ها', exact: true }).click();
+ await host.getByLabel('سرمایه دلاری', { exact: true }).fill('۳۰۰');
+ await host.getByLabel('گس کل دوره', { exact: true }).fill('۰٫۵');
+ await host.getByLabel('ورود به بازار', { exact: true }).fill('۱');
+ assert((await host.innerText()).includes('سرمایه و هزینه‌ها را وارد کنید'));
+ await host.getByLabel('اثر نامطلوب اجرای نرخ', { exact: true }).fill('۰٫۲۲');
+ assert.equal(await host.getByLabel('اثر نامطلوب اجرای نرخ', { exact: true }).inputValue(), '0.22');
+ await host.getByRole('button', { name: 'بررسی این سناریو', exact: true }).waitFor();
+ for (const width of [320, 390, 1440]) {
+  await page.setViewportSize({ width, height: 900 });
+  const fit = await host.evaluate(el => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  assert(fit.scroll <= fit.client + 1, `capital planner overflow: ${width}`);
+ }
+ await host.evaluate(el => el.scrollTo(0, 0));
+ await page.screenshot({ path: '/tmp/darino-boros-planner-desktop.png' });
+ await page.setViewportSize({ width: 390, height: 844 });
+ await host.evaluate(el => el.scrollTo(0, 0));
+ await page.screenshot({ path: '/tmp/darino-boros-planner-mobile.png' });
+ await host.getByRole('button', { name: 'بررسی این سناریو', exact: true }).click();
+ assert(Number(await host.getByLabel('حجم واحد بازده', { exact: true }).inputValue()) > 0);
+ assert.equal(await host.getByLabel('سرمایه', { exact: true }).inputValue(), '300');
+ await host.getByRole('button', { name: 'بستن', exact: true }).click();
  await page.setViewportSize({ width: 390, height: 844 });
  await host.getByRole('tab', { name: 'شبیه‌ساز', exact: true }).click();
- await host.getByRole('radio', { name: 'تحلیل ورود', exact: true }).click();
  const quantity = host.getByLabel('حجم واحد بازده', { exact: true });
  await quantity.fill(''); await quantity.pressSequentially('0.65', { delay: 40 });
  await page.waitForTimeout(100);
@@ -78,5 +99,5 @@ try {
  await page.setViewportSize({ width: 390, height: 844 });
  await page.screenshot({ path: '/tmp/darino-boros-preview-mobile.png' });
  assert.deepEqual(errors, []);
- console.log('PASS: 5 Boros tabs at 320/390/1440px in light/dark; decimal typing, native collateral units, manual entry costs, allocated YU size and forecast labels. PWA layout uses the same responsive surfaces; installation is not tested.');
+ console.log('PASS: 5 Boros tabs at 320/390/1440px in light/dark; decimal typing, native collateral units, manual entry costs, allocated YU size, capital ranking/cost completeness/scenario transfer and forecast labels. PWA layout uses the same responsive surfaces; installation is not tested.');
 } finally { await browser.close(); }

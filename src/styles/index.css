@@ -491,3 +491,25 @@
 @media (max-width: 639px) {
   .darino-surface.p-6, .darino-surface.p-8 { padding: 16px; }
 }
+
+/* Boros: a compact, shared desktop/PWA workspace. */
+.boros-workspace { --boros-radius: 18px; }
+.boros-workspace .darino-surface { border-radius: var(--boros-radius); }
+.boros-workspace [role="tablist"] { margin-inline: 0; padding: 5px; gap: 3px; border: 1px solid rgb(var(--c-divider)); border-radius: 14px; background: rgb(var(--c-card)); }
+.boros-workspace [role="tablist"] button { min-height: 44px; border-radius: 10px; border-bottom: 0; padding-inline: 15px; }
+.boros-workspace [role="tablist"] button[aria-selected="true"] { background: rgb(var(--c-brand-500) / .1); }
+.boros-planner-grid { display: grid; gap: 16px; }
+.boros-best-card { background-image: radial-gradient(ellipse at 100% 0%, rgb(78 136 244 / .13), transparent 65%), radial-gradient(ellipse at 0% 100%, rgb(30 181 143 / .09), transparent 60%); }
+.boros-market-card { transition: border-color .18s ease; }
+.boros-market-card:hover { border-color: rgb(var(--c-brand-500) / .4); }
+.boros-workspace input, .boros-workspace select { min-width: 0; }
+.boros-workspace details > summary { min-height: 44px; }
+@media (min-width: 1024px) { .boros-planner-grid { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); align-items: stretch; } }
+@media (max-width: 480px) {
+  .boros-workspace { --boros-radius: 16px; }
+  .boros-workspace .grid { column-gap: 12px; }
+  .boros-workspace [role="tablist"] button { padding-inline: 12px; }
+  .boros-workspace input, .boros-workspace select { font-size: 16px; }
+  .boros-best-card { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .boros-market-card { transition: none; } }

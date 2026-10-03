@@ -49,7 +49,7 @@ export default function BorosDashboard() {
   const header = (
     <PageHeader
       title="تحلیل بوروس"
-      subtitle="تحلیل و شبیه‌سازی نرخ تأمین مالی"
+
       meta={
         markets.length > 0 ? (
           <FreshnessBar
@@ -69,6 +69,7 @@ export default function BorosDashboard() {
 
   return (
     <Page>
+      <div className="boros-workspace space-y-5">
       {header}
 
       {!error && stale && (
@@ -99,7 +100,7 @@ export default function BorosDashboard() {
         </div>
       )}
 
-      <Notice tone="neutral">سناریوی سررسید؛ هزینه‌های شخصی را در تحلیل ورود وارد کنید.</Notice>
+
 
       <div className="space-y-6">
         <Tabs<Tab> label="بخش‌های بوروس" options={TABS} value={tab} onChange={setTab} />
@@ -112,6 +113,7 @@ export default function BorosDashboard() {
         {tab === 'risk' && <RiskMonitorTab markets={activeMarkets} />}
         {tab === 'audit' && <AuditTab markets={activeMarkets} />}
       </div>
+    </div>
     </Page>
   );
 }

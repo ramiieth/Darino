@@ -124,3 +124,9 @@ it('sends actual Boros PnL and preview without identifiers or double-counting da
  expect(context.sections.find(s=>s.key==='dashboard')!.rows[0].metrics.totalUsd).toBeNull();
  expect(JSON.stringify(context)).not.toContain(root);expect(JSON.stringify(context)).not.toContain(handle);
 });
+
+it('exports capital plan as hypothetical and expires its execution assumptions', () => {
+ useAssistantInsights.setState({ rows: { borosCapitalPlan: [{ name: 'بیشترین خالص تخمینی', kind: 'borosCapitalPlan', source: 'simulation', status: 'ready', asOf: NOW - 181000, metrics: { capitalUsd: 300, projectedNetUsd: 25, assumedExecutionApr: .0862, estimatedLiquidationApr: .01 } }] } });
+ const rows = appContextSchema.parse(buildAppContext(empty(), NOW)).sections.find(s => s.key === 'boros')!.rows;
+ expect(rows.find(r => r.kind === 'borosCapitalPlan')).toMatchObject({ source: 'simulation', status: 'stale', metrics: { capitalUsd: 300, projectedNetUsd: 25, assumedExecutionApr: .0862 } });
+});

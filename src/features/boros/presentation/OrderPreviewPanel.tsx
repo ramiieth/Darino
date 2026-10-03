@@ -19,21 +19,22 @@ import type { BorosDirection, BorosMarket } from '../domain/types';
 const optionalNumber = (s: string) => /^\d+(?:\.\d*)?$|^\.\d+$/.test(s) ? Number(s) : null;
 const STATE_FA = { unavailable: 'داده تازه یا بازار فعال در دسترس نیست', incomplete: 'هزینه‌ها را تکمیل کنید', underfunded: 'سرمایه کافی نیست', negative: 'سود پایه مثبت نیست', positive: 'سناریوهای بررسی‌شده مثبت‌اند', conditional: 'فرصت مشروط' };
 
-export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket }: {
+export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr, collateralPriceUsd, markets = [], onSelectMarket, initial }: {
   market: BorosMarket; direction: BorosDirection; fixedRate: number | null; underlyingApr: number; collateralPriceUsd: number;
+  initial?: { sizeYu: number; capitalUsd: number; feesUsd: number; gasUsd: number; slippageUsd: number };
   markets?: BorosMarket[];
   onSelectMarket?: (marketId: number, direction: BorosDirection) => void;
 }) {
-  const [notional, setNotional] = useState('2');
+  const [notional, setNotional] = useState(initial ? String(initial.sizeYu) : '2');
   const [quote,setQuote]=useState<OfficialPreview|null>(null);
   const quoted=quote&&quote.marketId===market.marketId&&quote.side===direction&&quote.matchedSize===Number(notional)&&Date.now()-quote.fetchedAt<180000?quote:null;
   const effectiveRate=quoted?.matchedApr??fixedRate;
   useEffect(()=>{if(!quote)return;const t=setTimeout(()=>setQuote(null),Math.max(0,180000-(Date.now()-quote.fetchedAt)));return()=>clearTimeout(t);},[quote]);
-  const [collateral, setCollateral] = useState('');
-  const [capitalUnit, setCapitalUnit] = useState('asset');
-  const [gas, setGas] = useState('');
-  const [slippage, setSlippage] = useState('');
-  const [fees, setFees] = useState('');
+  const [collateral, setCollateral] = useState(initial ? String(initial.capitalUsd) : '');
+  const [capitalUnit, setCapitalUnit] = useState(initial ? 'usd' : 'asset');
+  const [gas, setGas] = useState(initial ? String(initial.gasUsd) : '');
+  const [slippage, setSlippage] = useState(initial ? String(initial.slippageUsd) : '');
+  const [fees, setFees] = useState(initial ? String(initial.feesUsd) : '');
   const [margin, setMargin] = useState('');
   const [allocation, setAllocation] = useState('50');
   const [floating, setFloating] = useState('');

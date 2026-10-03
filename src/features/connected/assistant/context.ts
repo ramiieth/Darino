@@ -118,7 +118,7 @@ export function buildAppContext(p: ConnectedPortfolio, now = Date.now(), activit
             return insight(`${borosAssetName(m.asset)} · ${borosVenueName(m.venue)}`, `${direction === 'long' ? 'لانگ' : 'شورت'} · ${direction === 'long' ? a.statusLong : a.statusShort} · وثیقه ${tokenName(m.collateralSymbol ?? '')}`, metrics, 'api', boros.stale || a.freshness.stale ? 'stale' : !a.valid || m.status !== 'GOOD' ? 'unavailable' : 'partial', m.snapshotAt ?? boros.loadedAt);
         });
     });
-    borosRows.push(...(useAssistantInsights.getState().rows.borosEntry ?? []), ...(useAssistantInsights.getState().rows.borosOfficialPreview ?? []).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>180000?'stale' as const:r.status})));
+    borosRows.push(...(useAssistantInsights.getState().rows.borosCapitalPlan ?? []).map(r => ({ ...r, status: r.asOf !== null && now - r.asOf > 180000 ? 'stale' as const : r.status })), ...(useAssistantInsights.getState().rows.borosEntry ?? []), ...(useAssistantInsights.getState().rows.borosOfficialPreview ?? []).map(r=>({...r,status:r.asOf!==null&&now-r.asOf>180000?'stale' as const:r.status})));
     const accountState=useBorosAccount.getState(); const account=accountState.data;
     const realRows:InsightRow[]=[];
     if(account){
