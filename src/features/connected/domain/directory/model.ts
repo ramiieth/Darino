@@ -1,3 +1,4 @@
+import { toFaDigits } from '@/shared/utils/formatters';
 import { safeLogoSrc } from '@/shared/lib/logoSources';
 import { CHAIN_NAME_FA,llamaChainLogo } from '@/features/custody/data/chainDirectory';
 import { protocolNames,identityKey,retiredProtocols,retiredChains } from './names';
@@ -13,7 +14,7 @@ export function normalizeMetadata(protocols:unknown,chains:unknown,at=Date.now()
  if(stopped(r)||keys.some(k=>retiredProtocols.has(k))){blockedProtocols.add(identityKey(slug));blockedProtocols.add(identityKey(name));continue;}
  const key=keys.find(k=>protocolNames[k]),logo=safeLogoSrc(typeof r.logo==='string'?r.logo:null);if(!key||!logo)continue;
  const aliases=[...new Set([identityKey(slug),identityKey(name),key,...(r.parentProtocol?[identityKey(String(r.parentProtocol).replace(/^parent#/,''))]:[])])];
- protocolRows.push({slug,name,nameFa:protocolNames[key],logo,aliases,tvl:typeof r.tvl==='number'&&Number.isFinite(r.tvl)?r.tvl:0});
+ protocolRows.push({slug,name,nameFa:protocolNames[key]+((name.match(/\bv\s*(\d+)\b/i)??slug.match(/-v(\d+)(?:-|$)/i))?` · نسخهٔ ${toFaDigits((name.match(/\bv\s*(\d+)\b/i)??slug.match(/-v(\d+)(?:-|$)/i))![1])}`:''),logo,aliases,tvl:typeof r.tvl==='number'&&Number.isFinite(r.tvl)?r.tvl:0});
  }
  const chainRows:ChainInfo[]=[];
  for(const raw of Array.isArray(chains)?chains:[]){if(!raw||typeof raw!=='object')continue;const r=raw as Record<string,unknown>,name=String(r.name??''),key=identityKey(name);if(stopped(r)||retiredChains.has(key)){blockedChains.add(key);blockedChains.add(identityKey(chainIds[name]??name.toLowerCase().replace(/\s+/g,'-')));continue;}if(!CHAIN_NAME_FA[name]||typeof r.tvl!=='number'||r.tvl<=0)continue;

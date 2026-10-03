@@ -50,7 +50,7 @@ export function AssetPicker({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{value.nameFa}</p>
             <p className="text-2xs font-semibold text-muted">
-              <bdi dir="ltr">{value.symbol}</bdi> · {ASSET_CLASS_LABELS[value.kind]}
+              {ASSET_CLASS_LABELS[value.kind]}
             </p>
           </div>
           <Button variant="ghost" size="sm" className="text-accent" onClick={() => setBrowsing(true)}>
@@ -94,7 +94,7 @@ export function AssetPicker({
                 <AssetLogo symbol={a.symbol} kind={kindForLogo(a.kind)} size={28} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink">{a.nameFa}</span>
-                  <span className="block text-2xs font-semibold text-muted"><bdi dir="ltr">{a.symbol}</bdi></span>
+
                 </span>
                 {active ? <Check aria-hidden className="h-4 w-4 shrink-0 text-accent" /> : compact && <Badge tone="neutral">افزودن</Badge>}
               </button>

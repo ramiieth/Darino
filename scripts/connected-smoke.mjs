@@ -92,7 +92,7 @@ try {
  await page.screenshot({path:'/tmp/darino-reference-portfolio-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('button',{name:'نمایش همهٔ تراکنش‌ها',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#portfolio-tab-activity')?.getAttribute('aria-selected')==='true');assert.equal(await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).getAttribute('aria-selected'),'true');
- await page.locator('main').getByText('یونی‌سواپ',{exact:true}).first().waitFor();await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
+ await page.locator('main').getByText('یونی‌سواپ · نسخهٔ ۳',{exact:true}).first().waitFor();await fits();await page.screenshot({path:'/tmp/darino-clean-transactions.png',fullPage:true});
  await page.getByRole('button',{name:'جزئیات دریافت · کیف آزمایشی',exact:true}).click();
  await page.screenshot({path:'/tmp/darino-native-transaction-sheet.png',fullPage:true});
  await page.keyboard.press('Escape');
@@ -122,11 +122,14 @@ try {
  assert.equal(await picker.getByText('NOLOGO',{exact:true}).count(),0);
  await picker.getByRole('searchbox',{name:'جستجوی رمزارز'}).pressSequentially('اتریوم');
  assert.equal(await picker.getByRole('searchbox',{name:'جستجوی رمزارز'}).inputValue(),'اتریوم');
- assert.equal(await picker.getByRole('button',{name:'انتخاب اتر رپ شده · WETH',exact:true}).count(),0);
+ assert.equal(await picker.getByRole('button',{name:'انتخاب اتر رپ شده',exact:true}).count(),0);
  await picker.getByRole('searchbox',{name:'جستجوی رمزارز'}).fill('');
  await page.screenshot({path:'/tmp/darino-asset-picker.png',fullPage:true});
- await picker.getByRole('button',{name:'انتخاب اتریوم · ETH',exact:true}).click();
- await costSection.locator('input').nth(0).fill('0.300000000000000001');
+ await picker.getByRole('button',{name:'انتخاب اتریوم',exact:true}).click();
+ const quantityInput=costSection.getByRole('textbox',{name:'مقدار خرید',exact:true});
+ for(const value of ['۰.۶۵','۰٫۶۵','٠٫٦٥','0,65']){await quantityInput.fill(value);assert.equal(await quantityInput.inputValue(),'0.65');}
+ await quantityInput.fill('');await quantityInput.pressSequentially('۰.۶۵');assert.equal(await quantityInput.inputValue(),'0.65');
+ await quantityInput.fill('0.300000000000000001');
  await costSection.locator('input').nth(1).fill('2000');
  await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
  const calendar=page.getByRole('dialog',{name:'تاریخ خرید',exact:true});
@@ -135,6 +138,10 @@ try {
  await costSection.getByRole('button',{name:'تاریخ خرید',exact:true}).click();
  await page.getByRole('dialog',{name:'تاریخ خرید',exact:true}).getByRole('button',{name:'امروز',exact:true}).click();
  await costSection.getByRole('button',{name:'ثبت خرید',exact:true}).click();await page.locator('summary').filter({hasText:'خریدها'}).first().waitFor();
+ await page.locator('summary').filter({hasText:'خریدها'}).first().click();await page.getByRole('button',{name:'اصلاح',exact:true}).first().click();
+ const editCost=page.getByRole('dialog',{name:'اصلاح خرید',exact:true});assert.equal(await editCost.getByRole('textbox',{name:'مقدار خرید',exact:true}).inputValue(),'0.300000000000000001');
+ await editCost.getByRole('textbox',{name:'مقدار خرید',exact:true}).fill('۰٫۶۵');await editCost.getByRole('button',{name:'ذخیرهٔ اصلاح',exact:true}).click();
+ await page.getByRole('button',{name:'اصلاح',exact:true}).first().click();assert.equal(await page.getByRole('dialog',{name:'اصلاح خرید',exact:true}).getByRole('textbox',{name:'مقدار خرید',exact:true}).inputValue(),'0.65');await page.keyboard.press('Escape');
  await fits();await page.screenshot({path:'/tmp/darino-cost-mobile.png',fullPage:true});
  await page.evaluate(()=>location.hash='#/holdings');await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'تراکنش‌ها',exact:true}).getAttribute('aria-selected'),'true');assert.equal(await page.getByRole('link',{name:'دارایی و فعالیت شبکه‌ای',exact:true}).count(),0);await page.getByText('تطبیق انتقال‌های نیازمند بررسی',{exact:true}).waitFor();await fits();
  await page.getByRole('tab',{name:'دارایی‌ها',exact:true}).click();await page.getByRole('button',{name:'انتخاب شبکه',exact:true}).click();
@@ -146,12 +153,12 @@ try {
  await arcusForm.getByLabel('آدرس عمومی کیف پول',{exact:true}).fill(address);
  await arcusForm.getByLabel('شمارهٔ زیرحساب',{exact:true}).fill('0');
  await arcusForm.getByRole('button',{name:'ذخیره',exact:true}).click();
- await page.getByText('اعتبار تسویهٔ پرپچوال · USDG',{exact:true}).waitFor();
+ await page.getByText('یو اس دی جی',{exact:true}).first().waitFor();
  await fits();await page.screenshot({path:'/tmp/darino-arcus-perp-native.png',fullPage:true});
  await page.getByRole('tab',{name:'اسپات',exact:true}).click();
  await page.getByText('مبنای موجودی',{exact:true}).waitFor();
- await page.waitForFunction(()=>document.querySelector('main')?.innerText.includes('WETH'));
- assert((await page.locator('main').innerText()).includes('WETH'));await fits();
+ await page.waitForFunction(()=>document.querySelector('main')?.innerText.includes('اتر رپ شده'));
+ assert((await page.locator('main').innerText()).includes('اتر رپ شده'));await fits();
  await page.screenshot({path:'/tmp/darino-spot-mobile.png',fullPage:true});
  const routes=['/','/dashboard','/wallets','/assistant','/simulation','/defi','/boros','/accounting','/holdings','/arcus','/calculators','/vehicle','/realestate','/security'];
  for(const theme of ['light','dark']) {
@@ -177,7 +184,7 @@ try {
  await page.evaluate(()=>location.hash='#/dashboard');await page.waitForTimeout(450);
  await page.screenshot({path:'/tmp/darino-native-pwa.png',fullPage:true});
  console.log('PASS: iOS standalone PWA layouts at 320/390px.');
- await page.evaluate(()=>location.hash='#/defi');await page.getByRole('heading',{name:'اتریوم',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'بلست',exact:true}).count(),0);await fits();await page.screenshot({path:'/tmp/darino-defi-mobile.png',fullPage:true});await page.getByRole('tab',{name:'پروتکل‌ها',exact:true}).click();await page.getByRole('heading',{name:'آوه',exact:true}).waitFor();await fits();
+ await page.evaluate(()=>location.hash='#/defi');await page.getByRole('heading',{name:'اتریوم',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'بلست',exact:true}).count(),0);await fits();await page.screenshot({path:'/tmp/darino-defi-mobile.png',fullPage:true});await page.getByRole('tab',{name:'پروتکل‌ها',exact:true}).click();await page.getByRole('heading',{name:'آوه · نسخهٔ ۳',exact:true}).waitFor();await fits();
  quotaWallet=true;await page.evaluate(()=>location.hash='#/dashboard');await page.reload();await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();await page.locator('summary').filter({hasText:'وضعیت همگام‌سازی'}).click();await page.getByText(/سهمیهٔ روزانهٔ زریون تمام شده/).first().waitFor();assert(/[1۱][,٬][3۳][0۰][0۰]/.test(await page.locator('main').innerText()),'persisted wallet disappeared after reload and quota');await fits();console.log('PASS: cached wallet survives reload and daily quota; Monad/Plasma and Persian protocol identity present.');
  assert.deepEqual(errors,[]);
  console.log('PASS: minimal management → rename → transactions → stale retention → AI privacy → manual simulation → cost migration → purchase cost → legacy route redirect → Arcus spot; 14 routes at 320/390/1440px fit in light and dark themes.');

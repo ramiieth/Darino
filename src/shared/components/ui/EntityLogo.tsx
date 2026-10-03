@@ -22,8 +22,8 @@ function Letters({ text, size, square }: { text: string; size: number; square?: 
     <span
       aria-hidden
       className={cn(
-        'flex shrink-0 items-center justify-center bg-surface-2 font-bold text-muted ring-1 ring-divider',
-        square ? 'rounded-[28%]' : 'rounded-full'
+        'flex shrink-0 items-center justify-center bg-surface-2 font-bold text-muted',
+        'rounded-full overflow-hidden'
       )}
       style={{ width: size, height: size, fontSize: Math.max(8, size * 0.36) }}
     >
@@ -36,7 +36,7 @@ export function LogoImage({
   src,
   label,
   size = 28,
-  square = false,
+  square: _square = false,
   className
 }: {
   src: string | null | undefined;
@@ -46,17 +46,17 @@ export function LogoImage({
   square?: boolean;
   className?: string;
 }) {
-  size = Math.round(size * 0.92);
+  size = Math.round(size * 0.96);
   const safe = safeLogoSrc(src);
   const [failed, setFailed] = useState<string|null>(null);
   if (!safe || failed===safe) {
     return (
       <span role="img" aria-label={label} className={cn('inline-flex', className)}>
-        <Letters text={label} size={size} square={square} />
+        <Letters text={label} size={size} square={_square} />
       </span>
     );
   }
-  return <span className={cn('inline-flex shrink-0 items-center justify-center bg-white ring-1 ring-divider',square?'rounded-[28%]':'rounded-full',className)} style={{width:size,height:size,backgroundColor:safe==='/logos/chain-4663.svg'?'#C3F53C':undefined}}><img src={safe} alt={label} width={size} height={size} loading="lazy" decoding="async" referrerPolicy="no-referrer" title={label} onError={()=>setFailed(safe)} className="max-h-full max-w-full object-contain" style={{width:size,height:size,padding:safe==='/logos/chain-4663.svg'?Math.max(1,Math.round(size*.12)):undefined}}/></span>;
+  return <span className={cn('entity-logo inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white',className)} style={{width:size,height:size,backgroundColor:safe==='/logos/chain-4663.svg'?'#C3F53C':undefined}}><img src={safe} alt={label} width={size} height={size} loading="lazy" decoding="async" referrerPolicy="no-referrer" title={label} onError={()=>setFailed(safe)} className="max-h-full max-w-full rounded-full object-contain" style={{width:size,height:size,padding:safe==='/logos/chain-4663.svg'?Math.max(1,Math.round(size*.12)):undefined}}/></span>;
 
 }
 
@@ -76,13 +76,13 @@ export function TokenLogo({
   networkName?: string | null;
   size?: number;
 }) {
-  const badge = Math.max(12, Math.round(size * 0.44));
+  const badge = Math.max(18, Math.round(size * 0.54));
   const alt = networkName ? `${name ?? symbol} روی ${networkName}` : name ?? symbol;
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: Math.round(size*.92), height: Math.round(size*.92) }} role="img" aria-label={alt}>
-      <LogoImage src={logo} label={symbol} size={size} />
+    <span className="relative inline-flex shrink-0" style={{ width: Math.round(size*.96), height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt}>
+      <LogoImage src={logo} label={name ?? symbol} size={size} />
       {networkName !== undefined && networkName !== null && (
-        <span className="absolute -bottom-0.5 -end-0.5 rounded-full bg-card p-px">
+        <span className="token-network-badge rounded-full bg-card p-px" style={{position:'absolute',bottom:-5,right:-4,lineHeight:0}}>
           <LogoImage src={networkLogo} label={networkName} size={badge} square />
         </span>
       )}

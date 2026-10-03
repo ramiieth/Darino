@@ -62,7 +62,7 @@ export function LlamaLogo({
       loading="lazy"
       onError={() => setFailed(true)}
       className={cn(
-        'shrink-0 rounded-full bg-card object-contain ring-1 ring-divider',
+        'shrink-0 rounded-full bg-card object-contain ',
         className
       )}
       style={{ width: size, height: size }}

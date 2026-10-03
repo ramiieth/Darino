@@ -224,7 +224,7 @@ export function DcaCalculator() {
             pdfTitle={`گزارش خرید دوره‌ای — ${asset.symbol}`}
             pdfSections={[
               {
-                heading: `سرمایه‌گذاری دوره‌ای ${asset.nameFa} (${asset.symbol})`,
+                heading: `سرمایه‌گذاری دوره‌ای ${asset.nameFa}`,
                 table: {
                   headers: ['موارد', 'مقدار'],
                   rows: [

@@ -129,7 +129,7 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                             <span className="min-w-0">
                               <span className="block max-w-[11rem] truncate font-semibold text-ink">{row.nameFa}</span>
                               <span className="block text-2xs font-semibold text-muted">
-                                <bdi dir="ltr">{row.symbol}</bdi>
+
                                 {row.source === 'snapshot' && <span className="text-warn"> · {t('snapshot')}</span>}
                               </span>
                             </span>
@@ -169,7 +169,7 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-ink">{row.nameFa}</span>
                           <span className="block text-2xs text-muted">
-                            <bdi dir="ltr">{row.symbol}</bdi> · {t('colCurrentPrice')} <Price row={row} v={row.currentPrice} />
+                             · {t('colCurrentPrice')} <Price row={row} v={row.currentPrice} />
                           </span>
                         </span>
                         <span className="shrink-0 text-end">

@@ -10,6 +10,7 @@
  *
  * These components format; they never compute business values.
  */
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 import type { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight, Clock3, Minus } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
@@ -75,12 +76,11 @@ export function UsdText({ value, compact = false, signed = false, className }: {
   const abs = Math.abs(value);
   const sign = value > 0 ? (signed ? '+' : '') : value < 0 ? '-' : '';
   const body = signed ? (compact ? fmtCompactFa(abs) : toFaDigits(abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))) : fmtUsdNumber(abs, compact);
+  const [number, ...scale] = body.split(' ');
   return (
-    <span className={cn('inline-flex items-baseline gap-1', className)}>
-      <bdi dir="ltr" className="num-ltr">
-        {sign}
-        {body}
-      </bdi>
+    <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
+      <bdi dir="ltr" className="num-ltr">{sign}{number}</bdi>
+      {scale.length > 0 && <span>{scale.join(' ')}</span>}
       <span className="text-[0.62em] font-medium opacity-70">دلار</span>
     </span>
   );
@@ -217,9 +217,9 @@ export function QuantityValue({
       ? fmtNumLatin(value)
       : toFaDigits(value.toLocaleString('en-US', { maximumFractionDigits: digits }));
   return (
-    <span className={cn('num-ltr', className)}>
-      {text}
-      {unit && <span className="ms-1 text-muted">{unit}</span>}
+    <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
+      <bdi dir="ltr">{text}</bdi>
+      {unit && <span className="text-muted">{persianAssetName(unit)}</span>}
     </span>
   );
 }

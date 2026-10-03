@@ -59,9 +59,7 @@ function MoverList({
             <AssetLogo symbol={r.coin.symbol} kind={r.coin.kind} size={28} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{r.coin.nameFa}</p>
-              <p className="text-2xs font-semibold text-muted">
-                <bdi dir="ltr">{r.coin.symbol}</bdi>
-              </p>
+
             </div>
             <PercentValue value={r.pct} className="shrink-0 text-sm font-semibold" />
           </li>

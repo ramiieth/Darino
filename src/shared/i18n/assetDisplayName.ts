@@ -80,8 +80,12 @@ export const ASSET_NAME_FA: Record<string, string> = {
 
   /* ---------- استیبل‌کوین ---------- */
   USDT: 'تتر',
+  USDT0: 'تتر',
+  'USD₮0': 'تتر',
+  MON: 'موناد',
+  XPL: 'پلاسما',
   USDC: 'یو‌اس‌دی‌سی',
-  USDG: 'دلار جهانی',
+  USDG: 'یو اس دی جی',
   EURC: 'یورو کوین',
   DAI: 'دای',
   USDE: 'یو‌اس‌دی‌ای',
@@ -156,4 +160,12 @@ export function hasAssetNameFa(symbol: string): boolean {
 export function assetSearchText(symbol: string, fallbackName?: string | null): string {
   const d = assetDisplayName(symbol, fallbackName);
   return `${d.ticker} ${d.name} ${fallbackName ?? ''}`.toLowerCase();
+}
+
+/** Display spelling for unknown tickers; never changes provider or database identifiers. */
+const LETTER_FA:Record<string,string>={A:'ای',B:'بی',C:'سی',D:'دی',E:'ای',F:'اف',G:'جی',H:'اچ',I:'آی',J:'جی',K:'کی',L:'ال',M:'ام',N:'ان',O:'او',P:'پی',Q:'کیو',R:'آر',S:'اس',T:'تی',U:'یو',V:'وی',W:'دبلیو',X:'ایکس',Y:'وای',Z:'زد'};
+export function persianAssetName(symbol:string,fallback?:string|null):string {
+ const d=assetDisplayName(symbol,fallback);
+ if(d.rtl)return d.name;
+ return (symbol??'').toUpperCase().split('').map(c=>LETTER_FA[c]??c.replace(/[0-9]/g,n=>'۰۱۲۳۴۵۶۷۸۹'[Number(n)])).join(' ').trim()||'دارایی';
 }

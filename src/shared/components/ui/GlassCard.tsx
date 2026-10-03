@@ -32,7 +32,7 @@ export const Surface = forwardRef<HTMLDivElement, SurfaceProps>(
   ({ className, variant = 'raised', animated = false, as = 'div', ...props }, ref) => {
     // semantic element choice only — all share HTMLElement behaviour
     const Tag = as as 'div';
-    return <Tag ref={ref} className={cn(VARIANT[variant], animated && 'anim-fade-in', className)} {...props} />;
+    return <Tag ref={ref} className={cn('darino-surface min-w-0', VARIANT[variant], animated && 'anim-fade-in', className)} {...props} />;
   }
 );
 Surface.displayName = 'Surface';

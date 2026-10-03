@@ -43,6 +43,8 @@ export function Sheet({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   const dragRef = useRef<{ startY: number; dy: number } | null>(null);
   const titleId = useId();
   const descId = useId();
@@ -61,7 +63,7 @@ export function Sheet({
       if(activeSheets[activeSheets.length-1]!==panel)return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        closeRef.current();
         return;
       }
       if (e.key === 'Tab' && panelRef.current) {
@@ -86,15 +88,16 @@ export function Sheet({
     };
 
     window.addEventListener('keydown', onKey);
-    requestAnimationFrame(() => panelRef.current?.focus());
+    const focusFrame = requestAnimationFrame(() => {if(activeSheets[activeSheets.length-1]===panel)panel.focus();});
     return () => {
+      cancelAnimationFrame(focusFrame);
       window.removeEventListener('keydown', onKey);
       const top=activeSheets[activeSheets.length-1]===panel;
       const index=activeSheets.indexOf(panel);if(index>=0)activeSheets.splice(index,1);
       if(!activeSheets.length)document.body.style.overflow=originalOverflow;
       if(top&&previous?.isConnected)previous.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

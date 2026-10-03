@@ -1,3 +1,4 @@
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * Command palette (Ctrl/⌘K) — jump to any section or find an asset.
  * Combobox + listbox semantics, arrow/enter/escape, focus restore.
@@ -182,8 +183,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             <AssetLogo symbol={e.symbol} kind={e.kind} size={32} />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold text-ink">{e.nameFa}</span>
-              <span className="block text-2xs font-semibold text-muted"><bdi dir="ltr">
-                {e.symbol}
+              <span className="block text-2xs font-semibold text-muted"><bdi dir="rtl">
+                {persianAssetName(e.symbol)}
               </bdi></span>
             </span>
             <span className="num-ltr shrink-0 text-sm font-semibold text-ink">{fmtUSD(e.price)}</span>

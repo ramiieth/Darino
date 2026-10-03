@@ -2,8 +2,8 @@
 export const APPROVED_NETWORKS = [
  {id:'ethereum',name:'اتریوم',llama:'Ethereum',logo:'/logos/chain-1.svg'},
  {id:'base',name:'بیس',llama:'Base',logo:'/logos/chain-8453.svg'},
- {id:'arbitrum',name:'آربیتروم',llama:'Arbitrum',logo:'/logos/chain-42161.png'},
- {id:'polygon',name:'پالیگان',llama:'Polygon',logo:'/logos/chain-137.jpg'},
+ {id:'arbitrum',name:'آربیتروم',llama:'Arbitrum',logo:'/logos/chain-arbitrum.svg'},
+ {id:'polygon',name:'پالیگان',llama:'Polygon',logo:'/logos/chain-polygon.svg'},
  {id:'binance-smart-chain',name:'بی‌ان‌بی چین',llama:'BSC',logo:'/logos/chain-56.svg'},
  {id:'optimism',name:'اپتیمیزم',llama:'OP Mainnet',logo:'/logos/chain-10.png'},
  {id:'hyperevm',name:'هایپر ای‌وی‌ام',llama:'Hyperliquid',logo:'/logos/chain-999.png'},

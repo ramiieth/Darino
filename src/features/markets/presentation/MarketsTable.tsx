@@ -326,7 +326,7 @@ function Logo({ src, symbol, size = 28 }: { src: string | null; symbol: string; 
   if (!small) {
     return (
       <span
-        className="flex shrink-0 items-center justify-center rounded-full bg-surface-2 text-2xs font-bold text-muted ring-1 ring-divider"
+        className="flex shrink-0 items-center justify-center rounded-full bg-surface-2 text-2xs font-bold text-muted "
         style={{ width: size, height: size }}
       >
         {symbol.slice(0, 2)}
@@ -335,13 +335,13 @@ function Logo({ src, symbol, size = 28 }: { src: string | null; symbol: string; 
   }
   return (
     <img
-      src={small}
+      src={/^(POL|MATIC)$/i.test(symbol)?'/logos/chain-polygon.svg':small}
       alt=""
       loading="lazy"
       decoding="async"
       width={size}
       height={size}
-      className="shrink-0 rounded-full bg-card object-contain ring-1 ring-divider"
+      className="shrink-0 rounded-full bg-card object-contain "
       style={{ width: size, height: size }}
     />
   );
@@ -420,7 +420,7 @@ function MarketDetailSheet({
       open
       onClose={onClose}
       title={d.name}
-      description={`${asset.symbol} · ${SOURCE_FA[asset.source]}`}
+      description={SOURCE_FA[asset.source]}
       size="sm"
       footer={
         <Button variant={watched ? 'outline' : 'secondary'} className="w-full" icon={<Star className={cn(watched && 'fill-current')} />} onClick={onWatch}>

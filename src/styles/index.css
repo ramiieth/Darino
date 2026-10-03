@@ -440,7 +440,7 @@
   .activity-native-row { min-height: 88px; }
 }
 @media (display-mode: standalone) {
-  .native-portfolio-hero, .native-wallet-card { border-radius: 22px; }
+  .native-portfolio-hero, .native-wallet-card { border-radius: 18px; }
   .activity-native-row { padding-block: 14px; }
   .native-activity-explorer { overscroll-behavior-y: contain; }
   .asset-value { line-height: 1.35; }
@@ -450,7 +450,7 @@
 
 /* iOS standalone fallback uses the same install detection as the app shell. */
 [data-installed-pwa="true"] .native-portfolio-hero,
-[data-installed-pwa="true"] .native-wallet-card { border-radius: 22px; }
+[data-installed-pwa="true"] .native-wallet-card { border-radius: 18px; }
 [data-installed-pwa="true"] .activity-native-row { padding-block: 14px; }
 [data-installed-pwa="true"] .native-activity-explorer { overscroll-behavior-y: contain; }
 [data-installed-pwa="true"] .asset-value { line-height: 1.35; }
@@ -472,3 +472,22 @@
 
 .wallet-management-list, .wallet-management-row { -webkit-tap-highlight-color: transparent; }
 .wallet-management-row button { min-width: 44px; min-height: 44px; touch-action: manipulation; }
+
+/* Shared density and identity rules for web and installed PWA. */
+.persian-amount { direction: rtl; unicode-bidi: isolate; }
+.entity-logo { border: 0; box-shadow: none; }
+.assistant-message { min-width: 0; overflow-wrap: anywhere; border-radius: 16px; padding: 16px; }
+.assistant-answer { border: 1px solid rgb(var(--c-brand-500) / .22); background: linear-gradient(145deg, rgb(var(--c-brand-500) / .055), rgb(var(--c-card))); }
+.assistant-question { margin-inline-start: 12%; background: rgb(var(--c-surface-2) / .8); }
+.assistant-response p, .assistant-response li { overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  .assistant-message { padding: 14px; border-radius: 14px; }
+  .wallet-management-row { min-height: 64px; }
+}
+[data-installed-pwa="true"] .assistant-chat { border-radius: 18px; }
+[data-installed-pwa="true"] .assistant-message { padding: 14px; }
+
+.darino-surface.p-6, .darino-surface.p-8 { padding: 20px; }
+@media (max-width: 639px) {
+  .darino-surface.p-6, .darino-surface.p-8 { padding: 16px; }
+}
