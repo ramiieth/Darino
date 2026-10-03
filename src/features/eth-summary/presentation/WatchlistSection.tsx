@@ -95,9 +95,7 @@ export function WatchlistSection() {
                 <AssetLogo symbol={r.symbol} kind={r.kind} size={32} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-ink">{r.nameFa}</p>
-                  <p className="text-2xs font-semibold text-muted">
-                    <bdi dir="ltr">{r.symbol}</bdi>
-                  </p>
+
                 </div>
                 <div className="shrink-0 text-end">
                   <p className="text-sm font-semibold text-ink">

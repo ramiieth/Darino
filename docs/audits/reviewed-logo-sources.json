@@ -87,5 +87,13 @@
   "chain-avalanche.svg": {
     "source": "https://zerion.io/_next/static/media/avalanche.7e25af74.svg",
     "sha256": "4f7725257dd2eaf99e11365ce60bec9595087bbcf7828c6f22aad7d4cdcb2fd8"
+  },
+  "chain-polygon.svg": {
+    "source": "https://zerion.io/_next/static/media/polygon.a7108e3a.svg",
+    "sha256": "12a92ad39c0ad8b6658e42d8d07499a026e0ccd7d020792cc08abe13f25dc60d"
+  },
+  "chain-arbitrum.svg": {
+    "source": "https://zerion.io/_next/static/media/arbitrum.eace833c.svg",
+    "sha256": "30308bb090a9859de5324056c1aa062747cc4d9645309bf65d47cd540781aacc"
   }
 }

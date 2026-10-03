@@ -1,3 +1,4 @@
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * ⑤ Market comparison — the same capital in several assets over one period.
  * Value, profit, return, CAGR, ranking, sort, filter, CSV/PDF.
@@ -159,7 +160,7 @@ export function CompareCalculator() {
         <ul className="flex flex-wrap gap-1.5" aria-label="دارایی‌های انتخاب‌شده">
           {selected.map((a) => (
             <li key={a.symbol} className="inline-flex h-8 items-center gap-1 rounded-control bg-surface-2 pe-1 ps-2.5 text-xs font-semibold text-ink">
-              <bdi dir="ltr">{a.symbol}</bdi>
+              <bdi dir="rtl">{persianAssetName(a.symbol,a.nameFa)}</bdi>
               <button
                 type="button"
                 onClick={() => removeAsset(a.symbol)}
@@ -184,7 +185,7 @@ export function CompareCalculator() {
           <ResultHero
             label="بهترین عملکرد"
             value={best ? <PercentValue value={best.returnPct} tone="auto" /> : <span className="text-subtle">—</span>}
-            sub={best ? `${best.nameFa} (${best.symbol}) · ارزش ${fmtUSD(best.currentValue)}` : 'داده تاریخی هنوز دریافت نشده است'}
+            sub={best ? `${best.nameFa} · ارزش ${fmtUSD(best.currentValue)}` : 'داده تاریخی هنوز دریافت نشده است'}
           >
             <MetricGrid cols={3}>
               <Metric label="بدترین عملکرد" value={worst ? <PercentValue value={worst.returnPct} /> : '—'} sub={worst ? worst.symbol : undefined} />
@@ -228,7 +229,7 @@ export function CompareCalculator() {
                       <td className="num-ltr !ps-4 text-xs text-subtle md:!ps-5">{i + 1}</td>
                       <td>
                         <p className="font-semibold text-ink">{r.nameFa}</p>
-                        <bdi dir="ltr" className="text-2xs text-muted">{r.symbol}</bdi>
+
                       </td>
                       <td className="col-num text-muted"><MoneyValue value={r.historicalPrice} /></td>
                       <td className="col-num"><MoneyValue value={r.currentPrice} /></td>

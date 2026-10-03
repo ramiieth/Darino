@@ -9,7 +9,7 @@
  *  - متن لاتین با <bdi dir="ltr"> ایزوله می‌شود → به‌هم‌ریختگی bidi ندارد
  *  - نام‌های طولانی truncate می‌شوند → ارتفاع ردیف‌ها ثابت می‌ماند
  * ============================================================ */
-import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 import { cn } from '@/shared/lib/cn';
 
 export function AssetName({
@@ -29,28 +29,27 @@ export function AssetName({
   nameClassName?: string;
   tickerClassName?: string;
 }) {
-  const d = assetDisplayName(symbol, fallbackName);
-  const sameAsTicker = d.name === d.ticker;
+  const name = persianAssetName(symbol, fallbackName);
 
   return (
     <div className={cn('min-w-0', className)}>
       <p
-        title={d.name}
+        title={name}
         className={cn(
           'truncate text-start text-sm font-semibold leading-5 text-ink',
           nameClassName
         )}
       >
-        <bdi dir={d.rtl ? 'rtl' : 'ltr'}>{d.name}</bdi>
+        <bdi dir="rtl">{name}</bdi>
       </p>
-      {(!sameAsTicker || meta) && (
+      {meta && (
         <p
           className={cn(
             'flex min-w-0 items-center gap-1.5 text-start text-2xs font-semibold leading-4 text-muted',
             tickerClassName
           )}
         >
-          {!sameAsTicker && <bdi dir="ltr" className="truncate">{d.ticker}</bdi>}
+
           {meta && (
             <span className="shrink-0 truncate font-normal text-subtle">{meta}</span>
           )}

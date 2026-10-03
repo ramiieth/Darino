@@ -1,3 +1,4 @@
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * ① Profit & loss — what is my position worth now vs what I paid?
  * INPUT (asset · qty · buy price · fees) → RESULT (P/L) → SECONDARY → CHARTS → EXPORT
@@ -88,7 +89,7 @@ export function PnlCalculator() {
       )}
       <div className="grid grid-cols-2 gap-4">
         <Field label="تعداد واحد">
-          <Input dir="ltr" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} suffix={asset?.symbol} />
+          <Input dir="ltr" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} suffix={asset?persianAssetName(asset.symbol):undefined} />
         </Field>
         <Field label="قیمت خرید">
           <Input dir="ltr" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} suffix="دلار" />
@@ -144,7 +145,7 @@ export function PnlCalculator() {
           {!histLoading && series && (
             <>
               <LineChartCard
-                title={`قیمت ${asset.symbol}`}
+                title={`قیمت ${persianAssetName(asset.symbol)}`}
                 labels={series.map((p) => fmtFaDate(p.t))}
                 datasets={[{ label: 'قیمت', data: series.map((p) => p.price), color: 'chart-1', fill: true }]}
               />
@@ -164,7 +165,7 @@ export function PnlCalculator() {
             pdfTitle={`گزارش سود و زیان — ${asset.symbol}`}
             pdfSections={[
               {
-                heading: `سود و زیان سرمایه‌گذاری ${asset.nameFa} (${asset.symbol})`,
+                heading: `سود و زیان سرمایه‌گذاری ${asset.nameFa}`,
                 table: {
                   headers: ['موارد', 'مقدار'],
                   rows: [

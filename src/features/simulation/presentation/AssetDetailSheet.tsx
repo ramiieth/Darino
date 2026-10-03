@@ -28,7 +28,7 @@ export function AssetDetailSheet({ row, onClose }: { row: SimAssetRow | null; on
       open
       onClose={onClose}
       title={row.nameFa}
-      description={row.symbol}
+      description={row.nameFa}
       variant="panel"
       footer={
         <Button

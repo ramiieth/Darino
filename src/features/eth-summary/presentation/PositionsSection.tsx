@@ -61,7 +61,7 @@ export function PositionsSection({ o }: { o: PortfolioOverview }) {
                           <div className="min-w-0">
                             <p className="font-semibold text-ink">{p.nameFa}</p>
                             <p className="text-xs text-muted">
-                              <bdi dir="ltr">{p.symbol}</bdi>
+
                               {p.change24hPct !== null && (
                                 <>
                                   {' · '}

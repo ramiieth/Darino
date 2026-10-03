@@ -70,7 +70,7 @@ export function AnalyticsCards({ result, timeline }: { result: TimelineResult; t
                   {t(c.label)}
                 </Badge>
                 <p className="mt-1 truncate text-sm font-semibold text-ink">
-                  {row.nameFa} <bdi dir="ltr" className="text-xs font-normal text-muted">{row.symbol}</bdi>
+                  {row.nameFa}
                 </p>
               </div>
               <div className="text-end">

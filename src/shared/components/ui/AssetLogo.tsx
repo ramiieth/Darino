@@ -70,7 +70,7 @@ export function LetterAvatar({
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full font-bold ring-1 ring-divider',
+        'flex shrink-0 items-center justify-center rounded-full font-bold ',
         KIND_GRADIENTS[kind]
       )}
       style={{ width: size, height: size, fontSize: Math.max(9, size * 0.32) }}
@@ -91,7 +91,7 @@ export function AssetLogo({
   size?: number;
   className?: string;
 }) {
-  size = Math.round(size * 0.92);
+  size = Math.round(size * 0.96);
   // فقط لوگو از logoStore (سبک — بدون sync قیمت توکنایز در لود عمومی)
   const logos = useLogoStore((s) => s.bySymbol);
   const top250 = useLogoStore((s) => s.top250);
@@ -125,6 +125,7 @@ export function AssetLogo({
       : u;
 
   const candidates: (string | null | undefined)[] = [
+    /^(POL|MATIC)$/i.test(symbol)?'/logos/chain-polygon.svg':undefined,
     logos[symbol] ? smallize(logos[symbol]) : undefined,
     seedUrl ? smallize(seedUrl) : undefined,
     logoStoreUrl ? smallize(logoStoreUrl) : undefined,
@@ -141,7 +142,7 @@ export function AssetLogo({
     return (
       <span
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full ring-1 ring-divider',
+          'flex shrink-0 items-center justify-center rounded-full ',
           KIND_GRADIENTS[kind]
         )}
         style={{ width: size, height: size }}
@@ -166,7 +167,7 @@ export function AssetLogo({
       referrerPolicy="no-referrer"
       onError={() => setFailed((f) => (f.includes(currentIdx) ? f : [...f, currentIdx]))}
       className={cn(
-        'shrink-0 rounded-full bg-card object-contain ring-1 ring-divider',
+        'shrink-0 rounded-full bg-card object-contain ',
         className
       )}
       style={{ width: size, height: size }}

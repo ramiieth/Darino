@@ -162,7 +162,7 @@ export function StablecoinsCG() {
                       <AssetLogo symbol={sym} kind="crypto" size={28} />
                       <div className="min-w-0">
                         <p className="max-w-[9rem] truncate font-semibold text-ink sm:max-w-none">{faName(sym, c.name)}</p>
-                        <p className="text-2xs font-semibold text-muted"><bdi dir="ltr">{sym}</bdi></p>
+
                       </div>
                     </div>
                   </td>
