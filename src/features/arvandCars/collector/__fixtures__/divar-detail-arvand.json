@@ -1,0 +1,143 @@
+{
+ "sections": [
+  {
+   "widgets": [
+    {
+     "widget_type": "LEGEND_TITLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.LegendTitleRowData",
+      "title": "سانتافه 3.3L شش سیلندر دو دف پلاک اروند",
+      "high_level_heading": true,
+      "padding": "NO_PADDING"
+     }
+    },
+    {
+     "widget_type": "EXPANDABLE_SECTION",
+     "data": {
+      "@type": "type.googleapis.com/widgets.ExpandableSectionData",
+      "widget_list": [
+       {
+        "widget_type": "DESCRIPTION_ROW",
+        "data": {
+         "@type": "type.googleapis.com/widgets.DescriptionRowData",
+         "text": "انتشار آگهی: ۱۱ مهر ۱۴۰۵، ۲۲:۰۷\nآخرین به‌روز‌رسانی: ۱۱ مهر ۱۴۰۵، ۲۲:۱۵",
+         "is_primary": true,
+         "small": true,
+         "text_alignment": "RIGHT"
+        }
+       }
+      ],
+      "title": "۱ ساعت پیش در اهواز، پادادشهر، خ پادادشهر چهاردهم",
+      "icon": {}
+     }
+    }
+   ]
+  },
+  {
+   "widgets": [
+    {
+     "widget_type": "TITLE_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.TitleRowData",
+      "text": "توضیحات",
+      "text_color": "TEXT_PRIMARY",
+      "text_type": "SECONDARY"
+     }
+    },
+    {
+     "widget_type": "DESCRIPTION_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.DescriptionRowData",
+      "text": "ماشین دوم بوده همش تو پارکینگه \nکاپوت تعویض استوک سینی جلو ترمیم بدون ایراد\nنیم فول سفارش خلیج فارس\nدنبال ماشین سالم و نگهداری شده هستی درخدمتم \nبا توجه به افزایش قیمت ها قیمتشو خوب زدم",
+      "is_primary": true,
+      "text_alignment": "RIGHT"
+     }
+    }
+   ]
+  },
+  {
+   "widgets": [
+    {
+     "widget_type": "GROUP_INFO_ROW",
+     "data": {
+      "@type": "type.googleapis.com/widgets.GroupInfoRow",
+      "items": [
+       {
+        "title": "کارکرد",
+        "value": "۱۴۰۰۰۰"
+       },
+       {
+        "title": "مدل (سال تولید)",
+        "value": "۲۰۱۵"
+       },
+       {
+        "title": "رنگ",
+        "value": "مشکی"
+       }
+      ],
+      "has_divider": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "برند و مدل",
+      "value": "هیوندای سانتافه ix 45 3300cc"
+     },
+     "action_log": {
+      "server_side_info": {
+       "info": {
+        "@type": "type.googleapis.com/action_log.PostViewListDataItemInfo",
+        "post_token": "gaBvkO5p",
+        "jli": {
+         "category": {
+          "value": "light"
+         },
+         "brand_model": {
+          "value": [
+           "Hyundai Santafe ix45 3300cc"
+          ]
+         }
+        },
+        "field": "brand_model",
+        "value": "Hyundai Santafe ix45 3300cc"
+       },
+       "item_type": {
+        "type": "POST_VIEW_LIST_DATA_ITEM"
+       }
+      },
+      "enabled": true
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "مهلت بیمهٔ شخص ثالث",
+      "value": "۶ ماه"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "گیربکس",
+      "value": "اتوماتیک"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "نوع سوخت",
+      "value": "بنزین"
+     }
+    },
+    {
+     "widget_type": "UNEXPANDABLE_ROW",
+     "data": {
+      "title": "قیمت پایه",
+      "value": "‏۴,۳۵۰,۰۰۰,۰۰۰ تومان"
+     }
+    }
+   ]
+  }
+ ]
+}
