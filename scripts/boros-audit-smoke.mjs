@@ -80,9 +80,11 @@ try {
  await quantity.fill('۰٫۶۵'); assert.equal(await quantity.inputValue(), '0.65');
  await host.getByLabel('وثیقه موجود', { exact: true }).fill('۰٫۱');
  assert.equal(await host.getByLabel('وثیقه موجود', { exact: true }).inputValue(), '0.1');
- await host.getByLabel('مجموع کارمزدها', { exact: true }).fill('۰٫۲');
- await host.getByLabel('لغزش خارج از نرخ ورود', { exact: true }).fill('۰٫۱');
- await host.getByLabel('گس', { exact: true }).fill('۰٫۰۵');
+ await host.getByText('هزینه‌ها و فرض‌های سناریو',{exact:true}).click();
+ await host.getByLabel('هزینهٔ ورود اضافی', { exact: true }).fill('۰٫۲');
+ await host.getByLabel('هزینهٔ اضافی خارج از نرخ اجرا', { exact: true }).fill('۰٫۱');
+ await host.getByLabel('گس کل دوره', { exact: true }).fill('۰٫۰۵');
+ await host.getByText('جزئیات محاسبه و سناریوهای تغییر نرخ',{exact:true}).click();
  assert((await host.innerText()).includes('نرخ ضمنی لیکوییدشدن'));
  assert((await host.innerText()).includes('سناریوی بدبینانه'));
  assert((await host.innerText()).includes('تسویه تا سررسید (فرض نرخ ثابت)'));

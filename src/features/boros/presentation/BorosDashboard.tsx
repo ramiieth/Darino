@@ -27,11 +27,11 @@ import { AuditTab } from './AuditTab';
 type Tab = 'entry' | 'account' | 'opp' | 'compare' | 'sim' | 'risk' | 'audit' | 'guide';
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'sim', label: 'پیش‌نمایش' },
   { value: 'entry', label: 'پیشنهاد ورود' },
   { value: 'account', label: 'حساب من' },
   { value: 'opp', label: 'بازارها و فرصت‌ها' },
   { value: 'compare', label: 'مقایسه بازارها' },
-  { value: 'sim', label: 'پیش‌نمایش' },
   { value: 'risk', label: 'مانیتور ریسک' },
   { value:'guide',label:'راهنما' },
   { value: 'audit', label: 'بررسی محاسبات' }
@@ -39,7 +39,7 @@ const TABS: { value: Tab; label: string }[] = [
 
 export default function BorosDashboard() {
   const { markets, loading, error, stale, syncProgress, loadedAt } = useBoros();
-  const [tab, setTab] = useState<Tab>('entry');
+  const [tab, setTab] = useState<Tab>('sim');
   const [target,setTarget]=useState<{marketId:number;direction:BorosDirection;entry?:EntrySelection}|undefined>();
   const inspect=(marketId:number,direction:BorosDirection='long')=>{setTarget({marketId,direction});setTab('sim');};
 
@@ -48,7 +48,10 @@ export default function BorosDashboard() {
     if (error) retryBorosSoon(15_000);
   }, [error]);
 
-  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now() && m.isUiWhitelisted), [markets]);
+  const [now,setNow]=useState(Date.now());
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[]);
+  const activeIds=markets.filter(m=>m.maturity*1000>now&&m.isUiWhitelisted&&m.status==='GOOD').map(m=>m.marketId).join(',');
+  const activeMarkets = useMemo(() => markets.filter((m) => m.maturity * 1000 > Date.now() && m.isUiWhitelisted && m.status==='GOOD'), [markets,activeIds]);
   const reload = () => {
     resetBorosLoad();
     void loadBoros();
