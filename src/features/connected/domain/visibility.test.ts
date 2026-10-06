@@ -59,3 +59,5 @@ describe('shared display policy for portfolio, activity and asset pickers',()=>{
   expect(tx.spam).toBe(true);expect(tx.transfers[0].verified).toBe(true);
  });
 });
+
+it('supports LP receipt formats while retaining contract identity and dust checks',()=>{for(const symbol of ['LP-NEW-2028-01-01','PENDLE-LPT']){const p={...eth,id:symbol,symbol,name:symbol,contract:'0x'+'ab'.repeat(20),protocol:'Pendle',value:2.01};expect(visiblePosition(p)).toBe(true);expect(visiblePosition({...p,value:2})).toBe(false);expect(visiblePosition({...p,contract:null})).toBe(false);expect(visiblePosition({...p,spam:true})).toBe(false);}});
