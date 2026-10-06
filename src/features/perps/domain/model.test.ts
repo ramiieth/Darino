@@ -1,0 +1,9 @@
+import { describe, it, expect } from 'vitest';
+import { numeric, lighterAccounts, lighterMarkets, ondoMarkets } from './model';
+const address='0x1111111111111111111111111111111111111111';
+describe('public perps adapters',()=>{
+ it('does not turn missing or invalid values into zero',()=>{for(const v of [null,undefined,'',true,{},'NaN',Infinity])expect(numeric(v)).toBeNull();expect(numeric('0')).toBe(0);});
+ it('only displays active visible lighter perpetual markets',()=>{expect(lighterMarkets({order_book_details:[{symbol:'LIT',status:'active',mark_price:'2',daily_price_change:'-4'},{symbol:'HIDDEN',status:'active',market_config:{hidden:true}},{symbol:'CLOSED',status:'inactive'}]})).toEqual([{symbol:'LIT',price:2,change:-4}]);});
+ it('uses mark prices and preserves unavailable Ondo prices',()=>{expect(ondoMarkets({result:{perps:{tradingPairs:[{market:'BTC-USD.P'},{market:'AAPL-USD.P'}]}}},{result:{'BTC-USD.P':{markPrice:'100'}}})).toEqual([{symbol:'BTC-USD.P',price:100,change:null},{symbol:'AAPL-USD.P',price:null,change:null}]);});
+ it('checks account ownership, deduplicates accounts and excludes closed positions',()=>{const account={account_index:7,l1_address:address,total_asset_value:'80',available_balance:'20',positions:[{symbol:'BTC',sign:-1,position:'2',position_value:'1000',unrealized_pnl:'-10'},{symbol:'ETH',sign:1,position:'0'}]};const result=lighterAccounts({accounts:[account,account,{...account,account_index:8,l1_address:'0x2222222222222222222222222222222222222222'}]},address);expect(result).toHaveLength(1);expect(result[0].equity).toBe(80);expect(result[0].positions).toHaveLength(1);expect(result[0].positions[0].side).toBe('short');});
+});
