@@ -1,0 +1,12 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getPerpsRead } from '../../api/_perpsRead';
+const address='0x1111111111111111111111111111111111111111';
+afterEach(()=>vi.unstubAllGlobals());
+const ok=(data:unknown)=>new Response(JSON.stringify(data),{status:200});
+describe('fixed read-only perps gateway',()=>{
+ it('rejects arbitrary operations and addresses before fetching',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);await expect(getPerpsRead('https://evil.example','')).rejects.toMatchObject({status:400});await expect(getPerpsRead('lighter-account','https://evil.example')).rejects.toMatchObject({status:400});expect(f).not.toHaveBeenCalled();});
+ it('paginates only the fixed Robinhood API with GET and no credentials',async()=>{const f=vi.fn().mockResolvedValueOnce(ok({code:200,accounts:[{index:1}],next_cursor:'next'})).mockResolvedValueOnce(ok({code:200,accounts:[{index:2}]}));vi.stubGlobal('fetch',f);const data=await getPerpsRead('lighter-account',address) as {accounts:unknown[]};expect(data.accounts).toHaveLength(2);expect(f.mock.calls[1][0]).toContain('cursor=next');for(const [url,opts] of f.mock.calls){expect(new URL(url).origin).toBe('https://api.rh.lighter.xyz');expect(opts.method).toBe('GET');expect(opts.redirect).toBe('error');expect(opts.headers).toEqual({accept:'application/json'});}});
+ it('rejects repeating cursors rather than returning partial totals',async()=>{vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>Promise.resolve(ok({code:200,accounts:[],next_cursor:'same'}))));await expect(getPerpsRead('lighter-account',address)).rejects.toMatchObject({status:502});});
+ it('handles provider errors and invalid account bodies',async()=>{vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce(new Response('',{status:429})).mockResolvedValueOnce(ok({code:200})));await expect(getPerpsRead('lighter-markets','')).rejects.toMatchObject({status:429});await expect(getPerpsRead('lighter-account',address)).rejects.toMatchObject({status:502});});
+ it('requests only the two public Ondo endpoints',async()=>{const f=vi.fn().mockImplementation(()=>Promise.resolve(ok({success:true,result:{}})));vi.stubGlobal('fetch',f);await getPerpsRead('ondo-markets','');expect(f.mock.calls.map(c=>c[0]).sort()).toEqual(['https://api.ondoperps.xyz/v1/markets','https://api.ondoperps.xyz/v1/perps/mark_prices']);});
+});
