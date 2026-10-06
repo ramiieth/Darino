@@ -10,4 +10,4 @@ The user configured a read-only API key identifier as `Ondo_API_KEY`, and reques
 
 Source: https://docs.ondoperps.xyz/api-reference/api_key_authentication.md
 
-The key's read-only permission and a single-ID authentication alternative cannot be independently verified with the available access. Therefore no speculative Bearer-token or unauthenticated private-balance requests are added. The module continues to show public markets and links to the official account page; private balance integration remains pending a documented authentication method compatible with the user's constraint.
+The official app's API-key interface includes View Only as distinct from View/Trade and View/Transfer; its create-key dialog also displays API Key and API Secret separately. The specific configured key's permissions were not accessed, and a single-ID authentication alternative was not found. Therefore no speculative Bearer-token or unauthenticated private-balance requests are added. The module continues to show public markets and links to the official account page; private balance integration remains pending a documented authentication method compatible with the user's constraint.
