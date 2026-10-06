@@ -101,7 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         id: 'lighter-robinhood', to: '/lighter-robinhood', label: 'لایتر رابین‌هود', description: 'حساب و بازارهای Lighter روی Robinhood Chain', icon: Activity
       },
-      { id: 'ondo-perps', to: '/ondo-perps', label: 'Ondo Perps', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity },
+      { id: 'ondo-perps', to: '/ondo-perps', label: 'اوندو پرپس', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity },
       {
         id: 'security',
         to: '/security',

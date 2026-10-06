@@ -153,7 +153,7 @@ export function App() {
             }
           />
           <Route path="/lighter-robinhood" element={<Private label="لایتر رابین‌هود"><PerpsPage provider="lighter" /></Private>} />
-          <Route path="/ondo-perps" element={<Private label="Ondo Perps"><PerpsPage provider="ondo" /></Private>} />
+          <Route path="/ondo-perps" element={<Private label="اوندو پرپس"><PerpsPage provider="ondo" /></Private>} />
           <Route path="/wallets" element={<Private label="مدیریت کیف پول‌ها"><ConnectedPage /></Private>} />
           <Route path="/assistant" element={<Private label="دستیار پرتفولیو"><AssistantPage /></Private>} />
           <Route path="*" element={<MarketsHomePage />} />

@@ -22,11 +22,15 @@ const fits=async()=>assert(await page.evaluate(()=>document.documentElement.scro
 try{
  await page.goto(base+'/#/lighter-robinhood');await page.getByRole('heading',{name:'لایتر — شبکهٔ رابین‌هود',exact:true}).waitFor();
  await page.getByText('قیمت مارک: ۲٫۲ USDG',{exact:true}).waitFor();
+ assert.equal(await page.locator('.token-network-badge img').getAttribute('src'),'/logos/chain-4663.svg');
+ await page.waitForFunction(()=>[...document.querySelectorAll('img')].some(i=>i.getAttribute('src')==='/logos/platform-lighter.png'&&i.complete&&i.naturalWidth>0));
  await page.getByPlaceholder('حساب من',{exact:true}).fill('حساب آزمایشی');await page.getByPlaceholder('0x…',{exact:true}).fill(address);await page.getByRole('button',{name:'افزودن حساب',exact:true}).click();
  await page.getByRole('heading',{name:'حساب آزمایشی',exact:true}).waitFor();await page.getByText('شورت',{exact:true}).waitFor();await fits();
  await page.reload();await page.getByRole('heading',{name:'حساب آزمایشی',exact:true}).waitFor();await page.getByText('شورت',{exact:true}).waitFor();
  await page.getByRole('button',{name:'حذف اتصال',exact:true}).click();await page.getByRole('heading',{name:'حساب آزمایشی',exact:true}).waitFor({state:'hidden'});
- await page.evaluate(()=>location.hash='#/ondo-perps');await page.getByText('AAPL-USD.P',{exact:true}).waitFor();await page.getByText('قیمت مارک: ۳۰۰ USD',{exact:true}).waitFor();await fits();
+ await page.evaluate(()=>location.hash='#/ondo-perps');await page.getByText('AAPL-USD.P',{exact:true}).waitFor();await page.getByText('قیمت مارک: ۳۰۰ USD',{exact:true}).waitFor();await page.getByRole('heading',{name:'اوندو پرپس',exact:true}).waitFor();
+ await page.waitForFunction(()=>[...document.querySelectorAll('img')].some(i=>i.getAttribute('src')==='/logos/platform-ondo.png'&&i.complete&&i.naturalWidth>0));
+ assert.equal(await page.locator('.token-network-badge').count(),0);await page.getByText('اتریوم',{exact:true}).waitFor();await page.getByText('آربیتروم',{exact:true}).waitFor();await fits();
  await page.setViewportSize({width:1440,height:1000});await fits();await page.screenshot({path:'/tmp/darino-ondo-perps-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/darino-ondo-perps-mobile.png',fullPage:true});
  assert.deepEqual(errors,[]);console.log('Perps smoke passed: Lighter account add/persistence/remove, short positions, Ondo prices, mobile/desktop layout.');
