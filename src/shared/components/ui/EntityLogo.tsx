@@ -3,7 +3,7 @@
  *
  *  • منبع تصویر فقط: مسیر محلی اپ (public/logos/*.png) یا آیکون‌های میزبان‌های معتبر زریون و دیفای‌لاما
  *    (https://icons.llama.fi/<نام>.jpg — همان منبعی که بخش دیفای اپ استفاده می‌کند).
- *    URL دلخواه کاربر هرگز بارگذاری نمی‌شود؛ نشان‌های YT/PT بردارهای داخلی اپ هستند.
+ *    URL دلخواه کاربر هرگز بارگذاری نمی‌شود؛ توکن‌های YT/PT/LP از لوگوی دارایی و نشان شبکه استفاده می‌کنند.
  *  • پس‌زمینهٔ پیش‌فرض لوگو سفید است؛ رابین‌هود سبز برند است تا لوگوهای شفاف (مثل آرک) در حالت تیره هم دیده شوند.
  *  • هویت لوگو: شبکه ← شناسهٔ شبکه/chainId · توکن ← شناسهٔ دارایی (شبکه+قرارداد) ·
  *    پلتفرم ← شناسهٔ مستقل. نماد به‌تنهایی برای انتخاب لوگو کافی نیست.
@@ -11,7 +11,7 @@
  *  • خطای بارگذاری یا نبود تصویر → آواتار حرفی هم‌اندازه (رابط خراب نمی‌شود).
  */
 import { useState } from 'react';
-import { YieldTokenMark, yieldTokenIdentity } from './YieldTokenMark';
+import { yieldTokenIdentity } from './YieldTokenMark';
 import { cn } from '@/shared/lib/cn';
 
 import { safeLogoSrc } from '@/shared/lib/logoSources';
@@ -81,8 +81,8 @@ export function TokenLogo({
   const badge = yieldIdentity ? Math.max(16, Math.round(size * 0.42)) : Math.max(18, Math.round(size * 0.54));
   const alt = networkName ? `${name ?? symbol} روی ${networkName}` : name ?? symbol;
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: Math.round(size*.96), height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt}>
-      {yieldIdentity ? <YieldTokenMark symbol={symbol} size={size} /> : <LogoImage src={logo} label={name ?? symbol} size={size} />}
+    <span className="relative inline-flex shrink-0" style={{ width: Math.round(size*.96), height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt} data-yield-token={yieldIdentity?.kind} data-yield-symbol={yieldIdentity?symbol:undefined}>
+      <LogoImage src={logo} label={yieldIdentity?.underlyingFa || name || symbol} size={size} />
       {networkName !== undefined && networkName !== null && (
         <span className="token-network-badge rounded-full bg-card p-px" style={{position:'absolute',bottom:-5,right:-4,lineHeight:0}}>
           <LogoImage src={networkLogo} label={networkName} size={badge} square />

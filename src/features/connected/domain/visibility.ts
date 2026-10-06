@@ -1,3 +1,4 @@
+import { yieldTokenIdentity } from '../../../shared/domain/yieldTokenIdentity';
 import { safeLogoSrc } from '../../../shared/lib/logoSources';
 import Decimal from 'decimal.js';
 import { ASSETS } from '../../custody/domain/catalog';
@@ -14,12 +15,12 @@ const reviewedTokens:Record<string,string>={bitcoin:'/logos/token-btc.png',btc:'
 export function tokenLogo(t:Token):string|null {return safeLogoSrc(catalogToken(t)?.logo ?? (t.verified===true&&t.tokenId?reviewedTokens[t.tokenId]:null) ?? t.icon);}
 export function trustedToken(t:Token):boolean {return !t.spam && (!!catalogToken(t)||t.verified===true) && !!tokenLogo(t);}
 export function robinhoodGas(t:Token):boolean {const local=catalogToken(t);return t.chain==='robinhood'&&local?.symbol==='ETH'&&!local.contract;}
-/** Pendle receipts are shown above $4 for YT and above $2 for PT.
+/** Pendle receipts are shown above $4 for YT and above $2 for PT/LP.
  * A symbol alone is insufficient: require a contract and provider identity too.
  */
 export function yieldTokenPosition(p:LivePosition):boolean {
- return !!p.contract && /^(YT|PT)(?:$|[-\s])/i.test(p.symbol) &&
-  (p.verified===true || /pendle/i.test(p.protocol??'') || /pendle|yield token|principal token|^(YT|PT)[-\s]/i.test(p.name));
+ return !!p.contract && !!yieldTokenIdentity(p.symbol,p.name) &&
+  (p.verified===true || /pendle/i.test(p.protocol??'') || /pendle|yield token|principal token|liquidity provider|^(YT|PT|LP)[-\s]/i.test(p.name));
 }
 export function visiblePosition(p:LivePosition):boolean {
  if(!p.displayable||p.spam)return false;

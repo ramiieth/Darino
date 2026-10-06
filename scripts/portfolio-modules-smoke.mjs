@@ -15,7 +15,7 @@ snapshot.positions.push(
  {...snapshot.positions[0],id:'no-logo',tokenId:'nologo',symbol:'NOLOGO',contract:'0x'+'77'.repeat(20),value:30,icon:null,verified:false},
  {...snapshot.positions[0],id:'trash',tokenId:'trash',symbol:'SPAM',value:300,spam:true}
 );
-snapshot.positions.push(...['YT','PT'].map((kind,i)=>({...snapshot.positions[0],id:kind,tokenId:kind,contract:'0x'+String(i+2).repeat(40),name:kind+'-USDe-30DEC2026',symbol:kind+'-USDe-30DEC2026',quantity:'10',value:i?100:4.01,price:i?10:0.401,icon:null,verified:false,protocol:'Pendle'})));
+snapshot.positions.push(...['YT','PT'].map((kind,i)=>({...snapshot.positions[0],id:kind,tokenId:kind,contract:'0x'+String(i+2).repeat(40),name:kind+'-USDe-30DEC2026',symbol:kind+'-USDe-30DEC2026',quantity:'10',value:i?100:4.01,price:i?10:0.401,icon:'/logos/token-usdc.svg',verified:false,protocol:'Pendle'})));
 snapshot.total=11435.01;
 await page.route('**/*',async route => {
  const u=new URL(route.request().url());
@@ -71,18 +71,19 @@ try {
  }
  console.log('Checking dashboard');
  await page.evaluate(()=>location.hash='#/dashboard');
- await page.getByText('YT-USDe-30DEC2026',{exact:true}).first().waitFor();
- await page.getByText('PT-USDe-30DEC2026',{exact:true}).first().waitFor();
+ await page.locator('[data-yield-label="YT"]').first().waitFor();
+ await page.locator('[data-yield-label="PT"]').first().waitFor();
  for(const kind of ['YT','PT']) {
-  const mark=page.locator(`svg[data-yield-token="${kind}"]`).first();
+  const mark=page.locator(`[data-yield-token="${kind}"]`).first();
   await mark.waitFor();
-  const logo=mark.locator('..');
+  const logo=mark;
   assert.equal(await logo.locator('.token-network-badge img').getAttribute('src'),'/logos/chain-1.svg');
+  assert.equal(await logo.locator('.entity-logo img').first().getAttribute('src'),'/logos/token-usdc.svg');
  }
- await page.locator('svg[data-yield-token="PT"]').first().scrollIntoViewIfNeeded();
+ await page.locator('[data-yield-token="PT"]').first().scrollIntoViewIfNeeded();
  await page.screenshot({path:'/tmp/darino-yield-token-marks-desktop.png',fullPage:false});
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(400);await fits();
- await page.locator('svg[data-yield-token="YT"]').first().scrollIntoViewIfNeeded();
+ await page.locator('[data-yield-token="YT"]').first().scrollIntoViewIfNeeded();
  await page.screenshot({path:'/tmp/darino-yield-token-marks-mobile.png',fullPage:false});
 
  assert.equal(await page.locator('#eth-scenario-title,#whatif-title,#movers-title').count(),0);
