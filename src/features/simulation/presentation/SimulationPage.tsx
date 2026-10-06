@@ -1,3 +1,5 @@
+import { SimulatedInvestmentCard } from '@/features/cryptomarkets/presentation/SimulatedInvestmentCard';
+import type { PerfPeriod } from '@/features/cryptomarkets/data/useTopPerformers';
 import { toFaDigits } from '@/shared/utils/formatters';
 import { useMemo, useState } from 'react';
 import { RefreshCw, SlidersHorizontal, Layers } from 'lucide-react';
@@ -27,6 +29,7 @@ import type { SimAssetRow } from '@/shared/types';
 type TimelineTab = 't1' | 't2';
 
 export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void }) {
+  const [perfPeriod, setPerfPeriod] = useState<PerfPeriod>('30d');
   const [tab, setTab] = useState<TimelineTab>('t1');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
@@ -171,6 +174,8 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
         }
       />
 
+      <ScenarioCashCard />
+
       <div className="space-y-4">
         <Tabs<TimelineTab>
           label="بازه زمانی"
@@ -191,12 +196,13 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-5">
           <SimContextChips result={result} />
-          <ScenarioCashCard />
         </div>
         <div className="min-w-0 lg:col-span-7">
           <CategoryReturnChart result={result} />
         </div>
       </div>
+
+      <SimulatedInvestmentCard period={perfPeriod} onPeriodChange={setPerfPeriod} />
 
       <Section id="insights" title="یافته‌های کلیدی" description="فرضی و گذشته‌نگر — پیش‌بینی آینده نیست">
         <AnalyticsCards result={result} timeline={timeline} />

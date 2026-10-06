@@ -14,9 +14,19 @@ const reviewedTokens:Record<string,string>={bitcoin:'/logos/token-btc.png',btc:'
 export function tokenLogo(t:Token):string|null {return safeLogoSrc(catalogToken(t)?.logo ?? (t.verified===true&&t.tokenId?reviewedTokens[t.tokenId]:null) ?? t.icon);}
 export function trustedToken(t:Token):boolean {return !t.spam && (!!catalogToken(t)||t.verified===true) && !!tokenLogo(t);}
 export function robinhoodGas(t:Token):boolean {const local=catalogToken(t);return t.chain==='robinhood'&&local?.symbol==='ETH'&&!local.contract;}
+/** Pendle receipts are shown above $4 for YT and above $2 for PT.
+ * A symbol alone is insufficient: require a contract and provider identity too.
+ */
+export function yieldTokenPosition(p:LivePosition):boolean {
+ return !!p.contract && /^(YT|PT)(?:$|[-\s])/i.test(p.symbol) &&
+  (p.verified===true || /pendle/i.test(p.protocol??'') || /pendle|yield token|principal token|^(YT|PT)[-\s]/i.test(p.name));
+}
 export function visiblePosition(p:LivePosition):boolean {
- if(!p.displayable||!trustedToken(p))return false;
+ if(!p.displayable||p.spam)return false;
+ const yieldToken=yieldTokenPosition(p);
+ if(!yieldToken&&!trustedToken(p))return false;
  try{if(!p.quantity||!new Decimal(p.quantity).isFinite()||new Decimal(p.quantity).lte(0))return false;}catch{return false;}
+ if(yieldToken)return p.value!==null&&Number.isFinite(p.value)&&p.value>(/^YT(?:$|[-\s])/i.test(p.symbol)?4:2);
  return robinhoodGas(p)||(p.value!==null&&Number.isFinite(p.value)&&Math.abs(p.value)>=2);
 }
 export function visiblePositions(positions:LivePosition[]):LivePosition[] {return positions.filter(visiblePosition).sort((a,b)=>Math.abs(b.value??0)-Math.abs(a.value??0));}

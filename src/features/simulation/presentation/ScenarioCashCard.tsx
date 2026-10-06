@@ -20,8 +20,8 @@ export function ScenarioCashCard({ compact = false }: { compact?: boolean }) {
     catch { toast('error', 'ذخیرهٔ سرمایه انجام نشد'); } finally { setSaving(false); }
   }
   return <Surface className={compact ? 'space-y-3 p-4' : 'space-y-4 p-4 md:p-5'}>
-    <div><h3 className="text-sm font-bold text-ink">سرمایهٔ دستی شبیه‌سازی</h3><p className="text-xs leading-6 text-muted">مبلغ مستقل برای هر بازه</p></div>
-    <div className="grid gap-3 sm:grid-cols-2">{['از ۱ ژانویهٔ ۲۰۲۵', 'از ۱ ژوئیهٔ ۲۰۲۶'].map((label, i) => <Field key={label} label={label}><Input dir="ltr" inputMode="decimal" suffix="دلار" value={values[i]} onChange={e => setValues(v => v.map((x,j) => j === i ? e.target.value : x))} /></Field>)}</div>
+    <div><h3 className="text-sm font-bold text-ink">مقدار تتر شبیه‌سازی</h3><p className="text-xs leading-6 text-muted">مقدار تتر (USDT) را برای هر تاریخ شروع به‌صورت مستقل وارد کنید؛ مبنای محاسبه هر تتر برابر یک دلار است.</p></div>
+    <div className="grid gap-3 sm:grid-cols-2">{['از ۱ ژانویهٔ ۲۰۲۵', 'از ۱ ژوئیهٔ ۲۰۲۶'].map((label, i) => <Field key={label} label={label}><Input dir="ltr" inputMode="decimal" suffix="USDT" value={values[i]} onChange={e => setValues(v => v.map((x,j) => j === i ? e.target.value : x))} /></Field>)}</div>
     <Button loading={saving} disabled={!valid || !hydrated} onClick={() => void save()}>ذخیره و بازمحاسبه</Button>
   </Surface>;
 }

@@ -72,7 +72,7 @@ try {
  await page.setViewportSize({width:1440,height:1000});
  await page.waitForTimeout(400); await page.screenshot({path:'/tmp/darino-assistant-desktop.png',fullPage:false}); await fits();
  await page.evaluate(()=>location.hash='#/simulation');
- await page.getByRole('heading',{name:'سرمایهٔ دستی شبیه‌سازی'}).waitFor();
+ await page.getByRole('heading',{name:'مقدار تتر شبیه‌سازی'}).waitFor();
  assert.equal(await page.getByText('خودکار از حسابداری',{exact:true}).count(),0);
  await page.evaluate(()=>location.hash='#/dashboard');
  await page.getByText('ارزش دارایی‌های متصل',{exact:true}).waitFor();
