@@ -38,6 +38,20 @@ describe('shared display policy for portfolio, activity and asset pickers',()=>{
   expect(visibleTransaction({...receive,spam:true})).toBe(false);
   expect(visibleTransaction({...receive,type:'approve',transfers:[]})).toBe(true);
  });
+ it('shows YT above $4 and PT above $2, without requiring logos or verification',()=>{
+  for(const symbol of ['YT-USDe-30DEC2026','PT-USDe-30DEC2026']) {
+   const threshold=symbol.startsWith('YT')?4:2;
+   const receipt={...eth,id:symbol,tokenId:symbol,contract:'0x'+'ab'.repeat(20),symbol,name:symbol,verified:false,icon:null,value:threshold+0.01,protocol:'Pendle'};
+   expect(visiblePosition(receipt)).toBe(true);
+   expect(visibleWalletValue({address:'a',fetchedAt:0,total:null,change:null,positions:[eth,receipt],chains:[],complete:true,unpriced:0})).toBe(3000+threshold+0.01);
+   for(const value of [0,0.05,1.99,2,threshold-0.01,threshold,-1,null,NaN])expect(visiblePosition({...receipt,value})).toBe(false);
+   expect(visiblePosition({...receipt,quantity:'0'})).toBe(false);
+   expect(visiblePosition({...receipt,spam:true})).toBe(false);
+   expect(visiblePosition({...receipt,displayable:false})).toBe(false);
+   expect(visiblePosition({...receipt,contract:null})).toBe(false);
+   expect(visiblePosition({...receipt,protocol:null,name:'Unknown token'})).toBe(false);
+  }
+ });
  it('normalizes real verification and trash flags from Zerion for both positions and transactions',()=>{
   const f={id:'token',flags:{verified:true},symbol:'TEST'};
   expect(normalizePosition({attributes:{fungible_info:f}}).verified).toBe(true);

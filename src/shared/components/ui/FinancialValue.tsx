@@ -223,7 +223,7 @@ export function QuantityValue({
   return (
     <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
       <bdi dir="ltr">{text}</bdi>
-      {unit && <span className="text-muted">{persianAssetName(unit)}</span>}
+      {unit && <span className="min-w-0 max-w-full text-muted [overflow-wrap:anywhere]">{/^(YT|PT)(?:$|[-\s])/i.test(unit) ? unit : persianAssetName(unit)}</span>}
     </span>
   );
 }

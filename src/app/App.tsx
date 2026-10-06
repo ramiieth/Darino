@@ -8,6 +8,7 @@ import { AuthBootstrap, AuthGate } from '@/features/auth/AuthGate';
 // ⚠️ فقط صفحه اصلی (بازار) مستقیم import می‌شود — بقیه lazy تا باندل
 // اولیه سبک بماند و اپ زود بالا بیاید (تغییر اساسی برای روان‌سازی)
 const DashboardPage = lazy(() => import('@/features/eth-summary/presentation/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const MarketPerformancePage = lazy(() => import('@/features/cryptomarkets/presentation/MarketPerformancePage').then((m) => ({ default: m.MarketPerformancePage })));
 const SimulationPage = lazy(() => import('@/features/simulation/presentation/SimulationPage').then((m) => ({ default: m.SimulationPage })));
 const DeFiPage = lazy(() => import('@/features/defi/presentation/DeFiPage').then((m) => ({ default: m.DeFiPage })));
 const CarMarketPage = lazy(() => import('@/features/carMarket/presentation/CarMarketPage').then((m) => ({ default: m.CarMarketPage })));
@@ -57,6 +58,7 @@ export function App() {
               </Private>
             }
           />
+          <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
           <Route
             path="/simulation"
             element={

@@ -60,7 +60,7 @@ export function SimulatedInvestmentCard({
 }) {
   const { coins, perf1d, perf7d, perf30, perf60, perf90, loading, historyDone } = useTopPerformers();
   const investable = useInvestableCash();
-  // hypothetical capital = current real cash balance
+  // Hypothetical capital is manually entered and independent of wallet balances.
   const capital = investable.cash ?? 0;
   const [draft, setDraft] = useState('');
   const entered = Number(normalizeNumericInput(draft));
@@ -80,7 +80,7 @@ export function SimulatedInvestmentCard({
       description={investable.cash === null ? 'مبلغ فرضی را خودتان وارد کنید' : `اگر ${fmtUSD(capital)} سرمایهٔ دستی در ابتدای بازه سرمایه‌گذاری شده بود`}
     >
       <Surface className="p-4 md:p-5">
-        <div className="mb-4 flex flex-wrap items-end gap-3"><Field label="سرمایهٔ دستی این کارت (دلار)"><Input dir="ltr" inputMode="decimal" value={draft} placeholder={investable.cash === null ? 'مبلغ سرمایه' : String(investable.cash)} onChange={e => setDraft(e.target.value)} /></Field><Button disabled={!draft.trim() || !Number.isFinite(entered) || entered <= 0} onClick={() => { void saveScenarioCash({ mode: 'manual', manualUsd: entered }).catch(() => toast('error', 'ذخیره انجام نشد')); }}>ذخیره</Button></div>
+        <div className="mb-4 flex flex-wrap items-end gap-3"><Field label="مقدار تتر برای بازهٔ گذشته (USDT)"><Input dir="ltr" inputMode="decimal" suffix="USDT" value={draft} placeholder={investable.cash === null ? 'مبلغ سرمایه' : String(investable.cash)} onChange={e => setDraft(e.target.value)} /></Field><Button disabled={!draft.trim() || !Number.isFinite(entered) || entered <= 0} onClick={() => { void saveScenarioCash({ mode: 'manual', manualUsd: entered }).catch(() => toast('error', 'ذخیره انجام نشد')); }}>ذخیره</Button></div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SegmentedControl
             options={PERF_PERIODS}

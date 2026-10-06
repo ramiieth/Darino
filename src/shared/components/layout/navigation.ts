@@ -126,6 +126,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'tools',
     label: 'ابزارها',
     items: [
+      { id: 'market-performance', to: '/market-performance', label: 'عملکرد بازار', description: 'بازده بازار در ۱، ۷، ۳۰، ۶۰ و ۹۰ روز گذشته', icon: Activity },
       {
         id: 'calculators',
         to: '/calculators',
