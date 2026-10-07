@@ -87,13 +87,14 @@ try {
   assert(await rows.count()>0);
   for(const row of await rows.all()) {
    const label=row.locator('[data-yield-label]');assert.equal(await label.innerText(),'sUSDat');
+   const alignment=await label.evaluate(e=>{const r=document.createRange();r.selectNodeContents(e);const meta=e.closest('.positions-identity').querySelector('p.flex');return {text:r.getBoundingClientRect().right,meta:meta.getBoundingClientRect().right,align:getComputedStyle(e).textAlign};});assert.equal(alignment.align,'right');assert(Math.abs(alignment.text-alignment.meta)<2,'receipt title must align with metadata beside the logo');
    const qty=row.locator('.positions-quantity');assert(!/[A-Za-z]|وای|پی/.test(await qty.innerText()));
    assert.equal(await qty.evaluate(e=>getComputedStyle(e.firstElementChild).whiteSpace),'nowrap');
    const containerWide=await row.evaluate(e=>e.closest('.positions-list-container').getBoundingClientRect().width>=640);
    if(containerWide)assert.equal(await qty.evaluate(e=>getComputedStyle(e).paddingInlineStart),'0px');
   }
   await page.locator('[data-yield-token="YT"]').first().scrollIntoViewIfNeeded();
-  await page.screenshot({path:`/tmp/darino-pendle-compact-${width}.png`,fullPage:false});
+  await page.screenshot({path:`/tmp/darino-pendle-aligned-${width}.png`,fullPage:false});
  }
 
  assert.equal(await page.locator('#eth-scenario-title,#whatif-title,#movers-title').count(),0);
