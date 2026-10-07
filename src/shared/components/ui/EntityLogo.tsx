@@ -88,7 +88,7 @@ export function TokenLogo({
   const alt = networkName ? `${name ?? symbol} روی ${networkName}` : name ?? symbol;
   return (
     <span className="relative inline-flex shrink-0" style={{ height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt} data-yield-token={yieldIdentity?.kind} data-yield-symbol={yieldIdentity?symbol:undefined}>
-      <span className="relative inline-flex shrink-0" style={{width:Math.round(size*.96),height:Math.round(size*.96)}}><LogoImage src={official?.logo ?? logo} label={yieldIdentity?.underlyingFa || name || symbol} size={size} />
+      <span className="relative inline-flex shrink-0" style={{width:Math.round(size*.96),height:Math.round(size*.96)}}><LogoImage src={official?.logo ?? logo} label={yieldIdentity?.underlying || name || symbol} size={size} />
       {networkName !== undefined && networkName !== null && (
         <span className="token-network-badge rounded-full bg-card p-px" style={{position:'absolute',bottom:-5,right:-4,lineHeight:0}}>
           <LogoImage src={networkLogo} label={networkName} size={badge} square />

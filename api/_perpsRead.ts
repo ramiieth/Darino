@@ -13,8 +13,11 @@ async function read(url: string): Promise<Record<string, unknown>> {
   return data;
 }
 export async function getPerpsRead(op: string, address: string): Promise<unknown> {
-  if (op === 'lighter-mainnet-markets') return read(`${MAINNET}/api/v1/orderBookDetails`);
-  if (op === 'lighter-markets') return read(`${LIGHTER}/api/v1/orderBookDetails`);
+  if (op === 'lighter-mainnet-markets'||op === 'lighter-markets') {
+    const host=op==='lighter-mainnet-markets'?MAINNET:LIGHTER;
+    const [books,metadata]=await Promise.all([read(`${host}/api/v1/orderBookDetails`),read(`${host}/api/v1/tokenlist`).catch(()=>null)]);
+    return {...books,...(Array.isArray(metadata?.tokens)?{tokens:metadata.tokens}:{})};
+  }
   if (op === 'ondo-markets') {
     const [markets, prices] = await Promise.all([read(`${ONDO}/v1/markets`), read(`${ONDO}/v1/perps/mark_prices`)]);
     return { markets, prices };

@@ -85,7 +85,7 @@ function errorText(e: ArcusError | null): string | null {
 /** نام فارسی بازار بر اساس دارایی پایه (مثل «بیت‌کوین» به‌جای BTC-USD) */
 function marketNameFa(m: ArcusMarket | undefined, displayName: string): string {
   const base = m?.baseAsset ?? displayName.split('-')[0];
-  return marketAssetName(base);
+  return marketAssetName(base,m?.fullAssetName);
 }
 
 function MarketLogo({ m, name, size = 28 }: { m: ArcusMarket | undefined; name: string; size?: number }) {
@@ -285,7 +285,7 @@ function PositionsList({ res, orders, marketById }: { res: Res<ArcusPosition[]>;
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="relative shrink-0"><MarketLogo m={m} name={p.marketDisplayName} size={40}/><span className="absolute -bottom-1 -left-1 rounded-full bg-card p-0.5"><LogoImage src={chainIdentity('robinhood').logo} label="رابین‌هود" size={16}/></span></span>
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p><p className="mt-1 text-xs text-muted">اندازهٔ پوزیشن <bdi dir="rtl">{tokenQuantity(p.size)} {persianAssetName(m?.baseAsset??p.marketDisplayName.split('-')[0])}</bdi></p>
+                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p><p className="mt-1 text-xs text-muted">اندازهٔ پوزیشن <bdi dir="rtl">{tokenQuantity(p.size)} {marketNameFa(m,p.marketDisplayName)}</bdi></p>
               </div>
               <Badge tone={p.side === 'LONG' ? 'gain' : 'loss'}>{p.side === 'LONG' ? 'لانگ (خرید)' : 'شورت (فروش)'}</Badge>
               <Badge tone="neutral">{p.marginMode === 'CROSS' ? 'مارجین متقاطع' : 'مارجین ایزوله'}</Badge>
