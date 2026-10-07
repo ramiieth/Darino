@@ -66,7 +66,7 @@ export function LetterAvatar({
   kind: AssetKind;
   size: number;
 }) {
-  const letters = symbol.replace(/[^A-Za-z0-9]/g, '').slice(0, 2) || symbol.slice(0, 1);
+  const letters = symbol.replace(/[^A-Za-z0-9؀-ۿ]/g, '').slice(0, 2) || symbol.slice(0, 1);
   return (
     <span
       className={cn(
@@ -84,12 +84,14 @@ export function AssetLogo({
   symbol,
   kind,
   size = 32,
-  className
+  className,
+  fallbackLabel
 }: {
   symbol: string;
   kind: AssetKind;
   size?: number;
   className?: string;
+  fallbackLabel?:string;
 }) {
   size = Math.round(size * 0.96);
   // فقط لوگو از logoStore (سبک — بدون sync قیمت توکنایز در لود عمومی)
@@ -154,7 +156,7 @@ export function AssetLogo({
   }
 
   if (!url) {
-    return <LetterAvatar symbol={symbol} kind={kind} size={size} />;
+    return <LetterAvatar symbol={fallbackLabel??symbol} kind={kind} size={size} />;
   }
 
   return (

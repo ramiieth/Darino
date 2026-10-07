@@ -10,6 +10,7 @@
  *  • لوگوی توکن همراه نشان کوچک شبکه است؛ لوگوی پلتفرم از شبکه مستقل است.
  *  • خطای بارگذاری یا نبود تصویر → آواتار حرفی هم‌اندازه (رابط خراب نمی‌شود).
  */
+import { usePendleLogo } from './usePendleLogo';
 import { useState } from 'react';
 import { yieldTokenIdentity } from './YieldTokenMark';
 import { cn } from '@/shared/lib/cn';
@@ -64,6 +65,8 @@ export function LogoImage({
 /** لوگوی توکن + نشان شبکه در گوشه */
 export function TokenLogo({
   logo,
+  chain,
+  contract,
   symbol,
   name,
   networkLogo,
@@ -71,6 +74,8 @@ export function TokenLogo({
   size = 32
 }: {
   logo: string | null | undefined;
+  chain?: string;
+  contract?: string | null;
   symbol: string;
   name?: string;
   networkLogo?: string | null;
@@ -78,16 +83,18 @@ export function TokenLogo({
   size?: number;
 }) {
   const yieldIdentity = yieldTokenIdentity(symbol);
+  const official = usePendleLogo(!!yieldIdentity,chain,contract);
   const badge = yieldIdentity ? Math.max(16, Math.round(size * 0.42)) : Math.max(18, Math.round(size * 0.54));
   const alt = networkName ? `${name ?? symbol} روی ${networkName}` : name ?? symbol;
   return (
-    <span className="relative inline-flex shrink-0" style={{ width: Math.round(size*.96), height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt} data-yield-token={yieldIdentity?.kind} data-yield-symbol={yieldIdentity?symbol:undefined}>
-      <LogoImage src={logo} label={yieldIdentity?.underlyingFa || name || symbol} size={size} />
+    <span className="relative inline-flex shrink-0" style={{ height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt} data-yield-token={yieldIdentity?.kind} data-yield-symbol={yieldIdentity?symbol:undefined}>
+      <span className="relative inline-flex shrink-0" style={{width:Math.round(size*.96),height:Math.round(size*.96)}}><LogoImage src={official?.logo ?? logo} label={yieldIdentity?.underlyingFa || name || symbol} size={size} />
       {networkName !== undefined && networkName !== null && (
         <span className="token-network-badge rounded-full bg-card p-px" style={{position:'absolute',bottom:-5,right:-4,lineHeight:0}}>
           <LogoImage src={networkLogo} label={networkName} size={badge} square />
         </span>
-      )}
+      )}</span>
+      {yieldIdentity&&<span dir="ltr" data-yield-logo-badge={yieldIdentity.kind} className="ms-1 self-center rounded bg-surface-2 px-1 py-0.5 text-[9px] font-bold leading-none text-muted">{yieldIdentity.kind}</span>}
     </span>
   );
 }

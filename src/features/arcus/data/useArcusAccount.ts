@@ -251,7 +251,7 @@ export function useArcusAccount(ref: AccountRef | null, opts: { live: boolean; h
     const startTimer = () => {
       if (timer) return;
       timer = setInterval(() => {
-        if (document.visibilityState === 'visible' && refRef.current) void refreshSummary(refRef.current);
+        if (document.visibilityState === 'visible' && refRef.current) {void refreshSummary(refRef.current);void loadMarkets(refRef.current.env);}
       }, interval);
     };
     const stopTimer = () => {
@@ -260,7 +260,7 @@ export function useArcusAccount(ref: AccountRef | null, opts: { live: boolean; h
     };
     const onVis = () => {
       if (document.visibilityState === 'visible') {
-        if (refRef.current) void refreshSummary(refRef.current);
+        if (refRef.current) {void refreshSummary(refRef.current);void loadMarkets(refRef.current.env);}
         startTimer();
       } else stopTimer();
     };

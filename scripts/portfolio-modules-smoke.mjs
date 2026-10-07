@@ -77,6 +77,7 @@ try {
   const mark=page.locator(`[data-yield-token="${kind}"]`).first();
   await mark.waitFor();
   const logo=mark;
+  assert.equal(await logo.locator(`[data-yield-logo-badge="${kind}"]`).innerText(),kind);
   assert.equal(await logo.locator('.token-network-badge img').getAttribute('src'),'/logos/chain-1.svg');
   assert.equal(await logo.locator('.entity-logo img').first().getAttribute('src'),'/logos/token-usdc.svg');
  }
