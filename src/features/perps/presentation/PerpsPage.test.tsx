@@ -8,11 +8,11 @@ vi.mock('@/repositories/remoteClient',()=>({fetchJson:vi.fn(()=>new Promise(()=>
 afterEach(cleanup);
 it.each(['lighter','ondo'] as const)('renders Persian tickers, currency units and figures on %s',provider=>{
  const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
- client.setQueryData(['perps-markets',provider],[{symbol:'USO',price:145.29,change:12.5},{symbol:'FUTURE2',price:0.000125,change:null}]);
+ client.setQueryData(['perps-markets',provider],[{symbol:'USO',price:145.29,change:12.5},{symbol:'FUTURE2',price:0.000125,change:null},{symbol:'EIGEN',price:1.2,change:null}]);
  const {container}=render(<QueryClientProvider client={client}><PerpsPage provider={provider}/></QueryClientProvider>);
- expect(screen.getByText('یو‌اس‌او')).toBeTruthy();expect(screen.getByText('اف‌یو‌تی‌یو‌آر‌ای۲')).toBeTruthy();
+ expect(screen.getByText('یو‌اس‌او')).toBeTruthy();expect(screen.getByText('آیگن')).toBeTruthy();expect(screen.getByText('FUTURE2')).toBeTruthy();
  expect(screen.getByText('قیمت مارک: ۱۴۵.۲۹ '+(provider==='lighter'?'یو‌اس‌دی‌جی':'دلار'))).toBeTruthy();
- expect(container.textContent).not.toMatch(/USDG|USD|\bUSO\b|[0-9]/);
+ expect(container.textContent).not.toMatch(/USDG|USD|\bUSO\b/);
 });
 
 it('offers four separate Lighter views and retains Robinhood currency only in its own view',()=>{

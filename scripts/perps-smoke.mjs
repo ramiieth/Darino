@@ -14,7 +14,7 @@ await page.route('**/*',async route=>{
  if(u.pathname==='/api/auth')body={available:true,authenticated:true,session:{id:'qa',label:'QA',createdAt:Date.now(),stepUpFresh:true}};
  if(u.pathname==='/api/integrations'){
  const op=u.searchParams.get('op');
- if(op==='lighter-mainnet-markets')body={code:200,order_book_details:[{symbol:'BTC',status:'active',mark_price:'100'}],spot_order_book_details:[{symbol:'LIT/USDC',status:'active',last_trade_price:'3.8'}]};
+ if(op==='lighter-mainnet-markets')body={code:200,tokens:[{symbol:'EIGEN',name:'EigenCloud',logo:'eigen',logo_extension:'svg'}],order_book_details:[{symbol:'BTC',status:'active',mark_price:'100'},{symbol:'EIGEN',status:'active',mark_price:'1.2'}],spot_order_book_details:[{symbol:'LIT/USDC',status:'active',last_trade_price:'3.8'}]};
  if(op==='lighter-mainnet-account')body={accounts:[{account_index:9,l1_address:address,total_asset_value:'25',available_balance:'10',positions:[],assets:[{symbol:'LIT',balance:'2',locked_balance:'1',margin_balance:'0'},{symbol:'EMPTY',balance:'0'}]}]};
  if(op==='lighter-markets')body={code:200,order_book_details:[{symbol:'LIT',status:'active',mark_price:'2.2',daily_price_change:'3.1'}]};
  if(op==='lighter-account')body={accounts:[{account_index:7,l1_address:address,total_asset_value:'100',available_balance:'80',positions:[{symbol:'LIT',sign:-1,position:'10',avg_entry_price:'2.5',unrealized_pnl:'3',liquidation_price:'8'}]}]};
@@ -37,7 +37,7 @@ try{
  assert.equal(await page.locator('.token-network-badge').count(),0);await page.getByText('اتریوم',{exact:true}).waitFor();await page.getByText('آربیتروم',{exact:true}).waitFor();await fits();
  await page.setViewportSize({width:1440,height:1000});await fits();await page.screenshot({path:'/tmp/darino-ondo-perps-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/darino-ondo-perps-mobile.png',fullPage:true});
- await page.goto(base+'/#/lighter');await page.getByText('قیمت مارک: ۱۰۰ یو‌اس‌دی‌سی',{exact:true}).waitFor();
+ await page.goto(base+'/#/lighter');await page.getByText('قیمت مارک: ۱۰۰ یو‌اس‌دی‌سی',{exact:true}).waitFor();await page.getByText('آیگن',{exact:true}).waitFor();await page.getByLabel('جست‌وجوی بازار').fill('آیگن');assert.equal(await page.getByText('بیت‌کوین',{exact:true}).count(),0);await page.getByLabel('جست‌وجوی بازار').fill('EigenCloud');await page.getByText('آیگن',{exact:true}).waitFor();await page.getByLabel('جست‌وجوی بازار').fill('');
  assert.equal(await page.getByRole('tab').count(),4);
  await page.getByRole('tab',{name:'بازار اسپات',exact:true}).click();await page.getByText('قیمت: ۳.۸ یو‌اس‌دی‌سی',{exact:true}).waitFor();
  await page.getByRole('tab',{name:'دارایی‌ها',exact:true}).click();await page.getByPlaceholder('حساب من',{exact:true}).fill('حساب اصلی');await page.getByPlaceholder('0x…',{exact:true}).fill(address);await page.getByRole('button',{name:'افزودن حساب',exact:true}).click();await page.getByText('موجودی: ۲',{exact:true}).waitFor();assert.equal(await page.getByText('ای‌ام‌پی‌تی‌وای',{exact:true}).count(),0);

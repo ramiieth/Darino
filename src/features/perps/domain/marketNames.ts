@@ -1,0 +1,24 @@
+import { ASSET_NAME_FA } from '@/shared/i18n/assetDisplayName';
+const names:Record<string,string>={
+ USO:'صندوق نفت آمریکا',WTI:'نفت وست تگزاس',BRENT:'نفت برنت',NATGAS:'گاز طبیعی',COPPER:'مس',GLD:'صندوق طلا',SLV:'صندوق نقره',
+ LIT:'لایتر',ANTHROPIC:'آنتروپیک',OPENAI:'اوپن‌ای‌آی',SPCX:'اسپیس‌اکس',SMCI:'سوپر مایکرو',IREN:'آیرن',LUNR:'اینتویتیو ماشینز',BABA:'علی‌بابا',MU:'مایکرون',SKHY:'اس‌کی هاینیکس',SKHYNIX:'اس‌کی هاینیکس',VVV:'ونیس',CRCL:'سرکل',SOXL:'صندوق نیمه‌رسانا سه‌برابر',AI:'سی‌تری ای‌آی',SHEIN:'شین',ORCL:'اوراکل',SOFI:'سوفای',SNDK:'سندیسک',QBTS:'دی‌ویو',ASTS:'ای‌اس‌تی اسپیس‌موبایل',BE:'بلوم انرژی',CASHCAT:'کش‌کت',TSM:'نیمه‌رسانای تایوان',CRWV:'کورویو',USELESS:'یوزلس',CLSK:'کلین‌اسپارک',SGOV:'صندوق اوراق خزانهٔ کوتاه‌مدت',WULF:'تراولف',PONS:'پونز',RGTI:'ریگتی',AMC:'ای‌ام‌سی',USAR:'یو‌اس‌ای رِر ارث',ANSEM:'انسم',PUMP:'پامپ',
+ ADBE:'ادوبی',ARM:'آرم',AVGO:'برادکام',BB:'بلک‌بری',BMNR:'بیت‌ماین',CBRS:'سربراس',CELH:'سلسیوس',CXMT:'چانگ‌شین',DKNG:'درفت‌کینگز',GLW:'کورنینگ',HOOD:'رابین‌هود',IBM:'آی‌بی‌ام',LITE:'لومنتوم',MINIMAX:'مینی‌مکس',MRNA:'مدرنا',MRVL:'مارول',NBIS:'نبیوس',NOK:'نوکیا',OKLO:'اوکلو',PURR:'هایپرلیکویید استراتژیز',RDDT:'ردیت',SMSN:'سامسونگ',TTWO:'تیک‌تو',UNITREE:'یونیتری',ZHIPU:'ژیپو',DRAM:'صندوق حافظهٔ راند‌هیل',EWY:'صندوق کرهٔ جنوبی',KORU:'صندوق کرهٔ جنوبی سه‌برابر',URNM:'صندوق معدن‌کاران اورانیوم',IBB:'صندوق زیست‌فناوری',US100:'شاخص آمریکا ۱۰۰',US500:'شاخص آمریکا ۵۰۰',VXX:'شاخص نوسان کوتاه‌مدت',USDJPY:'دلار آمریکا / ین ژاپن',EURUSD:'یورو / دلار آمریکا',
+
+ '2Z':'دابل زیرو',SPX:'اس‌پی‌ایکس ۶۹۰۰','0G':'زیرو جی',AI16Z:'ای‌آی ۱۶ زد',EIGEN:'آیگن',WLD:'ورلدکوین',ZK:'زی‌کی‌سینک',KAITO:'کایتو',ZORA:'زورا',PYTH:'پیت نتورک',TAO:'بیت‌تنسور',DYDX:'دی‌وای‌دی‌اکس',STRK:'استارک‌نت',JTO:'جیتو',BERA:'براچین',GRASS:'گراس',WLFI:'ورلد لیبرتی فایننشال',AERO:'ایرودروم',AVNT:'آوانتیس',GMX:'جی‌ام‌اکس',NMR:'نومرر',AXS:'اکسی اینفینیتی',CRO:'کرونوس',VIRTUAL:'ویرچوال',MET:'متئورا',SYRUP:'میپل فایننس',MYX:'مایکس فایننس',LINEA:'لینیا',ZRO:'لیرزیرو',S:'سونیک',AZTEC:'ازتک',ASTER:'استر',PENGU:'پاجی پنگوئنز',FARTCOIN:'فارت‌کوین',POPCAT:'پاپ‌کت',PIPPIN:'پیپین',DASH:'دش',DUSK:'داسک',FF:'فالکون فایننس',DOLO:'دولومایت',RESOLV:'ریزولو',RAIL:'ریل‌گان',ROBO:'فبریک پروتکل',EDEN:'اوپن‌ایدن',EDGE:'اج‌ایکس',FOGO:'فوگو',FOLKS:'فولکس فایننس',CAP:'کپ',APEX:'اپکس',ARC:'ای‌آی ریگ کامپلکس',BIO:'بایو پروتکل',BIRB:'مون‌بردز',CC:'کنتون نتورک',STBL:'استیبل',STABLE:'استیبل',DATA:'دیتا نتورک',RIVER:'ریور',SKR:'سیکر سولانا موبایل',MEGA:'مگاات',YZY:'ییزی مانی',WEN:'ون',TRUMP:'ترامپ',GRAM:'گرام',IP:'استوری',CTR:'سیتریا',PROVE:'پروو',PRL:'پرل',OURA:'اورا',STONK:'استونک',STABLECOINX:'استیبل‌کوین‌ایکس',ADI:'ادی',CHIP:'چیپ',H100:'اچ ۱۰۰',LAUNCHCOIN:'لانچ‌کوین',
+ QNT:'کوانت',BOT:'روبواستراتژی',F:'فورد',BAC:'بانک آمریکا',CCL:'کارنیوال',VT:'صندوق سهام جهانی ونگارد',RVI:'صندوق سرمایه‌گذاری رابین‌هود',CPER:'صندوق شاخص مس آمریکا',GME:'گیم‌استاپ',ASML:'ای‌اس‌ام‌ال',QCOM:'کوالکام',NOW:'سرویس‌ناو',DELL:'دل',RKLB:'راکت لب',BYD:'بی‌وای‌دی',HYUNDAI:'هیوندای',HYUNDAIUSD:'هیوندای',SAMSUNG:'سامسونگ',SAMSUNGUSD:'سامسونگ',XIAOMI:'شیائومی',POPMART:'پاپ‌مارت',POPSMART:'پاپ‌اسمارت',TENCENT:'تنسنت',KIOXIA:'کیوکسیا',WDC:'وسترن دیجیتال',AXTI:'ای‌ایکس‌تی',AAOI:'اپلاید اپتوالکترونیکس',GEV:'جی‌ای ورنوا',HANMI:'هانمی سمی‌کنداکتور',SMIC:'شرکت بین‌المللی ساخت نیمه‌رسانا',SPACEX:'اسپیس‌اکس',SKHYNIXUSD:'اس‌کی هاینیکس',STRC:'سهام ممتاز استراتژی',
+ BRENTOIL:'نفت برنت',XCU:'مس',XPT:'پلاتین',XPD:'پالادیوم',WHEAT:'گندم',SOXX:'صندوق نیمه‌رسانای آی‌شیرز',SOXS:'صندوق فروش نیمه‌رسانا سه‌برابر',URA:'صندوق اورانیوم',IWM:'صندوق راسل ۲۰۰۰',DIA:'صندوق داوجونز',MAGS:'صندوق هفت شرکت بزرگ',BOTZ:'صندوق رباتیک و هوش مصنوعی',KRCOMP:'شاخص بورس کره',US10Y:'اوراق خزانهٔ ده‌ساله آمریکا',GBPUSD:'پوند بریتانیا / دلار آمریکا',AUDUSD:'دلار استرالیا / دلار آمریکا',NZDUSD:'دلار نیوزیلند / دلار آمریکا',USDCAD:'دلار آمریکا / دلار کانادا',USDCHF:'دلار آمریکا / فرانک سوئیس',USDHKD:'دلار آمریکا / دلار هنگ‌کنگ',USDKRW:'دلار آمریکا / وون کره'
+};
+
+// Full provider names distinguish reused tickers (e.g. Arcus QNT is Quantinuum).
+const providerNames:Record<string,string>={quantinuum:'کوانتینیوم',quant:'کوانت',artificialinu:'آرتیفیشال اینو',c3ai:'سی‌تری ای‌آی',eigencloud:'آیگن',eigenlayer:'آیگن',eigen:'آیگن'};
+export const marketBase=(symbol:string)=>symbol.split(/[-/_]/)[0].replace(/\.P$/i,'');
+export function marketAssetName(symbol:string,providerName?:string|null){
+ const base=marketBase(symbol),key=base.toUpperCase();
+ const explicit=providerName?.trim();
+ const identified=explicit?providerNames[explicit.toLowerCase().replace(/[^a-z0-9]/g,'')]:undefined;
+ if(identified)return identified;
+ const scaled=/^(?:1000|K)(SHIB|PEPE|BONK|FLOKI|NOT|TOSHI)$/.exec(key);
+ if(scaled)return `۱۰۰۰ ${ASSET_NAME_FA[scaled[1]]??({NOT:'نات‌کوین',TOSHI:'توشی'} as Record<string,string>)[scaled[1]]}`;
+ const normalized=key==='RHQQQ'?'QQQ':key==='RHSPY'?'SPY':key;
+ return names[normalized]??ASSET_NAME_FA[normalized]??(explicit&&explicit.toUpperCase()!==key?explicit:base);
+}

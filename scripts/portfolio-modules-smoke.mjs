@@ -15,7 +15,7 @@ snapshot.positions.push(
  {...snapshot.positions[0],id:'no-logo',tokenId:'nologo',symbol:'NOLOGO',contract:'0x'+'77'.repeat(20),value:30,icon:null,verified:false},
  {...snapshot.positions[0],id:'trash',tokenId:'trash',symbol:'SPAM',value:300,spam:true}
 );
-snapshot.positions.push(...['YT','PT'].map((kind,i)=>({...snapshot.positions[0],id:kind,tokenId:kind,contract:'0x'+String(i+2).repeat(40),name:kind+'-USDe-30DEC2026',symbol:kind+'-USDe-30DEC2026',quantity:'10',value:i?100:4.01,price:i?10:0.401,icon:'/logos/token-usdc.svg',verified:false,protocol:'Pendle'})));
+snapshot.positions.push(...['YT','PT'].map((kind,i)=>({...snapshot.positions[0],id:kind,tokenId:kind,contract:'0x'+String(i+2).repeat(40),name:kind+'-sUSDat-30DEC2026',symbol:kind+'-sUSDat-30DEC2026',quantity:'1234567.890123',value:i?100:4.01,price:i?10:0.401,icon:'/logos/token-usdc.svg',verified:false,protocol:'Pendle'})));
 snapshot.total=11435.01;
 await page.route('**/*',async route => {
  const u=new URL(route.request().url());
@@ -81,11 +81,20 @@ try {
   assert.equal(await logo.locator('.token-network-badge img').getAttribute('src'),'/logos/chain-1.svg');
   assert.equal(await logo.locator('.entity-logo img').first().getAttribute('src'),'/logos/token-usdc.svg');
  }
- await page.locator('[data-yield-token="PT"]').first().scrollIntoViewIfNeeded();
- await page.screenshot({path:'/tmp/darino-yield-token-marks-desktop.png',fullPage:false});
- await page.setViewportSize({width:390,height:844});await page.waitForTimeout(400);await fits();
- await page.locator('[data-yield-token="YT"]').first().scrollIntoViewIfNeeded();
- await page.screenshot({path:'/tmp/darino-yield-token-marks-mobile.png',fullPage:false});
+ for(const width of [390,768,1440]) {
+  await page.setViewportSize({width,height:844});await page.waitForTimeout(300);await fits();
+  const rows=page.locator('.positions-grid').filter({has:page.locator('[data-yield-label]')});
+  assert(await rows.count()>0);
+  for(const row of await rows.all()) {
+   const label=row.locator('[data-yield-label]');assert.equal(await label.innerText(),'sUSDat');
+   const qty=row.locator('.positions-quantity');assert(!/[A-Za-z]|وای|پی/.test(await qty.innerText()));
+   assert.equal(await qty.evaluate(e=>getComputedStyle(e.firstElementChild).whiteSpace),'nowrap');
+   const containerWide=await row.evaluate(e=>e.closest('.positions-list-container').getBoundingClientRect().width>=640);
+   if(containerWide)assert.equal(await qty.evaluate(e=>getComputedStyle(e).paddingInlineStart),'0px');
+  }
+  await page.locator('[data-yield-token="YT"]').first().scrollIntoViewIfNeeded();
+  await page.screenshot({path:`/tmp/darino-pendle-compact-${width}.png`,fullPage:false});
+ }
 
  assert.equal(await page.locator('#eth-scenario-title,#whatif-title,#movers-title').count(),0);
  await fits();
