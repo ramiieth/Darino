@@ -1,6 +1,6 @@
 import { isBitcoinAddress,validBitcoinAddress } from './bitcoinAddress.js';
 /** Read-only provider data; never written into the accounting ledger. */
-export interface ChainInfo { id: string; name: string; icon: string | null; positions: boolean; transactions: boolean }
+export interface ChainInfo { chainId?:number; id: string; name: string; icon: string | null; positions: boolean; transactions: boolean }
 export interface LivePosition {
   id: string; tokenId: string; chain: string; contract: string | null; name: string; symbol: string;
   icon: string | null; quantity: string | null; value: number | null; price: number | null;

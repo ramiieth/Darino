@@ -24,16 +24,16 @@ import { ChipGroup, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Field, Select } from '@/shared/components/ui/Input';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
-import { AssetLogo } from '@/shared/components/ui/AssetLogo';
 import { LogoImage } from '@/shared/components/ui/EntityLogo';
 import { toast } from '@/shared/store/toastStore';
-import { fmtDateTime, fmtRelativeAge } from '@/shared/utils/formatters';
+import { fmtDateTime, fmtRelativeAge,toFaDigits } from '@/shared/utils/formatters';
 import { useCustody } from '@/features/custody/data/useCustody';
 import { saveOperation } from '@/features/custody/data/repository';
 import { HoldingForm } from '@/features/custody/presentation/HoldingsManager';
 import { formatAmount, cmp } from '@/features/custody/domain/decimal';
 import { linkTransfer, operationFromTransfer, reconcileTransfers, type ExternalTransfer } from '@/features/custody/domain/reconcile';
-import { assetDisplayName,persianAssetName } from '@/shared/i18n/assetDisplayName';
+import { MarketAssetLogo,marketAssetName } from '@/features/perps/presentation/MarketAssetIdentity';
+import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 import type { Holding } from '@/features/custody/domain/types';
 import { ERROR_TEXT, type ArcusError } from '../api/client';
 import type { HistoryKind } from '../api/paginate';
@@ -78,20 +78,20 @@ function tsCell(v: unknown) {
 
 function errorText(e: ArcusError | null): string | null {
   if (!e) return null;
-  if (e.kind === 'rate_limited' && e.retryAfterMs) return `${ERROR_TEXT.rate_limited} (حدود ${Math.ceil(e.retryAfterMs / 1000)} ثانیه)`;
+  if (e.kind === 'rate_limited' && e.retryAfterMs) return `${ERROR_TEXT.rate_limited} (حدود ${toFaDigits(Math.ceil(e.retryAfterMs / 1000))} ثانیه)`;
   return e.message || ERROR_TEXT[e.kind];
 }
 
 /** نام فارسی بازار بر اساس دارایی پایه (مثل «بیت‌کوین» به‌جای BTC-USD) */
 function marketNameFa(m: ArcusMarket | undefined, displayName: string): string {
   const base = m?.baseAsset ?? displayName.split('-')[0];
-  return assetDisplayName(base, m?.fullAssetName).name;
+  return marketAssetName(base);
 }
 
 function MarketLogo({ m, name, size = 28 }: { m: ArcusMarket | undefined; name: string; size?: number }) {
   const base = m?.baseAsset ?? name.split('-')[0];
   // لوگوی بازار بر اساس دارایی پایه (نه هویت توکن روی زنجیره)
-  return <AssetLogo symbol={base} kind="crypto" size={size} />;
+  return <MarketAssetLogo symbol={base} size={size} />;
 }
 
 export default function ArcusPage() {
@@ -364,11 +364,11 @@ function OrdersList({ res, marketById }: { res: Res<ArcusOrder[]>; marketById: M
     <div className="space-y-4">
       {res.error && <Notice tone="stale">{errorText(res.error)} — آخرین دادهٔ معتبر.</Notice>}
       <Surface className="p-4">
-        <h3 className="mb-2 text-sm font-bold text-ink">سفارش‌های باز ({open.length})</h3>
+        <h3 className="mb-2 text-sm font-bold text-ink">سفارش‌های باز ({toFaDigits(open.length)})</h3>
         {open.length ? <ul className="divide-y divide-divider">{open.map((o) => <OrderRow key={o.orderId} o={o} m={marketById.get(o.marketId)} />)}</ul> : <p className="text-xs text-muted">ندارد</p>}
       </Surface>
       <Surface className="p-4">
-        <h3 className="mb-2 text-sm font-bold text-ink">سفارش‌های در انتظار فعال‌سازی — حد سود و حد ضرر ({untrig.length})</h3>
+        <h3 className="mb-2 text-sm font-bold text-ink">سفارش‌های در انتظار فعال‌سازی — حد سود و حد ضرر ({toFaDigits(untrig.length)})</h3>
         {untrig.length ? <ul className="divide-y divide-divider">{untrig.map((o) => <OrderRow key={o.orderId} o={o} m={marketById.get(o.marketId)} />)}</ul> : <p className="text-xs text-muted">ندارد</p>}
       </Surface>
 

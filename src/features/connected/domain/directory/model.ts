@@ -18,7 +18,7 @@ export function normalizeMetadata(protocols:unknown,chains:unknown,at=Date.now()
  }
  const chainRows:ChainInfo[]=[];
  for(const raw of Array.isArray(chains)?chains:[]){if(!raw||typeof raw!=='object')continue;const r=raw as Record<string,unknown>,name=String(r.name??''),key=identityKey(name);if(stopped(r)||retiredChains.has(key)){blockedChains.add(key);blockedChains.add(identityKey(chainIds[name]??name.toLowerCase().replace(/\s+/g,'-')));continue;}if(!CHAIN_NAME_FA[name]||typeof r.tvl!=='number'||r.tvl<=0)continue;
- const id=chainIds[name]??name.toLowerCase().replace(/\s+/g,'-');if(!/^[-a-z0-9]{1,60}$/.test(id))continue;chainRows.push({id,name:CHAIN_NAME_FA[name],icon:llamaChainLogo(name),positions:false,transactions:false});
+ const id=chainIds[name]??name.toLowerCase().replace(/\s+/g,'-');if(!/^[-a-z0-9]{1,60}$/.test(id))continue;chainRows.push({id,chainId:typeof r.chainId==='number'?r.chainId:undefined,name:CHAIN_NAME_FA[name],icon:llamaChainLogo(name),positions:false,transactions:false});
  }
  return {fetchedAt:at,chains:chainRows,protocols:protocolRows.sort((a,b)=>b.tvl-a.tvl),blockedProtocols:[...blockedProtocols],blockedChains:[...blockedChains]};
 }

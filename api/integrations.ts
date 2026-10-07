@@ -1,3 +1,4 @@
+import { getPendleLogos } from './_pendleLogos.js';
 import zerionWebhook from './_zerionWebhook.js';
 import { isBitcoinAddress } from '../src/features/connected/domain/bitcoinAddress.js';
 import { getBitcoinWallet,getBitcoinTransactions } from './_bitcoin.js';
@@ -36,8 +37,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     if(op==='wallet-events'&&req.method==='GET'){const addresses=(u.searchParams.get('addresses')??'').split(',').filter(Boolean);if(addresses.length>30||!(await Promise.all(addresses.map(validPublicAddress))).every(Boolean)){json(res,400,{error:'آدرس معتبر نیست'});return;}const budget=await zerionQuota();json(res,200,{refreshAfterMs:budget&&budget.level!=='normal'?budget.walletMs:60000,events:Object.fromEntries(await Promise.all(addresses.map(async a=>[a.startsWith('0x')?a.toLowerCase():a,await walletActivityAt(a)])))});return;}
     if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
+    if(op==='pendle-logos' && req.method==='GET'){json(res,200,await getPendleLogos());return;}
     if(op==='directory' && req.method==='GET'){json(res,200,await getDirectory());return;}
-    if(['lighter-markets','lighter-account','ondo-markets'].includes(op) && req.method==='GET'){json(res,200,await getPerpsRead(op,u.searchParams.get('address')?.trim()??''));return;}
+    if(['lighter-markets','lighter-account','lighter-mainnet-markets','lighter-mainnet-account','ondo-markets'].includes(op) && req.method==='GET'){json(res,200,await getPerpsRead(op,u.searchParams.get('address')?.trim()??''));return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';

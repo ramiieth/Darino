@@ -152,6 +152,7 @@ export function App() {
               </Lazy>
             }
           />
+          <Route path="/lighter" element={<Private label="لایتر"><PerpsPage provider="lighter" initialTab="perp" /></Private>} />
           <Route path="/lighter-robinhood" element={<Private label="لایتر رابین‌هود"><PerpsPage provider="lighter" /></Private>} />
           <Route path="/ondo-perps" element={<Private label="اوندو پرپس"><PerpsPage provider="ondo" /></Private>} />
           <Route path="/wallets" element={<Private label="مدیریت کیف پول‌ها"><ConnectedPage /></Private>} />
