@@ -85,6 +85,7 @@ export function TokenLogo({
   const yieldIdentity = yieldTokenIdentity(symbol);
   const official = usePendleLogo(!!yieldIdentity,chain,contract);
   const badge = yieldIdentity ? Math.max(16, Math.round(size * 0.42)) : Math.max(18, Math.round(size * 0.54));
+  const receiptTone=yieldIdentity?.kind==='YT'?'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300':yieldIdentity?.kind==='PT'?'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300':'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300';
   const alt = networkName ? `${name ?? symbol} روی ${networkName}` : name ?? symbol;
   return (
     <span className="relative inline-flex shrink-0" style={{ height: Math.round(size*.96), position: 'relative' }} role="img" aria-label={alt} data-yield-token={yieldIdentity?.kind} data-yield-symbol={yieldIdentity?symbol:undefined}>
@@ -94,7 +95,7 @@ export function TokenLogo({
           <LogoImage src={networkLogo} label={networkName} size={badge} square />
         </span>
       )}</span>
-      {yieldIdentity&&<span dir="ltr" data-yield-logo-badge={yieldIdentity.kind} className="ms-1 self-center rounded bg-surface-2 px-1 py-0.5 text-[9px] font-bold leading-none text-muted">{yieldIdentity.kind}</span>}
+      {yieldIdentity&&<span dir="ltr" data-yield-logo-badge={yieldIdentity.kind} className={`ms-1 self-center rounded-md px-1.5 py-1 text-[10px] font-bold leading-none ${receiptTone}`}>{yieldIdentity.kind}</span>}
     </span>
   );
 }
