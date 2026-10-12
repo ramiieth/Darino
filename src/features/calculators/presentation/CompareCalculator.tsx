@@ -2,6 +2,7 @@ import { useAssistantInsights } from '@/shared/assistant/insights';
 import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 /**
  * ⑤ Market comparison — the same capital in several assets over one period.
+ * End price per asset: manual forecast › history at the end date (past) › live price.
  * Value, profit, return, CAGR, ranking, sort, filter, CSV/PDF.
  * Calculations in domain (calcCompare).
  */
@@ -19,7 +20,9 @@ import { LineChartCard, BarChartCard, fmtFaDate } from './CalcCharts';
 import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { getHistoricalSeries } from '@/features/calculators/data/historical';
-import { calcCompare, type CompareResult } from '@/features/calculators/domain';
+import { calcCompare, priceFromSeries, type CompareResult } from '@/features/calculators/domain';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
+import { parseNum, priceInput } from './parse';
 import type { CalculatorAsset } from '@/features/calculators/data/catalogs';
 import { SERIES } from '@/shared/design/chartTheme';
 import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
@@ -43,31 +46,38 @@ export function CompareCalculator() {
   const [sort, setSort] = useState<SortKey>('return');
   const [dir, setDir] = useState<SortDir>('desc');
   const [filterQ, setFilterQ] = useState('');
+  const [targets, setTargets] = useState<Record<string, string>>({});
 
   const startTs = useMemo(() => new Date(start + 'T00:00:00').getTime(), [start]);
   const endTs = useMemo(() => new Date(end + 'T00:00:00').getTime(), [end]);
   const years = Math.max((endTs - startTs) / (365.25 * 86_400_000), 0);
+  const now = useMemo(() => Date.now(), []);
+  /** end date already passed → value at the historical end price, not today's */
+  const endInPast = endTs < now - 2 * 86_400_000;
+  const histKey = (symbol: string) => `${symbol}|${startTs}|${endTs}`;
 
   const addAsset = (a: CalculatorAsset | null) => {
     if (a && !selected.some((x) => x.symbol === a.symbol)) setSelected((s) => [...s, a]);
   };
   const removeAsset = (symbol: string) => {
     setSelected((s) => s.filter((x) => x.symbol !== symbol));
-    setHist((h) => {
-      const n = { ...h };
+    setTargets((t) => {
+      const n = { ...t };
       delete n[symbol];
       return n;
     });
   };
 
-  // historical series per asset (start price)
+  // historical series per asset and range (start price, and end price when the end is past)
   useEffect(() => {
+    if (!(endTs > startTs)) return;
     for (const a of selected) {
-      if (hist[a.symbol] !== undefined || loading[a.symbol]) continue;
-      setLoading((l) => ({ ...l, [a.symbol]: true }));
-      getHistoricalSeries(a.kind, a.symbol, startTs, endTs).then((s) => {
-        setHist((h) => ({ ...h, [a.symbol]: s }));
-        setLoading((l) => ({ ...l, [a.symbol]: false }));
+      const k = histKey(a.symbol);
+      if (hist[k] !== undefined || loading[k]) continue;
+      setLoading((l) => ({ ...l, [k]: true }));
+      getHistoricalSeries(a.kind, a.symbol, startTs - 3 * 86_400_000, Math.min(endTs, now)).then((s) => {
+        setHist((h) => ({ ...h, [k]: s }));
+        setLoading((l) => ({ ...l, [k]: false }));
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,22 +86,17 @@ export function CompareCalculator() {
   const results: CompareResult[] = useMemo(
     () =>
       selected.map((a) => {
-        const series = hist[a.symbol];
-        let historical: number | null = null;
-        if (series && series.length > 0) {
-          let best = series[0].price;
-          for (const p of series) {
-            if (p.t <= startTs + 3 * 86_400_000) best = p.price;
-            else break;
-          }
-          historical = best;
-        }
+        const series = hist[histKey(a.symbol)];
+        const historical = priceFromSeries(series, startTs);
+        const manual = parseNum(targets[a.symbol] ?? '');
+        const endPrice = manual > 0 ? manual : endInPast ? priceFromSeries(series, endTs) : (prices[a.symbol] ?? null);
         return calcCompare(
-          { symbol: a.symbol, nameFa: a.nameFa, investment: Number(invest) || 0, historicalPrice: historical, currentPrice: prices[a.symbol] ?? null },
+          { symbol: a.symbol, nameFa: a.nameFa, investment: Number(invest) || 0, historicalPrice: historical, currentPrice: endPrice },
           years
         );
       }),
-    [selected, hist, prices, invest, startTs, years]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, hist, prices, invest, startTs, endTs, endInPast, years, targets]
   );
 
   useEffect(() => { useAssistantInsights.getState().put('calculatorCompare', results.slice(0, 20).map(r => ({ name: r.nameFa, symbol: r.symbol, kind: 'مقایسه فرضی', source: 'simulation', status: 'ready', asOf: Date.now(), metrics: { investment: r.investment, historicalPrice: r.historicalPrice, currentPrice: r.currentPrice, returnPct: r.returnPct, profit: r.profit, currentValue: r.currentValue, startTs, endTs } }))); }, [results, startTs, endTs]);
@@ -121,7 +126,7 @@ export function CompareCalculator() {
     const labels: string[] = [];
     const datasets: { label: string; data: number[]; color: (typeof SERIES)[number] }[] = [];
     selected.forEach((a, i) => {
-      const series = hist[a.symbol];
+      const series = hist[histKey(a.symbol)];
       if (!series || series.length < 2 || !series[0].price) return;
       const base = series[0].price;
       const pts = series.filter((p) => p.t >= startTs - 86_400_000 && p.t <= endTs + 86_400_000);
@@ -129,6 +134,7 @@ export function CompareCalculator() {
       if (labels.length === 0) labels.push(...pts.map((p) => fmtFaDate(p.t)));
     });
     return { labels, datasets };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, hist, startTs, endTs]);
 
   const onSort = (k: SortKey) => {
@@ -176,6 +182,31 @@ export function CompareCalculator() {
           ))}
         </ul>
       )}
+      {selected.length > 0 && (
+        <Disclosure summary={endInPast ? 'قیمت پایان دستی (اختیاری)' : 'پیش‌بینی قیمت در تاریخ پایان'} defaultOpen={!endInPast && endTs > now + 86_400_000}>
+          <p className="mb-2 text-2xs leading-5 text-muted">
+            {endInPast
+              ? 'خالی = قیمت تاریخی در تاریخ پایان.'
+              : 'تاریخ پایان در آینده است؛ قیمت مورد انتظار هر دارایی را وارد کنید. خالی = قیمت فعلی.'}
+          </p>
+          <ul className="space-y-2">
+            {selected.map((a) => (
+              <li key={a.symbol} className="grid grid-cols-[1fr_9rem] items-center gap-2">
+                <span className="truncate text-xs font-semibold text-ink">{persianAssetName(a.symbol, a.nameFa)}</span>
+                <Input
+                  dir="ltr"
+                  inputMode="decimal"
+                  aria-label={`قیمت پایان ${a.symbol}`}
+                  value={targets[a.symbol] ?? ''}
+                  placeholder={priceInput(endInPast ? priceFromSeries(hist[histKey(a.symbol)], endTs) : prices[a.symbol])}
+                  onChange={(e) => setTargets((t) => ({ ...t, [a.symbol]: e.target.value }))}
+                  suffix="$"
+                />
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
     </>
   );
 
@@ -219,7 +250,7 @@ export function CompareCalculator() {
                     <th scope="col" className="w-10 !ps-4 md:!ps-5">#</th>
                     {th('name', 'دارایی', false)}
                     <th scope="col" className="col-num">قیمت شروع</th>
-                    <th scope="col" className="col-num">قیمت فعلی</th>
+                    <th scope="col" className="col-num">{endInPast ? 'قیمت پایان' : 'قیمت فعلی / هدف'}</th>
                     {th('value', 'ارزش')}
                     {th('profit', 'سود')}
                     {th('return', 'بازده')}
@@ -235,7 +266,10 @@ export function CompareCalculator() {
 
                       </td>
                       <td className="col-num text-muted"><MoneyValue value={r.historicalPrice} /></td>
-                      <td className="col-num"><MoneyValue value={r.currentPrice} /></td>
+                      <td className="col-num">
+                        <MoneyValue value={r.currentPrice} />
+                        {parseNum(targets[r.symbol] ?? '') > 0 && <span className="block text-2xs text-accent">پیش‌بینی</span>}
+                      </td>
                       <td className="col-num font-semibold text-ink"><MoneyValue value={r.currentValue} /></td>
                       <td className="col-num"><MoneyValue value={r.profit} signed tone="auto" /></td>
                       <td className="col-num font-semibold"><PercentValue value={r.returnPct} /></td>

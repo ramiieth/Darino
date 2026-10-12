@@ -16,7 +16,11 @@ import { parseIsoToTs, formatGregorianIso } from '@/shared/utils/jalali';
 import { CalcShell, ResultHero, ResultPlaceholder } from './StatCard';
 import { BarChartCard, fmtFaDate } from './CalcCharts';
 import { ExportButtons } from './ExportButtons';
-import { calcXirr, type CashFlow } from '@/features/calculators/domain';
+import { calcXirr, scheduleDates, SCHEDULE_FREQUENCY_LABELS, type CashFlow, type ScheduleFrequency } from '@/features/calculators/domain';
+import { Field } from '@/shared/components/ui/Input';
+import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
+import { parseNum } from './parse';
 import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
 
 interface FlowRow {
@@ -31,6 +35,21 @@ export function XirrCalculator() {
     { id: 2, date: '2024-07-01', amount: '-5000' },
     { id: 3, date: new Date().toISOString().slice(0, 10), amount: '18000' }
   ]);
+
+  const [genAmount, setGenAmount] = useState('-500');
+  const [genFreq, setGenFreq] = useState<ScheduleFrequency>('monthly');
+  const [genStart, setGenStart] = useState('2024-02-01');
+  const [genEnd, setGenEnd] = useState(() => new Date().toISOString().slice(0, 10));
+  const genDates = useMemo(
+    () => scheduleDates(new Date(genStart + 'T00:00:00').getTime(), new Date(genEnd + 'T00:00:00').getTime(), genFreq),
+    [genStart, genEnd, genFreq]
+  );
+  const addPeriodic = () => {
+    const amt = parseNum(genAmount);
+    if (!Number.isFinite(amt) || amt === 0 || genDates.length === 0) return;
+    const base = Date.now();
+    setRows((r) => [...r, ...genDates.slice(0, 600).map((t, i) => ({ id: base + i, date: formatGregorianIso(t), amount: String(amt) }))].sort((a, b) => a.date.localeCompare(b.date)));
+  };
 
   const addRow = () => setRows((r) => [...r, { id: Date.now(), date: new Date().toISOString().slice(0, 10), amount: '0' }]);
   const removeRow = (id: number) => setRows((r) => (r.length > 2 ? r.filter((x) => x.id !== id) : r));
@@ -86,6 +105,26 @@ export function XirrCalculator() {
       <Button variant="outline" size="sm" icon={<Plus />} onClick={addRow}>
         افزودن جریان نقدی
       </Button>
+      <Disclosure summary="افزودن جریان‌های دوره‌ای (مثلاً واریز ماهانه)">
+        <div className="space-y-3">
+          <ChipGroup<ScheduleFrequency>
+            label="دوره"
+            value={genFreq}
+            onChange={setGenFreq}
+            options={(['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'] as ScheduleFrequency[]).map((f) => ({ value: f, label: SCHEDULE_FREQUENCY_LABELS[f] }))}
+          />
+          <Field label="مبلغ هر دوره (واریز منفی)">
+            <Input dir="ltr" inputMode="decimal" value={genAmount} onChange={(e) => setGenAmount(e.target.value)} suffix="دلار" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <SmartDateField label="از" value={genStart ? parseIsoToTs(genStart) : null} onChange={(ts) => setGenStart(ts ? formatGregorianIso(ts) : '')} />
+            <SmartDateField label="تا" value={genEnd ? parseIsoToTs(genEnd) : null} onChange={(ts) => setGenEnd(ts ? formatGregorianIso(ts) : '')} />
+          </div>
+          <Button variant="secondary" size="sm" icon={<Plus />} onClick={addPeriodic} disabled={genDates.length === 0 || !(Math.abs(parseNum(genAmount)) > 0)}>
+            افزودن {toFaDigits(genDates.length)} جریان
+          </Button>
+        </div>
+      </Disclosure>
     </>
   );
 
@@ -101,7 +140,7 @@ export function XirrCalculator() {
             </Notice>
           )}
           <ResultHero
-            label="بازده واقعی سالانه — بازده واقعی سالانه"
+            label="بازده واقعی سالانه (XIRR)"
             value={<PercentValue value={result.xirr === null ? null : result.xirr * 100} tone="auto" />}
           >
             <MetricGrid cols={3}>

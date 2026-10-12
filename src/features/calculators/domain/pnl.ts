@@ -1,7 +1,7 @@
 /**
  * ۱) ماشین‌حساب سود و زیان — فرمول‌های رسمی:
  *   Current Value = Current Price × Quantity
- *   Total Cost     = (Buy Price × Quantity) − Buy Fee
+ *   Total Cost     = (Buy Price × Quantity) + Buy Fee
  *   Net Value      = Current Value − Sell Fee
  *   Profit         = Net Value − Total Cost
  *   Return %       = (Profit ÷ Total Cost) × 100
@@ -21,7 +21,7 @@ export interface PnlResult {
   currentValue: number | null;
   /** سرمایه اولیه = Buy Price × Quantity */
   initialInvestment: number;
-  /** کل سرمایه پرداخت‌شده = (Buy Price × Quantity) − Buy Fee */
+  /** کل سرمایه پرداخت‌شده = (Buy Price × Quantity) + Buy Fee — کارمزد هزینه است و به بهای تمام‌شده اضافه می‌شود */
   totalCost: number;
   /** ارزش خالص فروش = Current Value − Sell Fee */
   netValue: number | null;
@@ -39,7 +39,7 @@ export function calcPnl(input: PnlInput): PnlResult {
   const sellFee = D(input.sellFee);
 
   const initialInvestment = round12(qty.mul(buy));
-  const totalCost = round12(qty.mul(buy).minus(buyFee));
+  const totalCost = round12(qty.mul(buy).plus(buyFee));
 
   if (cur === null) {
     return {
