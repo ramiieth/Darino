@@ -1,5 +1,5 @@
 /**
- * Investment calculators — five tools, all math in domain; UI presents only.
+ * Investment calculators — six tools, all math in domain; UI presents only.
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState } from 'react';
@@ -11,19 +11,24 @@ import { DcaCalculator } from './DcaCalculator';
 import { CagrCalculator } from './CagrCalculator';
 import { XirrCalculator } from './XirrCalculator';
 import { CompareCalculator } from './CompareCalculator';
+import { PerpCalculator } from './PerpCalculator';
 
-type CalcTab = 'pnl' | 'dca' | 'cagr' | 'xirr' | 'compare';
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'cagr' | 'xirr' | 'compare';
 
 const TABS: { value: CalcTab; label: string; description: string }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
-  { value: 'dca', label: 'خرید دوره‌ای', description: 'نتیجه سرمایه‌گذاری منظم با مبلغ ثابت در یک بازه' },
-  { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش' },
+  { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
+  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر و آرکوس — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' },
+  { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش، یا پیش‌بینی ارزش آینده با واریز دوره‌ای' },
   { value: 'xirr', label: 'بازده واقعی', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
   { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' }
 ];
 
 export function CalculatorsPage() {
   const [tab, setTab] = useState<CalcTab>('pnl');
+  // PERP polls live market APIs — mount it only once it has been opened
+  const [perpOpened, setPerpOpened] = useState(false);
+  if (tab === 'perp' && !perpOpened) setPerpOpened(true);
   const current = TABS.find((t) => t.value === tab);
   const panel = (id: CalcTab) => ({
     className: cn(tab !== id && 'hidden'),
@@ -47,6 +52,9 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('dca')}>
           <DcaCalculator />
+        </div>
+        <div {...panel('perp')}>
+          {perpOpened && <PerpCalculator />}
         </div>
         <div {...panel('cagr')}>
           <CagrCalculator />

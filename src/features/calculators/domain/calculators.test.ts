@@ -18,14 +18,14 @@ import {
 } from '@/features/calculators/domain';
 
 describe('۱) سود و زیان (P&L) — فرمول‌های رسمی', () => {
-  it('محاسبه کامل: Value = Price×Qty، TotalCost = Buy×Qty−Fee، Profit = Net−Cost', () => {
+  it('محاسبه کامل: Value = Price×Qty، TotalCost = Buy×Qty+Fee، Profit = Net−Cost', () => {
     const r = calcPnl({ quantity: 2, buyPrice: 100, currentPrice: 150, buyFee: 5, sellFee: 10 });
     expect(r.currentValue).toBe(300); // 150×2
     expect(r.initialInvestment).toBe(200); // 100×2
-    expect(r.totalCost).toBe(195); // 200−5
+    expect(r.totalCost).toBe(205); // 200+5 (کارمزد خرید جزو بهای تمام‌شده است)
     expect(r.netValue).toBe(290); // 300−10
-    expect(r.profit).toBe(95); // 290−195
-    expect(r.returnPct).toBeCloseTo(48.7179487179, 6); // 95/195×100
+    expect(r.profit).toBe(85); // 290−205
+    expect(r.returnPct).toBeCloseTo(41.4634146341, 6); // 85/205×100
   });
 
   it('قیمت فعلی null → همه خروجی‌های وابسته null (N/A بدون کرش)', () => {

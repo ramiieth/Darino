@@ -5,3 +5,5 @@ export * from './dca';
 export * from './cagr';
 export * from './xirr';
 export * from './compare';
+export * from './schedule';
+export * from './perp';

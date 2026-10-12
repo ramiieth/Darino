@@ -4,6 +4,8 @@ import { usePublishInsight } from '@/shared/assistant/insights';
  *   CAGR = (final ÷ initial)^(1 ÷ years) − 1   (domain: calcCagrFull)
  * Results appear only once both values are entered (an empty final value is
  * not "−100%").
+ * Second mode — projection: initial + periodic contributions (fixed or growing,
+ * any frequency) compounded at an expected annual return (domain: projectGrowth).
  */
 import { useMemo, useState } from 'react';
 import { Field, Input } from '@/shared/components/ui/Input';
@@ -16,7 +18,10 @@ import { CalcShell, ResultHero, ResultPlaceholder } from './StatCard';
 import { LineChartCard } from './CalcCharts';
 import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
-import { calcCagrFull } from '@/features/calculators/domain';
+import { calcCagrFull, projectGrowth, SCHEDULE_FREQUENCY_LABELS, type ScheduleFrequency } from '@/features/calculators/domain';
+import { SegmentedControl, ChipGroup } from '@/shared/components/ui/SegmentedControl';
+import { numOr } from './parse';
+import type { ReactNode } from 'react';
 import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
 
 const REFERENCE = [
@@ -26,7 +31,148 @@ const REFERENCE = [
   { symbol: 'SPY', label: 'شاخص اس‌اندپی ۵۰۰' }
 ];
 
+type CagrMode = 'rate' | 'project';
+
 export function CagrCalculator() {
+  const [mode, setMode] = useState<CagrMode>('rate');
+  const modeSwitch = (
+    <SegmentedControl<CagrMode>
+      label="نوع محاسبه"
+      fill
+      value={mode}
+      onChange={setMode}
+      options={[
+        { value: 'rate', label: 'محاسبهٔ نرخ رشد' },
+        { value: 'project', label: 'پیش‌بینی ارزش آینده' }
+      ]}
+    />
+  );
+  return mode === 'rate' ? <CagrRate modeSwitch={modeSwitch} /> : <GrowthProjection modeSwitch={modeSwitch} />;
+}
+
+const PROJ_FREQS: ScheduleFrequency[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
+
+function GrowthProjection({ modeSwitch }: { modeSwitch: ReactNode }) {
+  const [initial, setInitial] = useState('10000');
+  const [contrib, setContrib] = useState('500');
+  const [freq, setFreq] = useState<ScheduleFrequency>('monthly');
+  const [contribGrowth, setContribGrowth] = useState('0');
+  const [rate, setRate] = useState('15');
+  const [years, setYears] = useState('10');
+
+  const y = numOr(years);
+  const ready = y > 0 && y <= 60 && numOr(initial) + numOr(contrib) > 0;
+  const result = useMemo(
+    () =>
+      ready
+        ? projectGrowth({
+            initial: numOr(initial),
+            contribution: numOr(contrib),
+            frequency: freq,
+            contributionGrowthPct: numOr(contribGrowth),
+            annualReturnPct: numOr(rate),
+            years: y
+          })
+        : null,
+    [ready, initial, contrib, freq, contribGrowth, rate, y]
+  );
+
+  usePublishInsight('calculatorCagr', 'پیش‌بینی رشد', result ? { finalValue: result.finalValue, totalContributed: result.totalContributed, profit: result.profit, annualReturnPct: numOr(rate), years: y } : null);
+
+  const inputs = (
+    <>
+      {modeSwitch}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="سرمایهٔ اولیه">
+          <Input dir="ltr" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} suffix="دلار" />
+        </Field>
+        <Field label="بازده سالانهٔ مورد انتظار">
+          <Input dir="ltr" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} suffix="٪" />
+        </Field>
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-muted">واریز دوره‌ای</p>
+        <ChipGroup<ScheduleFrequency> label="دوره واریز" value={freq} onChange={setFreq} options={PROJ_FREQS.map((f) => ({ value: f, label: SCHEDULE_FREQUENCY_LABELS[f] }))} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="مبلغ هر واریز">
+          <Input dir="ltr" inputMode="decimal" value={contrib} onChange={(e) => setContrib(e.target.value)} suffix="دلار" />
+        </Field>
+        <Field label="افزایش سالانهٔ واریز">
+          <Input dir="ltr" inputMode="decimal" value={contribGrowth} onChange={(e) => setContribGrowth(e.target.value)} suffix="٪" />
+        </Field>
+      </div>
+      <Field label="مدت">
+        <Input dir="ltr" inputMode="decimal" value={years} onChange={(e) => setYears(e.target.value)} suffix="سال" />
+      </Field>
+      <p className="text-xs leading-5 text-muted">واریز صفر یعنی فقط رشد سرمایهٔ اولیه. افزایش سالانه برای واریزی است که هر سال بیشتر می‌شود (مثلاً با رشد درآمد).</p>
+    </>
+  );
+
+  return (
+    <CalcShell inputs={inputs}>
+      {!result ? (
+        <ResultPlaceholder>سرمایهٔ اولیه یا واریز دوره‌ای و مدت (حداکثر ۶۰ سال) را وارد کنید.</ResultPlaceholder>
+      ) : (
+        <>
+          <ResultHero label="ارزش پیش‌بینی‌شده" value={<MoneyValue value={result.finalValue} />} sub={`پس از ${toFaDigits(y)} سال با بازده سالانهٔ ${toFaDigits(numOr(rate))}٪`}>
+            <MetricGrid cols={3}>
+              <Metric label="کل واریزی" value={<MoneyValue value={result.totalContributed} />} />
+              <Metric label="سود مرکب" value={<MoneyValue value={result.profit} signed tone="auto" />} />
+              <Metric label="ضریب رشد" value={<span className="num-ltr">{result.multiple === null ? '—' : `${result.multiple.toFixed(2)}×`}</span>} />
+            </MetricGrid>
+          </ResultHero>
+          <LineChartCard
+            title="ارزش سبد در برابر کل واریزی"
+            description="مسیر فرضی با بازده ثابت؛ بازار واقعی نوسان دارد"
+            labels={result.points.map((p) => `${toFaDigits(p.t.toFixed(1))} سال`)}
+            datasets={[
+              { label: 'ارزش', data: result.points.map((p) => p.value), color: 'chart-1', fill: true },
+              { label: 'کل واریزی', data: result.points.map((p) => p.contributed), color: 'chart-4', dashed: true }
+            ]}
+          />
+          <Surface className="px-4 md:px-5">
+            <h3 className="pt-4 text-sm font-bold text-ink">ارزش در پایان هر سال</h3>
+            <KeyValueList
+              dense
+              rows={result.yearly.map((p) => ({
+                  label: `سال ${toFaDigits(p.year)}`,
+                  value: <MoneyValue value={p.value} />,
+                  hint: <>واریزی <MoneyValue value={p.contributed} /></>
+                }))}
+            />
+          </Surface>
+          <ExportButtons
+            filename="growth-projection.csv"
+            headers={['سال', 'کل واریزی', 'ارزش']}
+            rows={result.points.map((p) => [p.t.toFixed(2), p.contributed, p.value])}
+            pdfTitle="گزارش پیش‌بینی رشد"
+            pdfSections={[
+              {
+                heading: 'پیش‌بینی ارزش آینده',
+                table: {
+                  headers: ['موارد', 'مقدار'],
+                  rows: [
+                    ['سرمایه اولیه', fmtUSD(numOr(initial))],
+                    ['واریز هر دوره', fmtUSD(numOr(contrib))],
+                    ['بازده سالانه', fmtPct(numOr(rate))],
+                    ['مدت (سال)', String(y)],
+                    ['کل واریزی', fmtUSD(result.totalContributed)],
+                    ['ارزش نهایی', fmtUSD(result.finalValue)],
+                    ['سود', fmtUSD(result.profit)]
+                  ]
+                },
+                note: 'پیش‌بینی با بازده ثابت فرضی است و تضمینی نیست.'
+              }
+            ]}
+          />
+        </>
+      )}
+    </CalcShell>
+  );
+}
+
+function CagrRate({ modeSwitch }: { modeSwitch: ReactNode }) {
   const { prices } = useCalculatorPrices();
   const [initial, setInitial] = useState('10000');
   const [final, setFinal] = useState('');
@@ -55,6 +201,7 @@ export function CagrCalculator() {
 
   const inputs = (
     <>
+      {modeSwitch}
       <div className="grid grid-cols-2 gap-4">
         <Field label="ارزش اولیه">
           <Input dir="ltr" inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} suffix="دلار" />
