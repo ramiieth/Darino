@@ -21,6 +21,7 @@ const ConnectedPage = lazy(() => import('@/features/connected/presentation/Conne
 const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
 const SecurityPage = lazy(() => import('@/features/auth/SecurityPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
+const DigikalaPage = lazy(() => import('@/features/digikala/presentation/DigikalaPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
@@ -142,6 +143,14 @@ export function App() {
               <Lazy label="بازار املاک">
                 <PropertyMarketPage />
               </Lazy>
+            }
+          />
+          <Route
+            path="/digikala"
+            element={
+              <Private label="دیجی‌کالا">
+                <DigikalaPage />
+              </Private>
             }
           />
           <Route

@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Wallet,
   Sparkles,
+  ShoppingBag,
   type LucideIcon
 } from 'lucide-react';
 
@@ -163,6 +164,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'قیمت، محله‌ها و سناریوی دلاری',
         icon: Home,
         match: ['/property-market']
+      },
+      {
+        id: 'digikala',
+        to: '/digikala',
+        label: 'دیجی‌کالا',
+        title: 'دیجی‌کالا — جستجو و مقایسه',
+        description: 'مقایسه قیمت، نظرات خریداران و بهترین خرید با بودجه',
+        icon: ShoppingBag
       }
     ]
   }
