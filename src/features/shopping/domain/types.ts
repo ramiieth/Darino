@@ -46,6 +46,8 @@ export interface ShopQuery {
   intents: Intent[];
   /** عبارت جستجو پس از حذف شهر، بودجه و واژه‌های دستوری */
   keywords: string;
+  /** «کروسان یا موهیتو یا اسپرسو» → هر گزینه جدا (حداکثر ۴)؛ برای غذا هر کدام جستجو می‌شود */
+  alternatives?: string[];
   city: CityRef | null;
   /** مقصد (سفر) یا چند شهر برای «شمال» */
   destinations: CityRef[];

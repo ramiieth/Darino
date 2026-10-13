@@ -4,6 +4,7 @@ import type { CityRef, ShopItem } from '../src/features/shopping/domain/types.js
 import { item } from './_shopGoods.js';
 import { json, num, request, safeUrl, SourceError } from './_shopHttp.js';
 import { bridgeOnline, relayConfigured, relaySearch } from './_shopRelay.js';
+import { CLOSED_NOTE } from '../src/features/shopping/domain/rank.js';
 
 export interface LocalQuery { keywords: string; city: CityRef | null; sort: 'best' | 'cheapest'; maxPrice: number | null; minPrice: number | null; used: boolean }
 /** دستهٔ آگهی دیوار (همه با درخواست واقعی بررسی شده‌اند) */
@@ -67,7 +68,7 @@ export async function divar(q: LocalQuery & { category?: DivarCategory }): Promi
 
 /* ---------- Snappfood: restaurants, cafés, pastry shops, caterers ---------- */
 
-const CAFE = /کافه|قهوه|لاته|کاپوچینو|اسپرسو|موکا|آیس|نوشیدنی|آبمیوه|اسموتی|شیک|کیک|کروسان|دسر|شیرینی|بستنی|چای/;
+const CAFE = /کافه|قهوه|لاته|کاپوچینو|اسپرسو|موکا|آیس|نوشیدنی|آبمیوه|اسموتی|شیک|کیک|کروسان|دسر|شیرینی|بستنی|چای|ماکیاتو|فراپ|آمریکانو|هات ?چاکلت|موکتل|کوکتل|موهیتو|لیموناد|دمنوش|فالوده|تیرامیسو|دونات|وافل|پنکیک|براونی/;
 const FRUIT = /میوه|سبزی|تره ?بار|صیفی/;
 const PROTEIN = /گوشت|مرغ|ماهی|میگو|قصابی|پروتئین|تخم ?مرغ/;
 
@@ -98,8 +99,10 @@ export function parseSnappfood(items: unknown[], city: CityRef): ShopItem[] {
       discountPercent: Math.max(0, Math.min(99, Math.round(num(it.discountRatio) ?? 0))),
       rating: r10 != null && r10 > 0 && r10 <= 10 ? Math.round(r10 * 5) / 10 : null, ratingCount: num(v.comments),
       summary: [type, short(v.title, 60)].filter(Boolean).join(' ') || null,
-      location: [city.name, short(v.area, 40)].filter(Boolean).join('، '), available: v.open !== false,
+      location: [city.name, short(v.area, 40)].filter(Boolean).join('، '),
+      // رستوران بسته حذف نمی‌شود (شب‌ها همه بسته‌اند)؛ در رتبه‌بندی پایین‌تر می‌آید
       facts: [
+        ...(v.open === false ? [{ label: 'وضعیت', value: CLOSED_NOTE }] : []),
         ...(fee != null ? [{ label: 'پیک', value: fee === 0 ? 'رایگان' : `${fee.toLocaleString('en-US')} تومان` }] : []),
         ...(short(it.desc, 90) ? [{ label: 'توضیح', value: short(it.desc, 90) }] : [])
       ]
@@ -112,7 +115,7 @@ export async function snappfood(q: LocalQuery & { grocery?: boolean }): Promise<
   const c = q.city;
   const types = foodTypes(q.keywords, q.grocery);
   if (!c || !types.length) return [];
-  const job = { query: q.keywords.slice(0, 60), lat: c.lat, lon: c.lon, types, discount: q.sort === 'cheapest' };
+  const job = { query: q.keywords.slice(0, 60), lat: c.lat, lon: c.lon, types, discount: false }; // «ارزان‌ترین» ≠ فقط تخفیف‌دار: has_discount در بیشتر شهرها نتیجه را خالی می‌کرد؛ مرتب‌سازی قیمت با rankItems است
   if (relayConfigured()) {
     if (!(await bridgeOnline())) throw new SourceError('پل مک خاموش است', 503);
     const r = await relaySearch(job);

@@ -39,6 +39,11 @@ const ACCESSORY = /^(?:(?:فروش|فروشی|خرید|ویژه|حراج|تخف�
 // آگهی خدمات/تعمیر یا خریدار، خودِ کالا نیست (مگر کاربر همین را خواسته باشد)
 const SERVICE_AD = /تعمیر|نمایندگی|سرویس (و|کار)|خریدار|خرید (فوری|نقدی)|خرید ?و? ?فروش|خریدفروش|می ?خریم|گازگیری|نصب/;
 
+// در منوی رستوران این‌ها افزودنی‌اند و همیشه «ارزان‌ترین» درمی‌آیند، نه خود غذا
+const FOOD_EXTRA = /^(سس|پنیر اضافه|نان|نوشابه|دوغ|آب معدنی|ظرف|بسته ?بندی|ادویه|اضافه|افزودنی|تاپینگ|سالاد کلم|خیار ?شور|ترشی|قاشق|چنگال)/;
+/** رستوران بسته حذف نمی‌شود (شب‌ها همه بسته‌اند)؛ فقط پایین‌تر می‌آید */
+export const CLOSED_NOTE = 'فعلاً بسته';
+
 function canon(text: string): string {
   let t: string = normalizeFa(text).toLowerCase();
   for (const [re, to] of SYNONYMS) t = t.replace(re, ` ${to} `);
@@ -59,7 +64,7 @@ export function relevance(title: string, keywords: string, strictNumbers = true)
   const tokens = t.split(' ');
   const hit = words.filter((w) => t.includes(w) || tokens.some((x) => x.length > 2 && w.startsWith(x))).length / words.length;
   const k = canon(keywords);
-  const accessory = ACCESSORY.test(t) && !ACCESSORY.test(k);
+  const accessory = (ACCESSORY.test(t) && !ACCESSORY.test(k)) || (FOOD_EXTRA.test(t) && !FOOD_EXTRA.test(k));
   const serviceAd = SERVICE_AD.test(t) && !SERVICE_AD.test(k);
   // واژهٔ اول (اسم اصلی در فارسی) باید در عنوان باشد: «ظروف پلاستیکی» ≠ «چاقو با دستهٔ پلاستیکی»
   const head = words[0];
@@ -92,7 +97,7 @@ export function withinBudget(items: ShopItem[], q: Pick<ShopQuery, 'maxPrice' | 
     (i.priceToman == null || ((q.maxPrice == null || i.priceToman <= q.maxPrice) && (q.minPrice == null || i.priceToman >= q.minPrice))));
 }
 
-export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sort' | 'maxPrice' | 'minPrice' | 'keywords'> & { deal?: ShopQuery['deal'] }): RankedItem[] {
+export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sort' | 'maxPrice' | 'minPrice' | 'keywords' | 'alternatives'> & { deal?: ShopQuery['deal'] }): RankedItem[] {
   const pool = withinBudget(items, q);
   const seen = new Set<string>();
   const deduped = pool.filter((i) => { const k = profileOf(i, q.intents) === 'trip' ? i.id : `${i.service}:${i.title}:${i.priceToman}`; if (seen.has(k)) return false; seen.add(k); return true; });
@@ -104,7 +109,11 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   const generic = kwWords.length <= 1 && !/\d/.test(q.keywords);
   const textual = (i: ShopItem) => (GROCERY.includes(i.service) ? !generic : ['goods', 'listing'].includes(profileOf(i, q.intents)));
   const dealPenalty = (i: ShopItem) => (q.deal === 'rent' && /فروش|پیش ?فروش/.test(i.title) && !/اجاره|رهن/.test(i.title)) || (q.deal === 'buy' && /اجاره|رهن/.test(i.title) && !/فروش/.test(i.title)) ? 0.3 : 1;
-  const rel = new Map(deduped.map((i) => [i, (textual(i) ? relevance(i.title, q.keywords) : 1) * dealPenalty(i)]));
+  // «کروسان یا موهیتو» → ارتباط با نزدیک‌ترین گزینه، و هر گزینه سهم خودش را از فهرست می‌گیرد
+  const alts = q.alternatives && q.alternatives.length > 1 ? q.alternatives : [q.keywords];
+  const bestAlt = (i: ShopItem) => alts.map((k, ix) => [relevance(i.title, k), ix] as const).reduce((a, b) => (b[0] > a[0] ? b : a));
+  const altOf = new Map(deduped.map((i) => [`${i.service}:${i.id}`, bestAlt(i)[1]]));
+  const rel = new Map(deduped.map((i) => [i, (textual(i) ? bestAlt(i)[0] : 1) * dealPenalty(i)]));
   let strong = deduped.filter((i) => rel.get(i)! >= 0.6);
   let unique = strong.length >= 3 ? strong : deduped.filter((i) => rel.get(i)! >= 0.34);
   // «۳۰۰ گرمی» دقیقاً نبود؟ نزدیک‌ترین اندازه‌ها (بدون شرط عدد) به‌جای پاسخ خالی
@@ -138,7 +147,8 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
     const discount = clamp01(item.discountPercent / 50);
     const soon = item.soonDays == null ? 0.4 : clamp01(1 - item.soonDays / 30);
     const fresh = item.order == null ? 0.5 : clamp01(1 - item.order / 25);
-    const score = (w.quality * quality + w.trust * trust + w.price * priceScore + w.discount * discount + w.soon * soon + (w.fresh ?? 0) * fresh) * (0.55 + 0.45 * rel.get(item)!);
+    const score = (w.quality * quality + w.trust * trust + w.price * priceScore + w.discount * discount + w.soon * soon + (w.fresh ?? 0) * fresh) * (0.55 + 0.45 * rel.get(item)!)
+      * (item.facts.some((f) => f.value === CLOSED_NOTE) ? 0.6 : 1);
 
     const reasons: string[] = [];
     const med = median(g);
@@ -154,10 +164,10 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
 
   scored.sort((a, b) => b.score - a.score || (a.priceToman ?? Infinity) - (b.priceToman ?? Infinity));
   // سفر: هر مسیر و هر وسیله (پرواز/قطار/اتوبوس/تاکسی) سهم منصفانه؛ بقیه: هر منبع حداکثر ۱۰
-  const bucketOf = (i: ShopItem) => (profileOf(i, q.intents) === 'trip' ? `${i.location}|${i.title.split(' ')[0]}` : i.service);
+  const bucketOf = (i: ShopItem) => (profileOf(i, q.intents) === 'trip' ? `${i.location}|${i.title.split(' ')[0]}` : alts.length > 1 ? `${i.service}|${altOf.get(`${i.service}:${i.id}`) ?? 0}` : i.service);
   const buckets = new Set(scored.map(bucketOf));
   const trip = scored.some((i) => profileOf(i, q.intents) === 'trip');
-  const cap = trip ? Math.max(2, Math.floor(MAX_RESULTS / Math.max(1, buckets.size))) : MAX_PER_SOURCE;
+  const cap = trip || alts.length > 1 ? Math.max(2, Math.floor(MAX_RESULTS / Math.max(1, buckets.size))) : MAX_PER_SOURCE;
   const perGroup = new Map<string, number>();
   const out: RankedItem[] = [];
   const take = (s: RankedItem) => { perGroup.set(bucketOf(s), (perGroup.get(bucketOf(s)) ?? 0) + 1); out.push({ ...s, rank: out.length + 1 }); };
