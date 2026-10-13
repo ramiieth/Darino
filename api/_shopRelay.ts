@@ -27,7 +27,7 @@ const JOB_TTL = 2 * 60_000;
 const RESULT_TTL = 10 * 60_000;
 const ONLINE_MS = 45_000;
 const STALE_CLAIM_MS = 30_000;
-export const ALLOWED_TYPES = [0, 1, 2, 3, 5, 8];
+export const ALLOWED_TYPES = [0, 1, 2, 3, 5, 6, 8, 11];
 const MAX_ITEMS = 160;
 const MAX_RESULT_BYTES = 800_000;
 

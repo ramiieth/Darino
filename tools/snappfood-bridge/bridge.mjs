@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SNAPPFOOD = 'https://snappfood.ir/search/api/v5/search';
-const ALLOWED_TYPES = [0, 1, 2, 3, 5, 8];
+const ALLOWED_TYPES = [0, 1, 2, 3, 5, 6, 8, 11];
 const IDLE_MS = 12_000; // بیکار: هر ۱۲ ثانیه (در سهمیهٔ رایگان Vercel)
 const ACTIVE_MS = 3_000; // تا ۵ دقیقه پس از هر جستجو: هر ۳ ثانیه
 const SNAPP_GAP_MS = 1_500; // فاصلهٔ بین درخواست‌ها به اسنپ‌فود

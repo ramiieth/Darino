@@ -10,12 +10,18 @@ import { SERVICE } from '../domain/services';
 import type { RankedItem } from '../domain/types';
 import { ServiceTag } from './ServiceLogo';
 
+/** بعضی CDNها (ترب) گاهی اتصال HTTP/2 را می‌بندند و همهٔ تصاویر با هم خطا می‌دهند؛ دو بار دوباره تلاش می‌شود */
+const MAX_RETRIES = 2;
+
 export function Thumb({ src, className }: { src: string | null; className?: string }) {
-  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const failed = attempt > MAX_RETRIES;
+  const url = src && attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+  const retry = () => (attempt < MAX_RETRIES ? window.setTimeout(() => setAttempt((n) => n + 1), 800 * (attempt + 1)) : setAttempt(MAX_RETRIES + 1));
   return (
     <span className={cn('flex shrink-0 items-center justify-center overflow-hidden rounded-field bg-surface-2', className)}>
-      {src && !failed ? (
-        <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-cover" />
+      {url && !failed ? (
+        <img key={attempt} src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={retry} className="h-full w-full object-cover" />
       ) : (
         <ShoppingBag aria-hidden className="h-1/3 w-1/3 text-subtle" />
       )}
@@ -73,7 +79,7 @@ function Links({ item, compact }: { item: RankedItem; compact?: boolean }) {
   );
 }
 
-export function ResultsTable({ items, topId }: { items: RankedItem[]; topId: string | null }) {
+export function ResultsTable({ items, topIds }: { items: RankedItem[]; topIds: string[] }) {
   const anyDiscount = items.some((i) => i.discountPercent > 0);
   const anyRating = items.some((i) => i.rating != null);
   const anyPrice = items.some((i) => i.priceToman != null || i.facts.some((f) => f.label === 'قیمت'));
@@ -97,7 +103,7 @@ export function ResultsTable({ items, topId }: { items: RankedItem[]; topId: str
             </thead>
             <tbody>
               {items.map((i) => (
-                <tr key={i.id} className={cn(i.id === topId && 'bg-accent-soft')}>
+                <tr key={i.id} className={cn(topIds.includes(i.id) && 'bg-accent-soft')}>
                   <td className="!ps-5 font-bold tabular-nums text-muted">{toFaDigits(i.rank)}</td>
                   <td className="!whitespace-normal">
                     <div className="flex min-w-[260px] max-w-[420px] items-center gap-3">
@@ -130,7 +136,7 @@ export function ResultsTable({ items, topId }: { items: RankedItem[]; topId: str
       <ol className="space-y-2.5 md:hidden">
         {items.map((i) => (
           <li key={i.id}>
-            <Surface className={cn('space-y-2.5 p-3', i.id === topId && 'ring-2 ring-accent')}>
+            <Surface className={cn('space-y-2.5 p-3', topIds.includes(i.id) && 'ring-2 ring-accent')}>
               <div className="flex gap-3">
                 <div className="relative">
                   <Thumb src={i.image} className="h-20 w-20" />
