@@ -14,7 +14,8 @@ import { getPerpsRead } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema } from './_assistant.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
-import { DK_SORT_IDS, type DkSort } from '../src/features/digikala/domain/types.js';
+import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
+import { shopAsk } from './_shop.js';
 export const config={api:{bodyParser:false}};
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -29,7 +30,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
-  if (++limit.count > (op === 'analyze' ? 4 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (++limit.count > (op === 'analyze' ? 4 : op === 'shop-ask' ? 12 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
     if (req.method === 'POST' && op === 'analyze') {
@@ -43,6 +44,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if(op==='directory' && req.method==='GET'){json(res,200,await getDirectory());return;}
     if(['lighter-markets','lighter-account','lighter-mainnet-markets','lighter-mainnet-account','ondo-markets'].includes(op) && req.method==='GET'){json(res,200,await getPerpsRead(op,u.searchParams.get('address')?.trim()??''));return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
+    if(op==='shop-ask' && req.method==='GET'){const q=(u.searchParams.get('q')??'').trim();const home=u.searchParams.get('home')??'';if(q.length<3||q.length>300||(home&&!/^[a-z-]{2,30}$/.test(home))){json(res,400,{error:'درخواست را در ۳ تا ۳۰۰ حرف بنویسید'});return;}json(res,200,await shopAsk(q,home||null));return;}
     if(op==='dk-search' && req.method==='GET'){const q=(u.searchParams.get('q')??'').trim().slice(0,80);const page=Math.min(Math.max(Number(u.searchParams.get('page'))||1,1),20);const sort=u.searchParams.get('sort')??'relevant';if(q.length<2||!Object.hasOwn(DK_SORT_IDS,sort)){json(res,400,{error:'عبارت جستجو یا مرتب‌سازی معتبر نیست'});return;}json(res,200,await searchDigikala(q,page,sort as DkSort));return;}
     if(op==='dk-product' && req.method==='GET'){const id=Number(u.searchParams.get('id'));if(!Number.isSafeInteger(id)||id<1){json(res,400,{error:'شناسهٔ کالا معتبر نیست'});return;}json(res,200,await digikalaProduct(id));return;}
     if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }

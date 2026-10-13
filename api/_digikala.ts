@@ -1,7 +1,7 @@
 /** Read-only Digikala product data from its public web API. Host is fixed; inputs are validated by the caller. */
 import { obj, arr, str } from '../src/features/connected/domain/model.js';
 import { ProviderError } from './_zerion.js';
-import { DK_SORT_IDS, type DkCard, type DkComment, type DkOffer, type DkProduct, type DkSearchResult, type DkSort, type DkSpecGroup } from '../src/features/digikala/domain/types.js';
+import { DK_SORT_IDS, type DkCard, type DkComment, type DkOffer, type DkProduct, type DkSearchResult, type DkSort, type DkSpecGroup } from '../src/features/shopping/digikala/domain/types.js';
 
 const API = 'https://api.digikala.com';
 const SITE = 'https://www.digikala.com';

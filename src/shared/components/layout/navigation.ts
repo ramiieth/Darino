@@ -8,6 +8,7 @@
  *   دارایی من   what I own and its record
  *   بازدهی     yield product (Boros)
  *   ابزارها    what-if tools
+ *   دستیار و راهنمای خرید   Iranian shops, food, travel, doctors (read-only)
  */
 import {
   LayoutDashboard,
@@ -164,14 +165,21 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'قیمت، محله‌ها و سناریوی دلاری',
         icon: Home,
         match: ['/property-market']
-      },
+      }
+    ]
+  },
+  {
+    id: 'shopping',
+    label: 'دستیار و راهنمای خرید',
+    items: [
       {
-        id: 'digikala',
-        to: '/digikala',
-        label: 'دیجی‌کالا',
-        title: 'دیجی‌کالا — جستجو و مقایسه',
-        description: 'مقایسه قیمت، نظرات خریداران و بهترین خرید با بودجه',
-        icon: ShoppingBag
+        id: 'shopping',
+        to: '/shopping',
+        label: 'دستیار خرید',
+        title: 'دستیار و راهنمای خرید',
+        description: 'کالا، غذا، سفر، پزشک و کتاب از چند سایت ایرانی — مقایسه و پیشنهاد برتر',
+        icon: ShoppingBag,
+        match: ['/digikala']
       }
     ]
   }
