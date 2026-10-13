@@ -21,7 +21,7 @@ const ConnectedPage = lazy(() => import('@/features/connected/presentation/Conne
 const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
 const SecurityPage = lazy(() => import('@/features/auth/SecurityPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
-const DigikalaPage = lazy(() => import('@/features/digikala/presentation/DigikalaPage'));
+const ShoppingPage = lazy(() => import('@/features/shopping/presentation/ShoppingPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
@@ -146,13 +146,14 @@ export function App() {
             }
           />
           <Route
-            path="/digikala"
+            path="/shopping"
             element={
-              <Private label="دیجی‌کالا">
-                <DigikalaPage />
+              <Private label="دستیار و راهنمای خرید">
+                <ShoppingPage />
               </Private>
             }
           />
+          <Route path="/digikala" element={<Navigate to="/shopping?tab=digikala" replace />} />
           <Route
             path="/design-system"
             element={

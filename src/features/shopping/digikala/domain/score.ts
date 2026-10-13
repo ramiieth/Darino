@@ -7,7 +7,7 @@
  *         + ۷٪ تخفیف + ۸٪ اعتبار فروشنده
  *  میانگین بیزی نمی‌گذارد «۵ ستاره با ۲ رأی» از «۴.۵ با ۲۰۰۰ رأی» جلو بزند.
  * ============================================================ */
-import type { DkCard } from './types';
+import type { DkCard } from './types.js';
 
 const PRIOR_STARS = 3.5;
 const PRIOR_WEIGHT = 20;

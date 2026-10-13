@@ -35,7 +35,8 @@ const SORTS: { value: DkSort; label: string }[] = [
 const QUICK = ['هدفون بی‌سیم', 'گوشی موبایل', 'لپ‌تاپ', 'ساعت هوشمند', 'پاوربانک', 'جاروبرقی', 'قهوه‌ساز'];
 const MAX_COMPARE = 4;
 
-export default function DigikalaPage() {
+/** embedded: زبانهٔ «دیجی‌کالا» در «دستیار و راهنمای خرید» — بدون سرصفحهٔ جدا */
+export default function DigikalaPage({ embedded = false }: { embedded?: boolean }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DkSort>('relevant');
   const [minText, setMinText] = useState('');
@@ -80,20 +81,15 @@ export default function DigikalaPage() {
   const toggleCompare = (c: DkCard) =>
     setCompare((old) => (old.some((o) => o.id === c.id) ? old.filter((o) => o.id !== c.id) : old.length >= MAX_COMPARE ? old : [...old, c]));
   const firstLoad = loading && items.length === 0;
+  const status = meta && !firstLoad && (
+    <p className="text-xs text-muted">
+      {fmtCount(meta.totalItems)} نتیجه برای «{meta.q}» · به‌روزرسانی {fmtRelativeAge(meta.at)}
+    </p>
+  );
 
   return (
     <Page className={cn(compare.length > 0 && 'pb-28')}>
-      <PageHeader
-        eyebrow="ابزارها"
-        title="دیجی‌کالا"
-        meta={
-          meta && !firstLoad && (
-            <p className="text-xs text-muted">
-              {fmtCount(meta.totalItems)} نتیجه برای «{meta.q}» · به‌روزرسانی {fmtRelativeAge(meta.at)}
-            </p>
-          )
-        }
-      />
+      {embedded ? status : <PageHeader eyebrow="دستیار و راهنمای خرید" title="دیجی‌کالا" meta={status} />}
 
       <Surface variant="focal" className="space-y-4 p-4 md:p-5">
         <form onSubmit={submit} className="flex gap-2">
