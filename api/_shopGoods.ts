@@ -7,7 +7,7 @@ import { json, num, plain, request, safeUrl, SourceError } from './_shopHttp.js'
 export interface GoodsQuery { keywords: string; sort: 'best' | 'cheapest'; maxPrice: number | null; minPrice: number | null }
 
 export function item(p: Partial<ShopItem> & Pick<ShopItem, 'id' | 'service' | 'title' | 'url'>): ShopItem {
-  const out: ShopItem = { summary: null, image: null, priceToman: null, priceBeforeToman: null, discountPercent: 0, rating: null, ratingCount: null, location: null, available: true, facts: [], mapUrl: null, soonDays: null, ...p };
+  const out: ShopItem = { summary: null, image: null, brandLogo: null, priceToman: null, priceBeforeToman: null, discountPercent: 0, rating: null, ratingCount: null, location: null, available: true, facts: [], mapUrl: null, soonDays: null, ...p };
   if (out.rating != null) out.rating = Math.round(Math.min(5, Math.max(0, out.rating)) * 10) / 10;
   out.title = out.title.replace(/\s+/g, ' ').trim();
   return out;

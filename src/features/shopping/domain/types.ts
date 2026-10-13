@@ -66,6 +66,8 @@ export interface ShopItem {
   /** یک خط خلاصه (برند، فروشنده، ایرلاین و ساعت، تخصص و مطب…) */
   summary: string | null;
   image: string | null;
+  /** لوگوی فروشنده/رستوران، اگر جدا از عکس محصول است */
+  brandLogo?: string | null;
   url: string;
   priceToman: number | null;
   priceBeforeToman: number | null;

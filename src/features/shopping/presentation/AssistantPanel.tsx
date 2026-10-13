@@ -175,6 +175,9 @@ export function AssistantPanel() {
 
       {loading && (
         <div className="space-y-3" aria-busy="true" aria-label="در حال جستجو در چند سایت">
+          {/غذا|رستوران|کافه|پیتزا|برگر|کباب|جوجه|قهوه|لاته|کیک|شیرینی|کترینگ|اسنپ ?فود|ساندویچ|سوشی|خورش|قورمه|بستنی/.test(text) && (
+            <p className="text-xs text-muted">رستوران‌ها از طریق پل مک شما از اسنپ‌فود خوانده می‌شوند؛ تا حدود ۲۰ ثانیه طول می‌کشد.</p>
+          )}
           <Skeleton className="h-7 w-2/3 rounded-full" />
           {Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-20 rounded-card" />)}
         </div>

@@ -1,0 +1,19 @@
+;; Sandbox پل اسنپ‌فود — آخرین قانونِ منطبق اعمال می‌شود.
+(version 1)
+(allow default)
+
+;; هیچ چیز در پوشهٔ خانه خواندنی یا نوشتنی نیست: Library (کروم، افزونه‌ها، Keychain، کیف پول‌ها)،
+;; Documents، Desktop، Downloads، .ssh و … — به‌جز پوشهٔ خود پل و محل نصب node.
+(deny file-read* file-write* (subpath "__HOME__"))
+(allow file-read* (subpath "__NODE_DIR__"))
+
+;; Keychainهای سیستمی هم بسته‌اند.
+(deny file-read* file-write* (subpath "/Library/Keychains") (subpath "/private/var/db/keychain"))
+
+;; خارج از پوشهٔ پل هیچ چیز نوشته نمی‌شود (جز موقت‌ها و خروجی ترمینال).
+(deny file-write* (subpath "/"))
+(allow file-read* file-write* (subpath "__DIR__"))
+(allow file-write* (subpath "/private/var/folders") (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr") (regex #"^/dev/tty"))
+
+;; اجرای برنامهٔ دیگر ممنوع.
+(deny process-fork)

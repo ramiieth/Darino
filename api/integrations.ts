@@ -16,6 +16,7 @@ import { analyze, analysisSchema } from './_assistant.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
 import { shopAsk } from './_shop.js';
+import { relayEndpoint } from './_shopRelay.js';
 export const config={api:{bodyParser:false}};
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -23,6 +24,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (!['GET','POST'].includes(req.method ?? '')) { json(res,405,{ error: 'روش درخواست مجاز نیست' }); return; }
   const webhookUrl=new URL(req.url??'/', 'https://darino.local');
   if(webhookUrl.searchParams.get('op')==='zerion-webhook'){await zerionWebhook(req,res);return;}
+  // The Mac bridge authenticates with SHOP_RELAY_KEY (not a user session) and can only claim/submit Snappfood search jobs.
+  if(webhookUrl.searchParams.get('op')==='shop-relay'){await relayEndpoint(req,res);return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
   const op = u.searchParams.get('op') ?? 'status';

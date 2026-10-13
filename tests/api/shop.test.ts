@@ -75,7 +75,7 @@ describe('دستیار خرید — سرور', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>blocked</html>', { status: 403 })));
     const a = await shopAsk('ارزان‌ترین پیتزا در اهواز', 'ahvaz', NOW + 1);
     expect(a.items).toEqual([]);
-    expect(a.sources).toEqual([{ service: 'snappfood', ok: false, count: 0, note: 'سرور خارج از ایران را نمی‌پذیرد' }]);
+    expect(a.sources).toEqual([{ service: 'snappfood', ok: false, count: 0, note: 'پل مک تنظیم نشده (سرور خارج از ایران)' }]);
     expect(a.links[0].url).toBe('https://snappfood.ir');
   });
 });

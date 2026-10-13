@@ -23,6 +23,16 @@ export function Thumb({ src, className }: { src: string | null; className?: stri
   );
 }
 
+/** خلاصه + لوگوی فروشنده/رستوران (اگر سرویس جدا داده باشد) */
+function Summary({ item }: { item: RankedItem }) {
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
+      {item.brandLogo && <img src={item.brandLogo} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" className="h-5 w-5 shrink-0 rounded-full bg-white object-cover ring-1 ring-divider" />}
+      <span className="line-clamp-1">{item.summary}</span>
+    </p>
+  );
+}
+
 function Rating({ item }: { item: RankedItem }) {
   if (item.rating == null) return <span className="text-subtle">—</span>;
   return (
@@ -94,7 +104,7 @@ export function ResultsTable({ items, topId }: { items: RankedItem[]; topId: str
                       <Thumb src={i.image} className="h-14 w-14" />
                       <div className="min-w-0 space-y-1">
                         <a href={i.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-semibold leading-6 text-ink hover:text-accent">{i.title}</a>
-                        {i.summary && <p className="line-clamp-1 text-xs text-muted">{i.summary}</p>}
+                        {i.summary && <Summary item={i} />}
                         <ServiceTag id={i.service} />
                       </div>
                     </div>
@@ -128,7 +138,7 @@ export function ResultsTable({ items, topId }: { items: RankedItem[]; topId: str
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
                   <a href={i.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-semibold leading-6 text-ink">{i.title}</a>
-                  {i.summary && <p className="line-clamp-1 text-xs text-muted">{i.summary}</p>}
+                  {i.summary && <Summary item={i} />}
                   <ServiceTag id={i.service} />
                 </div>
               </div>

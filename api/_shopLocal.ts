@@ -2,7 +2,8 @@
 import { arr, obj, str } from '../src/features/connected/domain/model.js';
 import type { CityRef, ShopItem } from '../src/features/shopping/domain/types.js';
 import { item } from './_shopGoods.js';
-import { json, num, safeUrl } from './_shopHttp.js';
+import { json, num, safeUrl, SourceError } from './_shopHttp.js';
+import { bridgeOnline, relayConfigured, relaySearch } from './_shopRelay.js';
 
 export interface LocalQuery { keywords: string; city: CityRef | null; sort: 'best' | 'cheapest'; maxPrice: number | null; minPrice: number | null; used: boolean }
 
@@ -54,26 +55,58 @@ export async function divar(q: LocalQuery): Promise<ShopItem[]> {
   }).filter((i) => i.title && i.url);
 }
 
-const FOOD_PARAMS = { optionalClient: 'PWA', client: 'PWA', deviceType: 'PWA', appVersion: '6.0.0' };
+/* ---------- Snappfood: restaurants, cafés, pastry shops, caterers ---------- */
 
-/** Snappfood blocks most non-Iranian server IPs (403); the caller then shows the direct search link. */
+const CAFE = /کافه|قهوه|لاته|کاپوچینو|اسپرسو|موکا|آیس|نوشیدنی|آبمیوه|اسموتی|شیک|کیک|کروسان|دسر|شیرینی|بستنی|چای/;
+
+/** Which Snappfood verticals to search: 0 = default mix (restaurants, fast food, caterers), 2 = cafés, 3 = pastry. */
+export function foodTypes(keywords: string): number[] {
+  return CAFE.test(keywords) ? [0, 2, 3] : [0];
+}
+
+const short = (v: unknown, n = 120) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+
+/** Items arrive pre-normalised from the Mac bridge (tools/snappfood-bridge); every field is re-validated here. */
+export function parseSnappfood(items: unknown[], city: CityRef): ShopItem[] {
+  const seen = new Set<string>();
+  return items.map(obj).flatMap((it) => {
+    const v = obj(it.vendor);
+    const code = short(v.code, 16); const pid = short(String(it.id ?? ''), 20);
+    if (!/^[\w-]{3,16}$/.test(code) || !/^\d{1,20}$/.test(pid) || seen.has(`${code}:${pid}`)) return [];
+    seen.add(`${code}:${pid}`);
+    const before = num(it.price); const final = num(it.final) ?? before;
+    const r10 = num(it.rating10) ?? num(v.rating10);
+    const fee = num(v.fee);
+    const type = short(v.type, 30);
+    return [item({
+      id: `sf-${code}-${pid}`, service: 'snappfood', title: short(it.title), url: `https://snappfood.ir/restaurant/menu/${code}?productId=${pid}`,
+      image: safeUrl(it.image) ?? safeUrl(v.logo), brandLogo: safeUrl(v.logo),
+      priceToman: final != null && final > 0 ? Math.round(final) : null, priceBeforeToman: before && final && before > final ? Math.round(before) : null,
+      discountPercent: Math.max(0, Math.min(99, Math.round(num(it.discountRatio) ?? 0))),
+      rating: r10 != null && r10 > 0 && r10 <= 10 ? Math.round(r10 * 5) / 10 : null, ratingCount: num(v.comments),
+      summary: [type, short(v.title, 60)].filter(Boolean).join(' ') || null,
+      location: [city.name, short(v.area, 40)].filter(Boolean).join('، '), available: v.open !== false,
+      facts: [
+        ...(fee != null ? [{ label: 'پیک', value: fee === 0 ? 'رایگان' : `${fee.toLocaleString('en-US')} تومان` }] : []),
+        ...(short(it.desc, 90) ? [{ label: 'توضیح', value: short(it.desc, 90) }] : [])
+      ]
+    })];
+  }).filter((i) => i.title);
+}
+
+/** Snappfood blocks non-Iranian IPs, so a configured Mac bridge (Iranian VPN route) fetches it. */
 export async function snappfood(q: LocalQuery): Promise<ShopItem[]> {
   const c = q.city;
   if (!c) return [];
-  const qs = new URLSearchParams({ ...FOOD_PARAMS, lat: String(c.lat), long: String(c.lon), query: q.keywords, page: '0', page_size: '40' });
-  if (q.sort === 'cheapest') qs.set('filters', '["has_discount"]');
-  const data = await json(`https://snappfood.ir/search/api/v5/search?${qs}`);
-  return arr(obj(obj(data.data).product_variations).items).map(obj).map((it) => {
-    const v = obj(it.vendor); const code = str(v.code);
-    const before = num(it.price); const final = num(it.priceAfterDiscount) ?? before;
-    const r10 = num(it.normalized_rating);
-    return item({
-      id: `sf-${str(it.id)}`, service: 'snappfood', title: str(it.title).trim(), url: /^[\w]{3,12}$/.test(code) ? `https://snappfood.ir/restaurant/menu/-r-${code}/` : '',
-      image: safeUrl(it.image) ?? safeUrl(v.logo), priceToman: final, priceBeforeToman: before && final && before > final ? before : null,
-      discountPercent: Math.round(num(it.discountRatio) ?? 0), rating: r10 ? Math.round(r10 * 5) / 10 : null, ratingCount: num(v.commentCount),
-      summary: str(v.title) || null, location: c.name, available: v.is_open !== false
-    });
-  }).filter((i) => i.title && i.url);
+  const job = { query: q.keywords.slice(0, 60), lat: c.lat, lon: c.lon, types: foodTypes(q.keywords), discount: q.sort === 'cheapest' };
+  if (relayConfigured()) {
+    if (!(await bridgeOnline())) throw new SourceError('پل مک خاموش است', 503);
+    const r = await relaySearch(job);
+    if (!r.ok) throw new SourceError(r.error === 'blocked' ? 'مک از مسیر ایران وصل نیست' : 'پل مک پاسخ نداد', 503);
+    return parseSnappfood(r.items, c);
+  }
+  // Vercel runs outside Iran and Snappfood answers 403 there; without the bridge only the direct link is offered.
+  throw new SourceError('پل مک تنظیم نشده (سرور خارج از ایران)', 403);
 }
 
 const MARKET_PARAMS = { client: 'PWA', deviceType: 'PWA', appVersion: '1.403.1' };
