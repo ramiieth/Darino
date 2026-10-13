@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { plan, shopAsk } from '../../api/_shop';
-import { safeUrl } from '../../api/_shopHttp';
+import { displayImage, fetchImage, safeUrl } from '../../api/_shopHttp';
 import { adPrice } from '../../api/_shopLocal';
 import { cityByName } from '../../src/features/shopping/domain/cities';
 import { parseShopQuery } from '../../src/features/shopping/domain/intent';
@@ -15,12 +15,12 @@ const services = (text: string) => plan(parseShopQuery(text, { now: NOW, home: a
 describe('دستیار خرید — سرور', () => {
   it('انتخاب منبع بر اساس نیت', () => {
     expect(services('پلی استیشن 5 اسلیم کارکرده در اهواز')).toEqual(['sheypoor', 'divar']);
-    expect(services('هدفون بی سیم')).toEqual(['digikala', 'technolife', 'masterkala']);
-    expect(services('کفش رانینگ')).toEqual(['digikala', 'shopino']);
+    expect(services('هدفون بی سیم')).toEqual(['torob', 'digikala', 'technolife', 'masterkala', 'sheypoor', 'divar']);
+    expect(services('کفش رانینگ')).toEqual(['torob', 'digikala', 'shopino', 'sheypoor', 'divar']);
     expect(services('متخصص قلب در تهران')).toEqual(['paziresh24', 'doctoreto']);
-    expect(services('ارزان‌ترین پرواز یا قطار به مشهد')).toEqual(['mrbilit', 'mrbilit']);
+    expect(services('ارزان‌ترین پرواز یا قطار به مشهد')).toEqual(['mrbilit', 'alibaba', 'mrbilit']);
     expect(services('ویلا در شمال')).toEqual(['otaghak']);
-    expect(services('ارزان‌ترین شیر کم چرب در اهواز')).toEqual(['snappmarket']);
+    expect(services('ارزان‌ترین شیر کم چرب در اهواز')).toEqual(['snappmarket', 'okala', 'bamadar']);
     const food = plan(parseShopQuery('پیتزا در اهواز', { now: NOW, home: ahvaz }), NOW);
     expect(food.tasks.map((t) => t.service)).toEqual(['snappfood']);
     expect(food.linkOnly).toContain('snappfood');
@@ -33,6 +33,17 @@ describe('دستیار خرید — سرور', () => {
     expect(safeUrl('https://divar.ir.evil.com/x')).toBeNull();
     expect(safeUrl('https://s100.divarcdn.com/a.webp')).toBe('https://s100.divarcdn.com/a.webp');
     expect(safeUrl('/image/x.png', 'https://www.technolife.com')).toBe('https://www.technolife.com/image/x.png');
+  });
+
+  it('پراکسی تصویر فقط برای CDNهای مشخص و فقط تصویر', async () => {
+    expect(displayImage('https://image.torob.com/a.webp')).toBe('/api/integrations?op=shop-img&u=https%3A%2F%2Fimage.torob.com%2Fa.webp');
+    expect(displayImage('https://dkstatics-public.digikala.com/a.jpg')).toBe('https://dkstatics-public.digikala.com/a.jpg');
+    await expect(fetchImage('https://evil.example/a.png')).rejects.toThrow('میزبان تصویر مجاز نیست');
+    await expect(fetchImage('http://image.torob.com/a.webp')).rejects.toThrow('میزبان تصویر مجاز نیست');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })));
+    await expect(fetchImage('https://image.torob.com/a.webp')).rejects.toThrow('تصویر دریافت نشد');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/webp' } })));
+    expect((await fetchImage('https://image.torob.com/a.webp')).body.length).toBe(3);
   });
 
   it('قیمت آگهی: ریال به تومان، «توافقی» و قیمت نمادین حذف', () => {
@@ -64,18 +75,18 @@ describe('دستیار خرید — سرور', () => {
       return new Response('{}', { status: 404 });
     }));
     const a = await shopAsk('ارزان‌ترین پرواز به کیش از اهواز', 'ahvaz', NOW);
-    expect(calls.every((u) => u.startsWith('https://flight.atighgasht.com/'))).toBe(true);
+    expect(calls.every((u) => /^https:\/\/(flight\.atighgasht\.com|ws\.alibaba\.ir)\//.test(u))).toBe(true);
     expect(a.items.map((i) => i.priceToman)).toEqual([6_100_000, 7_000_000]);
     expect(a.items[0].url).toBe('https://mrbilit.com/flights/AWZ-KIH?departureDate=2026-10-16');
-    expect(a.top?.why).toBe("مستربلیط: ۹۰۰٬۰۰۰ تومان ارزان‌تر از رتبهٔ دوم");
-    expect(a.links.map((l) => l.service)).toEqual(['flytoday']);
+    expect(a.tops[0].why).toBe('مستربلیط: ۹۰۰٬۰۰۰ تومان ارزان‌تر از رتبهٔ ۲');
+    expect(a.links.map((l) => l.service)).toEqual(expect.arrayContaining(['flytoday', 'snapptrip']));
   });
 
   it('منبع مسدود (۴۰۳) به لینک مستقیم تبدیل می‌شود، نه خطای کل پاسخ', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>blocked</html>', { status: 403 })));
     const a = await shopAsk('ارزان‌ترین پیتزا در اهواز', 'ahvaz', NOW + 1);
     expect(a.items).toEqual([]);
-    expect(a.sources).toEqual([{ service: 'snappfood', ok: false, count: 0, note: 'سرور خارج از ایران را نمی‌پذیرد' }]);
+    expect(a.sources).toEqual([{ service: 'snappfood', ok: false, count: 0, note: 'پل مک تنظیم نشده (سرور خارج از ایران)' }]);
     expect(a.links[0].url).toBe('https://snappfood.ir');
   });
 });

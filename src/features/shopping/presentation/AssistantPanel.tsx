@@ -3,7 +3,8 @@
  *  ۱۰ گزینهٔ برتر از چند پلتفرم در یک جدول + «پیشنهاد برتر» با دلیل
  *  همه‌چیز فقط‌خواندنی است؛ خرید، رزرو و پرداخت در خود سایت انجام می‌شود.
  * ============================================================ */
-import { type FormEvent, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ExternalLink, Sparkles, Trophy } from 'lucide-react';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
 import { Button, buttonClass } from '@/shared/components/ui/Button';
@@ -21,16 +22,21 @@ import { ResultsTable, Thumb } from './ResultsTable';
 import { ServiceLogo, ServiceTag } from './ServiceLogo';
 
 const EXAMPLES = [
-  'بهترین پلی‌استیشن ۵ اسلیم کارکرده در اهواز',
-  'ارزان‌ترین پرواز یا قطار از اهواز به مشهد',
-  'ویلا در شمال شبی حداکثر ۳ میلیون برای ۴ نفر',
-  'متخصص پوست با نوبت خالی در اهواز بر اساس نظرات',
-  'کرم ضد آفتاب برای پوست چرب',
-  'ارزان‌ترین پیتزای تخفیف‌دار در اهواز'
+  'بهترین پلی‌استیشن ۵ اسلیم کارکرده',
+  'پرواز به تهران و شیراز و اصفهان',
+  'اتوبوس vip به تهران',
+  'تاکسی دربست به مشهد',
+  'ارزان‌ترین تور کیش',
+  'شلوار مردانه با خرید اقساطی',
+  'ارزان‌ترین سس مایونز ۳۰۰ گرمی',
+  'اجاره آپارتمان',
+  'آگهی‌های استخدام',
+  'متخصص پوست با نوبت خالی',
+  'ارزان‌ترین پیتزای تخفیف‌دار'
 ];
 
 const INTENT_LABEL: Record<Intent, string> = {
-  product: 'کالا', fashion: 'پوشاک', beauty: 'آرایشی', food: 'غذا', grocery: 'سوپرمارکت', flight: 'پرواز', train: 'قطار', stay: 'اقامت', tour: 'تور', doctor: 'پزشک', book: 'کتاب'
+  product: 'کالا', fashion: 'پوشاک', beauty: 'آرایشی', food: 'غذا', grocery: 'سوپرمارکت', flight: 'پرواز', train: 'قطار', bus: 'اتوبوس', taxi: 'تاکسی دربست', stay: 'اقامت', tour: 'تور', doctor: 'پزشک', book: 'کتاب', job: 'استخدام', estate: 'املاک', car: 'خودرو', service: 'خدمات'
 };
 
 function Understood({ a }: { a: ShopAnswer }) {
@@ -52,28 +58,84 @@ function Understood({ a }: { a: ShopAnswer }) {
   );
 }
 
-function TopPick({ a }: { a: ShopAnswer }) {
-  if (!a.top) return null;
-  const i = a.top.item;
+function TopPicks({ a }: { a: ShopAnswer }) {
+  if (!a.tops.length) return null;
+  const [first, ...rest] = a.tops;
+  const i = first.item;
   return (
-    <Surface variant="focal" className="relative overflow-hidden p-4 md:p-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-accent-soft to-transparent" />
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Thumb src={i.image} className="h-28 w-28 self-center shadow-card" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="inline-flex items-center gap-1.5 text-sm font-extrabold text-warn"><Trophy aria-hidden className="h-4 w-4" /> پیشنهاد برتر</p>
-          <p className="text-base font-bold leading-7 text-ink">{i.title}</p>
-          <p className="text-sm leading-6 text-muted">{a.top.why}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            {i.priceToman != null && <span className="text-lg font-extrabold text-ink">{i.priceToman === 0 ? 'رایگان' : fmtPrice(i.priceToman)}</span>}
-            <ServiceTag id={i.service} />
+    <Section title={<span className="inline-flex items-center gap-2"><Trophy aria-hidden className="h-5 w-5 text-warn" />{toFaDigits(a.tops.length)} پیشنهاد برتر</span>}>
+      <div className="space-y-3">
+        <Surface variant="focal" className="relative overflow-hidden p-4 md:p-5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-accent-soft to-transparent" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Thumb src={i.image} className="h-28 w-28 self-center shadow-card" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="inline-flex items-center gap-1.5 text-sm font-extrabold text-warn"><Trophy aria-hidden className="h-4 w-4" /> پیشنهاد اول</p>
+              <p className="text-base font-bold leading-7 text-ink">{i.title}</p>
+              <p className="text-sm leading-6 text-muted">{first.why}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                {i.priceToman != null && <span className="text-lg font-extrabold text-ink">{i.priceToman === 0 ? 'رایگان' : fmtPrice(i.priceToman)}</span>}
+                <ServiceTag id={i.service} />
+              </div>
+            </div>
+            <a href={i.url} target="_blank" rel="noopener noreferrer" className={cn(buttonClass('primary', 'md'), 'gap-1.5 self-stretch sm:self-center')}>
+              ورود به {SERVICE[i.service].name} <ExternalLink aria-hidden className="h-4 w-4" />
+            </a>
           </div>
-        </div>
-        <a href={i.url} target="_blank" rel="noopener noreferrer" className={cn(buttonClass('primary', 'md'), 'gap-1.5 self-stretch sm:self-center')}>
-          ورود به {SERVICE[i.service].name} <ExternalLink aria-hidden className="h-4 w-4" />
-        </a>
+        </Surface>
+        {rest.length > 0 && (
+          <ol className="grid gap-2.5 sm:grid-cols-2">
+            {rest.map((p, n) => (
+              <li key={p.item.id}>
+                <Surface className="flex h-full gap-3 p-3">
+                  <div className="relative shrink-0">
+                    <Thumb src={p.item.image} className="h-16 w-16" />
+                    <span className="absolute -top-1.5 start-1 rounded-full bg-warn px-1.5 text-[10px] font-bold text-white">{toFaDigits(n + 2)}</span>
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <a href={p.item.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-semibold leading-6 text-ink hover:text-accent">{p.item.title}</a>
+                    <p className="line-clamp-2 text-xs leading-5 text-muted">{p.why}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {p.item.priceToman != null && <span className="text-sm font-bold text-ink">{p.item.priceToman === 0 ? 'رایگان' : fmtPrice(p.item.priceToman)}</span>}
+                      <ServiceTag id={p.item.service} />
+                    </div>
+                  </div>
+                </Surface>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
-    </Surface>
+    </Section>
+  );
+}
+
+/** فروشگاه‌های خرید اقساطی همان دسته — جدا از جدول کالاها */
+function InstallmentStores({ a }: { a: ShopAnswer }) {
+  if (!a.stores.length) return null;
+  return (
+    <Section title="فروشگاه‌های خرید اقساطی (اسنپ‌پی و دیجی‌پی)" description="فقط فروشگاه‌های همین دسته؛ شرایط اقساط را پیش از خرید در سایت فروشگاه ببینید.">
+      <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        {a.stores.map((st) => (
+          <li key={st.id}>
+            <a href={st.url} target="_blank" rel="noopener noreferrer" className="block h-full">
+              <Surface className="flex h-full items-center gap-3 p-3 transition hover:shadow-card">
+                <Thumb src={st.image} className="h-12 w-12 bg-white" />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="truncate text-sm font-bold text-ink">{st.title}</p>
+                  {st.summary && <p className="line-clamp-1 text-xs text-muted">{st.summary}</p>}
+                  <p className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {st.facts.map((f) => <span key={f.label} className="rounded-full bg-positive/10 px-2 py-0.5 font-semibold text-positive">{toFaDigits(f.value)}</span>)}
+                    {st.location && <span className="text-subtle">{st.location}</span>}
+                  </p>
+                </div>
+                <ServiceLogo id={st.service} className="h-6 w-6" />
+              </Surface>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 
@@ -116,6 +178,8 @@ export function AssistantPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const runId = useRef(0);
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('q');
 
   async function run(q: string) {
     if (q.trim().length < 3) { setError('درخواست را کمی کامل‌تر بنویسید'); return; }
@@ -130,6 +194,15 @@ export function AssistantPanel() {
       if (id === runId.current) setLoading(false);
     }
   }
+
+  // درخواست نمونهٔ پلتفرم‌ها (زبانهٔ سرویس‌ها) از ?q= می‌آید و یک بار اجرا می‌شود
+  useEffect(() => {
+    if (!asked) return;
+    setText(asked);
+    void run(asked);
+    setParams((p) => { const n = new URLSearchParams(p); n.delete('q'); return n; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asked]);
 
   const submit = (e: FormEvent) => { e.preventDefault(); void run(text); };
   const example = (q: string) => { setText(q); void run(q); };
@@ -175,6 +248,9 @@ export function AssistantPanel() {
 
       {loading && (
         <div className="space-y-3" aria-busy="true" aria-label="در حال جستجو در چند سایت">
+          {/غذا|رستوران|کافه|پیتزا|برگر|کباب|جوجه|قهوه|لاته|کیک|شیرینی|کترینگ|اسنپ ?فود|ساندویچ|سوشی|خورش|قورمه|بستنی/.test(text) && (
+            <p className="text-xs text-muted">رستوران‌ها از طریق پل مک شما از اسنپ‌فود خوانده می‌شوند؛ تا حدود ۲۰ ثانیه طول می‌کشد.</p>
+          )}
           <Skeleton className="h-7 w-2/3 rounded-full" />
           {Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-20 rounded-card" />)}
         </div>
@@ -190,12 +266,13 @@ export function AssistantPanel() {
           {answer.hints.map((h) => <Notice key={h} tone="warn">{h}</Notice>)}
           {answer.items.length > 0 ? (
             <Section title={`${toFaDigits(answer.items.length)} گزینهٔ برتر`}>
-              <ResultsTable items={answer.items} topId={answer.top?.item.id ?? null} />
+              <ResultsTable items={answer.items} topIds={answer.tops.map((t) => t.item.id)} />
             </Section>
           ) : (
             !answer.hints.length && <Notice tone="info" title="نتیجهٔ مستقیمی پیدا نشد">این منابع از سرور دارینو پاسخ ندادند یا نتیجه‌ای نداشتند؛ از لینک‌های زیر مستقیم ببینید.</Notice>
           )}
-          <TopPick a={answer} />
+          <TopPicks a={answer} />
+          <InstallmentStores a={answer} />
           <DirectLinks a={answer} />
           <SourcesLine a={answer} />
         </div>

@@ -12,12 +12,14 @@ export type ServiceId =
   | 'paziresh24' | 'doctoreto'
   | 'taaghche' | 'fidibo' | 'sibook'
   | 'khanoumi' | 'asalbanoo'
-  | 'payping' | 'bale';
+  | 'payping' | 'bale'
+  | 'torob' | 'alibaba' | 'snapptrip' | 'bamadar' | 'snapppay' | 'digipay';
 
 export type ServiceCategory = 'shopping' | 'food' | 'travel' | 'health' | 'books' | 'beauty' | 'payment';
 
 /** نیت تشخیص‌داده‌شده از متن فارسی کاربر */
-export type Intent = 'product' | 'fashion' | 'beauty' | 'food' | 'grocery' | 'flight' | 'train' | 'stay' | 'tour' | 'doctor' | 'book';
+export type Intent = 'product' | 'fashion' | 'beauty' | 'food' | 'grocery' | 'flight' | 'train' | 'bus' | 'taxi' | 'stay' | 'tour' | 'doctor' | 'book'
+  | 'job' | 'estate' | 'car' | 'service';
 
 export interface CityRef {
   name: string;
@@ -29,6 +31,12 @@ export interface CityRef {
   iata: string | null;
   /** شناسهٔ ایستگاه قطار در مستربلیط */
   trainId: number | null;
+  /** شناسهٔ شهر اتوبوس در مستربلیط (همهٔ پایانه‌ها) */
+  busId: number | null;
+  /** اسلاگ صفحهٔ تاکسی بین‌شهری مستربلیط (فقط شهرهای دارای تاکسی) */
+  taxiSlug: string | null;
+  /** نزدیک‌ترین فرودگاه پرپرواز وقتی شهر فرودگاه ندارد یا کم‌پرواز است */
+  nearIata: string | null;
   lat: number;
   lon: number;
 }
@@ -50,6 +58,10 @@ export interface ShopQuery {
   minPrice: number | null;
   used: boolean;
   sort: 'best' | 'cheapest';
+  /** خرید اقساطی (اسنپ‌پی/دیجی‌پی) خواسته شده */
+  installment: boolean;
+  /** املاک: اجاره/رهن یا خرید */
+  deal: 'rent' | 'buy' | null;
   /** سرویس‌هایی که کاربر نامشان را آورده */
   named: ServiceId[];
 }
@@ -66,6 +78,8 @@ export interface ShopItem {
   /** یک خط خلاصه (برند، فروشنده، ایرلاین و ساعت، تخصص و مطب…) */
   summary: string | null;
   image: string | null;
+  /** لوگوی فروشنده/رستوران، اگر جدا از عکس محصول است */
+  brandLogo?: string | null;
   url: string;
   priceToman: number | null;
   priceBeforeToman: number | null;
@@ -81,6 +95,8 @@ export interface ShopItem {
   mapUrl: string | null;
   /** چند روز تا اولین نوبت/حرکت (برای رتبه‌بندی پزشک و سفر) */
   soonDays: number | null;
+  /** جایگاه در فهرست خود منبع (آگهی‌ها: ۰ = جدیدترین) */
+  order?: number | null;
 }
 
 export interface RankedItem extends ShopItem {
@@ -106,7 +122,10 @@ export interface ServiceLink {
 export interface ShopAnswer {
   query: ShopQuery;
   items: RankedItem[];
-  top: { item: RankedItem; why: string } | null;
+  /** فروشگاه‌های اقساطی مرتبط (اسنپ‌پی/دیجی‌پی)، جدا از جدول کالاها */
+  stores: RankedItem[];
+  /** ۵ پیشنهاد برتر به ترتیب، با دلیل */
+  tops: { item: RankedItem; why: string }[];
   sources: SourceStatus[];
   /** لینک جستجوی مستقیم برای منابعی که داده نداشتند یا اتصال مستقیم ندارند */
   links: ServiceLink[];

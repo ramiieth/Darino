@@ -54,8 +54,28 @@ const ROWS: Row[] = [
   ['لاهیجان', 'lahijan', 746, null, null, null, 37.1728, 49.9765]
 ];
 
+/** شناسهٔ شهر اتوبوس مستربلیط («همهٔ پایانه‌ها») — از GetBusCityList */
+const BUS: Record<string, number> = {
+  تهران: 11320000, کرج: 18310000, مشهد: 31310000, اصفهان: 21310000, شیراز: 41310000, تبریز: 26310000, اهواز: 36310000, قم: 14310000,
+  کرمانشاه: 71310000, ارومیه: 57310000, رشت: 54310000, کرمان: 45310000, یزد: 93310000, زاهدان: 61310000, همدان: 75310000, اراک: 51310000,
+  قزوین: 15310000, زنجان: 67310000, ساری: 16310000, گرگان: 97310000, بندرعباس: 64310000, بوشهر: 95310000, قشم: 64370000, آبادان: 36320000,
+  خرمشهر: 36380000, دزفول: 36390000, اندیمشک: 36330000, سنندج: 73310000, 'خرم‌آباد': 81310000, سمنان: 87310000, بیرجند: 33310000,
+  چابهار: 61330000, بابلسر: 16340000, رامسر: 16390000, نوشهر: 16450000, چالوس: 16460000, کاشان: 21420000, شاهرود: 87330000, ایلام: 83310000,
+  یاسوج: 85310000, شهرکرد: 77310000, بجنورد: 32310000, اردبیل: 91310000, لاهیجان: 54450000
+};
+
+/** تاکسی بین‌شهری دربست مستربلیط (GetTaxiCityList) — شناسه همان شناسهٔ اتوبوس است */
+const TAXI: Record<string, string> = {
+  تهران: 'tehran', کرج: 'karaj', مشهد: 'mashhad', اصفهان: 'esfahan', شیراز: 'shiraz', تبریز: 'tabriz', اهواز: 'ahwaz', قم: 'qom', کرمانشاه: 'kermanshah',
+  رشت: 'rasht', یزد: 'yazd', همدان: 'hamedan', اراک: 'arak', قزوین: 'qazvin', زنجان: 'zanjan', ساری: 'sari', گرگان: 'gorgan', بندرعباس: 'bandar_abbas',
+  بوشهر: 'bushehr', سمنان: 'semnan', بابلسر: 'babolsar', رامسر: 'ramsar', نوشهر: 'nowshahr', چالوس: 'chalous', کاشان: 'kashan', شهرکرد: 'shahr_e_kord', لاهیجان: 'lahijan'
+};
+
+/** شهر بدون فرودگاه یا کم‌پرواز → نزدیک‌ترین فرودگاه پرپرواز */
+const NEAR_AIRPORT: Record<string, string> = { کرج: 'THR', قم: 'THR', کاشان: 'IFN', خرمشهر: 'ABD', اندیمشک: 'DEF', لاهیجان: 'RAS', بابلسر: 'SRY', چالوس: 'NSH', شاهرود: 'SNX' };
+
 export const CITIES: CityRef[] = ROWS.map(([name, slug, divarId, sheypoor, iata, trainId, lat, lon]) => ({
-  name, slug, sheypoorSlug: sheypoor ?? slug, divarId, iata, trainId, lat, lon
+  name, slug, sheypoorSlug: sheypoor ?? slug, divarId, iata, trainId, busId: BUS[name] ?? null, taxiSlug: TAXI[name] ?? null, nearIata: NEAR_AIRPORT[name] ?? null, lat, lon
 }));
 
 /** نام‌های دیگر یک شهر (املای رایج، بدون فاصلهٔ مجازی) */

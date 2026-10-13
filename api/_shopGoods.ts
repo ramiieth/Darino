@@ -7,9 +7,11 @@ import { json, num, plain, request, safeUrl, SourceError } from './_shopHttp.js'
 export interface GoodsQuery { keywords: string; sort: 'best' | 'cheapest'; maxPrice: number | null; minPrice: number | null }
 
 export function item(p: Partial<ShopItem> & Pick<ShopItem, 'id' | 'service' | 'title' | 'url'>): ShopItem {
-  const out: ShopItem = { summary: null, image: null, priceToman: null, priceBeforeToman: null, discountPercent: 0, rating: null, ratingCount: null, location: null, available: true, facts: [], mapUrl: null, soonDays: null, ...p };
-  if (out.rating != null) out.rating = Math.round(Math.min(5, Math.max(0, out.rating)) * 10) / 10;
-  out.title = out.title.replace(/\s+/g, ' ').trim();
+  const out: ShopItem = { summary: null, image: null, brandLogo: null, priceToman: null, priceBeforeToman: null, discountPercent: 0, rating: null, ratingCount: null, location: null, available: true, facts: [], mapUrl: null, soonDays: null, ...p };
+  // امتیاز ۰ یعنی «هنوز امتیازی ندارد»، نه بدترین امتیاز
+  out.rating = out.rating != null && out.rating > 0 ? Math.round(Math.min(5, out.rating) * 10) / 10 : null;
+  // فاصله‌های اضافه و نویسه‌های بی‌معنای ابتدای عنوان («??سس …»)
+  out.title = out.title.replace(/\s+/g, ' ').trim().replace(/^[^\p{L}\p{N}(]+/u, '');
   return out;
 }
 
@@ -144,4 +146,19 @@ export async function taaghche(q: GoodsQuery): Promise<ShopItem[]> {
       facts: final === 0 ? [{ label: 'قیمت', value: 'رایگان' }] : []
     });
   }).filter((i) => i.title && /\d$/.test(i.url));
+}
+
+/** ترب: کمترین قیمت هر کالا در صدها فروشگاه؛ آگهی‌های پولی (is_adv) کنار گذاشته می‌شوند. قیمت تومان است. */
+export async function torob(q: GoodsQuery): Promise<ShopItem[]> {
+  const qs = new URLSearchParams({ q: q.keywords, page: '0', size: '24' });
+  const data = await json(`https://api.torob.com/v4/base-product/search/?${qs}`);
+  return arr(data.results).map(obj).filter((p) => p.is_adv !== true).map((p) => {
+    const price = num(p.price);
+    const path = str(p.web_client_absolute_url);
+    return item({
+      id: `tr-${str(p.random_key)}`, service: 'torob', title: str(p.name1).trim(), url: path.startsWith('/p/') ? `https://torob.com${path}` : '',
+      image: safeUrl(p.image_url), priceToman: price && price > 0 ? price : null, available: !!price && price > 0,
+      summary: str(p.shop_text) || null, facts: str(p.price_text) ? [{ label: 'ترب', value: 'کمترین قیمت در فروشگاه‌ها' }] : []
+    });
+  }).filter((i) => i.title && i.url);
 }
