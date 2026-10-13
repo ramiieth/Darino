@@ -64,7 +64,9 @@ export function plan(q: ShopQuery, now: number): { tasks: Task[]; linkOnly: Serv
   }
   if (q.keywords && want('book')) { add('taaghche', () => taaghche(goods)); linkOnly.add('fidibo'); linkOnly.add('sibook'); }
   if (want('food')) {
-    if (q.city) add('snappfood', () => snappfood({ ...local, keywords: q.keywords || 'غذا' }));
+    // «کروسان یا موهیتو» → هر گزینه جدا؛ بدون نام غذا → همان نوع مکانی که نوشته شده
+    const dishes = q.alternatives?.length ? q.alternatives : [q.keywords || (/ک[یت]ترینگ/.test(q.text) ? 'کترینگ' : /کافه|قهوه/.test(q.text) ? 'کافه' : 'غذا')];
+    if (q.city) for (const keywords of dishes) add('snappfood', () => snappfood({ ...local, keywords }));
     else hints.push('شهر را بنویسید تا رستوران‌های همان شهر بررسی شوند.');
     linkOnly.add('snappfood');
   }
@@ -151,7 +153,7 @@ const ANSWER_TTL = 10 * 60_000;
 export async function shopAsk(text: string, homeSlug: string | null, now = Date.now()): Promise<ShopAnswer> {
   const home = CITIES.find((c) => c.slug === homeSlug) ?? null;
   const q = parseShopQuery(text, { now, home });
-  const key = JSON.stringify([q.intents, q.keywords, q.city?.slug, q.origin?.slug, q.destinations.map((d) => d.slug), q.date, q.nights, q.guests, q.maxPrice, q.minPrice, q.used, q.sort, q.deal, q.named, q.installment]);
+  const key = JSON.stringify([q.intents, q.keywords, q.alternatives, q.city?.slug, q.origin?.slug, q.destinations.map((d) => d.slug), q.date, q.nights, q.guests, q.maxPrice, q.minPrice, q.used, q.sort, q.deal, q.named, q.installment]);
   const hit = answers.get(key);
   if (hit && now - hit.at < ANSWER_TTL) return { ...hit.value, query: q };
 
