@@ -6,6 +6,9 @@
 ;; Documents، Desktop، Downloads، .ssh و … — به‌جز پوشهٔ خود پل و محل نصب node.
 (deny file-read* file-write* (subpath "__HOME__"))
 (allow file-read* (subpath "__NODE_DIR__"))
+;; Node برای پیدا کردن مسیر واقعی فایل پل فقط «مشخصات» خودِ پوشهٔ خانه را می‌بیند (lstat)؛
+;; فهرست و محتوای آن و همهٔ زیرپوشه‌ها همچنان بسته است.
+(allow file-read-metadata (literal "__HOME__"))
 
 ;; Keychainهای سیستمی هم بسته‌اند.
 (deny file-read* file-write* (subpath "/Library/Keychains") (subpath "/private/var/db/keychain"))
