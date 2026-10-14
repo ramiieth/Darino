@@ -23,7 +23,6 @@ const PROFILE: Record<'goods' | 'food' | 'trip' | 'stay' | 'doctor' | 'listing',
   doctor: { best: { quality: 0.45, trust: 0.3, price: 0, discount: 0, soon: 0.25 }, cheapest: { quality: 0.35, trust: 0.2, price: 0.25, discount: 0, soon: 0.2 } }
 };
 
-const MAX_PER_SOURCE = 10;
 
 /* ---------- ارتباط عنوان با درخواست ---------- */
 
@@ -62,7 +61,9 @@ export function relevance(title: string, keywords: string, strictNumbers = true)
   if (!words.length) return 1;
   const t = canon(title);
   const tokens = t.split(' ');
-  const hit = words.filter((w) => t.includes(w) || tokens.some((x) => x.length > 2 && w.startsWith(x))).length / words.length;
+  // «پر چرب» = «پرچرب»، «دستمال کاغذی» = «دستمالکاغذی»: فاصله‌ها در مقایسه حساب نمی‌شوند
+  const flat = t.replace(/ /g, '');
+  const hit = words.filter((w) => t.includes(w) || (w.length > 2 && flat.includes(w)) || tokens.some((x) => x.length > 2 && w.startsWith(x))).length / words.length;
   const k = canon(keywords);
   const accessory = (ACCESSORY.test(t) && !ACCESSORY.test(k)) || (FOOD_EXTRA.test(t) && !FOOD_EXTRA.test(k));
   const serviceAd = SERVICE_AD.test(t) && !SERVICE_AD.test(k);
@@ -114,7 +115,7 @@ export function categoryFit(items: ShopItem[], keywords: string): Map<ShopItem, 
   return fit;
 }
 
-export const MAX_RESULTS = 20;
+export const MAX_RESULTS = 30;
 export const TOP_PICKS = 5;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -157,7 +158,9 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   const fitOf = (i: ShopItem) => fits[altOf.get(`${i.service}:${i.id}`) ?? 0].get(i) ?? 1;
   const rel = new Map(deduped.map((i) => [i, (textual(i) ? bestAlt(i)[0] : 1) * dealPenalty(i) * fitOf(i)]));
   let strong = deduped.filter((i) => rel.get(i)! >= 0.6);
-  let unique = strong.length >= 3 ? strong : deduped.filter((i) => rel.get(i)! >= 0.34);
+  // کالای دقیق (همهٔ واژه‌ها: برند، چربی، اندازه) در چند فروشگاه هست؟ فقط همان؛ نه «برند دیگر» یا «کم‌چرب» به‌جای «پرچرب»
+  const exact = deduped.filter((i) => rel.get(i)! >= 0.6 && bestAlt(i)[0] >= 0.99);
+  let unique = exact.length >= 3 ? exact : strong.length >= 3 ? strong : deduped.filter((i) => rel.get(i)! >= 0.34);
   // «۳۰۰ گرمی» دقیقاً نبود؟ نزدیک‌ترین اندازه‌ها (بدون شرط عدد) به‌جای پاسخ خالی
   if (!unique.length && /\d/.test(q.keywords)) {
     for (const i of deduped) rel.set(i, (textual(i) ? relevance(i.title, q.keywords, false) : 1) * dealPenalty(i) * fitOf(i));
@@ -205,11 +208,11 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   });
 
   scored.sort((a, b) => b.score - a.score || (a.priceToman ?? Infinity) - (b.priceToman ?? Infinity));
-  // سفر: هر مسیر و هر وسیله (پرواز/قطار/اتوبوس/تاکسی) سهم منصفانه؛ بقیه: هر منبع حداکثر ۱۰
+  // هر منبع (و در سفر هر مسیر و وسیله) در دور اول سهم برابر از ۳۰ نتیجه دارد؛ سهم پرنشده را بهترین‌های باقی‌مانده پر می‌کنند
   const bucketOf = (i: ShopItem) => (profileOf(i, q.intents) === 'trip' ? `${i.location}|${i.title.split(' ')[0]}` : alts.length > 1 ? `${i.service}|${altOf.get(`${i.service}:${i.id}`) ?? 0}` : i.service);
   const buckets = new Set(scored.map(bucketOf));
   const trip = scored.some((i) => profileOf(i, q.intents) === 'trip');
-  const cap = trip || alts.length > 1 ? Math.max(2, Math.floor(MAX_RESULTS / Math.max(1, buckets.size))) : MAX_PER_SOURCE;
+  const cap = trip || alts.length > 1 ? Math.max(2, Math.floor(MAX_RESULTS / Math.max(1, buckets.size))) : Math.ceil(MAX_RESULTS / Math.max(1, buckets.size));
   const perGroup = new Map<string, number>();
   const out: RankedItem[] = [];
   const take = (s: RankedItem) => { perGroup.set(bucketOf(s), (perGroup.get(bucketOf(s)) ?? 0) + 1); out.push({ ...s, rank: out.length + 1 }); };

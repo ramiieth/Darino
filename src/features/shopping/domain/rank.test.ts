@@ -34,14 +34,20 @@ describe('رتبه‌بندی دستیار خرید', () => {
     expect(topPick(r)?.why).toMatch(/^دیوار: ارزان‌ترین گزینه/);
   });
 
-  it('بودجه، موجودی، ۲۰ نتیجه و سقف ۱۰ از هر منبع', () => {
-    const many = Array.from({ length: 14 }, (_, i) => base({ id: `s${i}`, title: `ps5 slim ${i}`, priceToman: 100_000_000 + i }));
-    const other = Array.from({ length: 15 }, (_, i) => base({ id: `d${i}`, service: 'divar', title: `ps5 slim دیوار ${i}`, priceToman: 120_000_000 + i }));
-    const r = rankItems([...many, ...other, base({ id: 'x', title: 'ps5 slim گران', priceToman: 300_000_000 }), base({ id: 'y', title: 'ps5 slim', priceToman: 1, available: false })], { ...q, maxPrice: 200_000_000 });
-    expect(r).toHaveLength(20);
-    expect(r.filter((i) => i.service === 'sheypoor')).toHaveLength(10);
+  it('بودجه، موجودی، ۳۰ نتیجه و سهم برابر هر منبع (سهم پرنشده را بقیه پر می‌کنند)', () => {
+    const many = Array.from({ length: 20 }, (_, i) => base({ id: `s${i}`, title: `ps5 slim ${i}`, priceToman: 100_000_000 + i }));
+    const other = Array.from({ length: 20 }, (_, i) => base({ id: `d${i}`, service: 'divar', title: `ps5 slim دیوار ${i}`, priceToman: 120_000_000 + i }));
+    const extra = [base({ id: 'x', title: 'ps5 slim گران', priceToman: 300_000_000 }), base({ id: 'y', title: 'ps5 slim', priceToman: 1, available: false })];
+    const r = rankItems([...many, ...other, ...extra], { ...q, maxPrice: 200_000_000 });
+    expect(r).toHaveLength(30);
+    expect(r.filter((i) => i.service === 'sheypoor')).toHaveLength(15);
+    expect(r.filter((i) => i.service === 'divar')).toHaveLength(15);
     expect(r.some((i) => i.id === 'x' || i.id === 'y')).toBe(false);
-    expect(r.map((i) => i.rank)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    expect(r.map((i) => i.rank)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
+    // منبع کم‌نتیجه: سهمش به منبع دیگر می‌رسد، هیچ منبعی محدود نمی‌شود
+    const few = rankItems([...many, ...other.slice(0, 4)], { ...q, maxPrice: 200_000_000 });
+    expect(few.filter((i) => i.service === 'sheypoor')).toHaveLength(20);
+    expect(few.filter((i) => i.service === 'divar')).toHaveLength(4);
   });
 
   it('پزشک: رضایت و تعداد نظر و نوبت نزدیک‌تر', () => {
@@ -83,5 +89,15 @@ describe('دقت نتایج', () => {
     // برند بدون نشانهٔ دسته فیلتر نمی‌شود
     const brand = [pool[1], pool[3], pool[8]];
     expect(rankItems(brand, { ...q, intents: ['grocery'], keywords: 'لادن' }).map((i) => i.id).sort()).toEqual(['o2', 's1']);
+  });
+  it('کالای دقیق در چند فروشگاه هست → برند دیگر و «کم چرب» به‌جای «پرچرب» نمی‌آید؛ «پر چرب» = «پرچرب»', () => {
+    const y = (id: string, title: string, service: ShopItem['service']) => base({ id, title, service, url: 'https://snapp.market/x', priceToman: 500_000 });
+    const pool = [
+      y('a', 'ماست پرچرب حاوی ویتامین D3 ست میهن 2 کیلوگرمی', 'snappmarket'), y('b', 'میهن ماست ست پرچرب 4% 2 کیلوگرم', 'bamadar'),
+      y('c', 'ماست ست پر چرب 2 کیلوگرمی میهن', 'okala'), y('x1', 'ماست کم چرب میهن 2 کیلوگرمی', 'snappmarket'),
+      y('x2', 'ماست پرچرب 3% چربی پگاه 2 کیلوگرمی', 'okala'), y('x3', 'ماست پرچرب ست میهن 900 گرمی', 'snappmarket')
+    ];
+    const ids = rankItems(pool, { ...q, intents: ['grocery'], keywords: 'ماست پرچرب میهن 2 کیلویی' }).map((i) => i.id).sort();
+    expect(ids).toEqual(['a', 'b', 'c']);
   });
 });
