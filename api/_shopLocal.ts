@@ -126,6 +126,54 @@ export async function snappfood(q: LocalQuery & { grocery?: boolean }): Promise<
   throw new SourceError('پل مک تنظیم نشده (سرور خارج از ایران)', 403);
 }
 
+/* ---------- تپسی‌فود: سرور خارج از ایران را رد نمی‌کند؛ مستقیم و بدون پل ---------- */
+
+const TAPSI = 'https://api.tapsi.food/v1/api/search-discovery/Search/aggregated-search';
+const TAPSI_CODE = /^\w{3,16}$/;
+
+/** شهری که تپسی‌فود هنوز در آن فعال نیست خالی برمی‌گردد؛ با فعال شدنش نتایج خودکار می‌آیند (جستجو با مختصات، بدون فهرست شهر) */
+export async function tapsifood(q: LocalQuery): Promise<ShopItem[]> {
+  const c = q.city;
+  if (!c || !q.keywords) return [];
+  const qs = new URLSearchParams({ query: q.keywords.slice(0, 60), latitude: String(c.lat), longitude: String(c.lon), pageSize: '20' });
+  // جستجوی «سرد» تپسی‌فود گاهی ۱۰ تا ۱۲ ثانیه طول می‌کشد (گرم: ۲ ثانیه)
+  const data = await json(`${TAPSI}?${qs}`, { timeoutMs: 18_000 });
+  const fee = (v: Record<string, unknown>) => { const n = num(v.deliveryPrice); return n == null ? [] : [{ label: 'پیک', value: n === 0 ? 'رایگان' : `${n.toLocaleString('en-US')} تومان` }]; };
+  const seen = new Set<string>();
+  const dishes = arr(data.products).map(obj).flatMap((g) => {
+    const v = obj(g.vendorInfo); const code = str(v.vendorCode);
+    if (!TAPSI_CODE.test(code)) return [];
+    const docs = arr(g.subDocs).length ? arr(g.subDocs).map(obj) : [obj(g.productInfo)];
+    return docs.flatMap((p) => {
+      const pid = str(p.id);
+      if (!/^\d{1,20}$/.test(pid) || seen.has(`${code}:${pid}`)) return [];
+      seen.add(`${code}:${pid}`);
+      const before = num(p.price); const final = num(p.priceAfterDiscount) ?? before;
+      return [item({
+        id: `tf-${code}-${pid}`, service: 'tapsifood', title: str(p.name).trim(), url: `https://tapsi.food/vendor/${code}/product/${pid}`,
+        image: safeUrl(arr(p.images)[0]) ?? safeUrl(v.logo), brandLogo: safeUrl(v.logo),
+        priceToman: final != null && final > 0 ? Math.round(final) : null, priceBeforeToman: before && final && before > final ? Math.round(before) : null,
+        discountPercent: Math.max(0, Math.min(99, Math.round(num(p.discountRatio) ?? 0))),
+        rating: num(p.rate) && num(p.ratesCount) ? num(p.rate) : num(v.rate), ratingCount: num(p.ratesCount) || num(v.ratesCount),
+        summary: str(v.title) || null, location: c.name,
+        facts: [...(v.vendorStatus === false ? [{ label: 'وضعیت', value: CLOSED_NOTE }] : []), ...fee(v)]
+      })];
+    });
+  });
+  // رستوران/کافه‌ای که نامش جستجو شده (مثلاً «کافه») هم با لینک منو
+  const vendors = arr(data.topVendors).map(obj).flatMap((t) => {
+    const v = obj(t.vendorInfo); const code = str(t.vendorCode);
+    if (!TAPSI_CODE.test(code) || !str(v.title)) return [];
+    return [item({
+      id: `tfv-${code}`, service: 'tapsifood', title: str(v.title).trim(), url: `https://tapsi.food/vendor/${code}`,
+      image: safeUrl(v.logo), brandLogo: safeUrl(v.logo), rating: num(v.rate), ratingCount: num(v.ratesCount),
+      summary: 'منوی کامل در تپسی‌فود', location: c.name,
+      facts: [...(v.isOpen === false ? [{ label: 'وضعیت', value: CLOSED_NOTE }] : []), ...fee(v)]
+    })];
+  });
+  return [...dishes.slice(0, 60), ...vendors].filter((i) => i.title);
+}
+
 const MARKET_PARAMS = { client: 'PWA', deviceType: 'PWA', appVersion: '1.403.1' };
 
 /** SnappMarket (svc.snapp.market) is not geo-blocked, unlike the Snappfood restaurant stack. Prices are Toman. */

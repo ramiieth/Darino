@@ -7,7 +7,7 @@
 
 export type ServiceId =
   | 'digikala' | 'technolife' | 'masterkala' | 'shopino' | 'sheypoor' | 'divar'
-  | 'snappfood' | 'snappmarket' | 'okala'
+  | 'snappfood' | 'tapsifood' | 'snappmarket' | 'okala'
   | 'mrbilit' | 'flytoday' | 'jabama' | 'otaghak'
   | 'paziresh24' | 'doctoreto'
   | 'taaghche' | 'fidibo' | 'sibook'

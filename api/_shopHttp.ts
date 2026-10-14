@@ -6,7 +6,7 @@ export const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 // Only these exact hosts are ever requested; a redirect elsewhere is refused.
 const HOSTS = new Set([
   'www.technolife.com', 'masterkala.com', 'api-go.shopino.app', 'www.khanoumi.com', 'asalbanooshop.com',
-  'www.sheypoor.com', 'api.divar.ir', 'snappfood.ir', 'svc.snapp.market', 'flight.atighgasht.com', 'train.mrbilit.com',
+  'www.sheypoor.com', 'api.divar.ir', 'snappfood.ir', 'api.tapsi.food', 'svc.snapp.market', 'flight.atighgasht.com', 'train.mrbilit.com',
   'core.otaghak.com', 'apigw.paziresh24.com', 'api.doctoreto.com', 'get.taaghche.com',
   'bus.mrbilit.ir', 'api.jabama.tours', 'ws.alibaba.ir', 'api.torob.com', 'marketcore.avani.website', 'apigateway.okala.com', 'snapppay.ir', 'www.mydigipay.com'
 ]);
@@ -14,7 +14,7 @@ const HOSTS = new Set([
 // Links and images shown to the user must be https on the service's own domains.
 const LINK_ROOTS = [
   'digikala.com', 'technolife.com', 'masterkala.com', 'shopino.app', 'khanoumi.com', 'asalbanooshop.com', 'sheypoor.com',
-  'divar.ir', 'divarcdn.com', 'snappfood.ir', 'snapp.market', 'snapp.express', 'mrbilit.com', 'mrbilit.ir', 'otaghak.com', 'paziresh24.com',
+  'divar.ir', 'divarcdn.com', 'snappfood.ir', 'tapsi.food', 'snapp.market', 'snapp.express', 'mrbilit.com', 'mrbilit.ir', 'otaghak.com', 'paziresh24.com',
   'doctoreto.com', 'taaghche.com', 'fidibo.com', 'jabama.com', 'flytoday.ir', 'okala.com', '30book.com', 'arvanvod.ir',
   'jabama.tours', 'alibaba.ir', 'torob.com', 'snapptrip.com', 'bamadar.com', 'avani.website', 'arvanstorage.ir', 'snapp.ir', 'snapppay.ir', 'mydigipay.com'
 ];

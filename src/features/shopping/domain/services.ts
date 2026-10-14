@@ -46,6 +46,7 @@ export const SERVICES: ServiceInfo[] = [
   { id: 'divar', name: 'دیوار', category: 'shopping', logo: '/logos/shop/divar.png', site: 'https://divar.ir', mode: 'live', blurb: 'آگهی کالا، استخدام، املاک، خودرو و خدمات در شهر شما', intents: ['product', 'fashion', 'job', 'estate', 'car', 'service'], aliases: ['دیوار'], examples: ['آگهی‌های استخدام دیوار', 'پژو ۲۰۶ در دیوار', 'رهن خانه ویلایی'] },
   // 🍕 غذا و خرید روزانه
   { id: 'snappfood', name: 'اسنپ‌فود', category: 'food', logo: '/logos/shop/snappfood.svg', site: 'https://snappfood.ir', mode: 'live', blurb: 'رستوران، کافه، شیرینی و کترینگ — از طریق پل مک شما (VPN ایران)', intents: ['food'], aliases: ['اسنپ‌فود', 'اسنپ فود', 'اسنپفود'], examples: ['ارزان‌ترین پیتزای تخفیف‌دار', 'بهترین آیس لاته در کافه‌ها'] },
+  { id: 'tapsifood', name: 'تپسی‌فود', category: 'food', logo: '/logos/shop/tapsifood.png', site: 'https://tapsi.food', mode: 'live', blurb: 'رستوران، کافه و شیرینی — مستقیم و بدون پل (در شهرهایی که فعال است)', intents: ['food'], aliases: ['تپسی‌فود', 'تپسی فود', 'تپسیفود'], examples: ['پیتزا ناپولیتن', 'کافه‌های اطراف'] },
   { id: 'snappmarket', name: 'اسنپ‌مارکت', category: 'food', logo: '/logos/shop/snappfood.svg', site: 'https://snapp.market', mode: 'live', blurb: 'سوپرمارکت‌های اطراف با قیمت و موجودی لحظه‌ای', intents: ['grocery'], aliases: ['اسنپ‌مارکت', 'اسنپ مارکت'], examples: ['ارزان‌ترین سس مایونز ۳۰۰ گرمی', 'شیر کم چرب'] },
   { id: 'okala', name: 'اکالا', category: 'food', logo: '/logos/shop/okala.png', site: 'https://www.okala.com', mode: 'live', blurb: 'مقایسهٔ قیمت فروشگاه‌های اطراف (جستجو با دسته‌بندی)', intents: ['grocery'], aliases: ['اکالا', 'اوکالا'], examples: ['سوسیس و کالباس یک کیلویی', 'برنج ایرانی'] },
   { id: 'bamadar', name: 'بامادر', category: 'food', logo: '/logos/shop/bamadar.png', site: 'https://bamadar.com', mode: 'live', blurb: 'هایپرمارکت در شهرهای خوزستان (اهواز، آبادان، خرمشهر، دزفول…)', intents: ['grocery'], aliases: ['بامادر', 'با مادر', 'فروشگاه مادر'], examples: ['روغن سرخ کردنی ۱.۵ لیتری', 'ارزان‌ترین تن ماهی'] },
@@ -101,6 +102,7 @@ export function searchUrl(id: ServiceId, text: string, ctx: { city?: CityRef | n
     case 'alibaba': return ctx.origin?.iata && ctx.destination?.iata ? `${s.site}/flights/${ctx.origin.iata}-${ctx.destination.iata}` : s.site;
     case 'torob': return `${s.site}/search/?query=${q(t)}`;
     case 'okala': return `${s.site}/search?q=${q(t)}`;
+    case 'tapsifood': return `${s.site}/search?query=${q(t)}`;
     case 'bamadar': return `${s.site}/market/search`;
     case 'snapppay': return `${s.site}/stores/`;
     case 'digipay': return `${s.site}/stores/`;

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { plan, shopAsk } from '../../api/_shop';
 import { displayImage, fetchImage, safeUrl } from '../../api/_shopHttp';
-import { adPrice } from '../../api/_shopLocal';
+import { adPrice, tapsifood } from '../../api/_shopLocal';
 import { cityByName } from '../../src/features/shopping/domain/cities';
 import { parseShopQuery } from '../../src/features/shopping/domain/intent';
 
@@ -22,7 +22,7 @@ describe('دستیار خرید — سرور', () => {
     expect(services('ویلا در شمال')).toEqual(['otaghak']);
     expect(services('ارزان‌ترین شیر کم چرب در اهواز')).toEqual(['snappmarket', 'okala', 'bamadar']);
     const food = plan(parseShopQuery('پیتزا در اهواز', { now: NOW, home: ahvaz }), NOW);
-    expect(food.tasks.map((t) => t.service)).toEqual(['snappfood']);
+    expect(food.tasks.map((t) => t.service)).toEqual(['snappfood', 'tapsifood']);
     expect(food.linkOnly).toContain('snappfood');
     expect(plan(parseShopQuery('پرواز ارزان', { now: NOW, home: ahvaz }), NOW).hints[0]).toMatch(/مقصد/);
   });
@@ -86,7 +86,27 @@ describe('دستیار خرید — سرور', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>blocked</html>', { status: 403 })));
     const a = await shopAsk('ارزان‌ترین پیتزا در اهواز', 'ahvaz', NOW + 1);
     expect(a.items).toEqual([]);
-    expect(a.sources).toEqual([{ service: 'snappfood', ok: false, count: 0, note: 'پل مک تنظیم نشده (سرور خارج از ایران)' }]);
+    expect(a.sources).toEqual([
+      { service: 'snappfood', ok: false, count: 0, note: 'پل مک تنظیم نشده (سرور خارج از ایران)' },
+      { service: 'tapsifood', ok: false, count: 0, note: 'سرور خارج از ایران را نمی‌پذیرد' }
+    ]);
     expect(a.links[0].url).toBe('https://snappfood.ir');
+  });
+  it('تپسی‌فود: غذا و رستوران با لینک منو، مستقیم و بدون پل', async () => {
+    let asked = '';
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      asked = url;
+      return new Response(JSON.stringify({
+        products: [{ vendorInfo: { title: 'پیتزا دل گوستو', vendorCode: '274776', deliveryPrice: 63000, vendorStatus: true, rate: 4.3, ratesCount: 106 },
+          subDocs: [{ id: '2322507', name: 'پیتزا ناپولیتن', price: 1600000, priceAfterDiscount: 960000, discountRatio: 40, rate: 5, ratesCount: 5, images: ['https://cdn.tapsi.food/a.jpg'] }] }],
+        topVendors: [{ vendorCode: '2w77n6', vendorInfo: { title: 'یامی پیتزا برگر', isOpen: false, deliveryPrice: 0 } }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }));
+    const r = await tapsifood({ keywords: 'پیتزا', city: ahvaz, sort: 'best', maxPrice: null, minPrice: null, used: false });
+    expect(asked).toContain('https://api.tapsi.food/');
+    expect(asked).toContain(`latitude=${ahvaz!.lat}`);
+    expect(r[0]).toMatchObject({ service: 'tapsifood', priceToman: 960000, priceBeforeToman: 1600000, discountPercent: 40, url: 'https://tapsi.food/vendor/274776/product/2322507' });
+    expect(r[1]).toMatchObject({ url: 'https://tapsi.food/vendor/2w77n6', facts: [{ value: 'فعلاً بسته' }, { label: 'پیک', value: 'رایگان' }] });
+    expect(services('پیتزا')).toEqual(['snappfood', 'tapsifood']);
   });
 });
