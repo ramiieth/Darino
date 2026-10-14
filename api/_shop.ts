@@ -6,7 +6,7 @@ import { SERVICE, searchUrl } from '../src/features/shopping/domain/services.js'
 import type { Intent, RankedItem, ServiceId, ServiceLink, ShopAnswer, ShopItem, ShopQuery, SourceStatus } from '../src/features/shopping/domain/types.js';
 import { asalbanoo, digikala, khanoumi, masterkala, shopino, taaghche, technolife, torob } from './_shopGoods.js';
 import { doctoreto, paziresh24 } from './_shopHealth.js';
-import { bamadar, divar, foodTypes, okala, sheypoor, snappfood, snappmarket, type DivarCategory } from './_shopLocal.js';
+import { bamadar, divar, foodTypes, okala, sheypoor, snappfood, snappmarket, tapsifood, type DivarCategory } from './_shopLocal.js';
 import { digipayStores, payCategory, snapppayStores } from './_shopPay.js';
 import { displayImage, SourceError } from './_shopHttp.js';
 import { alibabaFlights, buses, flights, otaghak, taxis, tours, trains } from './_shopTravel.js';
@@ -68,7 +68,7 @@ export function plan(q: ShopQuery, now: number): { tasks: Task[]; linkOnly: Serv
   if (want('food')) {
     // «کروسان یا موهیتو» → هر گزینه جدا؛ بدون نام غذا → همان نوع مکانی که نوشته شده
     const dishes = q.alternatives?.length ? q.alternatives : [q.keywords || (/ک[یت]ترینگ/.test(q.text) ? 'کترینگ' : /کافه|قهوه/.test(q.text) ? 'کافه' : 'غذا')];
-    if (q.city) for (const keywords of dishes) add('snappfood', () => snappfood({ ...local, keywords }));
+    if (q.city) for (const keywords of dishes) { add('snappfood', () => snappfood({ ...local, keywords })); add('tapsifood', () => tapsifood({ ...local, keywords })); }
     else hints.push('شهر را بنویسید تا رستوران‌های همان شهر بررسی شوند.');
     linkOnly.add('snappfood');
   }

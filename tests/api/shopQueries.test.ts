@@ -35,8 +35,8 @@ const CASES: Case[] = [
   ['گوشت قرمز تازه', { intents: ['grocery'], tasks: ['snappmarket', 'okala', 'bamadar', 'snappfood'] }],
   // غذا
   ['مرغ سوخاری', { intents: ['food', 'grocery'] }],
-  ['کباب کوبیده ارزان در اهواز', { intents: ['food'], keywords: 'کباب کوبیده', tasks: ['snappfood'] }],
-  ['آیس لاته در کافه‌های اهواز', { intents: ['food'], tasks: ['snappfood'] }],
+  ['کباب کوبیده ارزان در اهواز', { intents: ['food'], keywords: 'کباب کوبیده', tasks: ['snappfood', 'tapsifood'] }],
+  ['آیس لاته در کافه‌های اهواز', { intents: ['food'], tasks: ['snappfood', 'tapsifood'] }],
   // سفر
   ['پرواز های امروز را نشان بده', { intents: ['flight'], tasks: ['mrbilit', 'alibaba'] }],
   ['قطار فردا به تهران', { intents: ['train'], tasks: ['mrbilit'], noHint: true }],

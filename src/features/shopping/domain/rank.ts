@@ -125,7 +125,7 @@ function profileOf(item: ShopItem, intents: Intent[]): keyof typeof PROFILE {
   if (item.service === 'mrbilit') return 'trip';
   if (item.service === 'otaghak') return 'stay';
   if ((item.service === 'divar' || item.service === 'sheypoor') && intents.some((i) => i === 'job' || i === 'estate' || i === 'car' || i === 'service')) return 'listing';
-  if (item.service === 'snappfood' || intents.includes('food')) return 'food';
+  if (item.service === 'snappfood' || item.service === 'tapsifood' || intents.includes('food')) return 'food';
   return 'goods';
 }
 
@@ -143,7 +143,7 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   // کالا و آگهی باید به درخواست مربوط باشند؛ پرواز، اقامت و پزشک از قبل با فیلتر خود منبع آمده‌اند
   // فروشگاه‌های مواد غذایی برای یک واژهٔ کلی («میوه» → «سیب قرمز») به جستجوی خودشان اعتماد می‌شود؛
   // ولی «سس مایونز ۳۰۰ گرمی» یا برند باید واقعاً در عنوان باشد
-  const GROCERY: string[] = ['snappmarket', 'snappfood', 'okala', 'bamadar'];
+  const GROCERY: string[] = ['snappmarket', 'snappfood', 'tapsifood', 'okala', 'bamadar'];
   const kwWords = q.keywords.split(' ').filter(Boolean);
   const generic = kwWords.length <= 1 && !/\d/.test(q.keywords);
   const textual = (i: ShopItem) => (GROCERY.includes(i.service) ? !generic : ['goods', 'listing'].includes(profileOf(i, q.intents)));
