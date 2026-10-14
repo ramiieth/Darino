@@ -14,6 +14,8 @@ import { alibabaFlights, buses, flights, otaghak, taxis, tours, trains } from '.
 interface Task { service: ServiceId; run: () => Promise<ShopItem[]>; stores?: boolean }
 
 const TASK_TIMEOUT_MS = 20_000;
+// پل اسنپ‌فود در حالت بیکار هر ۱۲ ثانیه سر می‌زند و تا ۳ جستجو با فاصلهٔ ۱.۵ ثانیه می‌کند؛ ۲۰ ثانیه برای اولین جستجو کم بود
+const SLOW_MS: Partial<Record<ServiceId, number>> = { snappfood: 30_000 };
 const CLASSIFIEDS: ServiceId[] = ['sheypoor', 'divar'];
 const POPULAR = ['تهران', 'مشهد', 'کیش', 'شیراز', 'اصفهان'];
 
@@ -161,8 +163,8 @@ export async function shopAsk(text: string, homeSlug: string | null, now = Date.
   const status = new Map<ServiceId, SourceStatus>();
   const items: ShopItem[] = [];
   const storeItems: ShopItem[] = [];
-  const runAll = async (list: Task[]) => {
-    const settled = await Promise.allSettled(list.map((t) => withTimeout(t.run(), TASK_TIMEOUT_MS)));
+  const runAll = async (list: Task[], cap = Infinity) => {
+    const settled = await Promise.allSettled(list.map((t) => withTimeout(t.run(), Math.min(SLOW_MS[t.service] ?? TASK_TIMEOUT_MS, cap))));
     settled.forEach((r, i) => {
       const service = list[i].service;
       const s = status.get(service) ?? { service, ok: false, count: 0, note: null };
@@ -178,7 +180,7 @@ export async function shopAsk(text: string, homeSlug: string | null, now = Date.
   if (!ranked.length && words.length > 1 && tasks.length) {
     const shorter = { ...q, keywords: words.slice(0, Math.max(1, words.length - 1)).join(' ') };
     items.length = 0; storeItems.length = 0; status.clear();
-    await runAll(plan(shorter, now).tasks);
+    await runAll(plan(shorter, now).tasks, TASK_TIMEOUT_MS); // سقف ۶۰ ثانیهٔ تابع Vercel
     ranked = rankItems(items, shorter);
     if (ranked.length) hints.push(`برای «${q.keywords}» نتیجه‌ای نبود؛ نتایج «${shorter.keywords}» نمایش داده شد.`);
   }
@@ -192,7 +194,8 @@ export async function shopAsk(text: string, homeSlug: string | null, now = Date.
   const viaProxy = <T extends ShopItem>(i: T): T => ({ ...i, image: displayImage(i.image), brandLogo: displayImage(i.brandLogo ?? null) });
   ranked = ranked.map(viaProxy);
   const value: ShopAnswer = { query: q, items: ranked, tops: topPicks(ranked), stores: rankStores(storeItems).map(viaProxy), sources: [...status.values()], links, hints, fetchedAt: now };
-  if (ranked.length) {
+  // پاسخی که منبعی در آن شکست خورده (مثلاً پل کند بود) ۱۰ دقیقه نمی‌ماند تا جستجوی بعدی نتیجهٔ پل را بگیرد
+  if (ranked.length && [...status.values()].every((s) => s.ok)) {
     if (answers.size > 200) answers.delete(answers.keys().next().value as string);
     answers.set(key, { at: now, value });
   }
