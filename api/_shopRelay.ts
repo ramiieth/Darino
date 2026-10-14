@@ -88,7 +88,7 @@ export async function bridgeOnline(): Promise<boolean> {
 }
 
 /** Queue a search (deduplicated) and wait for the Mac; a fresh cached result returns at once. */
-export async function relaySearch(job: RelayJob, waitMs = 22_000): Promise<RelayResult> {
+export async function relaySearch(job: RelayJob, waitMs = 27_000): Promise<RelayResult> {
   if (!validJob(job)) throw new Error('invalid relay job');
   const id = jobId(job);
   const cached = await get(RES + id);
