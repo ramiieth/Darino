@@ -126,9 +126,6 @@ export async function snappfood(q: LocalQuery & { grocery?: boolean }): Promise<
   throw new SourceError('پل مک تنظیم نشده (سرور خارج از ایران)', 403);
 }
 
-/** شناسه‌ها گاهی عددی‌اند (اکالا، بامادر، اسنپ‌مارکت)؛ str() برای عدد رشتهٔ خالی می‌داد و همهٔ کالاهای اکالا دور ریخته می‌شد */
-const idOf = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : str(v));
-
 const MARKET_PARAMS = { client: 'PWA', deviceType: 'PWA', appVersion: '1.403.1' };
 
 /** SnappMarket (svc.snapp.market) is not geo-blocked, unlike the Snappfood restaurant stack. Prices are Toman. */
@@ -162,6 +159,9 @@ export async function snappmarket(q: LocalQuery): Promise<ShopItem[]> {
 }
 
 /* ---------- اکالا (حالت مهمان: جستجو با دسته‌بندی) و بامادر ---------- */
+
+/** شناسه‌ها گاهی عددی‌اند (اکالا، بامادر، اسنپ‌مارکت)؛ str() برای عدد رشتهٔ خالی می‌داد و همهٔ کالاهای اکالا دور ریخته می‌شد */
+const idOf = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : str(v));
 
 const OKALA = 'https://apigateway.okala.com/api';
 const rial = (v: unknown) => { const n = num(v); return n && n > 0 ? Math.round(n / 10) : null; };
