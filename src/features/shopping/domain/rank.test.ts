@@ -62,4 +62,26 @@ describe('دقت نتایج', () => {
     expect(relevance('سوسیس آلمانی 1 کیلوگرمی', 'سوسیس 1 کیلویی')).toBe(1);
     expect(relevance('روغن مایع ۱۰۰۰ گرمی', 'روغن مایع 1 کیلو')).toBe(1);
   });
+  it('دستهٔ فروشگاه تعیین می‌کند چه چیزی «روغن» یا «کیک» است، نه فقط واژهٔ عنوان', () => {
+    const g = (id: string, title: string, category: string | null, service: ShopItem['service'] = 'bamadar') =>
+      base({ id, title, category, service, url: 'https://bamadar.com/market/search', priceToman: 100_000 });
+    const pool = [
+      g('o1', 'روغن زیتون فرابکر سی سام', 'روغن'), g('o2', 'لادن طلایی روغن زیتون بکر 250 میلی لیتر', 'روغن'),
+      g('o3', 'روغن زیتون (هر کیلوگرم)', null), g('f1', 'اویلا روغن مخصوص سرخ کردنی', 'روغن'),
+      g('x1', 'تن ماهی مکنزی در روغن زیتون', 'تن ماهی'), g('x2', 'پودر صابون رختشویی با روغن نارگیل', null),
+      g('x3', 'ژل مو الترا استرانگ حاوی روغن آرگان', null), g('x4', 'کیک روغنی دوقلو نظری', 'کیک و کلوچه'),
+      g('s1', 'روغن آفتابگردان لادن', 'خواربار و نان › روغن پخت و پز و سالاد', 'snappmarket'),
+      g('x5', 'صابون حمام روغن زیتون دورو', 'آرایشی و بهداشتی › صابون', 'snappmarket'),
+      g('x6', 'پد جاذب روغن پرسان', 'خانه و سبک زندگی › لوازم یکبارمصرف › پد جاذب روغن', 'snappmarket'),
+      g('c1', 'نادری کیک دو قلو کاکائو', 'کیک و کلوچه'), g('c2', 'پودر کیک بروانی مرطوب', 'پودر کیک'),
+      g('c3', 'آل وایت مسواک کیک آف', 'بهداشت دهان و دندان')
+    ];
+    const ids = (keywords: string) => rankItems(pool, { ...q, intents: ['grocery'], keywords }).map((i) => i.id).sort();
+    expect(ids('روغن زیتون')).toEqual(['o1', 'o2', 'o3']);
+    expect(ids('روغن')).toEqual(['f1', 'o1', 'o2', 'o3', 's1']);
+    expect(ids('کیک')).toEqual(['c1', 'x4']);
+    // برند بدون نشانهٔ دسته فیلتر نمی‌شود
+    const brand = [pool[1], pool[3], pool[8]];
+    expect(rankItems(brand, { ...q, intents: ['grocery'], keywords: 'لادن' }).map((i) => i.id).sort()).toEqual(['o2', 's1']);
+  });
 });

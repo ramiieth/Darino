@@ -75,4 +75,7 @@ describe('فهم درخواست فارسی خرید', () => {
     expect(parseBudget('گوشی بین 10 تا 20 میلیون')).toMatchObject({ min: 10_000_000, max: 20_000_000 });
     expect(parseBudget('لپ تاپ زیر 500 هزار تومان').max).toBe(500_000);
   });
+  it('«کیک» هم از سوپرمارکت جستجو می‌شود، نه فقط کافه', () => {
+    expect(ask('کیک').intents).toEqual(['food', 'grocery']);
+  });
 });
