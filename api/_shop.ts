@@ -1,7 +1,7 @@
 /** Shopping assistant: Persian request → intent → parallel read-only sources → one ranked answer (≤20 + 5 top picks). */
 import { CITIES, cityByName } from '../src/features/shopping/domain/cities.js';
 import { parseShopQuery, tehranToday } from '../src/features/shopping/domain/intent.js';
-import { rankItems, topPicks } from '../src/features/shopping/domain/rank.js';
+import { rankItems, relevance, topPicks } from '../src/features/shopping/domain/rank.js';
 import { SERVICE, searchUrl } from '../src/features/shopping/domain/services.js';
 import type { Intent, RankedItem, ServiceId, ServiceLink, ShopAnswer, ShopItem, ShopQuery, SourceStatus } from '../src/features/shopping/domain/types.js';
 import { asalbanoo, digikala, khanoumi, masterkala, shopino, taaghche, technolife, torob } from './_shopGoods.js';
@@ -24,6 +24,22 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
     const t = setTimeout(() => reject(new SourceError('پاسخ نداد (زمان تمام شد)')), ms);
     p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
   });
+}
+
+/** جستجوی خود فروشگاه گاهی عبارت کامل را نمی‌فهمد («ماست پرچرب میهن 2 کیلویی» در بامادر → سس و مسواک)؛
+ *  اگر هیچ نتیجهٔ مرتبطی نبود، با عبارت کوتاه‌تر (بی عدد و واحد، سپس دو واژهٔ اول) دوباره می‌پرسد. رتبه‌بندی همچنان با عبارت کامل است. */
+const UNIT_WORD = /^(\d+(\.\d+)?|[\d.]+?(گرم|گرمی|کیلو|کیلویی|کیلوگرم|کیلوگرمی|لیتر|لیتری|میلی|سی ?سی)|گرم|گرمی|کیلو|کیلویی|کیلوگرم|کیلوگرمی|لیتر|لیتری|میلی ?لیتر|میلی ?لیتری|سی ?سی|عدد|عددی|بسته|بسته‌ای)$/;
+export async function widen<Q extends { keywords: string }>(source: (q: Q) => Promise<ShopItem[]>, q: Q): Promise<ShopItem[]> {
+  const words = q.keywords.split(' ').filter(Boolean);
+  const tries = [...new Set([q.keywords, words.filter((w) => !UNIT_WORD.test(w)).join(' '), words.slice(0, 2).join(' ')])].filter(Boolean);
+  let best: ShopItem[] = []; let bestRel = -1;
+  for (const keywords of tries) {
+    const items = await source({ ...q, keywords });
+    const rel = Math.max(0, ...items.map((i) => relevance(i.title, q.keywords, false)));
+    if (rel > bestRel) { best = items; bestRel = rel; }
+    if (rel >= 0.6) break;
+  }
+  return best;
 }
 
 /** Which sources answer this request, plus link-only services worth offering. */
@@ -89,9 +105,9 @@ export function plan(q: ShopQuery, now: number): { tasks: Task[]; linkOnly: Serv
   }
   if (want('grocery')) {
     if (q.city && q.keywords) {
-      add('snappmarket', () => snappmarket(local));
+      add('snappmarket', () => widen(snappmarket, local));
       add('okala', () => okala(local));
-      add('bamadar', () => bamadar(local));
+      add('bamadar', () => widen(bamadar, local));
       // میوه‌فروشی و پروتئینی‌ها فقط در اسنپ‌فود هستند (از طریق پل مک)
       if (foodTypes(q.keywords, true).length) add('snappfood', () => snappfood({ ...local, grocery: true }));
     }

@@ -192,7 +192,7 @@ export async function snappmarket(q: LocalQuery): Promise<ShopItem[]> {
         const price = num(p.price); const final = price != null ? price - (num(p.discount) ?? 0) : null;
         const img = obj(arr(p.images)[0]);
         return item({
-          id: `sm-${str(p.id)}-${code}`, service: 'snappmarket', title: str(p.title).trim(), url: `https://snapp.market/supermarket/%2B/${code}`,
+          id: `sm-${idOf(p.id)}-${code}`, service: 'snappmarket', title: str(p.title).trim(), url: `https://snapp.market/supermarket/%2B/${code}`,
           image: safeUrl(img.thumb) ?? safeUrl(img.main), priceToman: final, priceBeforeToman: price && final && price > final ? price : null,
           discountPercent: price && final && price > final ? Math.round((100 * (price - final)) / price) : 0,
           summary: str(v.title) || null, location: [c.name, str(v.area)].filter(Boolean).join('، '),
@@ -207,6 +207,9 @@ export async function snappmarket(q: LocalQuery): Promise<ShopItem[]> {
 }
 
 /* ---------- اکالا (حالت مهمان: جستجو با دسته‌بندی) و بامادر ---------- */
+
+/** شناسه‌ها گاهی عددی‌اند (اکالا، بامادر، اسنپ‌مارکت)؛ str() برای عدد رشتهٔ خالی می‌داد و همهٔ کالاهای اکالا دور ریخته می‌شد */
+const idOf = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : str(v));
 
 const OKALA = 'https://apigateway.okala.com/api';
 const rial = (v: unknown) => { const n = num(v); return n && n > 0 ? Math.round(n / 10) : null; };
@@ -233,7 +236,7 @@ export async function okala(q: LocalQuery): Promise<ShopItem[]> {
     for (const p of arr(g.products).map(obj)) {
       if (p.hasQuantity === false || p.supplyStatus === 2) continue;
       const final = rial(p.okPrice); const before = rial(p.price);
-      const id = str(p.id); const sid = str(store.storeId);
+      const id = idOf(p.id); const sid = idOf(store.storeId);
       if (!/^\d+$/.test(id) || !/^\d+$/.test(sid)) continue;
       out.push(item({
         id: `ok-${sid}-${id}`, service: 'okala', title: str(p.name).trim(), url: `https://www.okala.com/product/${id}?storeId=${sid}`,
@@ -262,7 +265,7 @@ export async function bamadar(q: LocalQuery): Promise<ShopItem[]> {
     const img = str(p.image);
     if (p.is_available === false || stock <= 0 || !final) return [];
     return [item({
-      id: `bm-${str(p.id)}`, service: 'bamadar', title: str(p.name).trim(), url: 'https://bamadar.com/market/search',
+      id: `bm-${idOf(p.id)}`, service: 'bamadar', title: str(p.name).trim(), url: 'https://bamadar.com/market/search',
       image: /^[\w/.-]+\.(webp|jpe?g|png)$/i.test(img) ? `https://avani.s3.ir-thr-at1.arvanstorage.ir/${img}` : null,
       priceToman: final, priceBeforeToman: off > 0 ? before : null, discountPercent: Math.round(num(price.discount_percentage) ?? 0),
       summary: [str(obj(p.brand).name), str(obj(p.category).name)].filter(Boolean).join(' · ') || null, location: q.city?.name ?? null,
