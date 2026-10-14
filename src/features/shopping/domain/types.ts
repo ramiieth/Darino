@@ -97,6 +97,8 @@ export interface ShopItem {
   mapUrl: string | null;
   /** چند روز تا اولین نوبت/حرکت (برای رتبه‌بندی پزشک و سفر) */
   soonDays: number | null;
+  /** دسته‌بندی خود فروشگاه، از کلی به جزئی با « › » (مثل «خواربار و نان › روغن پخت و پز و سالاد») */
+  category?: string | null;
   /** جایگاه در فهرست خود منبع (آگهی‌ها: ۰ = جدیدترین) */
   order?: number | null;
 }

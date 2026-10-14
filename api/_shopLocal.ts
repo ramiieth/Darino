@@ -148,6 +148,7 @@ export async function snappmarket(q: LocalQuery): Promise<ShopItem[]> {
           image: safeUrl(img.thumb) ?? safeUrl(img.main), priceToman: final, priceBeforeToman: price && final && price > final ? price : null,
           discountPercent: price && final && price > final ? Math.round((100 * (price - final)) / price) : 0,
           summary: str(v.title) || null, location: [c.name, str(v.area)].filter(Boolean).join('، '),
+          category: [str(p.root_category_title), str(p.menu_category_title), str(p.product_entity)].filter(Boolean).join(' › ') || null,
           facts: [
             ...(fee != null ? [{ label: 'پیک', value: v.is_pro === true ? 'رایگان (پرو)' : `${fee.toLocaleString('en-US')} تومان` }] : []),
             ...(num(v.minOrder) ? [{ label: 'حداقل سفارش', value: `${num(v.minOrder)!.toLocaleString('en-US')} تومان` }] : [])
@@ -173,11 +174,12 @@ export async function okala(q: LocalQuery): Promise<ShopItem[]> {
   walk(tree);
   const scored = [...flat.values()].map((n) => ({ n, hit: tokens.filter((t) => str(n.name).includes(t)).length, len: str(n.name).length }))
     .filter((x) => x.hit > 0).sort((a, b) => b.hit - a.hit || a.len - b.len);
-  const best = scored.filter((x) => x.hit === scored[0]?.hit).slice(0, 2).map((x) => str(x.n.latinName)).filter((s) => /^[a-z0-9-]{2,60}$/.test(s));
+  const best = scored.filter((x) => x.hit === scored[0]?.hit).slice(0, 2).filter((x) => /^[a-z0-9-]{2,60}$/.test(str(x.n.latinName)));
   if (!best.length) return [];
-  const replies = await Promise.all(best.map((slug) => json(`${OKALA}/unicorn/v2/products/nearby?slug=${slug}&lat=${c.lat}&lon=${c.lon}`)));
+  const replies = await Promise.all(best.map((x) => json(`${OKALA}/unicorn/v2/products/nearby?slug=${str(x.n.latinName)}&lat=${c.lat}&lon=${c.lon}`)));
   const out: ShopItem[] = [];
-  for (const g of replies.flatMap((r) => arr(r.data).map(obj))) {
+  for (const [ix, g] of replies.flatMap((r, ix) => arr(r.data).map((g) => [ix, obj(g)] as const))) {
+    const category = str(best[ix].n.name) || null;
     const store = obj(g.store);
     if (obj(store.earliestSlot).isClosed === true) continue;
     for (const p of arr(g.products).map(obj)) {
@@ -189,7 +191,7 @@ export async function okala(q: LocalQuery): Promise<ShopItem[]> {
         id: `ok-${sid}-${id}`, service: 'okala', title: str(p.name).trim(), url: `https://www.okala.com/product/${id}?storeId=${sid}`,
         image: safeUrl(p.imageUrl), brandLogo: safeUrl(store.logo), priceToman: final, priceBeforeToman: before && final && before > final ? before : null,
         discountPercent: Math.round(num(p.discountPercent) ?? 0), summary: str(store.storeName) ? `فروشگاه ${str(store.storeName)}` : null, location: c.name,
-        rating: num(store.rate), facts: num(store.deliveryPrice) === 0 ? [{ label: 'پیک', value: 'رایگان' }] : []
+        rating: num(store.rate), facts: num(store.deliveryPrice) === 0 ? [{ label: 'پیک', value: 'رایگان' }] : [], category
       }));
     }
   }
@@ -216,7 +218,7 @@ export async function bamadar(q: LocalQuery): Promise<ShopItem[]> {
       image: /^[\w/.-]+\.(webp|jpe?g|png)$/i.test(img) ? `https://avani.s3.ir-thr-at1.arvanstorage.ir/${img}` : null,
       priceToman: final, priceBeforeToman: off > 0 ? before : null, discountPercent: Math.round(num(price.discount_percentage) ?? 0),
       summary: [str(obj(p.brand).name), str(obj(p.category).name)].filter(Boolean).join(' · ') || null, location: q.city?.name ?? null,
-      facts: [{ label: 'موجودی', value: `${stock} عدد` }]
+      facts: [{ label: 'موجودی', value: `${stock} عدد` }], category: str(obj(p.category).name) || null
     })];
   });
 }

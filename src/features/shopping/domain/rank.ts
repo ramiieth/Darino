@@ -75,6 +75,45 @@ export function relevance(title: string, keywords: string, strictNumbers = true)
   const numbersMissing = words.filter((w) => /\d/.test(w)).some((w) => !new RegExp(`(^|[^\\d.])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(t));
   return hit * (accessory || forOther ? 0.3 : 1) * (serviceAd ? 0.5 : 1) * (headHit || words.length === 1 ? 1 : 0.45) * (numbersMissing && strictNumbers ? 0.3 : 1);
 }
+/* ---------- ارتباط دسته‌بندی با درخواست ---------- */
+
+/** اسم اصلی کالا در فارسی اول می‌آید (گاهی پس از برند): «روغن زیتون …»، «اویلا روغن …» — نه «صابون … روغن زیتون» */
+const headNear = (title: string, head: string) => { const i = canon(title).split(' ').indexOf(head); return i >= 0 && i <= 1; };
+const namesHead = (category: string, head: string) => category.split(' › ').some((c) => { const t = canon(c); return t === head || t.split(' ')[0] === head; });
+
+/**
+ * ضریب ۰ تا ۱ برای کالای فروشگاه‌هایی که دسته‌بندی می‌دهند — بدون لیست سیاه، جدا برای هر فروشگاه:
+ *  ۱) دسته‌ای که نامش با اسم کالا شروع شود («روغن»، «کیک و کلوچه»، «روغن پخت و پز») قوی‌ترین نشانه است؛ اگر هست فقط همان می‌ماند
+ *     و کالای دسته‌دار دیگر («تن ماهی»، «پودر کیک»، «بهداشت دهان») حذف می‌شود.
+ *  ۲) وگرنه دستهٔ اصلی با رأی عنوان‌هایی که با اسم کالا شروع می‌شوند پیدا می‌شود.
+ *  کالای بی‌دسته فقط وقتی می‌ماند که اسم کالا اول عنوانش باشد («پودر صابون با روغن نارگیل»، «کیک روغنی» حذف).
+ *  جستجوی برند یا هر چیزی که هیچ نشانه‌ای ندارد دست نمی‌خورد.
+ */
+export function categoryFit(items: ShopItem[], keywords: string): Map<ShopItem, number> {
+  const fit = new Map<ShopItem, number>();
+  const head = canon(keywords).split(' ')[0] ?? '';
+  if (!head) return fit;
+  // اگر فروشگاهی دسته‌ای به این نام دارد، واژه «نوع کالا»ست نه برند؛ فروشگاهِ بی‌نشانه هم باید آن را اول عنوان داشته باشد
+  const kind = items.some((i) => i.category && namesHead(i.category, head));
+  for (const service of new Set(items.filter((i) => i.category).map((i) => i.service))) {
+    const own = items.filter((i) => i.service === service);
+    const named = own.filter((i) => i.category && namesHead(i.category, head));
+    if (named.length) {
+      for (const i of own) fit.set(i, !i.category ? (headNear(i.title, head) ? 0.7 : 0) : named.includes(i) ? 1 : 0);
+      continue;
+    }
+    const votes = new Map<string, number>();
+    for (const i of own) if (i.category && headNear(i.title, head)) votes.set(i.category.split(' › ')[0], (votes.get(i.category.split(' › ')[0]) ?? 0) + 1);
+    const top = Math.max(0, ...votes.values());
+    if (!top) { if (kind) for (const i of own) fit.set(i, headNear(i.title, head) ? 0.7 : 0); continue; }
+    for (const i of own) {
+      const main = !!i.category && (votes.get(i.category.split(' › ')[0]) ?? 0) >= top * 0.3;
+      fit.set(i, headNear(i.title, head) ? (main || !i.category ? 1 : 0.3) : main ? 0.3 : 0);
+    }
+  }
+  return fit;
+}
+
 export const MAX_RESULTS = 20;
 export const TOP_PICKS = 5;
 
@@ -113,12 +152,15 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   const alts = q.alternatives && q.alternatives.length > 1 ? q.alternatives : [q.keywords];
   const bestAlt = (i: ShopItem) => alts.map((k, ix) => [relevance(i.title, k), ix] as const).reduce((a, b) => (b[0] > a[0] ? b : a));
   const altOf = new Map(deduped.map((i) => [`${i.service}:${i.id}`, bestAlt(i)[1]]));
-  const rel = new Map(deduped.map((i) => [i, (textual(i) ? bestAlt(i)[0] : 1) * dealPenalty(i)]));
+  // دسته‌بندی فروشگاه حتی برای واژهٔ کلی («روغن»، «کیک») اعمال می‌شود: «ژل مو حاوی روغن آرگان» روغن نیست
+  const fits = alts.map((k, ix) => categoryFit(deduped.filter((i) => altOf.get(`${i.service}:${i.id}`) === ix), k));
+  const fitOf = (i: ShopItem) => fits[altOf.get(`${i.service}:${i.id}`) ?? 0].get(i) ?? 1;
+  const rel = new Map(deduped.map((i) => [i, (textual(i) ? bestAlt(i)[0] : 1) * dealPenalty(i) * fitOf(i)]));
   let strong = deduped.filter((i) => rel.get(i)! >= 0.6);
   let unique = strong.length >= 3 ? strong : deduped.filter((i) => rel.get(i)! >= 0.34);
   // «۳۰۰ گرمی» دقیقاً نبود؟ نزدیک‌ترین اندازه‌ها (بدون شرط عدد) به‌جای پاسخ خالی
   if (!unique.length && /\d/.test(q.keywords)) {
-    for (const i of deduped) rel.set(i, (textual(i) ? relevance(i.title, q.keywords, false) : 1) * dealPenalty(i));
+    for (const i of deduped) rel.set(i, (textual(i) ? relevance(i.title, q.keywords, false) : 1) * dealPenalty(i) * fitOf(i));
     strong = deduped.filter((i) => rel.get(i)! >= 0.6);
     unique = (strong.length ? strong : deduped.filter((i) => rel.get(i)! >= 0.34)).map((i) => ({ ...i, facts: [{ label: 'اندازه', value: 'نزدیک‌ترین به درخواست' }, ...i.facts] }));
     for (const i of unique) rel.set(i, 0.8);
