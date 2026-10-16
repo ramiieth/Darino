@@ -15,3 +15,34 @@ it('routes mainnet reads to the mainnet host without Robinhood credentials or en
 
 it('preserves market prices when optional token metadata is unavailable',async()=>{vi.stubGlobal('fetch',vi.fn().mockImplementation(url=>String(url).endsWith('/tokenlist')?Promise.reject(new Error('offline')):Promise.resolve(ok({code:200,order_book_details:[{symbol:'EIGEN'}]}))));await expect(getPerpsRead('lighter-mainnet-markets','')).resolves.toMatchObject({order_book_details:[{symbol:'EIGEN'}]});});
 it('uses only the matching host for public names and icons',async()=>{const f=vi.fn().mockImplementation(url=>Promise.resolve(ok(String(url).endsWith('/tokenlist')?{code:200,tokens:[{symbol:'EIGEN',name:'EigenCloud'}]}:{code:200,order_book_details:[]})));vi.stubGlobal('fetch',f);await expect(getPerpsRead('lighter-markets','')).resolves.toMatchObject({tokens:[{symbol:'EIGEN',name:'EigenCloud'}]});expect(f.mock.calls.map(c=>c[0])).toEqual(['https://api.rh.lighter.xyz/api/v1/orderBookDetails','https://api.rh.lighter.xyz/api/v1/tokenlist']);});
+
+describe('عملیات عمومی Ondo برای ماشین‌حساب‌ها', () => {
+ const markets={success:true,result:{perps:{tradingPairs:[
+  {market:'MSTR-USD.P',pair:{base:'MSTR',quote:'USD'},longName:'Strategy',tags:['Equities'],makerFee:'0.0001',takerFee:'0.00025',marginInfo:[{maxLeverage:'10',maintenanceMarginRate:'0.05'}]},
+  {market:'https://evil.example',pair:{base:'X'}},
+  {market:'BTC-USD.P',pair:{base:'BTC'},marginInfo:'bad'}
+ ]}}};
+ const prices={success:true,result:{'MSTR-USD.P':{markPrice:'142.2'}}};
+ it('فقط فیلدهای عمومی لازم را نگه می‌دارد و بازار نامعتبر را حذف می‌کند',async()=>{
+  const { trimOndoMarkets } = await import('../../api/_perpsRead');
+  expect(trimOndoMarkets(markets,prices)).toEqual([
+   {market:'MSTR-USD.P',base:'MSTR',name:'Strategy',tags:['Equities'],makerFee:0.0001,takerFee:0.00025,maxLeverage:10,maintenanceMarginRate:0.05,markPrice:142.2},
+   {market:'BTC-USD.P',base:'BTC',name:'BTC',tags:[],makerFee:null,takerFee:null,maxLeverage:null,maintenanceMarginRate:null,markPrice:null}
+  ]);
+ });
+ it('فقط دو آدرس ثابت عمومی Ondo با GET و کش ۶۰ ثانیه‌ای',async()=>{
+  vi.resetModules();
+  const { getOndoPublicMarkets } = await import('../../api/_perpsRead');
+  const f=vi.fn().mockImplementation(url=>Promise.resolve(ok(String(url).endsWith('/mark_prices')?prices:markets)));vi.stubGlobal('fetch',f);
+  const a=await getOndoPublicMarkets();const b=await getOndoPublicMarkets();
+  expect(a).toBe(b);expect(a.markets).toHaveLength(2);
+  expect(f.mock.calls.map(c=>c[0]).sort()).toEqual(['https://api.ondoperps.xyz/v1/markets','https://api.ondoperps.xyz/v1/perps/mark_prices']);
+  for(const [,opts] of f.mock.calls){expect(opts.method).toBe('GET');expect(opts.headers).toEqual({accept:'application/json'});}
+ });
+ it('پاسخ بدون بازار معتبر خطا می‌دهد و کش نمی‌شود',async()=>{
+  vi.resetModules();
+  const { getOndoPublicMarkets } = await import('../../api/_perpsRead');
+  vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>Promise.resolve(ok({success:true,result:{}}))));
+  await expect(getOndoPublicMarkets()).rejects.toMatchObject({status:502});
+ });
+});
