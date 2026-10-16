@@ -45,6 +45,8 @@ export interface PerpMarket {
   maintenanceMarginFraction: number | null;
   /** کارمزد تیکر (٪) — null یعنی از API در دسترس نیست */
   takerFeePct: number | null;
+  /** کارمزد میکر (٪، منفی = ربیت) — null یعنی از API در دسترس نیست */
+  makerFeePct: number | null;
   volume24hUsd: number | null;
   change24hPct: number | null;
 }
@@ -76,6 +78,7 @@ interface LighterBook {
   market_type?: string;
   status?: string;
   taker_fee?: string;
+  maker_fee?: string;
   min_initial_margin_fraction?: number;
   maintenance_margin_fraction?: number;
   mark_price?: string;
@@ -105,6 +108,7 @@ export function normalizeLighter(books: LighterBook[], rates: { market_id: numbe
         maxLeverage: imf && imf > 0 ? Math.floor(10_000 / imf) : null,
         maintenanceMarginFraction: mmf === null ? null : mmf / 10_000,
         takerFeePct: num(b.taker_fee),
+        makerFeePct: num(b.maker_fee),
         volume24hUsd: num(b.daily_quote_token_volume),
         change24hPct: num(b.daily_price_change)
       };
@@ -136,7 +140,16 @@ interface ArcusMarketFull {
   maintenanceMarginFraction?: string | null;
   volume24hNotional?: string | null;
   priceChange24h?: string | null;
+  /** کارمزد پایهٔ حساب عمومی به واحد ppm (۲۲۵ = ۰٫۰۲۲۵٪) */
+  effectiveTakerFeePpm?: number | null;
+  effectiveMakerFeePpm?: number | null;
 }
+
+/** ppm → ٪ (۱٬۰۰۰٬۰۰۰ ppm = ۱۰۰٪) */
+const ppmPct = (v: unknown): number | null => {
+  const n = num(v);
+  return n === null ? null : n / 10_000;
+};
 
 const ARCUS_CATEGORY: Record<string, PerpCategory> = {
   CRYPTO: 'crypto',
@@ -163,7 +176,8 @@ export function normalizeArcus(markets: ArcusMarketFull[]): PerpMarket[] {
         fundingHourly: num(m.fundingRate),
         maxLeverage: imf && imf > 0 ? Math.floor(1 / imf) : null,
         maintenanceMarginFraction: num(m.maintenanceMarginFraction),
-        takerFeePct: null,
+        takerFeePct: ppmPct(m.effectiveTakerFeePpm),
+        makerFeePct: ppmPct(m.effectiveMakerFeePpm),
         volume24hUsd: num(m.volume24hNotional),
         change24hPct: change === null ? null : change * 100
       };

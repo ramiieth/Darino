@@ -213,5 +213,13 @@ describe('نرمال‌سازی بازارهای لایتر و آرکوس', () =
     expect(m.category).toBe('equity');
     expect(m.change24hPct).toBeCloseTo(1.15, 9);
     expect(m.takerFeePct).toBeNull();
+    expect(m.makerFeePct).toBeNull();
+  });
+  it('آرکوس: کارمزد ppm حساب پایه → ٪', () => {
+    const [m] = normalizeArcus([
+      { marketDisplayName: 'BTC-USD', marketId: 1, baseAsset: 'BTC', markPrice: '81417.8', effectiveTakerFeePpm: 225, effectiveMakerFeePpm: 0 }
+    ]);
+    expect(m.takerFeePct).toBeCloseTo(0.0225, 12);
+    expect(m.makerFeePct).toBe(0);
   });
 });

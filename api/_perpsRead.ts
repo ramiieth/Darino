@@ -12,6 +12,47 @@ async function read(url: string): Promise<Record<string, unknown>> {
   if (!data || typeof data !== 'object' || Array.isArray(data) || (data.code !== undefined && data.code !== 200 && data.code !== 0) || data.success === false) throw new ProviderError(502, 'پاسخ پلتفرم معتبر نیست');
   return data;
 }
+type Row = Record<string, unknown>;
+const asRow = (v: unknown): Row => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Row) : {});
+const fin = (v: unknown): number | null => {
+  if ((typeof v !== 'number' && typeof v !== 'string') || String(v).trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+export interface OndoPublicMarket {
+  market: string; base: string; name: string; tags: string[];
+  /** کسری (0.00025 = ۰٫۰۲۵٪) */
+  makerFee: number | null; takerFee: number | null;
+  maxLeverage: number | null; maintenanceMarginRate: number | null; markPrice: number | null;
+}
+/** Only the public fields the calculators need — the raw payload is ~240KB. */
+export function trimOndoMarkets(markets: unknown, prices: unknown): OndoPublicMarket[] {
+  const marks = asRow(asRow(prices).result);
+  const pairs = asRow(asRow(asRow(markets).result).perps).tradingPairs;
+  return (Array.isArray(pairs) ? pairs : []).map(asRow).flatMap((m) => {
+    const market = typeof m.market === 'string' ? m.market : '';
+    const base = String(asRow(m.pair).base ?? '');
+    if (!/^[A-Z0-9]{1,20}-USD\.P$/.test(market) || !/^[A-Z0-9]{1,20}$/.test(base)) return [];
+    const tier = asRow(Array.isArray(m.marginInfo) ? m.marginInfo[0] : null);
+    return [{
+      market, base, name: String(m.longName ?? base).slice(0, 80),
+      tags: (Array.isArray(m.tags) ? m.tags : []).filter((t): t is string => typeof t === 'string').slice(0, 5),
+      makerFee: fin(m.makerFee), takerFee: fin(m.takerFee),
+      maxLeverage: fin(tier.maxLeverage), maintenanceMarginRate: fin(tier.maintenanceMarginRate),
+      markPrice: fin(asRow(marks[market]).markPrice)
+    }];
+  });
+}
+let ondoPublic: { at: number; data: { markets: OndoPublicMarket[]; fetchedAt: number } } | null = null;
+/** Public market config for unauthenticated calculators; one upstream pair per minute per instance. */
+export async function getOndoPublicMarkets(): Promise<{ markets: OndoPublicMarket[]; fetchedAt: number }> {
+  if (ondoPublic && Date.now() - ondoPublic.at < 60_000) return ondoPublic.data;
+  const [markets, prices] = await Promise.all([read(`${ONDO}/v1/markets`), read(`${ONDO}/v1/perps/mark_prices`)]);
+  const data = { markets: trimOndoMarkets(markets, prices), fetchedAt: Date.now() };
+  if (!data.markets.length) throw new ProviderError(502, 'پاسخ پلتفرم معتبر نیست');
+  ondoPublic = { at: data.fetchedAt, data };
+  return data;
+}
 export async function getPerpsRead(op: string, address: string): Promise<unknown> {
   if (op === 'lighter-mainnet-markets'||op === 'lighter-markets') {
     const host=op==='lighter-mainnet-markets'?MAINNET:LIGHTER;
