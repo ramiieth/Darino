@@ -10,25 +10,7 @@
  *   ابزارها    what-if tools
  *   دستیار و راهنمای خرید   Iranian shops, food, travel, doctors (read-only)
  */
-import {
-  LayoutDashboard,
-  CandlestickChart,
-  BookOpenText,
-  Boxes,
-  Radar,
-  LineChart,
-  Calculator,
-  Car,
-  Home,
-  Palette,
-  Layers,
-  Activity,
-  ShieldCheck,
-  Wallet,
-  Sparkles,
-  ShoppingBag,
-  type LucideIcon
-} from 'lucide-react';
+import { Activity, Bell, BookOpenText, Boxes, Calculator, CandlestickChart, Car, Home, Layers, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -111,7 +93,8 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'امنیت و دستگاه‌ها',
         description: 'کلید عبور، نشست‌های دستگاه‌ها و خروج',
         icon: ShieldCheck
-      }
+      },
+      { id: 'alerts', to: '/alerts', label: 'اعلان‌ها', description: 'برعکس شدن اسپرد فاندینگ و نزدیک لیکویید، حتی وقتی اپ بسته است', icon: Bell }
     ]
   },
   {

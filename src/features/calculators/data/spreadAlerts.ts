@@ -1,27 +1,23 @@
 /**
  * هشدار برعکس‌شدن اسپرد فاندینگ — فهرست پایش در تنظیمات محلی، بررسی با نرخ‌های لحظه‌ای
  *
- * فقط وقتی دارینو باز است کار می‌کند (سرور یا پوش پس‌زمینه ندارد).
+ * داخل اپ: وقتی دارینو باز است، با toast خبر می‌دهد.
+ * بیرون از اپ: اگر وارد شده‌اید، فهرست با سرور همگام می‌شود و «اعلان‌ها» (Web Push / بله) با بررسی دوره‌ای خبر می‌دهد.
  * برای هر جفت فقط در لحظهٔ تغییر علامت (مثبت → صفر/منفی و برعکس) یک بار خبر می‌دهد.
  */
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import { settingGet, settingSet } from '@/shared/lib/db';
 import { toast } from '@/shared/store/toastStore';
+import { useAuth } from '@/features/auth/authClient';
+import { getAlertsStatus, saveAlertRules } from '@/features/alerts/data/alertsApi';
+import { DEFAULT_RULES, type AlertRules, type FundingWatch } from '@/features/alerts/domain/rules';
 import { DELTA_VENUE_LABELS, type DeltaVenue, type VenueBook } from './deltaMarkets';
 
 const KEY = 'calc.fundingWatch.v1';
 
-export interface WatchEntry {
-  key: string;
-  base: string;
-  shortVenue: DeltaVenue;
-  shortRef: string;
-  longVenue: DeltaVenue;
-  longRef: string;
-  /** آخرین علامت دیده‌شده: ۱ = به نفع، -۱ = برعکس */
-  lastSign: 1 | -1;
-}
+/** localOnly: بیرون از حساب زنگ خورده و هنوز به سرور نرفته */
+export type WatchEntry = FundingWatch & { shortVenue: DeltaVenue; longVenue: DeltaVenue; localOnly?: true };
 
 interface WatchState {
   hydrated: boolean;
@@ -31,17 +27,51 @@ interface WatchState {
 export const useSpreadWatch = create<WatchState>(() => ({ hydrated: false, entries: [] }));
 
 let hydrating: Promise<void> | null = null;
+/** تنظیم «نزدیک لیکویید» سرور؛ هنگام ذخیرهٔ فهرست بازنویسی نشود */
+let serverLiquidation: AlertRules['liquidation'] | null = null;
+
 export function hydrateSpreadWatch(): Promise<void> {
   if (useSpreadWatch.getState().hydrated) return Promise.resolve();
   hydrating ??= settingGet<WatchEntry[]>(KEY, []).then((list) => {
     useSpreadWatch.setState({ hydrated: true, entries: Array.isArray(list) ? list.filter((e) => e && typeof e.key === 'string').slice(0, 30) : [] });
+    void syncWithServer();
   });
   return hydrating;
+}
+
+const signedIn = () => useAuth.getState().status === 'authenticated';
+
+/**
+ * سرور مرجع است؛ فقط جفت‌هایی که بیرون از حساب زنگ خورده‌اند (localOnly) به آن اضافه می‌شوند.
+ * جفتی که از صفحهٔ «اعلان‌ها» یا دستگاه دیگر حذف شده، از فهرست محلی دوباره زنده نمی‌شود.
+ */
+export async function syncWithServer(): Promise<void> {
+  if (!signedIn()) return;
+  try {
+    const { rules } = await getAlertsStatus();
+    serverLiquidation = rules.liquidation;
+    const merged = new Map<string, WatchEntry>(rules.funding.map((w) => [w.key, w as WatchEntry]));
+    let added = false;
+    for (const e of useSpreadWatch.getState().entries) {
+      if (e.localOnly && !merged.has(e.key)) { const { localOnly: _, ...rest } = e; merged.set(e.key, rest); added = true; }
+    }
+    const entries = [...merged.values()].slice(0, 30);
+    useSpreadWatch.setState({ entries });
+    void settingSet(KEY, entries);
+    if (added) await saveAlertRules({ funding: entries, liquidation: serverLiquidation });
+  } catch {
+    /* بدون سرور، فهرست محلی کافی است */
+  }
+}
+
+if (typeof window !== 'undefined') {
+  useAuth.subscribe((s, prev) => { if (s.status === 'authenticated' && prev.status !== 'authenticated') void syncWithServer(); });
 }
 
 function save(entries: WatchEntry[]) {
   useSpreadWatch.setState({ entries });
   void settingSet(KEY, entries);
+  if (signedIn()) void saveAlertRules({ funding: entries, liquidation: serverLiquidation ?? DEFAULT_RULES.liquidation }).catch(() => undefined);
 }
 
 export function toggleWatch(entry: Omit<WatchEntry, 'lastSign'>): boolean {
@@ -50,7 +80,7 @@ export function toggleWatch(entry: Omit<WatchEntry, 'lastSign'>): boolean {
     save(entries.filter((e) => e.key !== entry.key));
     return false;
   }
-  save([...entries, { ...entry, lastSign: 1 as const }].slice(-30));
+  save([...entries, { ...entry, lastSign: 1 as const, ...(signedIn() ? {} : { localOnly: true as const }) }].slice(-30));
   if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission().catch(() => undefined);
   return true;
 }

@@ -20,6 +20,7 @@ const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
 const ConnectedPage = lazy(() => import('@/features/connected/presentation/ConnectedPage'));
 const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
 const SecurityPage = lazy(() => import('@/features/auth/SecurityPage'));
+const AlertsPage = lazy(() => import('@/features/alerts/presentation/AlertsPage'));
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
 const ShoppingPage = lazy(() => import('@/features/shopping/presentation/ShoppingPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
@@ -110,6 +111,14 @@ export function App() {
             element={
               <Private label="امنیت و دستگاه‌ها">
                 <SecurityPage />
+              </Private>
+            }
+          />
+          <Route
+            path="/alerts"
+            element={
+              <Private label="اعلان‌ها">
+                <AlertsPage />
               </Private>
             }
           />
