@@ -1,9 +1,9 @@
 /**
- * Investment calculators — eight tools, all math in domain; UI presents only.
+ * Investment calculators — ten tools, all math in domain; UI presents only.
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { Scale, ShieldHalf } from 'lucide-react';
+import { BadgeDollarSign, Radar, Scale, ShieldHalf } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { cn } from '@/shared/lib/cn';
@@ -15,8 +15,12 @@ import { CompareCalculator } from './CompareCalculator';
 import { PerpCalculator } from './PerpCalculator';
 import { HedgeCalculator } from './hedge/HedgeCalculator';
 import { DeltaNeutralCalculator } from './delta/DeltaNeutralCalculator';
+import { DeltaProfitCalculator } from './delta/DeltaProfitCalculator';
+import { FundingScanner } from './delta/FundingScanner';
+import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'delta' | 'cagr' | 'xirr' | 'compare';
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'delta' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
+const DELTA_TABS: CalcTab[] = ['delta', 'arb', 'scanner'];
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
@@ -34,6 +38,18 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     description: 'Long و Short هم‌اندازه در دو صرافی (آرکوس، اوندو پرپس، لایتر) — سود فاندینگ، هزینهٔ کارمزد و حجم، فاصله تا لیکویید',
     icon: <Scale aria-hidden />
   },
+  {
+    value: 'arb',
+    label: 'سود واقعی دلتا',
+    description: 'سرمایهٔ هر طرف را بدهید؛ بهترین جفت صرافی و سود خالص بعد از کارمزد، اسلیپیج و هزینهٔ انتقال',
+    icon: <BadgeDollarSign aria-hidden />
+  },
+  {
+    value: 'scanner',
+    label: 'اسکنر فاندینگ',
+    description: 'اختلاف فاندینگ ۱، ۷ و ۳۰ روزه، تعداد چرخش، ساعت‌های سودده و هشدار وقتی اختلاف برعکس شود',
+    icon: <Radar aria-hidden />
+  },
   { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش، یا پیش‌بینی ارزش آینده با واریز دوره‌ای' },
   { value: 'xirr', label: 'بازده واقعی', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
   { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' }
@@ -44,9 +60,10 @@ export function CalculatorsPage() {
   // PERP polls live market APIs — mount it only once it has been opened
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
-  // Delta neutral polls three venues and opens a WebSocket — mount it only once it has been opened
-  const [deltaOpened, setDeltaOpened] = useState(false);
-  if (tab === 'delta' && !deltaOpened) setDeltaOpened(true);
+  // Delta tabs poll three venues and share one Ondo WebSocket — mount each only once it has been opened
+  const [opened, setOpened] = useState<Partial<Record<CalcTab, true>>>({});
+  if (DELTA_TABS.includes(tab) && !opened[tab]) setOpened((o) => ({ ...o, [tab]: true }));
+  const venuesOpened = DELTA_TABS.some((t) => opened[t]);
   const current = TABS.find((t) => t.value === tab);
   const panel = (id: CalcTab) => ({
     className: cn(tab !== id && 'hidden'),
@@ -77,9 +94,13 @@ export function CalculatorsPage() {
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>
-        <div {...panel('delta')}>
-          {deltaOpened && <DeltaNeutralCalculator />}
-        </div>
+        {venuesOpened && (
+          <DeltaVenuesProvider>
+            <div {...panel('delta')}>{opened.delta && <DeltaNeutralCalculator />}</div>
+            <div {...panel('arb')}>{opened.arb && <DeltaProfitCalculator onOpenScanner={() => setTab('scanner')} />}</div>
+            <div {...panel('scanner')}>{opened.scanner && <FundingScanner />}</div>
+          </DeltaVenuesProvider>
+        )}
         <div {...panel('cagr')}>
           <CagrCalculator />
         </div>

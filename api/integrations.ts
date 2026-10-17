@@ -10,7 +10,7 @@ import { json, readBody } from './_neon.js';
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
-import { getPerpsRead, getOndoPublicMarkets } from './_perpsRead.js';
+import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema } from './_assistant.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
@@ -28,6 +28,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // The Mac bridge authenticates with SHOP_RELAY_KEY (not a user session) and can only claim/submit Snappfood search jobs.
   if(webhookUrl.searchParams.get('op')==='shop-relay'){await relayEndpoint(req,res);return;}
   // Public market data only (fees, margin, mark prices) for the calculators — no account, address or credential.
+  const publicOndo=webhookUrl.searchParams.get('op');
+  if((publicOndo==='ondo-perps-history'||publicOndo==='ondo-perps-depth')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{res.setHeader('Cache-Control',publicOndo==='ondo-perps-history'?'public, max-age=300, s-maxage=600':'public, max-age=10, s-maxage=15');json(res,200,publicOndo==='ondo-perps-history'?await getOndoFundingHistory(market):await getOndoDepth(market));}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(webhookUrl.searchParams.get('op')==='ondo-perps-public'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getOndoPublicMarkets());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');

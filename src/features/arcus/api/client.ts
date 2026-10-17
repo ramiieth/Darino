@@ -29,7 +29,8 @@ export const ARCUS_READ_PATHS = [
   '/v1/portfolio',
   '/v1/accountTransferUpdates',
   '/v1/leverages',
-  '/v1/markets'
+  '/v1/markets',
+  '/v1/fundingRates'
 ] as const;
 export type ArcusReadPath = (typeof ARCUS_READ_PATHS)[number];
 
@@ -234,6 +235,24 @@ async function doFetch<T>(env: ArcusEnv, url: string, opts: FetchOptions): Promi
 
 export function arcusGet<T>(env: ArcusEnv, path: ArcusReadPath, params: Record<string, QueryValue>, opts: FetchOptions = {}): Promise<T> {
   const url = buildArcusUrl(env, path, params);
+  const hit = inflight.get(url);
+  if (hit) return hit as Promise<T>;
+  const p = doFetch<T>(env, url, opts).finally(() => inflight.delete(url));
+  inflight.set(url, p);
+  return p;
+}
+
+/** نمادهای بازار آرکوس مثل BTC-USD یا 1000PEPE-USD */
+export const ARCUS_MARKET_RE = /^[A-Z0-9]{1,20}-USD$/;
+
+/** دفتر سفارش L2 عمومی یک بازار (حداکثر ۱۰۰ سطح) — مسیر ثابت، نماد اعتبارسنجی‌شده */
+export function arcusOrderBook<T>(env: ArcusEnv, market: string, opts: FetchOptions = {}): Promise<T> {
+  if (!ARCUS_MARKET_RE.test(market)) return Promise.reject(new ArcusError('invalid_input', 'بازار نامعتبر است'));
+  const host = ARCUS_HOSTS[env];
+  if (!host) return Promise.reject(new ArcusError('invalid_input', 'محیط نامعتبر'));
+  const u = new URL(`/v1/l2OrderBook/${market}`, host.rest);
+  u.searchParams.set('nLevels', '100');
+  const url = u.toString();
   const hit = inflight.get(url);
   if (hit) return hit as Promise<T>;
   const p = doFetch<T>(env, url, opts).finally(() => inflight.delete(url));
