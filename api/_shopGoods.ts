@@ -148,6 +148,30 @@ export async function taaghche(q: GoodsQuery): Promise<ShopItem[]> {
   }).filter((i) => i.title && /\d$/.test(i.url));
 }
 
+const FIDIBO_TYPE: Record<string, string> = { audiobook: 'کتاب صوتی', ebook: 'کتاب الکترونیکی', microbook: 'خلاصهٔ کتاب', micro_audiobook: 'خلاصهٔ صوتی' };
+
+/** فیدیبو: کتاب الکترونیکی و صوتی؛ API عمومی فهرست جستجو (قیمت تومان، تخفیف کمپین) */
+export async function fidibo(q: GoodsQuery): Promise<ShopItem[]> {
+  const qs = new URLSearchParams({ query: q.keywords, order: q.sort === 'cheapest' ? 'LOWEST_PRICE' : 'RELEVANT', size: '20', page: '1' });
+  const data = await json(`https://api.fidibo.com/flex/search/list/content?${qs}`, { timeoutMs: 15_000 });
+  return arr(obj(data.data).result).map(obj).flatMap((section) => arr(section.items).map(obj)).map((b) => {
+    const price = num(b.price) ?? 0;
+    const discounted = num(obj(b.campaign).discounted_price);
+    const final = discounted != null && discounted < price ? discounted : price;
+    const slug = arr(obj(b.action).inputs).map(obj).find((x) => x.key === 'slug')?.value;
+    const path = typeof slug === 'string' && /^\d+(-[^/?#\s]{1,200})?$/u.test(slug) ? slug : String(num(b.id) ?? '');
+    const rate = obj(b.rate); const votes = num(rate.responses) ?? 0;
+    return item({
+      id: `fd-${num(b.id)}`, service: 'fidibo', title: plain(str(b.title)), url: `https://fidibo.com/book/${encodeURI(path)}`, image: safeUrl(obj(b.cover).image),
+      priceToman: final, priceBeforeToman: final < price ? price : null, discountPercent: pct(price, final),
+      rating: votes ? num(rate.score) : null, ratingCount: votes,
+      summary: [plain(str(b.subtitle)), str(b.footerText)].filter(Boolean).join(' · ') || null,
+      available: (b.status ?? 'published') === 'published',
+      facts: [FIDIBO_TYPE[str(b.content_type)] && { label: 'نوع', value: FIDIBO_TYPE[str(b.content_type)] }, final === 0 && { label: 'قیمت', value: 'رایگان' }].filter((f): f is { label: string; value: string } => !!f)
+    });
+  }).filter((i) => i.title && /\/book\/\d/.test(i.url));
+}
+
 /** ترب: کمترین قیمت هر کالا در صدها فروشگاه؛ آگهی‌های پولی (is_adv) کنار گذاشته می‌شوند. قیمت تومان است. */
 export async function torob(q: GoodsQuery): Promise<ShopItem[]> {
   const qs = new URLSearchParams({ q: q.keywords, page: '0', size: '24' });

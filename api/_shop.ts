@@ -4,12 +4,12 @@ import { parseShopQuery, tehranToday } from '../src/features/shopping/domain/int
 import { rankItems, relevance, topPicks } from '../src/features/shopping/domain/rank.js';
 import { SERVICE, searchUrl } from '../src/features/shopping/domain/services.js';
 import type { Intent, RankedItem, ServiceId, ServiceLink, ShopAnswer, ShopItem, ShopQuery, SourceStatus } from '../src/features/shopping/domain/types.js';
-import { asalbanoo, digikala, khanoumi, masterkala, shopino, taaghche, technolife, torob } from './_shopGoods.js';
+import { asalbanoo, digikala, fidibo, khanoumi, masterkala, shopino, taaghche, technolife, torob } from './_shopGoods.js';
 import { doctoreto, paziresh24 } from './_shopHealth.js';
 import { bamadar, divar, foodTypes, okala, sheypoor, snappfood, snappmarket, tapsifood, type DivarCategory } from './_shopLocal.js';
 import { digipayStores, payCategory, snapppayStores } from './_shopPay.js';
 import { displayImage, SourceError } from './_shopHttp.js';
-import { alibabaFlights, buses, flights, otaghak, taxis, tours, trains } from './_shopTravel.js';
+import { alibabaFlights, buses, flights, jabamaStays, otaghak, taxis, tours, trains } from './_shopTravel.js';
 
 interface Task { service: ServiceId; run: () => Promise<ShopItem[]>; stores?: boolean }
 
@@ -80,7 +80,7 @@ export function plan(q: ShopQuery, now: number): { tasks: Task[]; linkOnly: Serv
       add('digipay', () => digipayStores(pq), true);
     } else { linkOnly.add('snapppay'); linkOnly.add('digipay'); }
   }
-  if (q.keywords && want('book')) { add('taaghche', () => taaghche(goods)); linkOnly.add('fidibo'); linkOnly.add('sibook'); }
+  if (q.keywords && want('book')) { add('taaghche', () => taaghche(goods)); add('fidibo', () => fidibo(goods)); linkOnly.add('sibook'); }
   if (want('food')) {
     // «کروسان یا موهیتو» → هر گزینه جدا؛ بدون نام غذا → همان نوع مکانی که نوشته شده
     const dishes = q.alternatives?.length ? q.alternatives : [q.keywords || (/ک[یت]ترینگ/.test(q.text) ? 'کترینگ' : /کافه|قهوه/.test(q.text) ? 'کافه' : 'غذا')];
@@ -143,9 +143,11 @@ export function plan(q: ShopQuery, now: number): { tasks: Task[]; linkOnly: Serv
   }
   if (want('stay')) {
     const cities = q.destinations.length ? q.destinations : q.city ? [q.city] : [];
-    if (cities.length) add('otaghak', () => otaghak({ cities, date: q.date, nights: q.nights, guests: q.guests, maxPrice: q.maxPrice, minPrice: q.minPrice, sort: q.sort, today }));
-    else hints.push('شهر یا منطقهٔ اقامت را بنویسید؛ مثلاً «ویلا در رامسر» یا «شمال».');
-    linkOnly.add('jabama'); linkOnly.add('snapptrip');
+    if (cities.length) {
+      const sq = { cities, date: q.date, nights: q.nights, guests: q.guests, maxPrice: q.maxPrice, minPrice: q.minPrice, sort: q.sort, today };
+      add('otaghak', () => otaghak(sq)); add('jabama', () => jabamaStays(sq));
+    } else { hints.push('شهر یا منطقهٔ اقامت را بنویسید؛ مثلاً «ویلا در رامسر» یا «شمال».'); linkOnly.add('jabama'); }
+    linkOnly.add('snapptrip');
   }
   if (want('doctor')) {
     if (q.city) {

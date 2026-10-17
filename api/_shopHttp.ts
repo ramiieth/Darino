@@ -7,7 +7,7 @@ export const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 const HOSTS = new Set([
   'www.technolife.com', 'masterkala.com', 'api-go.shopino.app', 'www.khanoumi.com', 'asalbanooshop.com',
   'www.sheypoor.com', 'api.divar.ir', 'snappfood.ir', 'api.tapsi.food', 'svc.snapp.market', 'flight.atighgasht.com', 'train.mrbilit.com',
-  'core.otaghak.com', 'apigw.paziresh24.com', 'api.doctoreto.com', 'get.taaghche.com',
+  'core.otaghak.com', 'apigw.paziresh24.com', 'api.doctoreto.com', 'get.taaghche.com', 'api.fidibo.com', 'gw.jabama.com',
   'bus.mrbilit.ir', 'api.jabama.tours', 'ws.alibaba.ir', 'api.torob.com', 'marketcore.avani.website', 'apigateway.okala.com', 'snapppay.ir', 'www.mydigipay.com'
 ]);
 

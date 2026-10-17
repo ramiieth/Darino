@@ -124,7 +124,7 @@ const fa = (n: number) => new Intl.NumberFormat('fa-IR', { maximumFractionDigits
 function profileOf(item: ShopItem, intents: Intent[]): keyof typeof PROFILE {
   if (item.service === 'paziresh24' || item.service === 'doctoreto') return 'doctor';
   if (item.service === 'mrbilit') return 'trip';
-  if (item.service === 'otaghak') return 'stay';
+  if (item.service === 'otaghak' || item.id.startsWith('jbs-')) return 'stay';
   if ((item.service === 'divar' || item.service === 'sheypoor') && intents.some((i) => i === 'job' || i === 'estate' || i === 'car' || i === 'service')) return 'listing';
   if (item.service === 'snappfood' || item.service === 'tapsifood' || intents.includes('food')) return 'food';
   return 'goods';
@@ -159,7 +159,8 @@ export function rankItems(items: ShopItem[], q: Pick<ShopQuery, 'intents' | 'sor
   const rel = new Map(deduped.map((i) => [i, (textual(i) ? bestAlt(i)[0] : 1) * dealPenalty(i) * fitOf(i)]));
   let strong = deduped.filter((i) => rel.get(i)! >= 0.6);
   // کالای دقیق (همهٔ واژه‌ها: برند، چربی، اندازه) در چند فروشگاه هست؟ فقط همان؛ نه «برند دیگر» یا «کم‌چرب» به‌جای «پرچرب»
-  const exact = deduped.filter((i) => rel.get(i)! >= 0.6 && bestAlt(i)[0] >= 0.99);
+  // فقط برای نتایجی که با عنوان سنجیده می‌شوند؛ اقامت/پرواز/پزشک را خود منبع فیلتر کرده («ویلا» در عنوان جاباما هست، در اتاقک نه)
+  const exact = deduped.filter((i) => rel.get(i)! >= 0.6 && (!textual(i) || bestAlt(i)[0] >= 0.99));
   let unique = exact.length >= 3 ? exact : strong.length >= 3 ? strong : deduped.filter((i) => rel.get(i)! >= 0.34);
   // «۳۰۰ گرمی» دقیقاً نبود؟ نزدیک‌ترین اندازه‌ها (بدون شرط عدد) به‌جای پاسخ خالی
   if (!unique.length && /\d/.test(q.keywords)) {
