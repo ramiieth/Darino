@@ -19,7 +19,7 @@ describe('دستیار خرید — سرور', () => {
     expect(services('کفش رانینگ')).toEqual(['torob', 'digikala', 'shopino', 'sheypoor', 'divar']);
     expect(services('متخصص قلب در تهران')).toEqual(['paziresh24', 'doctoreto']);
     expect(services('ارزان‌ترین پرواز یا قطار به مشهد')).toEqual(['mrbilit', 'alibaba', 'mrbilit']);
-    expect(services('ویلا در شمال')).toEqual(['otaghak']);
+    expect(services('ویلا در شمال')).toEqual(['otaghak', 'jabama']);
     expect(services('ارزان‌ترین شیر کم چرب در اهواز')).toEqual(['snappmarket', 'okala', 'bamadar']);
     const food = plan(parseShopQuery('پیتزا در اهواز', { now: NOW, home: ahvaz }), NOW);
     expect(food.tasks.map((t) => t.service)).toEqual(['snappfood', 'tapsifood']);

@@ -40,8 +40,8 @@ const CASES: Case[] = [
   // سفر
   ['پرواز های امروز را نشان بده', { intents: ['flight'], tasks: ['mrbilit', 'alibaba'] }],
   ['قطار فردا به تهران', { intents: ['train'], tasks: ['mrbilit'], noHint: true }],
-  ['هتل در مشهد شبی زیر ۳ میلیون', { intents: ['stay'], tasks: ['otaghak'] }],
-  ['ویلا در شمال برای ۴ نفر', { intents: ['stay'], tasks: ['otaghak'] }],
+  ['هتل در مشهد شبی زیر ۳ میلیون', { intents: ['stay'], tasks: ['otaghak', 'jabama'] }],
+  ['ویلا در شمال برای ۴ نفر', { intents: ['stay'], tasks: ['otaghak', 'jabama'] }],
   ['اتوبوس vip به تهران', { intents: ['bus'], tasks: ['mrbilit'], noHint: true }],
   ['تاکسی دربست اهواز به تهران', { intents: ['taxi'], tasks: ['mrbilit'], noHint: true }],
   ['اتوبوس شیراز به اصفهان', { intents: ['bus'], tasks: ['mrbilit'], noHint: true }],
@@ -58,7 +58,7 @@ const CASES: Case[] = [
   // سلامت، کتاب، زیبایی
   ['دندانپزشک خوب با نوبت خالی', { intents: ['doctor'], tasks: ['paziresh24', 'doctoreto'] }],
   ['جراح چشم لیزیک در تهران', { intents: ['doctor'], city: 'تهران' }],
-  ['کتاب صوتی ملت عشق', { intents: ['book'], keywords: 'ملت عشق', tasks: ['taaghche'] }],
+  ['کتاب صوتی ملت عشق', { intents: ['book'], keywords: 'ملت عشق', tasks: ['taaghche', 'fidibo'] }],
   ['کرم ضد آفتاب برای پوست چرب', { intents: ['beauty'], tasks: ['khanoumi', 'asalbanoo', 'digikala'] }]
 ];
 

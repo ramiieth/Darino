@@ -7,7 +7,7 @@
  *
  * نرخ‌ها همه «ساعتی» هستند: Arcus و Ondo ساعتی تسویه می‌کنند؛ نرخ ۸ساعتهٔ Lighter در usePerpMarkets ÷ ۸ شده است.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchJson } from '@/repositories/remoteClient';
 import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
@@ -23,6 +23,8 @@ export const DELTA_VENUE_LABELS: Record<DeltaVenue, string> = {
 
 export interface VenueQuote {
   venue: DeltaVenue;
+  /** شناسهٔ بازار در API همان صرافی: Lighter market_id · Arcus BTC-USD · Ondo BTC-USD.P */
+  ref: string;
   base: string;
   display: string;
   nameFa: string;
@@ -50,6 +52,7 @@ export interface VenueBook {
 export function fromPerpMarket(m: PerpMarket): VenueQuote {
   return {
     venue: m.venue,
+    ref: m.venue === 'lighter' ? m.id : m.display,
     base: m.base.toUpperCase(),
     display: m.display,
     nameFa: m.nameFa,
@@ -105,6 +108,7 @@ export function normalizeOndo(markets: readonly OndoPublicMarket[], funding: Rea
     const tag = m.tags.find((t) => ONDO_CATEGORY[t]);
     return {
       venue: 'ondo' as const,
+      ref: m.market,
       base: m.base.toUpperCase(),
       display: m.market,
       nameFa: assetDisplayName(m.base, m.name).name,
@@ -236,4 +240,20 @@ export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
       ondo: { status: ondoStatus, quotes: ondoMarkets.data ? normalizeOndo(ondoMarkets.data.markets, ondoFunding.rates) : [] }
     };
   }, [arcus.data, arcus.isError, arcus.isPending, lighter.data, lighter.isError, lighter.isPending, ondoMarkets.data, ondoMarkets.isError, ondoFunding.rates, ondoFunding.status]);
+}
+
+/* ---------------- اشتراک بین تب‌ها ---------------- */
+
+const DeltaBooksContext = createContext<Record<DeltaVenue, VenueBook> | null>(null);
+
+/** یک بار دریافت (و یک WebSocket اوندو) برای همهٔ تب‌های دلتا نوترال، سود واقعی و اسکنر */
+export function DeltaVenuesProvider({ children }: { children: ReactNode }) {
+  const books = useDeltaVenues();
+  return createElement(DeltaBooksContext.Provider, { value: books }, children);
+}
+
+export function useDeltaBooks(): Record<DeltaVenue, VenueBook> {
+  const books = useContext(DeltaBooksContext);
+  if (!books) throw new Error('useDeltaBooks requires DeltaVenuesProvider');
+  return books;
 }

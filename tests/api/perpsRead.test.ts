@@ -46,3 +46,9 @@ describe('عملیات عمومی Ondo برای ماشین‌حساب‌ها', (
   await expect(getOndoPublicMarkets()).rejects.toMatchObject({status:502});
  });
 });
+
+describe('تاریخچهٔ فاندینگ و عمق عمومی Ondo برای اسکنر', () => {
+ it('بازار نامعتبر پیش از هر درخواست رد می‌شود',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);const { getOndoFundingHistory, getOndoDepth } = await import('../../api/_perpsRead');await expect(getOndoFundingHistory('https://evil.example')).rejects.toMatchObject({status:400});await expect(getOndoDepth('BTC-USD.P&x=1')).rejects.toMatchObject({status:400});expect(f).not.toHaveBeenCalled();});
+ it('فقط مسیر ثابت تاریخچه، ۷۲۰ ساعت، خروجی خلاصه',async()=>{const f=vi.fn().mockResolvedValue(ok({success:true,result:[{market:'ETH-USD.P',time:'2026-10-17T14:00:00.007Z',fundingRate:'0.0000125'},{time:'bad',fundingRate:'1'}]}));vi.stubGlobal('fetch',f);const { getOndoFundingHistory } = await import('../../api/_perpsRead');const data=await getOndoFundingHistory('ETH-USD.P');expect(data).toEqual({market:'ETH-USD.P',rates:[{t:Date.parse('2026-10-17T14:00:00.007Z'),r:0.0000125}]});const url=new URL(f.mock.calls[0][0]);expect(url.origin+url.pathname).toBe('https://api.ondoperps.xyz/v1/perps/funding_rate_history');expect(url.searchParams.get('market')).toBe('ETH-USD.P');expect(url.searchParams.get('limit')).toBe('720');expect(f.mock.calls[0][1].method).toBe('GET');});
+ it('عمق: حداکثر ۱۰۰ سطح معتبر',async()=>{const f=vi.fn().mockResolvedValue(ok({success:true,result:{bids:[['100','1'],['x','2'],['99','0']],asks:[['101','2']]}}));vi.stubGlobal('fetch',f);const { getOndoDepth } = await import('../../api/_perpsRead');expect(await getOndoDepth('SOL-USD.P')).toEqual({market:'SOL-USD.P',bids:[[100,1]],asks:[[101,2]]});expect(new URL(f.mock.calls[0][0]).searchParams.get('depth')).toBe('100');});
+});

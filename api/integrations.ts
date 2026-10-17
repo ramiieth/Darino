@@ -6,11 +6,13 @@ import { getDirectory } from './_directory.js';
 /** One authenticated read-only endpoint for wallet data and Gemini analysis. No credentials reach the client. */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireSession } from './_authCore.js';
-import { json, readBody } from './_neon.js';
+import { db, isDbConfigured, json, readBody } from './_neon.js';
+import { ensureSchema } from './_schema.js';
+import { ALERT_OPS, handleAlertsOp, neonAlertsStore, runTick, verifyTickKey } from './_alerts.js';
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
-import { getPerpsRead, getOndoPublicMarkets } from './_perpsRead.js';
+import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema } from './_assistant.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
@@ -28,6 +30,21 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // The Mac bridge authenticates with SHOP_RELAY_KEY (not a user session) and can only claim/submit Snappfood search jobs.
   if(webhookUrl.searchParams.get('op')==='shop-relay'){await relayEndpoint(req,res);return;}
   // Public market data only (fees, margin, mark prices) for the calculators — no account, address or credential.
+  // بررسی دوره‌ای اعلان‌ها (GitHub Actions): بدون نشست، فقط با کلید زمان‌بند؛ پاسخ فقط شمارش‌ها
+  if(webhookUrl.searchParams.get('op')==='alerts-tick'){
+    if(req.method!=='POST'){json(res,405,{error:'روش درخواست مجاز نیست'});return;}
+    res.setHeader('Cache-Control','no-store');
+    try{
+      if(!isDbConfigured()){json(res,503,{error:'پایگاه داده تنظیم نشده'});return;}
+      const sql=db(); if(!(await ensureSchema(sql))){json(res,503,{error:'پایگاه داده آماده نیست'});return;}
+      const store=neonAlertsStore(sql); const key=req.headers['x-alerts-key'];
+      if(!(await verifyTickKey(store,typeof key==='string'?key:undefined))){json(res,401,{error:'کلید زمان‌بند معتبر نیست'});return;}
+      json(res,200,await runTick(store));
+    }catch{json(res,500,{error:'بررسی انجام نشد'});}
+    return;
+  }
+  const publicOndo=webhookUrl.searchParams.get('op');
+  if((publicOndo==='ondo-perps-history'||publicOndo==='ondo-perps-depth')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{res.setHeader('Cache-Control',publicOndo==='ondo-perps-history'?'public, max-age=300, s-maxage=600':'public, max-age=10, s-maxage=15');json(res,200,publicOndo==='ondo-perps-history'?await getOndoFundingHistory(market):await getOndoDepth(market));}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(webhookUrl.searchParams.get('op')==='ondo-perps-public'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getOndoPublicMarkets());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
@@ -39,6 +56,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (++limit.count > (op === 'analyze' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
+    if ((ALERT_OPS as readonly string[]).includes(op)) {
+      if (!isDbConfigured()) { json(res,503,{ error:'پایگاه داده تنظیم نشده' }); return; }
+      const [status, body] = await handleAlertsOp(neonAlertsStore(db()), op, req.method ?? 'GET', auth.userId, () => readBody(req));
+      json(res,status,body); return;
+    }
     if (req.method === 'POST' && op === 'analyze') {
       const parsed = analysisSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات تحلیل کامل یا معتبر نیست' }); return; }

@@ -291,3 +291,26 @@ CREATE TABLE IF NOT EXISTS "providerCache" (
   "expiresAt" BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS "providerCache_expiry" ON "providerCache" ("expiresAt");
+
+-- ------------------------------------------------------------
+-- اعلان‌ها — اشتراک‌های Web Push هر دستگاه، قواعد و وضعیت هشدارها
+--   فقط endpointهای سرویس‌های رسمی Push ذخیره می‌شوند (api/_webpush.ts).
+--   "alertsStore": userId='__system' کلیدهای VAPID و هش کلید زمان‌بند را نگه می‌دارد.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "pushSubscriptions" (
+  "userId"    TEXT NOT NULL,
+  endpoint    TEXT NOT NULL,
+  p256dh      TEXT NOT NULL,
+  auth        TEXT NOT NULL,
+  label       TEXT,
+  "createdAt" BIGINT NOT NULL,
+  PRIMARY KEY ("userId", endpoint)
+);
+
+CREATE TABLE IF NOT EXISTS "alertsStore" (
+  "userId"    TEXT NOT NULL,
+  "key"       TEXT NOT NULL,                -- rules | state | log | vapid | tick
+  payload     JSONB NOT NULL,
+  "updatedAt" BIGINT NOT NULL,
+  PRIMARY KEY ("userId", "key")
+);

@@ -9,3 +9,4 @@ export * from './schedule';
 export * from './perp';
 export * from './hedge';
 export * from './deltaNeutral';
+export * from './fundingArb';

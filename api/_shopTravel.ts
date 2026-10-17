@@ -1,4 +1,4 @@
-/** Travel sources: MrBilit flights and trains, Otaghak stays. Public read-only searches; Rial → Toman where needed. */
+/** Travel sources: MrBilit flights and trains, Otaghak and Jabama stays. Public read-only searches; Rial → Toman where needed. */
 import { arr, obj, str } from '../src/features/connected/domain/model.js';
 import type { CityRef, ShopItem } from '../src/features/shopping/domain/types.js';
 import { item } from './_shopGoods.js';
@@ -131,6 +131,41 @@ export async function otaghak(q: StayQuery): Promise<ShopItem[]> {
       facts: [{ label: 'ظرفیت', value: `${num(r.personCapacity) ?? '?'} نفر` }, { label: 'قیمت', value: 'هر شب' }]
     });
   }).filter((i) => i.title && /\/room\/\d+/.test(i.url));
+}
+
+const JABAMA_TYPE: Record<string, string> = { villa: 'ویلا', suite: 'سوئیت', apartment: 'آپارتمان', cottage: 'کلبه', ecotourism: 'بوم‌گردی', traditional: 'سنتی', inn: 'مسافرخانه', complex: 'مجتمع', hostel: 'هاستل' };
+const jabamaDay = (isoDate: string) => Number(isoDate.replaceAll('-', ''));
+
+/** جاباما: ویلا و اقامتگاه با قیمت دقیق همان تاریخ و تعداد نفر (ریال → تومان، میانگین هر شب مثل اتاقک) */
+export async function jabamaStays(q: StayQuery): Promise<ShopItem[]> {
+  const slugs = q.cities.slice(0, 7).map((c) => c.slug).filter((s) => /^[a-z0-9_-]{2,40}$/.test(s));
+  if (!slugs.length) return [];
+  const checkIn = q.date ?? addDays(q.today, 1); const checkOut = addDays(checkIn, q.nights);
+  const body: Record<string, unknown> = { 'page-size': 24, 'page-number': 1, 'location-cities': slugs, date: { start: jabamaDay(checkIn), end: jabamaDay(checkOut) }, capacity: q.guests };
+  // بودجه در درخواست برای کل اقامت و به ریال است؛ کاربر قیمت هر شب را می‌گوید
+  if (q.minPrice != null || q.maxPrice != null) body.price = Object.fromEntries([['start', q.minPrice], ['end', q.maxPrice]].filter(([, v]) => v != null).map(([k, v]) => [k, (v as number) * 10 * q.nights]));
+  if (q.sort === 'cheapest') { body.sort = 'price'; body['sort-direction'] = 'false'; }
+  const data = await json('https://gw.jabama.com/api/taraaz/v4/search/merchandising/legacy-plp/all?platform=desktop&allowEmptyCity=true&hasUnitRoom=true&guarantees=false', { method: 'POST', body, timeoutMs: 15_000 });
+  return arr(obj(data.result).items).map(obj).map((r) => {
+    const p = obj(r.price); const loc = obj(r.location); const rr = obj(r.rate_review); const geo = obj(loc.geo);
+    const nights = p.isDefaultDate === true ? 1 : Math.max(1, num(p.nights_count) ?? q.nights);
+    const total = toman(p.discountedPrice); const before = toman(p.mainPrice);
+    const perNight = total ? Math.round(total / nights) : null; const beforeNight = before ? Math.round(before / nights) : null;
+    const code = num(r.code); const type = str(r.type);
+    const dated = p.isDefaultDate !== true && /^\d{4}-\d{2}-\d{2}$/.test(str(p.fa_checkin)) && /^\d{4}-\d{2}-\d{2}$/.test(str(p.fa_checkout));
+    const comments = num(rr.count) ?? 0;
+    return item({
+      id: `jbs-${code}`, service: 'jabama', title: str(r.name).trim(),
+      url: code && /^[a-z]{2,20}$/.test(type || 'stay') ? `https://www.jabama.com/stay/${type || 'stay'}-${code}${dated ? `?checkIn=${str(p.fa_checkin)}&checkOut=${str(p.fa_checkout)}&passengersCount=${q.guests}` : ''}` : '',
+      image: safeUrl(r.image ?? arr(r.images)[0]),
+      summary: [JABAMA_TYPE[type] ?? '', r.reservation_type === 'instant' ? 'رزرو آنی' : ''].filter(Boolean).join(' · ') || null,
+      priceToman: perNight, priceBeforeToman: beforeNight && perNight && beforeNight > perNight ? beforeNight : null,
+      discountPercent: beforeNight && perNight && beforeNight > perNight ? Math.round((100 * (beforeNight - perNight)) / beforeNight) : 0,
+      rating: comments ? num(rr.score) : null, ratingCount: comments, location: [str(loc.city), str(loc.province)].filter(Boolean).join('، ') || null,
+      mapUrl: mapLink(geo.lat, geo.long),
+      facts: [{ label: 'ظرفیت', value: `${num(obj(r.capacity).base) ?? '?'} نفر` }, { label: 'قیمت', value: 'هر شب' }]
+    });
+  }).filter((i) => i.title && /\/stay\/[a-z]+-\d+/.test(i.url));
 }
 
 /** روز خواسته‌شده پر یا بی‌پرواز بود؟ نزدیک‌ترین روز با صندلی خالی در ۲ هفتهٔ بعد */

@@ -240,6 +240,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,png,svg,jpg,jpeg,webp}'],
         // design-source artwork, never requested by the app
         globIgnores: ['**/icons/icon-master.png'],
+        // دریافت اعلان‌های Web Push (public/push-sw.js) — بدون کش داده
+        importScripts: ['/push-sw.js'],
         navigateFallback: '/index.html',
         // مسیرهای API هرگز با پوستهٔ HTML کش‌شده پاسخ داده نمی‌شوند
         navigateFallbackDenylist: [/^\/api\//],

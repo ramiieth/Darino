@@ -1,0 +1,32 @@
+# بررسی دوره‌ای اعلان‌های دارینو — رایگان (ریپوی عمومی)
+# فقط سرور دارینو را با کلید زمان‌بند صدا می‌زند؛ پاسخ سرور در لاگ عمومی چاپ نمی‌شود.
+# راه‌اندازی: صفحهٔ «اعلان‌ها» در دارینو ← ساخت کلید ← Secret با نام ALERTS_TICK_KEY
+name: Darino alerts tick
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: alerts-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check alerts
+        env:
+          ALERTS_TICK_KEY: ${{ secrets.ALERTS_TICK_KEY }}
+          DARINO_URL: ${{ vars.DARINO_URL || 'https://dariiino.vercel.app' }}
+        run: |
+          if [ -z "$ALERTS_TICK_KEY" ]; then echo "ALERTS_TICK_KEY is not set; skipping."; exit 0; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 -X POST \
+            -H "x-alerts-key: $ALERTS_TICK_KEY" -H 'accept: application/json' \
+            "$DARINO_URL/api/integrations?op=alerts-tick")
+          echo "HTTP $code"
+          [ "$code" = "200" ]

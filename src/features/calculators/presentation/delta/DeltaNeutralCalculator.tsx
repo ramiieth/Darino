@@ -18,7 +18,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { usePublishInsight } from '@/shared/assistant/insights';
 import { CalcShell, ResultHero, ResultPlaceholder } from '../StatCard';
 import { parseNum } from '../parse';
-import { useDeltaVenues, DELTA_VENUE_LABELS, type DeltaVenue, type VenueQuote } from '@/features/calculators/data/deltaMarkets';
+import { useDeltaBooks, DELTA_VENUE_LABELS, type DeltaVenue, type VenueQuote } from '@/features/calculators/data/deltaMarkets';
 import { calcDeltaNeutral, fundingSpreads, type DeltaLegResult, type FundingSpread } from '@/features/calculators/domain';
 import { toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
@@ -49,7 +49,7 @@ const lowLiquidity = (s: FundingSpread<VenueQuote>) =>
   [s.a.volume24hUsd, s.b.volume24hUsd].some((v) => v !== null && v < LOW_LIQUIDITY_USD);
 
 export function DeltaNeutralCalculator() {
-  const books = useDeltaVenues();
+  const books = useDeltaBooks();
   const [pair, setPair] = useState<Pair>('arcus-ondo');
   const [base, setBase] = useState<string | null>(null);
   const [flipped, setFlipped] = useState(false);
