@@ -178,7 +178,11 @@ function ScannerCard({ o, notional, watched }: { o: Opportunity; notional: numbe
             aria-label={watched ? 'حذف هشدار' : 'هشدار وقتی برعکس شد'}
             className={cn(watched && 'text-accent hover:text-accent')}
             onClick={() => {
-              const on = toggleWatch({ key: o.key, base: o.base, shortVenue: o.short.venue, shortRef: o.short.ref, longVenue: o.long.venue, longRef: o.long.ref });
+              const shortVenue = o.short.venue;
+              const longVenue = o.long.venue;
+              // سرور هشدار فقط آرکوس، اوندو و لایتر mainnet را می‌شناسد؛ جفت‌های اسکنر هم از همین سه‌اند
+              if (shortVenue === 'lighterRh' || longVenue === 'lighterRh') return;
+              const on = toggleWatch({ key: o.key, base: o.base, shortVenue, shortRef: o.short.ref, longVenue, longRef: o.long.ref });
               toast('info', on ? `${o.base} زیر نظر است؛ اگر اختلاف برعکس شد خبر می‌دهیم.` : `هشدار ${o.base} حذف شد.`);
             }}
           >

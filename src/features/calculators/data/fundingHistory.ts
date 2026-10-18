@@ -115,6 +115,8 @@ async function getJson(url: string): Promise<unknown> {
 }
 
 export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promise<RatePoint[]> {
+  // جفت‌های اسکنر (PAIRS) لایتر رابین‌هود ندارند؛ نباید به شاخهٔ اوندو برسد
+  if (venue === 'lighterRh') throw new Error('unsupported venue');
   if (venue === 'lighter') {
     if (!/^\d{1,6}$/.test(ref)) throw new Error('invalid market');
     const now = Math.floor(Date.now() / 1000);
@@ -132,6 +134,7 @@ export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promi
 }
 
 export async function fetchOrderBook(venue: DeltaVenue, ref: string): Promise<OrderBook> {
+  if (venue === 'lighterRh') throw new Error('unsupported venue');
   if (venue === 'lighter') {
     if (!/^\d{1,6}$/.test(ref)) throw new Error('invalid market');
     return parseLighterBook(await getJson(`${LIGHTER_BASE}/api/v1/orderBookOrders?${new URLSearchParams({ market_id: ref, limit: '100' })}`));

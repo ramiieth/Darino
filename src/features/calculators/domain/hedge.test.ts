@@ -3,7 +3,7 @@
  * وثیقهٔ نامشخص، لیکویید و حالت‌های مرزی. همهٔ اعداد از فرمول‌ها به دست می‌آیند.
  */
 import { describe, expect, it } from 'vitest';
-import { calcHedge, toNumber, type HedgeInput } from '@/features/calculators/domain';
+import { calcHedge, hedgePayoff, toNumber, type HedgeInput } from '@/features/calculators/domain';
 
 // ۱۰٬۰۰۰ اسپات · Short ۳٬۰۰۰ · وثیقهٔ فیوچرز ۳٬۰۰۰ (اهرم ۱) · بدون هزینه
 const REF: HedgeInput = {
@@ -228,5 +228,29 @@ describe('toNumber — ورودی متنی', () => {
     expect(toNumber('۱۰۰۰')).toBe(1000);
     expect(toNumber('1,250.5')).toBe(1250.5);
     expect(toNumber('۲٫۵')).toBe(2.5);
+  });
+});
+
+describe('منحنی ارزش پرتفوی (hedgePayoff)', () => {
+  it('همان اعداد سناریوها؛ مرتب و بدون تکرار؛ ریزش بیش از ۱۰۰٪ حذف', () => {
+    const r = calcHedge(REF);
+    const p = hedgePayoff(REF, [18, -25, 0, -25, -150]);
+    expect(p.map((x) => x.movePct)).toEqual([-25, 0, 18]);
+    expect(p[0].hedged).toBe(r.drop.totalEnd);
+    expect(p[0].unhedged).toBe(r.drop.unhedgedEnd);
+    expect(p[2].hedged).toBe(r.rise.totalEnd);
+    expect(p[1].hedged).toBe(13_000);
+  });
+
+  it('شیب با هج کمتر است: هج ۳۰٪ یعنی ۷۰٪ حساسیت بدون هج', () => {
+    const [a, b] = hedgePayoff(REF, [0, 10]);
+    const [c, d] = [a.unhedged!, b.unhedged!];
+    expect((b.hedged! - a.hedged!) / (d - c)).toBeCloseTo(0.7, 12);
+  });
+
+  it('لیکویید در منحنی دیده می‌شود؛ وثیقهٔ نامشخص → null', () => {
+    expect(hedgePayoff({ ...REF, futuresCollateral: 1_000 }, [40])[0].liquidated).toBe(true);
+    const u = hedgePayoff({ ...REF, futuresCollateral: null }, [0])[0];
+    expect([u.hedged, u.unhedged]).toEqual([null, null]);
   });
 });

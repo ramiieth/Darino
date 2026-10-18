@@ -1,10 +1,12 @@
 /**
- * اتصال فقط‌خواندنی ماشین‌حساب پوشش ریسک به حساب‌های ثبت‌شدهٔ کاربر — لایتر (mainnet) و آرکوس (mainnet)
+ * اتصال فقط‌خواندنی به حساب‌های ثبت‌شدهٔ کاربر — لایتر (mainnet)، لایتر رابین‌هود و آرکوس (mainnet)
+ * مشترک بین ماشین‌حساب پوشش ریسک و پایش «اجرا و پایش دلتا».
  *
- *  حساب‌ها   custody (همان آدرس‌های عمومی که کاربر در بخش لایتر/آرکوس اضافه کرده؛ بدون کلید)
- *  لایتر     /api/integrations?op=lighter-mainnet-account  (همان query و کش صفحهٔ لایتر)
- *  آرکوس     refreshSummary / getArcusState (همان حافظهٔ جلسهٔ صفحهٔ آرکوس)
- *  بازار     usePerpMarkets — قیمت مارک، فاندینگ لحظه‌ای و کارمزد تیکر
+ *  حساب‌ها          custody (همان آدرس‌های عمومی که کاربر در بخش لایتر/آرکوس اضافه کرده؛ بدون کلید)
+ *  لایتر            /api/integrations?op=lighter-mainnet-account  (همان query و کش صفحهٔ لایتر)
+ *  لایتر رابین‌هود   /api/integrations?op=lighter-account          (همان query و کش صفحهٔ لایتر رابین‌هود)
+ *  آرکوس            refreshSummary / getArcusState (همان حافظهٔ جلسهٔ صفحهٔ آرکوس)
+ *  بازار            usePerpMarkets / useLighterRobinhoodMarkets — قیمت مارک، فاندینگ لحظه‌ای و کارمزد تیکر
  *
  * هیچ سفارشی ثبت نمی‌شود و چیزی ذخیره نمی‌شود. نرمال‌سازها خالص‌اند و جدا تست می‌شوند.
  */
@@ -16,11 +18,17 @@ import type { Holding } from '@/features/custody/domain/types';
 import { lighterAccounts, type LighterAccount } from '@/features/perps/domain/model';
 import { accountKey, getArcusState, refreshSummary, useArcusStoreVersion, type AccountRef } from '@/features/arcus/data/useArcusAccount';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
-import { usePerpMarkets, type PerpMarket } from './perpMarkets';
+import { useLighterRobinhoodMarkets, usePerpMarkets, type PerpMarket } from './perpMarkets';
 
-export type HedgeVenue = 'lighter' | 'arcus';
+export type HedgeVenue = 'lighter' | 'lighterRh' | 'arcus';
 
-export const HEDGE_VENUE_LABELS: Record<HedgeVenue, string> = { lighter: 'لایتر', arcus: 'آرکوس' };
+export const HEDGE_VENUE_LABELS: Record<HedgeVenue, string> = { lighter: 'لایتر', lighterRh: 'لایتر رابین‌هود', arcus: 'آرکوس' };
+
+/** کلید کش و endpoint همان صفحه‌های لایتر */
+export const LIGHTER_ACCOUNT_QUERY: Record<'lighter' | 'lighterRh', { key: string; op: string }> = {
+  lighter: { key: 'lighter-mainnet-account', op: 'lighter-mainnet-account' },
+  lighterRh: { key: 'lighter-robinhood-account', op: 'lighter-account' }
+};
 
 export interface LinkedHedgeAccount {
   id: string;
@@ -72,12 +80,14 @@ export function linkedHedgeAccounts(holdings: readonly Holding[]): LinkedHedgeAc
   return holdings.flatMap((h): LinkedHedgeAccount[] => {
     if (h.archivedAt) return [];
     if (h.kind === 'platform' && h.platformId === 'lighter-mainnet' && h.address) return [{ id: h.id, venue: 'lighter', label: h.label, address: h.address }];
+    if (h.kind === 'platform' && h.platformId === 'lighter-robinhood' && h.address) return [{ id: h.id, venue: 'lighterRh', label: h.label, address: h.address }];
     if (h.kind === 'arcus' && h.arcus?.env === 'mainnet') return [{ id: h.id, venue: 'arcus', label: h.label, address: h.arcus.address, arcus: h.arcus }];
     return [];
   });
 }
 
-export function lighterSnapshot(acc: LighterAccount, markOf: (base: string) => number | null): HedgeSnapshot {
+/** لایتر mainnet یا رابین‌هود — ساختار حساب یکی است */
+export function lighterSnapshot(acc: LighterAccount, markOf: (base: string) => number | null, venue: 'lighter' | 'lighterRh' = 'lighter'): HedgeSnapshot {
   const shorts = acc.positions
     .filter((p) => p.side === 'short')
     .map((p): HedgeShort => {
@@ -96,7 +106,7 @@ export function lighterSnapshot(acc: LighterAccount, markOf: (base: string) => n
       };
     });
   return {
-    venue: 'lighter',
+    venue,
     subAccount: acc.index,
     equity: acc.equity,
     shorts,
@@ -181,15 +191,17 @@ const SUMMARY_POLL_MS = 30_000;
 export function useHedgeAccount(acc: LinkedHedgeAccount | null): HedgeAccountData {
   const venue = acc?.venue ?? null;
   const lighterMarkets = usePerpMarkets('lighter');
+  const lighterRhMarkets = useLighterRobinhoodMarkets();
   const arcusMarkets = usePerpMarkets('arcus');
-  const markets = (venue === 'arcus' ? arcusMarkets.data : lighterMarkets.data) ?? [];
+  const markets = (venue === 'arcus' ? arcusMarkets.data : venue === 'lighterRh' ? lighterRhMarkets.data : lighterMarkets.data) ?? [];
   const markOf = (base: string) => markets.find((m) => m.base.toUpperCase() === base)?.markPrice ?? null;
 
-  // لایتر: همان query و کلید کش صفحهٔ لایتر
+  // لایتر (mainnet یا رابین‌هود): همان query و کلید کش صفحه‌های لایتر
+  const lighterVenue = venue === 'lighter' || venue === 'lighterRh' ? venue : 'lighter';
   const lighter = useQuery({
-    queryKey: ['lighter-mainnet-account', acc?.address.toLowerCase() ?? ''],
-    queryFn: () => fetchJson<unknown>(`/api/integrations?op=lighter-mainnet-account&address=${encodeURIComponent(acc!.address)}`, { timeoutMs: 15_000 }),
-    enabled: venue === 'lighter',
+    queryKey: [LIGHTER_ACCOUNT_QUERY[lighterVenue].key, acc?.address.toLowerCase() ?? ''],
+    queryFn: () => fetchJson<unknown>(`/api/integrations?op=${LIGHTER_ACCOUNT_QUERY[lighterVenue].op}&address=${encodeURIComponent(acc!.address)}`, { timeoutMs: 15_000 }),
+    enabled: venue === 'lighter' || venue === 'lighterRh',
     staleTime: 30_000,
     refetchInterval: 30_000,
     retry: 1
@@ -212,9 +224,10 @@ export function useHedgeAccount(acc: LinkedHedgeAccount | null): HedgeAccountDat
   const arcus = key ? getArcusState(key) : undefined;
 
   if (!acc) return { status: 'idle', snapshots: [], markets, fetchedAt: null };
-  if (acc.venue === 'lighter') {
+  if (acc.venue === 'lighter' || acc.venue === 'lighterRh') {
     if (!lighter.data) return { status: lighter.isError ? 'error' : 'loading', snapshots: [], markets, fetchedAt: null };
-    return { status: 'ready', snapshots: lighterAccounts(lighter.data, acc.address).map((a) => lighterSnapshot(a, markOf)), markets, fetchedAt: lighter.dataUpdatedAt || null };
+    const v = acc.venue;
+    return { status: 'ready', snapshots: lighterAccounts(lighter.data, acc.address).map((a) => lighterSnapshot(a, markOf, v)), markets, fetchedAt: lighter.dataUpdatedAt || null };
   }
   const a = arcus?.account;
   const p = arcus?.positions;

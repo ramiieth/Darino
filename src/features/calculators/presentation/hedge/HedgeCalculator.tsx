@@ -12,13 +12,13 @@ import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge, type Tone } from '@/shared/components/ui/Badge';
-import { KeyValueList, Metric, MetricGrid, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { KeyValueList, MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { usePublishInsight } from '@/shared/assistant/insights';
 import { toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
-import { calcHedge, type Coin, type HedgeInput, type HedgeResult, type HedgeScenario } from '@/features/calculators/domain';
+import { calcHedge, hedgePayoff, type Coin, type HedgeInput, type HedgeResult, type HedgeScenario } from '@/features/calculators/domain';
 import { HEDGE_COINS, DEFAULT_HEDGE_COIN } from '@/features/calculators/data/hedgeCoins';
 import {
   HEDGE_VENUE_LABELS,
@@ -32,6 +32,7 @@ import {
 } from '@/features/calculators/data/hedgeAccounts';
 import { parseNum } from '../parse';
 import { CoinLogo, CoinPicker } from './CoinPicker';
+import { PayoffChart } from './PayoffChart';
 
 type Sizing = 'usd' | 'pct';
 type Source = 'input' | 'live' | 'derived' | 'estimate' | 'unknown';
@@ -46,6 +47,7 @@ const SOURCE: Record<Source, { label: string; tone: Tone }> = {
   unknown: { label: 'نامشخص', tone: 'warn' }
 };
 
+const QUICK_RATIOS = [25, 50, 75, 100];
 const pctFmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 const fmtPct = (v: number) => `${toFaDigits(pctFmt.format(v))}٪`;
 /** مقدار عددی برای پرکردن فیلد (بدون نماد علمی) */
@@ -229,6 +231,12 @@ export function HedgeCalculator() {
       : null
   );
 
+  /** دکمهٔ نسبت سریع: اندازهٔ Short = اسپات × p٪ (برچسب «زنده» اندازه برداشته می‌شود) */
+  const applyRatio = (p: number) => {
+    if (sizing === 'pct') setRatio(String(p));
+    else if (v.spot > 0) track('short', setShortUsd)(fieldValue((v.spot * p) / 100));
+  };
+
   const switchSizing = (next: Sizing) => {
     if (next === sizing) return;
     // مقدار معادل را منتقل کن تا با تغییر روش، اندازهٔ Short عوض نشود
@@ -323,6 +331,26 @@ export function HedgeCalculator() {
             <Input {...num(ratio, setRatio, '٪')} />
           </Field>
         )}
+        <div className="-mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="نسبت هج سریع">
+          <span className="text-2xs text-subtle">نسبت سریع:</span>
+          {QUICK_RATIOS.map((p) => {
+            const active = result?.ratioPct != null && Math.abs(result.ratioPct - p) < 0.05;
+            return (
+              <button
+                key={p}
+                type="button"
+                aria-pressed={active}
+                onClick={() => applyRatio(p)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-2xs font-semibold transition-colors duration-fast',
+                  active ? 'border-accent bg-accent-soft text-accent' : 'border-divider text-muted hover:border-divider-strong hover:text-ink'
+                )}
+              >
+                {toFaDigits(p)}٪
+              </button>
+            );
+          })}
+        </div>
         <Field label="وثیقهٔ واقعی حساب فیوچرز" error={errors.collateral}>
           <Input {...num(collateral, track('collateral', setCollateral), 'دلار', 'نامشخص')} />
         </Field>
@@ -392,7 +420,7 @@ export function HedgeCalculator() {
               liqUsed={exchangeLiq !== null}
             />
           )}
-          <Summary r={result} coin={coin} live={live.size > 0} />
+          <Outcome r={result} coin={coin} live={live.size > 0} />
           {result.futuresCollateral === null && (
             <Notice tone="warn" title="وثیقهٔ حساب فیوچرز نامشخص است">
               سرمایهٔ اولیهٔ کل، موجودی فیوچرز، سرمایهٔ نهایی و بازده بدون آن حساب نمی‌شوند و از روی ارزش اسمی Short حدس زده نمی‌شوند. اثر مالی هج و ارزش اسپات همچنان
@@ -410,9 +438,9 @@ export function HedgeCalculator() {
               مواجههٔ خالص پرتفوی منفی (خالص Short) است؛ این دیگر فقط پوشش ریسک نیست و در رشد بازار زیان می‌دهد.
             </Notice>
           )}
-          <Structure r={result} sizing={sizing} live={live} exchangeLiq={exchangeLiq !== null} />
-          <Scenarios r={result} />
-          <Comparison r={result} />
+          <Payoff input={input!} r={result} />
+          <Composition r={result} sizing={sizing} live={live} exchangeLiq={exchangeLiq !== null} />
+          <DetailTable r={result} />
           <Details />
         </>
       )}
@@ -462,7 +490,7 @@ function AccountLink({
   if (!accounts.length) {
     return (
       <p className="text-xs leading-6 text-muted">
-        هنوز حساب لایتر یا آرکوسی ثبت نشده است. آدرس عمومی حساب را در بخش «لایتر» یا «آرکوس» اضافه کنید تا پوزیشن واقعی این‌جا خوانده شود. تا آن زمان اعداد را دستی
+        هنوز حسابی ثبت نشده است. آدرس عمومی حساب را در بخش «لایتر»، «لایتر رابین‌هود» یا «آرکوس» اضافه کنید تا پوزیشن واقعی این‌جا خوانده شود. تا آن زمان اعداد را دستی
         وارد کنید.
       </p>
     );
@@ -601,39 +629,27 @@ function LivePosition({
   );
 }
 
-/* ---------------- ۱. خلاصهٔ مالی ---------------- */
+/* ---------------- قاب مراحل ---------------- */
 
-function Summary({ r, coin, live }: { r: HedgeResult; coin: Coin; live: boolean }) {
+/** قاب یکسان همهٔ بخش‌های نتیجه: شمارهٔ مرحله + تیتر به شکل سؤال + یک جملهٔ توضیح */
+function Step({ n, id, title, sub, aside, focal, children }: { n: number; id: string; title: string; sub?: ReactNode; aside?: ReactNode; focal?: boolean; children: ReactNode }) {
   return (
-    <Surface variant="focal" as="section" aria-labelledby="hedge-summary" className="p-5 md:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h3 id="hedge-summary" className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-muted">
-            سرمایهٔ اولیهٔ کل {r.totalStart === null ? <Tag kind="unknown" /> : <Tag kind="derived" />}
-          </h3>
-          <div className="mt-1 text-4xl font-extrabold tracking-tight text-ink">{r.totalStart === null ? <Unknown /> : <MoneyValue value={r.totalStart} digits={2} />}</div>
-          <p className="mt-1.5 text-xs text-muted">اسپات + وثیقهٔ حساب فیوچرز + وجه نقد مستقل</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <CoinLogo coin={coin} size={36} />
+    <Surface as="section" variant={focal ? 'focal' : undefined} aria-labelledby={id} className={cn('space-y-4', focal ? 'p-5 md:p-6' : 'p-4 md:p-5')}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent">
+            {toFaDigits(n)}
+          </span>
           <div className="min-w-0">
-            <bdi dir="ltr" className="block font-latin text-sm font-bold text-ink">
-              {coin.symbol}
-            </bdi>
-            <span className="block truncate text-xs text-muted">{coin.name}</span>
+            <h3 id={id} className="text-sm font-bold text-ink md:text-base">
+              {title}
+            </h3>
+            {sub && <p className="mt-0.5 text-xs leading-6 text-muted">{sub}</p>}
           </div>
         </div>
+        {aside}
       </div>
-      <div className="mt-6 grid gap-5 border-t border-divider pt-5 sm:grid-cols-2">
-        <ScenarioSummary s={r.drop} />
-        <ScenarioSummary s={r.rise} />
-      </div>
-      <p className="mt-4 flex flex-wrap items-center gap-1.5 text-2xs text-subtle">
-        <Tag kind="estimate" />
-        {live
-          ? 'نقطهٔ شروع از حساب واقعی شما؛ نتیجه پیش‌بینی همان سناریوی قیمت است، پس از بستن فرضی Short — نه سود تحقق‌یافته'
-          : 'نتیجهٔ سناریو با ورودی‌های شما، پس از بستن فرضی Short — نه سود تحقق‌یافته'}
-      </p>
+      {children}
     </Surface>
   );
 }
@@ -648,92 +664,223 @@ function ScenarioTitle({ s }: { s: HedgeScenario }) {
   );
 }
 
-function ScenarioSummary({ s }: { s: HedgeScenario }) {
+/** نوار مقدار تک‌رنگ روی شیار — هویت با متن کنارش است، نه رنگ */
+function MagnitudeBar({ value, max, tone = 'accent', textured = false }: { value: number; max: number; tone?: 'accent' | 'gold'; textured?: boolean }) {
+  const w = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
   return (
-    <div className="min-w-0">
-      <h4 className="mb-2 text-sm font-bold text-ink">
-        <ScenarioTitle s={s} />
-      </h4>
-      <MetricGrid cols={2} className="gap-y-3">
-        <Metric size="sm" label="سرمایهٔ نهایی" value={s.totalEnd === null ? <Unknown /> : <MoneyValue value={s.totalEnd} digits={2} />} />
-        <Metric
-          size="sm"
-          label="سود/زیان خالص"
-          value={s.net === null ? <Unknown /> : <MoneyValue value={s.net} signed tone="auto" digits={2} />}
-          sub={s.roiPct === null ? undefined : <>بازده کل <PercentValue value={s.roiPct} digits={2} /></>}
-        />
-      </MetricGrid>
-      <p className="mt-2 text-xs text-muted">
-        اثر مالی هج نسبت به بدون هج: <MoneyValue value={s.hedgeEffectNet} signed tone="auto" digits={2} className="font-semibold" />
-      </p>
+    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2" aria-hidden>
+      <div
+        className={cn('h-full rounded-full', tone === 'accent' ? 'bg-chart-1 text-chart-1' : 'bg-gold/80 text-gold')}
+        style={{
+          width: `${w}%`,
+          ...(textured ? { backgroundColor: 'transparent', backgroundImage: 'repeating-linear-gradient(135deg, currentColor 0 3px, transparent 3px 6px)' } : {})
+        }}
+      />
     </div>
   );
 }
 
-/* ---------------- ۲. ساختار پرتفوی ---------------- */
+/* ---------------- ۱. هج با پرتفوی شما چه می‌کند؟ ---------------- */
 
-function Structure({ r, sizing, live, exchangeLiq }: { r: HedgeResult; sizing: Sizing; live: ReadonlySet<LiveField>; exchangeLiq: boolean }) {
-  const src = (f: LiveField): Source => (live.has(f) ? 'live' : 'input');
-  const label = (text: string, kind: Source) => (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {text}
-      <Tag kind={kind} />
-    </span>
-  );
+function Outcome({ r, coin, live }: { r: HedgeResult; coin: Coin; live: boolean }) {
+  const ends = [r.drop.totalEnd, r.drop.unhedgedEnd, r.rise.totalEnd, r.rise.unhedgedEnd].filter((v): v is number => v !== null);
+  const max = Math.max(...ends, 0);
   return (
-    <Surface as="section" aria-labelledby="hedge-structure" className="space-y-4 p-4 md:p-5">
-      <div>
-        <h3 id="hedge-structure" className="text-sm font-bold text-ink">
-          ساختار پرتفوی
-        </h3>
-        <p className="mt-0.5 text-2xs leading-5 text-subtle">ارزش اسمی و مواجهه اندازهٔ در معرض بازارند، نه پول پرداختی؛ وثیقه هزینه نیست و پس از بستن برمی‌گردد.</p>
+    <Step
+      n={1}
+      id="hedge-outcome"
+      focal
+      title="هج با پرتفوی شما چه می‌کند؟"
+      sub={
+        <>
+          سرمایهٔ اولیهٔ کل{' '}
+          {r.totalStart === null ? <span className="font-semibold text-warn">نامشخص</span> : <MoneyValue value={r.totalStart} digits={2} className="font-semibold text-ink" />} ·
+          اسپات + وثیقهٔ حساب فیوچرز + وجه نقد
+        </>
+      }
+      aside={
+        <span className="flex shrink-0 items-center gap-2">
+          <CoinLogo coin={coin} size={32} />
+          <bdi dir="ltr" className="font-latin text-sm font-bold text-ink">
+            {coin.symbol}
+          </bdi>
+        </span>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <OutcomeTile s={r.drop} max={max} />
+        <OutcomeTile s={r.rise} max={max} />
       </div>
-      <MetricGrid cols={3}>
-        <Metric size="sm" label={label('ارزش دارایی اسپات', src('spot'))} value={<MoneyValue value={r.spot} digits={2} />} />
-        <Metric
-          size="sm"
-          label={label('ارزش اسمی Short', sizing === 'usd' ? src('short') : 'derived')}
-          value={<MoneyValue value={r.shortNotional} digits={2} />}
-          sub="اندازهٔ پوزیشن در بازار"
-        />
-        <Metric
-          size="sm"
-          label={label('نسبت هج', sizing === 'pct' ? 'input' : 'derived')}
-          value={r.ratioPct === null ? '—' : fmtPct(r.ratioPct)}
-          sub="ارزش Short تقسیم بر ارزش اسپات"
-        />
-        <Metric
-          size="sm"
-          label={label(live.has('collateral') ? 'ارزش خالص حساب فیوچرز' : 'وثیقهٔ فیوچرز', r.futuresCollateral === null ? 'unknown' : src('collateral'))}
-          value={r.futuresCollateral === null ? <Unknown /> : <MoneyValue value={r.futuresCollateral} digits={2} />}
-          sub={r.effectiveLeverage === null ? 'مارجین پوزیشن' : `اهرم مؤثر ${toFaDigits(pctFmt.format(r.effectiveLeverage))}×`}
-        />
-        <Metric size="sm" label={label('وجه نقد مستقل', 'input')} value={<MoneyValue value={r.cash} digits={2} />} sub="سرمایهٔ آزاد بیرون از پوزیشن" />
-        <Metric
-          size="sm"
-          label={label('مواجههٔ خالص بازار', 'derived')}
-          value={<MoneyValue value={r.netExposure} signed digits={2} />}
-          sub={`اسپات − Short · ${r.ratioPct === null ? '—' : fmtPct(100 - r.ratioPct)} اسپات بی‌پوشش`}
-        />
-        <Metric size="sm" label={label('مواجههٔ ناخالص', 'derived')} value={<MoneyValue value={r.grossExposure} digits={2} />} sub="اسپات + Short — سرمایه نیست" />
-        <Metric
-          size="sm"
-          label={label('هزینهٔ تخمینی استراتژی', 'estimate')}
-          value={<MoneyValue value={-r.baseCosts.total} signed tone="auto" digits={2} />}
-          sub="کارمزد + اسلیپیج + سایر − فاندینگ، بدون تغییر قیمت"
-        />
-        <Metric
-          size="sm"
-          label={label(exchangeLiq ? 'حد لیکویید صرافی' : 'حد تقریبی صفر شدن وثیقه', r.collateralWipeoutPct === null ? 'unknown' : exchangeLiq ? 'live' : 'derived')}
-          value={r.collateralWipeoutPct === null ? <Unknown /> : `رشد ${fmtPct(r.collateralWipeoutPct)}`}
-          sub={exchangeLiq ? 'از قیمت لیکویید گزارش‌شده، نسبت به مارک فعلی' : 'بدون هزینه و مارجین نگهداری؛ لیکویید واقعی زودتر است'}
-        />
-      </MetricGrid>
-    </Surface>
+      <p className="flex flex-wrap items-center gap-1.5 text-2xs leading-5 text-subtle">
+        <Tag kind="estimate" />
+        {live
+          ? 'نقطهٔ شروع از حساب واقعی شما؛ نتیجه پیش‌بینی همان سناریوی قیمت است، پس از بستن فرضی Short — نه سود تحقق‌یافته.'
+          : 'نتیجهٔ سناریو با ورودی‌های شما، پس از بستن فرضی Short — نه سود تحقق‌یافته.'}
+      </p>
+    </Step>
   );
 }
 
-/* ---------------- ۳ و ۴. جدول‌های سناریو ---------------- */
+/** یک جملهٔ ساده برای اثر هج در این سناریو */
+function verdict(s: HedgeScenario): { text: string; tone: 'gain' | 'loss' | 'neutral' } {
+  const e = s.hedgeEffectNet;
+  if (Math.abs(e) < 0.005) return { text: 'هج اثری ندارد', tone: 'neutral' };
+  if (s.movePct < 0) return e > 0 ? { text: 'زیان کمتر با هج', tone: 'gain' } : { text: 'هزینهٔ هج بیشتر از پوشش', tone: 'loss' };
+  return e < 0 ? { text: 'سود کمتر با هج', tone: 'loss' } : { text: 'فاندینگ بیشتر از سود ازدست‌رفته', tone: 'gain' };
+}
+
+function OutcomeTile({ s, max }: { s: HedgeScenario; max: number }) {
+  const v = verdict(s);
+  return (
+    <article className="flex min-w-0 flex-col gap-3 rounded-card border border-divider bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-sm font-bold text-ink">
+          <ScenarioTitle s={s} />
+        </h4>
+        <Badge tone={v.tone}>{v.text}</Badge>
+      </div>
+      <div>
+        <div className="text-2xl font-extrabold tracking-tight">
+          <MoneyValue value={s.hedgeEffectNet} signed tone="auto" digits={2} />
+        </div>
+        <p className="text-2xs text-subtle">اثر خالص هج، پس از همهٔ هزینه‌ها، نسبت به بدون هج با همان سرمایه</p>
+      </div>
+      {s.totalEnd === null || s.unhedgedEnd === null ? (
+        <p className="text-xs text-warn">سرمایهٔ نهایی نامشخص است؛ وثیقهٔ حساب فیوچرز را وارد کنید.</p>
+      ) : (
+        <dl className="space-y-2.5">
+          {(
+            [
+              ['با هج', s.totalEnd, s.roiPct, 'accent'],
+              ['بدون هج', s.unhedgedEnd, s.unhedgedRoiPct, 'gold']
+            ] as const
+          ).map(([label, value, roi, tone]) => (
+            <div key={label} className="space-y-1">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <dt className="text-muted">{label}</dt>
+                <dd className="flex items-baseline gap-1.5 font-semibold text-ink">
+                  <MoneyValue value={value} digits={2} />
+                  <PercentValue value={roi} digits={2} className="text-2xs" />
+                </dd>
+              </div>
+              <MagnitudeBar value={value} max={max} tone={tone} />
+            </div>
+          ))}
+        </dl>
+      )}
+      {s.liquidated && <p className="text-2xs font-semibold text-negative">در این سناریو Short لیکویید می‌شود.</p>}
+    </article>
+  );
+}
+
+/* ---------------- ۲. منحنی ارزش پرتفوی ---------------- */
+
+const PAYOFF_GRID = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50];
+
+function Payoff({ input, r }: { input: HedgeInput; r: HedgeResult }) {
+  const marks = [r.drop.movePct, r.rise.movePct];
+  const points = useMemo(() => hedgePayoff(input, [...PAYOFF_GRID, ...marks]), [input, marks[0], marks[1]]);
+  return (
+    <Step n={2} id="hedge-payoff" title="در هر تغییر قیمت، پرتفوی چقدر می‌ارزد؟" sub="هر دو خط با همان سرمایهٔ اولیه شروع می‌کنند؛ فاصلهٔ آن‌ها همان اثر هج است.">
+      {r.futuresCollateral === null ? (
+        <p className="text-xs leading-6 text-warn">بدون وثیقهٔ حساب فیوچرز، ارزش کل پرتفوی معلوم نیست و منحنی رسم نمی‌شود.</p>
+      ) : (
+        <PayoffChart points={points} marks={marks} />
+      )}
+    </Step>
+  );
+}
+
+/* ---------------- ۳. پرتفوی از چه ساخته شده؟ ---------------- */
+
+function Composition({ r, sizing, live, exchangeLiq }: { r: HedgeResult; sizing: Sizing; live: ReadonlySet<LiveField>; exchangeLiq: boolean }) {
+  const tagOf = (f: LiveField) => (live.has(f) ? <Tag kind="live" /> : null);
+  const capital = r.totalStart;
+  const covered = Math.min(r.shortNotional, r.spot);
+  const uncovered = Math.max(0, r.spot - r.shortNotional);
+  const share = (v: number, of: number | null) => (of && of > 0 ? (v / of) * 100 : null);
+  const BarRow = ({ label, value, of, tag, textured }: { label: string; value: number; of: number; tag?: ReactNode; textured?: boolean }) => (
+    <div className="space-y-1">
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="inline-flex flex-wrap items-center gap-1.5 text-muted">
+          {label}
+          {tag}
+        </span>
+        <span className="flex items-baseline gap-1.5 font-semibold text-ink">
+          <MoneyValue value={value} digits={2} />
+          <span className="text-2xs font-normal text-subtle">{share(value, of) === null ? '' : fmtPct(share(value, of)!)}</span>
+        </span>
+      </div>
+      <MagnitudeBar value={value} max={of} textured={textured} />
+    </div>
+  );
+  return (
+    <Step n={3} id="hedge-structure" title="پرتفوی از چه ساخته شده؟" sub="سرمایه یعنی پولی که کنار گذاشته‌اید؛ مواجهه یعنی چه مقدارش با قیمت بالا و پایین می‌رود. این دو یکی نیستند.">
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="space-y-2.5">
+          <h4 className="text-xs font-bold text-ink">سرمایه</h4>
+          {capital === null ? (
+            <p className="text-xs text-warn">وثیقهٔ حساب فیوچرز نامشخص است؛ سرمایهٔ کل حساب نمی‌شود.</p>
+          ) : (
+            <>
+              <BarRow label="دارایی اسپات" value={r.spot} of={capital} tag={tagOf('spot')} />
+              <BarRow label={live.has('collateral') ? 'ارزش خالص حساب فیوچرز' : 'وثیقهٔ حساب فیوچرز'} value={r.futuresCollateral ?? 0} of={capital} tag={tagOf('collateral')} />
+              <BarRow label="وجه نقد مستقل" value={r.cash} of={capital} />
+            </>
+          )}
+        </div>
+        <div className="space-y-2.5">
+          <h4 className="text-xs font-bold text-ink">مواجهه با قیمت (از ارزش اسپات)</h4>
+          <BarRow label="پوشش‌داده با Short" value={covered} of={r.spot} tag={sizing === 'usd' ? tagOf('short') : null} textured />
+          <BarRow label="بی‌پوشش (مواجههٔ خالص)" value={uncovered} of={r.spot} />
+          {r.shortNotional > r.spot && (
+            <p className="text-2xs text-warn">
+              Short به اندازهٔ <MoneyValue value={r.shortNotional - r.spot} digits={2} /> بزرگ‌تر از اسپات است؛ پرتفوی خالص Short است.
+            </p>
+          )}
+        </div>
+      </div>
+      <KeyValueList
+        dense
+        rows={[
+          { label: 'نسبت هج', hint: 'ارزش Short تقسیم بر ارزش اسپات', value: r.ratioPct === null ? '—' : fmtPct(r.ratioPct) },
+          {
+            label: (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                ارزش اسمی Short {sizing === 'usd' && tagOf('short')}
+              </span>
+            ),
+            hint: 'اندازهٔ پوزیشن در بازار — پول پرداختی نیست',
+            value: <MoneyValue value={r.shortNotional} digits={2} />
+          },
+          { label: 'اهرم مؤثر', hint: 'ارزش اسمی Short تقسیم بر وثیقه', value: r.effectiveLeverage === null ? <Unknown /> : `${toFaDigits(pctFmt.format(r.effectiveLeverage))}×` },
+          { label: 'مواجههٔ ناخالص', hint: 'اسپات + Short — اندازهٔ کل در بازار، نه سرمایه', value: <MoneyValue value={r.grossExposure} digits={2} /> },
+          {
+            label: (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                هزینهٔ تخمینی استراتژی <Tag kind="estimate" />
+              </span>
+            ),
+            hint: 'کارمزد + اسلیپیج + سایر − فاندینگ، بدون تغییر قیمت',
+            value: <MoneyValue value={-r.baseCosts.total} signed tone="auto" digits={2} />
+          },
+          {
+            label: (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                {exchangeLiq ? 'حد لیکویید صرافی' : 'حد تقریبی صفر شدن وثیقه'} {exchangeLiq ? <Tag kind="live" /> : r.collateralWipeoutPct === null ? <Tag kind="unknown" /> : null}
+              </span>
+            ),
+            hint: exchangeLiq ? 'از قیمت لیکویید گزارش‌شده، نسبت به مارک فعلی' : 'بدون هزینه و مارجین نگهداری؛ لیکویید واقعی زودتر است',
+            value: r.collateralWipeoutPct === null ? <Unknown /> : <span className="whitespace-nowrap">رشد {fmtPct(r.collateralWipeoutPct)}</span>
+          }
+        ]}
+      />
+      <p className="text-2xs text-subtle">اعداد بدون برچسب، ورودی شما یا محاسبه از آن‌ها هستند.</p>
+    </Step>
+  );
+}
+
+/* ---------------- ۴. جزئیات هر سناریو ---------------- */
 
 interface Row {
   label: ReactNode;
@@ -746,22 +893,65 @@ const money = (v: number | null) => (v === null ? <Unknown /> : <MoneyValue valu
 const pnl = (v: number | null) => (v === null ? <Unknown /> : <MoneyValue value={v} signed tone="auto" digits={2} />);
 const cost = (v: number) => <MoneyValue value={v === 0 ? 0 : -v} tone={v > 0 ? 'loss' : 'none'} digits={2} />;
 const pct = (v: number | null) => (v === null ? <Unknown /> : <PercentValue value={v} digits={2} />);
+const both = (r: HedgeResult, f: (s: HedgeScenario) => ReactNode): [ReactNode, ReactNode] => [f(r.drop), f(r.rise)];
 
-function ScenarioTable({ id, title, note, r, rows }: { id: string; title: string; note?: ReactNode; r: HedgeResult; rows: Row[] }) {
+function DetailTable({ r }: { r: HedgeResult }) {
+  const groups: { title: string; rows: Row[] }[] = [
+    {
+      title: 'دارایی‌ها',
+      rows: [
+        { label: 'تغییر قیمت', cells: both(r, (s) => <PercentValue value={s.movePct} digits={1} />) },
+        { label: 'ارزش نهایی اسپات', cells: both(r, (s) => money(s.spotEnd)) },
+        { label: 'سود/زیان ناخالص Short', hint: '−ارزش اسمی × تغییر قیمت', cells: both(r, (s) => pnl(s.shortGross)) }
+      ]
+    },
+    {
+      title: 'هزینه‌ها و فاندینگ',
+      rows: [
+        { label: 'کارمزد ورود و خروج', cells: both(r, (s) => cost(s.fees)) },
+        { label: 'فاندینگ', hint: 'مثبت = دریافتی', cells: both(r, (s) => pnl(s.funding)) },
+        { label: 'اسلیپیج', cells: both(r, (s) => cost(s.slippage)) },
+        { label: 'سایر هزینه‌ها', cells: both(r, (s) => cost(s.otherCosts)) }
+      ]
+    },
+    {
+      title: 'پس از بستن Short',
+      rows: [
+        {
+          label: 'موجودی نهایی حساب فیوچرز',
+          hint: 'وثیقه + سود/زیان Short + فاندینگ − هزینه‌ها',
+          cells: both(r, (s) => (
+            <>
+              {money(s.futuresEnd)}
+              {s.liquidated && <span className="block text-2xs font-semibold text-negative">لیکویید</span>}
+            </>
+          ))
+        },
+        { label: 'وجه نقد مستقل', cells: both(r, (s) => money(s.cashEnd)) },
+        { label: 'سرمایهٔ نهایی کل', cells: both(r, (s) => money(s.totalEnd)), emphasis: true },
+        { label: 'سود/زیان خالص کل', hint: 'سرمایهٔ نهایی − سرمایهٔ اولیه', cells: both(r, (s) => pnl(s.net)), emphasis: true },
+        { label: 'بازده کل سرمایه', hint: 'نسبت به سرمایهٔ اولیهٔ کل', cells: both(r, (s) => pct(s.roiPct)) },
+        { label: 'بازده پوزیشن Short', hint: 'نسبت به وثیقهٔ فیوچرز', cells: both(r, (s) => pct(s.shortRoePct)) }
+      ]
+    },
+    {
+      title: 'مقایسه با بدون هج (همان سرمایه)',
+      rows: [
+        { label: 'ارزش نهایی بدون هج', hint: 'اسپات + وثیقه به‌صورت نقد آزاد + وجه نقد', cells: both(r, (s) => money(s.unhedgedEnd)) },
+        { label: 'اختلاف دلاری (اثر خالص هج)', hint: 'پس از همهٔ هزینه‌ها', cells: both(r, (s) => pnl(s.hedgeEffectNet)), emphasis: true },
+        { label: 'اختلاف بازده', hint: 'واحد درصد؛ مبنای هر دو سرمایهٔ اولیهٔ کل', cells: both(r, (s) => pct(s.roiDiffPp)) },
+        { label: 'اثر هج پیش از هزینه', hint: 'همان سود/زیان ناخالص Short', cells: both(r, (s) => pnl(s.hedgeEffectGross)) }
+      ]
+    }
+  ];
   return (
-    <Surface as="section" aria-labelledby={id} className="space-y-3 p-4 md:p-5">
-      <div>
-        <h3 id={id} className="text-sm font-bold text-ink">
-          {title}
-        </h3>
-        {note && <p className="mt-0.5 text-2xs leading-5 text-subtle">{note}</p>}
-      </div>
+    <Step n={4} id="hedge-scenarios" title="جزئیات هر سناریو" sub="هر عدد فقط یک بار حساب شده؛ ردیف‌های پررنگ نتیجهٔ نهایی‌اند.">
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full table-fixed border-separate border-spacing-0 text-xs sm:text-sm">
-          <caption className="sr-only">{title}</caption>
+          <caption className="sr-only">جزئیات سناریوهای رشد و ریزش</caption>
           <thead>
             <tr>
-              <th scope="col" className="w-[42%] pb-2 text-start text-2xs font-semibold text-subtle" />
+              <th scope="col" className="w-[44%] pb-2 text-start text-2xs font-semibold text-subtle" />
               {[r.drop, r.rise].map((s) => (
                 <th key={s.movePct} scope="col" className="pb-2 text-end text-xs font-bold text-ink">
                   <ScenarioTitle s={s} />
@@ -769,79 +959,31 @@ function ScenarioTable({ id, title, note, r, rows }: { id: string; title: string
               ))}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i}>
-                <th scope="row" className={cn('border-t border-divider py-2 pe-2 text-start align-top font-normal', row.emphasis ? 'font-bold text-ink' : 'text-muted')}>
-                  {row.label}
-                  {row.hint && <span className="block text-2xs leading-5 text-subtle">{row.hint}</span>}
+          {groups.map((g) => (
+            <tbody key={g.title}>
+              <tr>
+                <th scope="colgroup" colSpan={3} className="pb-1 pt-4 text-start text-2xs font-bold text-subtle">
+                  {g.title}
                 </th>
-                {row.cells.map((c, ci) => (
-                  <td key={ci} className={cn('border-t border-divider py-2 text-end align-top [overflow-wrap:anywhere]', row.emphasis ? 'font-bold text-ink' : 'font-semibold text-ink')}>
-                    {c}
-                  </td>
-                ))}
               </tr>
-            ))}
-          </tbody>
+              {g.rows.map((row, i) => (
+                <tr key={i} className={row.emphasis ? 'bg-surface-2/60' : undefined}>
+                  <th scope="row" className={cn('border-t border-divider py-2 pe-2 ps-1 text-start align-top font-normal', row.emphasis ? 'font-bold text-ink' : 'text-muted')}>
+                    {row.label}
+                    {row.hint && <span className="block text-2xs font-normal leading-5 text-subtle">{row.hint}</span>}
+                  </th>
+                  {row.cells.map((c, ci) => (
+                    <td key={ci} className={cn('border-t border-divider py-2 pe-1 text-end align-top [overflow-wrap:anywhere]', row.emphasis ? 'font-bold text-ink' : 'font-semibold text-ink')}>
+                      {c}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
-    </Surface>
-  );
-}
-
-const both = (r: HedgeResult, f: (s: HedgeScenario) => ReactNode): [ReactNode, ReactNode] => [f(r.drop), f(r.rise)];
-
-function Scenarios({ r }: { r: HedgeResult }) {
-  const rows: Row[] = [
-    { label: 'تغییر قیمت', cells: both(r, (s) => <PercentValue value={s.movePct} digits={1} />) },
-    { label: 'ارزش نهایی اسپات', cells: both(r, (s) => money(s.spotEnd)) },
-    { label: 'سود/زیان ناخالص Short', hint: '−ارزش اسمی × تغییر قیمت', cells: both(r, (s) => pnl(s.shortGross)) },
-    { label: 'کارمزد ورود و خروج', cells: both(r, (s) => cost(s.fees)) },
-    { label: 'فاندینگ', hint: 'مثبت = دریافتی', cells: both(r, (s) => pnl(s.funding)) },
-    { label: 'اسلیپیج', cells: both(r, (s) => cost(s.slippage)) },
-    { label: 'سایر هزینه‌ها', cells: both(r, (s) => cost(s.otherCosts)) },
-    {
-      label: 'موجودی نهایی حساب فیوچرز',
-      hint: 'وثیقه + سود/زیان Short + فاندینگ − هزینه‌ها',
-      cells: both(r, (s) => (
-        <>
-          {money(s.futuresEnd)}
-          {s.liquidated && <span className="block text-2xs font-semibold text-negative">لیکویید</span>}
-        </>
-      ))
-    },
-    { label: 'وجه نقد مستقل', cells: both(r, (s) => money(s.cashEnd)) },
-    { label: 'سرمایهٔ نهایی کل', cells: both(r, (s) => money(s.totalEnd)), emphasis: true },
-    { label: 'سود/زیان خالص کل', hint: 'سرمایهٔ نهایی − سرمایهٔ اولیه', cells: both(r, (s) => pnl(s.net)), emphasis: true },
-    { label: 'بازده کل سرمایه', hint: 'نسبت به سرمایهٔ اولیهٔ کل', cells: both(r, (s) => pct(s.roiPct)) },
-    { label: 'بازده پوزیشن Short', hint: 'نسبت به وثیقهٔ فیوچرز', cells: both(r, (s) => pct(s.shortRoePct)) }
-  ];
-  return <ScenarioTable id="hedge-scenarios" title="سناریوهای رشد و ریزش (با هج)" r={r} rows={rows} />;
-}
-
-function Comparison({ r }: { r: HedgeResult }) {
-  const rows: Row[] = [
-    { label: 'سرمایهٔ اولیه (هر دو حالت)', cells: both(r, () => money(r.totalStart)) },
-    { label: 'ارزش نهایی با هج', cells: both(r, (s) => money(s.totalEnd)) },
-    { label: 'ارزش نهایی بدون هج', hint: 'اسپات + وثیقه به‌صورت نقد آزاد + وجه نقد', cells: both(r, (s) => money(s.unhedgedEnd)) },
-    { label: 'اختلاف دلاری (اثر مالی خالص هج)', hint: 'پس از همهٔ هزینه‌ها', cells: both(r, (s) => pnl(s.hedgeEffectNet)), emphasis: true },
-    {
-      label: 'اختلاف بازده',
-      hint: 'واحد درصد؛ مبنای هر دو: سرمایهٔ اولیهٔ کل',
-      cells: both(r, (s) => pct(s.roiDiffPp))
-    },
-    { label: 'اثر هج پیش از هزینه', hint: 'همان سود/زیان ناخالص Short', cells: both(r, (s) => pnl(s.hedgeEffectGross)) },
-    { label: 'بازده بدون هج', cells: both(r, (s) => pct(s.unhedgedRoiPct)) }
-  ];
-  return (
-    <ScenarioTable
-      id="hedge-compare"
-      title="مقایسه با حالت بدون هج"
-      note="با سرمایهٔ اولیهٔ یکسان: در حالت بدون هج همان مبلغ وثیقه به‌صورت نقد آزاد و بدون هزینه نگه داشته می‌شود."
-      r={r}
-      rows={rows}
-    />
+    </Step>
   );
 }
 
@@ -849,10 +991,7 @@ function Comparison({ r }: { r: HedgeResult }) {
 
 function Details() {
   return (
-    <Surface as="section" aria-labelledby="hedge-details" className="space-y-2 p-4 md:p-5">
-      <h3 id="hedge-details" className="text-sm font-bold text-ink">
-        جزئیات محاسبات
-      </h3>
+    <Step n={5} id="hedge-details" title="فرمول‌ها، اصطلاحات و یک مثال">
       <Disclosure summary="فرمول‌ها و فرض‌ها">
         <ul className="list-disc space-y-1.5 ps-4 text-xs leading-6 text-muted">
           <li>ارزش نهایی اسپات = ارزش اسپات × (۱ + تغییر قیمت).</li>
@@ -900,6 +1039,6 @@ function Details() {
           </div>
         </div>
       </Disclosure>
-    </Surface>
+    </Step>
   );
 }

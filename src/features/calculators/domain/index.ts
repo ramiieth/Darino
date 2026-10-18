@@ -11,3 +11,4 @@ export * from './hedge';
 export * from './deltaLedger';
 export * from './deltaNeutral';
 export * from './fundingArb';
+export * from './deltaExecution';
