@@ -6,12 +6,15 @@
  * فاندینگ دوره           = ارزش × اسپرد پیش‌بینی × ساعت
  * کارمزد                 = ارزش × ۲ × (کارمزد Long + کارمزد Short)      باز و بسته‌کردن
  * اسلیپیج                = ارزش × ۲ × (اسلیپیج Long + اسلیپیج Short)    خروج هم‌اندازهٔ ورود فرض می‌شود
- * سود خالص               = فاندینگ − کارمزد − اسلیپیج − هزینهٔ انتقال
+ * سود خالص               = فاندینگ − کارمزد − اسلیپیج − هزینهٔ انتقال      (deltaLedger؛ سود قیمت = ۰ با فرض اختلاف قیمت ثابت)
+ * سرمایهٔ نهایی           = سرمایهٔ هر دو طرف + سود خالص
+ * سربه‌سر اسپرد            = همهٔ هزینه‌ها ÷ (ارزش × ساعت) → سالانه
  *
  * «اسپرد پیش‌بینی» عمداً میانگین نرخ‌های تسویه‌شدهٔ ۷ روز است، نه نرخ لحظه‌ای؛
  * نرخ لحظه‌ای فقط وقتی جایگزین می‌شود که تاریخچهٔ کافی نباشد (و برچسب می‌خورد).
  */
 import { liquidationMovePct } from './deltaNeutral';
+import { deltaLedger } from './deltaLedger';
 
 const HOUR_MS = 3_600_000;
 const HOURS_PER_YEAR = 8760;
@@ -134,18 +137,28 @@ export interface RealNetInput {
 }
 
 export interface RealNetResult {
+  /** ارزش اسمی هر طرف = سرمایهٔ هر طرف × اهرم (در معرض بازار، نه پول پرداختی) */
   notional: number;
+  /** سرمایهٔ هر دو طرف = مارجین هر دو صرافی = سرمایهٔ مبنا */
   capital: number;
   funding: number;
   fees: number;
   slippage: number | null;
   transfer: number;
+  /** کارمزد + اسلیپیج + انتقال؛ null وقتی اسلیپیج معلوم نیست */
+  costs: number | null;
   /** null وقتی اسلیپیج معلوم نیست — عدد ناقص نمایش داده نمی‌شود */
   net: number | null;
+  /** سرمایه + سود خالص پس از بستن هر دو طرف و برگشت پول */
+  finalEquity: number | null;
   returnPct: number | null;
   aprOnCapital: number | null;
   /** روز لازم تا فاندینگ همهٔ هزینه‌ها را جبران کند؛ null = هرگز */
   breakEvenDays: number | null;
+  /** حداقل اختلاف فاندینگ سالانه (٪) که هزینه‌های همین مدت را جبران کند؛ null = نامعلوم */
+  breakEvenSpreadApr: number | null;
+  /** هزینهٔ هر ۰٫۰۱٪ کارمزد یا اسلیپیج اضافه در ۴ معامله (باز و بسته دو طرف) */
+  costPerBp: number;
   /** نزدیک‌ترین حرکت قیمت تا لیکویید (٪) */
   liquidationPct: number | null;
 }
@@ -163,9 +176,12 @@ export function realDeltaNet(i: RealNetInput): RealNetResult {
   const fees = notional * 2 * (pos(i.longFeePct) + pos(i.shortFeePct)) / 100;
   const slippage = i.longSlipPct === null || i.shortSlipPct === null ? null : (notional * 2 * (pos(i.longSlipPct) + pos(i.shortSlipPct))) / 100;
   const transfer = pos(i.transferCostUsd);
-  const net = slippage === null ? null : funding - fees - slippage - transfer;
+  // قیمت خنثی فرض می‌شود (ارزش برابر، اختلاف قیمت ثابت) → سود قیمت صفر
+  const ledger = slippage === null ? null : deltaLedger({ baseCapital: capital, grossTrading: 0, funding, fees, slippage, otherCosts: transfer });
+  const net = ledger?.net ?? null;
   const costs = fees + (slippage ?? 0) + transfer;
   const fundingPerDay = notional * spread * 24;
+  const exposureHours = notional * days * 24;
   const liqs = [liquidationMovePct('long', lev, i.longMmf), liquidationMovePct('short', lev, i.shortMmf)].filter((v): v is number => v !== null);
   return {
     notional,
@@ -174,10 +190,14 @@ export function realDeltaNet(i: RealNetInput): RealNetResult {
     fees,
     slippage,
     transfer,
+    costs: ledger?.totalCosts ?? null,
     net,
+    finalEquity: ledger?.finalEquity ?? null,
     returnPct: net !== null && capital > 0 ? (net / capital) * 100 : null,
     aprOnCapital: net !== null && capital > 0 && days > 0 ? (net / capital) * (365 / days) * 100 : null,
     breakEvenDays: fundingPerDay > 0 ? costs / fundingPerDay : costs === 0 ? 0 : null,
+    breakEvenSpreadApr: ledger && exposureHours > 0 ? hourlyToApr(ledger.totalCosts / exposureHours) : null,
+    costPerBp: notional * 4 * 0.0001,
     liquidationPct: liqs.length ? Math.min(...liqs) : null
   };
 }

@@ -28,9 +28,14 @@ export interface ArbEval extends RealNetResult {
   maxLeverage: number | null;
   /** اهرم انتخابی از سقف یکی از دو صرافی بیشتر است */
   overLeverage: boolean;
+  /** کارمزد از API نیامد و مقدار محافظه‌کارانه فرض شد */
+  feeAssumed: boolean;
+  /** (وسط دفتر Short ÷ وسط دفتر Long − ۱) × ۱۰۰ — فقط گزارش؛ در سود خالص نیست */
+  entryBasisPct: number | null;
 }
 
-export function evaluateArb(o: Opportunity, i: ArbInputs): ArbEval {
+/** spreadHourly = اسپرد مبنای پیش‌بینی؛ پیش‌فرض میانگین ۷ روز (یا نرخ لحظه‌ای با تاریخچهٔ ناکافی) */
+export function evaluateArb(o: Opportunity, i: ArbInputs, spreadHourly = o.projectedHourly): ArbEval {
   const notional = Math.max(0, i.capitalPerSide) * Math.max(0, i.leverage);
   const longFeePct = o.long.takerFeePct ?? FALLBACK_TAKER_PCT;
   const shortFeePct = o.short.takerFeePct ?? FALLBACK_TAKER_PCT;
@@ -44,7 +49,7 @@ export function evaluateArb(o: Opportunity, i: ArbInputs): ArbEval {
       leverage: i.leverage,
       holdDays: i.holdDays,
       transferCostUsd: i.transferCostUsd,
-      spreadHourly: o.projectedHourly,
+      spreadHourly,
       longFeePct,
       shortFeePct,
       longSlipPct,
@@ -57,8 +62,45 @@ export function evaluateArb(o: Opportunity, i: ArbInputs): ArbEval {
     longSlipPct,
     shortSlipPct,
     maxLeverage,
-    overLeverage: maxLeverage !== null && i.leverage > maxLeverage
+    overLeverage: maxLeverage !== null && i.leverage > maxLeverage,
+    feeAssumed: o.long.takerFeePct === null || o.short.takerFeePct === null,
+    entryBasisPct: o.longBook?.mid && o.shortBook?.mid ? (o.shortBook.mid / o.longBook.mid - 1) * 100 : null
   };
+}
+
+export type SpreadBasis = 'now' | 'd1' | 'd7' | 'd30';
+
+export const SPREAD_BASIS_LABELS: Record<SpreadBasis, string> = {
+  now: 'نرخ الان',
+  d1: 'میانگین ۱ روز',
+  d7: 'میانگین ۷ روز',
+  d30: 'میانگین ۳۰ روز'
+};
+
+export interface ArbScenarioRow {
+  basis: SpreadBasis;
+  /** اختلاف فاندینگ سالانهٔ همین مبنا (٪)؛ null = تاریخچه ندارد */
+  apr: number | null;
+  /** سود خالص به ازای هر مدت holds؛ null = مبنا یا اسلیپیج نامعلوم */
+  nets: (number | null)[];
+}
+
+/** سود خالص اگر اختلاف فاندینگ مثل الان / میانگین ۱، ۷ یا ۳۰ روز گذشته بماند — همه از دادهٔ واقعی همین جفت */
+export function arbScenarios(o: Opportunity, i: ArbInputs, holds: readonly number[] = [1, 7, 30]): ArbScenarioRow[] {
+  const aprs: Record<SpreadBasis, number | null> = {
+    now: o.currentApr,
+    d1: o.stats?.d1.avgApr ?? null,
+    d7: o.stats?.d7.avgApr ?? null,
+    d30: o.stats?.d30.avgApr ?? null
+  };
+  return (Object.keys(aprs) as SpreadBasis[]).map((basis) => {
+    const apr = aprs[basis];
+    return {
+      basis,
+      apr,
+      nets: holds.map((holdDays) => (apr === null ? null : evaluateArb(o, { ...i, holdDays }, apr / 8760 / 100).net))
+    };
+  });
 }
 
 export const venueName = (v: DeltaVenue) => DELTA_VENUE_LABELS[v];
