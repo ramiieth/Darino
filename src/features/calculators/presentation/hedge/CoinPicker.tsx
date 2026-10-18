@@ -4,11 +4,14 @@
  */
 import { useMemo, useState } from 'react';
 import { SearchField } from '@/shared/components/ui/Input';
+import { AssetLogo } from '@/shared/components/ui/AssetLogo';
 import { cn } from '@/shared/lib/cn';
 import { toEnDigits } from '@/shared/utils/formatters';
 import type { Coin } from '@/features/calculators/domain';
 
 export function CoinLogo({ coin, size }: { coin: Coin; size: number }) {
+  // دارایی بیرون از فهرست محلی (مثلاً سهام توکنی): لوگوی عمومی اپ
+  if (!coin.logo) return <AssetLogo symbol={coin.symbol} kind={coin.kind ?? 'crypto'} size={size} />;
   return (
     <img
       src={coin.logo}

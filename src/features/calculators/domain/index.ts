@@ -12,3 +12,4 @@ export * from './deltaLedger';
 export * from './deltaNeutral';
 export * from './fundingArb';
 export * from './deltaExecution';
+export * from './planner';

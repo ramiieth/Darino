@@ -25,7 +25,8 @@
 import { toEnDigits } from '@/shared/utils/formatters';
 import { D, round12, type Decimal } from './money';
 
-export type Coin = { symbol: string; name: string; color: string; logo: string };
+/** logo خالی = لوگوی عمومی اپ (AssetLogo)؛ kind برای دارایی‌های غیر رمزارز (سهام توکنی و …) */
+export type Coin = { symbol: string; name: string; color: string; logo: string; kind?: 'crypto' | 'tradfi' };
 
 export type HedgeInput = {
   /** ارزش فعلی دارایی اسپات (دلار) */
