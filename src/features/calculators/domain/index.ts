@@ -8,5 +8,6 @@ export * from './compare';
 export * from './schedule';
 export * from './perp';
 export * from './hedge';
+export * from './deltaLedger';
 export * from './deltaNeutral';
 export * from './fundingArb';
