@@ -5,7 +5,7 @@
  * فقط تحلیل؛ هیچ سفارشی ثبت نمی‌شود و به حساب کاربر وصل نیست. محاسبات در domain (calcDeltaNeutral, deltaSensitivity, fundingSpreads).
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Bot } from 'lucide-react';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Surface } from '@/shared/components/ui/GlassCard';
@@ -36,16 +36,11 @@ import { cn } from '@/shared/lib/cn';
 import { FALLBACK_MMF, FALLBACK_TAKER_PCT } from './arbEval';
 import { CapitalFlow, SourceTag, type FlowLine } from './CapitalFlow';
 import { ScenarioTable } from './ScenarioTable';
+import { DELTA_PAIRS, pairVenues, type DeltaPair } from './pairs';
 
-type Pair = 'arcus-ondo' | 'arcus-lighter' | 'ondo-lighter';
+type Pair = DeltaPair;
 type HoldUnit = 'hour' | 'day';
 type OrderType = 'maker' | 'taker';
-
-const PAIRS: { value: Pair; label: string }[] = [
-  { value: 'arcus-ondo', label: 'آرکوس ↔ اوندو' },
-  { value: 'arcus-lighter', label: 'آرکوس ↔ لایتر' },
-  { value: 'ondo-lighter', label: 'اوندو ↔ لایتر' }
-];
 
 /** بازار با حجم ۲۴ساعته کمتر از این مقدار «کم‌نقد» علامت می‌خورد */
 const LOW_LIQUIDITY_USD = 5_000_000;
@@ -82,7 +77,16 @@ function InputGroup({ title, children }: { title: string; children: ReactNode })
   );
 }
 
-export function DeltaNeutralCalculator() {
+export interface OpenExecutionRequest {
+  pair: Pair;
+  base: string | null;
+  flipped: boolean;
+  notionalPerSide: number;
+  leverage: number;
+  holdHours: number;
+}
+
+export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: (r: OpenExecutionRequest) => void }) {
   const books = useDeltaBooks();
   const [pair, setPair] = useState<Pair>('arcus-ondo');
   const [base, setBase] = useState<string | null>(null);
@@ -98,7 +102,7 @@ export function DeltaNeutralCalculator() {
   const [move, setMove] = useState('0');
   const [exitBasis, setExitBasis] = useState<ExitBasis>('keep');
 
-  const [va, vb] = pair.split('-') as [DeltaVenue, DeltaVenue];
+  const [va, vb] = pairVenues(pair);
   const status = [books[va].status, books[vb].status];
   const spreads = useMemo(() => fundingSpreads(books[va].quotes, books[vb].quotes), [books, va, vb]);
   const selected = spreads.find((s) => s.base === base) ?? spreads[0] ?? null;
@@ -171,21 +175,22 @@ export function DeltaNeutralCalculator() {
   const inputs = (
     <>
       <InputGroup title="بازار و جهت">
-        <div>
-          <p className="mb-1.5 text-xs font-semibold text-muted">دو صرافی</p>
-          <SegmentedControl<Pair>
-            label="جفت صرافی"
-            fill
-            size="sm"
+        <Field label="دو صرافی">
+          <Select
             value={pair}
-            onChange={(p) => {
-              setPair(p);
+            onChange={(e) => {
+              setPair(e.target.value as Pair);
               setBase(null);
               setFlipped(false);
             }}
-            options={PAIRS}
-          />
-        </div>
+          >
+            {DELTA_PAIRS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
         <Field label="بازار (مشترک در هر دو صرافی)">
           <Select value={selected?.base ?? ''} onChange={(e) => pickMarket(e.target.value)} disabled={!spreads.length}>
@@ -370,6 +375,23 @@ export function DeltaNeutralCalculator() {
           </ResultHero>
 
           <Warnings result={result} holdHours={holdHours} feeAssumed={longFee.assumed || shortFee.assumed} mmfAssumed={longQ.maintenanceMarginFraction === null || shortQ.maintenanceMarginFraction === null} />
+
+          {onOpenExecution && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-field bg-surface-2/70 px-3.5 py-2.5">
+              <p className="min-w-0 text-xs leading-6 text-muted">این عدد فرض می‌کند دو طرف یک‌باره باز می‌شوند. اجرای تدریجی ربات Tread.fi را کنارش ببینید.</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 text-accent"
+                icon={<Bot />}
+                onClick={() =>
+                  onOpenExecution({ pair, base: selected.base, flipped, notionalPerSide: n.notional, leverage: n.leverage, holdHours })
+                }
+              >
+                مقایسه با اجرای ربات
+              </Button>
+            </div>
+          )}
 
           <CapitalFlow
             base={result.ledger.baseCapital}

@@ -27,16 +27,18 @@ const market = (o: Partial<PerpMarket>): PerpMarket => ({
 });
 
 describe('حساب‌های قابل اتصال', () => {
-  it('فقط لایتر mainnet و آرکوس mainnet، بدون بایگانی‌شده‌ها', () => {
+  it('لایتر mainnet، لایتر رابین‌هود و آرکوس mainnet؛ بدون بایگانی‌شده‌ها و testnet', () => {
     const list = linkedHedgeAccounts([
       holding({ id: 'l', platformId: 'lighter-mainnet', address: '0xabc' }),
       holding({ id: 'r', platformId: 'lighter', address: '0xabc' }),
+      holding({ id: 'rh', platformId: 'lighter-robinhood', address: '0xabc' }),
       holding({ id: 'a', kind: 'arcus', arcus: { env: 'mainnet', address: '0xdef', accountIndex: 0 } }),
       holding({ id: 't', kind: 'arcus', arcus: { env: 'testnet', address: '0xdef', accountIndex: 0 } }),
       holding({ id: 'x', platformId: 'lighter-mainnet', address: '0x1', archivedAt: 5 })
     ]);
     expect(list.map((a) => [a.id, a.venue])).toEqual([
       ['l', 'lighter'],
+      ['rh', 'lighterRh'],
       ['a', 'arcus']
     ]);
   });
@@ -80,6 +82,11 @@ describe('لایتر', () => {
     expect(f.fundingPct8h).toBeCloseTo(0.01, 12);
     expect(f.spotUsd).toBeCloseTo(10_000, 9);
     expect(f.liquidationRisePct).toBeCloseTo(90, 9);
+  });
+
+  it('حساب لایتر رابین‌هود برچسب صرافی خودش را می‌گیرد', () => {
+    expect(lighterSnapshot(acc, () => 100_000, 'lighterRh').venue).toBe('lighterRh');
+    expect(lighterSnapshot(acc, () => 100_000).venue).toBe('lighter');
   });
 
   it('دادهٔ ناموجود صفر فرض نمی‌شود', () => {

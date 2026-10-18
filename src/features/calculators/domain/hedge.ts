@@ -178,11 +178,39 @@ function scenario(i: HedgeInput, S: number, H: number, Dc: number | null, C: num
   };
 }
 
+/** ورودی پاک‌شده: منفی/NaN = ۰، وثیقهٔ نامعلوم = null */
+function holdings(input: HedgeInput) {
+  return {
+    S: nonNeg(input.spot),
+    H: nonNeg(input.shortNotional),
+    Dc: input.futuresCollateral === null || !Number.isFinite(input.futuresCollateral) ? null : nonNeg(input.futuresCollateral),
+    C: nonNeg(input.cash)
+  };
+}
+
+export interface PayoffPoint {
+  movePct: number;
+  /** ارزش نهایی کل با هج؛ null = وثیقه نامشخص */
+  hedged: number | null;
+  /** ارزش نهایی کل بدون هج با همان سرمایه؛ null = وثیقه نامشخص */
+  unhedged: number | null;
+  liquidated: boolean;
+}
+
+/** منحنی ارزش پرتفوی با و بدون هج — همان مدل سناریو در چند تغییر قیمت (ریزش بیش از ۱۰۰٪ کنار گذاشته می‌شود) */
+export function hedgePayoff(input: HedgeInput, moves: readonly number[]): PayoffPoint[] {
+  const { S, H, Dc, C } = holdings(input);
+  return [...new Set(moves)]
+    .filter((m) => Number.isFinite(m) && m >= -100)
+    .sort((a, b) => a - b)
+    .map((movePct) => {
+      const s = scenario(input, S, H, Dc, C, movePct);
+      return { movePct, hedged: s.totalEnd, unhedged: s.unhedgedEnd, liquidated: s.liquidated };
+    });
+}
+
 export function calcHedge(input: HedgeInput): HedgeResult {
-  const S = nonNeg(input.spot);
-  const H = nonNeg(input.shortNotional);
-  const Dc = input.futuresCollateral === null || !Number.isFinite(input.futuresCollateral) ? null : nonNeg(input.futuresCollateral);
-  const C = nonNeg(input.cash);
+  const { S, H, Dc, C } = holdings(input);
   // ریزش حداکثر ۱۰۰٪ (قیمت منفی نمی‌شود)؛ رشد سقف ندارد
   const drop = Math.min(nonNeg(input.dropPct), 100);
   const rise = nonNeg(input.risePct);

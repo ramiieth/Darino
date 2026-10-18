@@ -1,9 +1,9 @@
 /**
- * Investment calculators — ten tools, all math in domain; UI presents only.
+ * Investment calculators — eleven tools, all math in domain; UI presents only.
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { BadgeDollarSign, Radar, Scale, ShieldHalf } from 'lucide-react';
+import { BadgeDollarSign, Bot, Radar, Scale, ShieldHalf } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { cn } from '@/shared/lib/cn';
@@ -17,10 +17,12 @@ import { HedgeCalculator } from './hedge/HedgeCalculator';
 import { DeltaNeutralCalculator } from './delta/DeltaNeutralCalculator';
 import { DeltaProfitCalculator } from './delta/DeltaProfitCalculator';
 import { FundingScanner } from './delta/FundingScanner';
+import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
+import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'delta' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
-const DELTA_TABS: CalcTab[] = ['delta', 'arb', 'scanner'];
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'delta' | 'execution' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
+const DELTA_TABS: CalcTab[] = ['delta', 'execution', 'arb', 'scanner'];
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
@@ -35,8 +37,14 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   {
     value: 'delta',
     label: 'دلتا نوترال',
-    description: 'Long و Short هم‌اندازه در دو صرافی (آرکوس، اوندو پرپس، لایتر) — مسیر سرمایه، سود خالص تخمینی در سناریوی خروج، کارمزد، اسلیپیج و فاصله تا لیکویید',
+    description: 'Long و Short هم‌اندازه در دو صرافی (آرکوس، اوندو پرپس، لایتر، لایتر رابین‌هود) — مسیر سرمایه، سود خالص تخمینی در سناریوی خروج، کارمزد، اسلیپیج و فاصله تا لیکویید',
     icon: <Scale aria-hidden />
+  },
+  {
+    value: 'execution',
+    label: 'اجرا و پایش دلتا',
+    description: 'پیش از اجرا: «محاسبهٔ ساده» در برابر اجرای ربات Tread.fi (پر شدن تدریجی، عدم توازن، حد ضرر) · در حال اجرا: پوزیشن‌های واقعی حساب‌های لایتر، لایتر رابین‌هود و آرکوس',
+    icon: <Bot aria-hidden />
   },
   {
     value: 'arb',
@@ -64,6 +72,12 @@ export function CalculatorsPage() {
   const [opened, setOpened] = useState<Partial<Record<CalcTab, true>>>({});
   if (DELTA_TABS.includes(tab) && !opened[tab]) setOpened((o) => ({ ...o, [tab]: true }));
   const venuesOpened = DELTA_TABS.some((t) => opened[t]);
+  // «مقایسه با اجرای ربات» در دلتا نوترال: همان انتخاب به تب اجرا می‌رود
+  const [handoff, setHandoff] = useState<ExecutionHandoff | null>(null);
+  const openExecution = (h: Omit<ExecutionHandoff, 'nonce'>) => {
+    setHandoff({ ...h, nonce: Date.now() });
+    setTab('execution');
+  };
   const current = TABS.find((t) => t.value === tab);
   const panel = (id: CalcTab) => ({
     className: cn(tab !== id && 'hidden'),
@@ -96,7 +110,8 @@ export function CalculatorsPage() {
         </div>
         {venuesOpened && (
           <DeltaVenuesProvider>
-            <div {...panel('delta')}>{opened.delta && <DeltaNeutralCalculator />}</div>
+            <div {...panel('delta')}>{opened.delta && <DeltaNeutralCalculator onOpenExecution={openExecution} />}</div>
+            <div {...panel('execution')}>{opened.execution && <DeltaExecutionTab handoff={handoff} />}</div>
             <div {...panel('arb')}>{opened.arb && <DeltaProfitCalculator onOpenScanner={() => setTab('scanner')} />}</div>
             <div {...panel('scanner')}>{opened.scanner && <FundingScanner />}</div>
           </DeltaVenuesProvider>

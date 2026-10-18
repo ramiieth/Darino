@@ -1,7 +1,9 @@
 /**
- * بازارهای دلتا نوترال — آرکوس، اوندو پرپس و لایتر (فقط دادهٔ عمومی بازار؛ بدون حساب/کلید)
+ * بازارهای دلتا نوترال — آرکوس، اوندو پرپس، لایتر (mainnet) و لایتر رابین‌هود (فقط دادهٔ عمومی بازار؛ بدون حساب/کلید)
  *
  *  Arcus · Lighter   usePerpMarkets (مستقیم از مرورگر، CORS باز)
+ *  Lighter رابین‌هود  useLighterRobinhoodMarkets — api.rh.lighter.xyz، همان ساختار mainnet
+ *                    (فقط دلتا نوترال و اجرا؛ اسکنر و سود واقعی دلتا جفت‌های ثابت خود را دارند)
  *  Ondo  تنظیمات     /api/integrations?op=ondo-perps-public  (کارمزد، مارجین، قیمت مارک — REST اوندو CORS ندارد)
  *  Ondo  فاندینگ     wss://api.ondoperps.xyz/ws  کانال عمومی fundingRatesPerps (WebSocket محدودیت CORS ندارد)
  *
@@ -11,14 +13,15 @@ import { createContext, createElement, useContext, useEffect, useMemo, useState,
 import { useQuery } from '@tanstack/react-query';
 import { fetchJson } from '@/repositories/remoteClient';
 import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
-import { usePerpMarkets, type PerpCategory, type PerpMarket } from './perpMarkets';
+import { useLighterRobinhoodMarkets, usePerpMarkets, type PerpCategory, type PerpMarket } from './perpMarkets';
 
-export type DeltaVenue = 'arcus' | 'ondo' | 'lighter';
+export type DeltaVenue = 'arcus' | 'ondo' | 'lighter' | 'lighterRh';
 
 export const DELTA_VENUE_LABELS: Record<DeltaVenue, string> = {
   arcus: 'آرکوس',
   ondo: 'اوندو پرپس',
-  lighter: 'لایتر'
+  lighter: 'لایتر',
+  lighterRh: 'لایتر رابین‌هود'
 };
 
 export interface VenueQuote {
@@ -224,10 +227,11 @@ function useOndoMarkets(enabled: boolean) {
 const statusOf = (q: { isPending: boolean; isError: boolean; data?: unknown }): VenueStatus =>
   q.data ? 'ready' : q.isError ? 'error' : 'loading';
 
-/** هر سه صرافی؛ برای Ondo وضعیت «آماده» یعنی هم تنظیمات و هم فاندینگ زنده رسیده باشد */
+/** همهٔ صرافی‌ها؛ برای Ondo وضعیت «آماده» یعنی هم تنظیمات و هم فاندینگ زنده رسیده باشد */
 export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
   const arcus = usePerpMarkets('arcus');
   const lighter = usePerpMarkets('lighter');
+  const lighterRh = useLighterRobinhoodMarkets();
   const ondoMarkets = useOndoMarkets(true);
   const ondoFunding = useOndoFunding(true);
 
@@ -237,9 +241,25 @@ export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
     return {
       arcus: { status: statusOf(arcus), quotes: (arcus.data ?? []).map(fromPerpMarket) },
       lighter: { status: statusOf(lighter), quotes: (lighter.data ?? []).map(fromPerpMarket) },
+      // همان نرمال‌سازی لایتر، با برچسب صرافی رابین‌هود
+      lighterRh: { status: statusOf(lighterRh), quotes: (lighterRh.data ?? []).map((m) => ({ ...fromPerpMarket(m), venue: 'lighterRh' as const })) },
       ondo: { status: ondoStatus, quotes: ondoMarkets.data ? normalizeOndo(ondoMarkets.data.markets, ondoFunding.rates) : [] }
     };
-  }, [arcus.data, arcus.isError, arcus.isPending, lighter.data, lighter.isError, lighter.isPending, ondoMarkets.data, ondoMarkets.isError, ondoFunding.rates, ondoFunding.status]);
+  }, [
+    arcus.data,
+    arcus.isError,
+    arcus.isPending,
+    lighter.data,
+    lighter.isError,
+    lighter.isPending,
+    lighterRh.data,
+    lighterRh.isError,
+    lighterRh.isPending,
+    ondoMarkets.data,
+    ondoMarkets.isError,
+    ondoFunding.rates,
+    ondoFunding.status
+  ]);
 }
 
 /* ---------------- اشتراک بین تب‌ها ---------------- */

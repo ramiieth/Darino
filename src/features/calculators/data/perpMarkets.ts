@@ -115,12 +115,27 @@ export function normalizeLighter(books: LighterBook[], rates: { market_id: numbe
     });
 }
 
-async function fetchLighter(): Promise<PerpMarket[]> {
+async function fetchLighterFrom(base: string): Promise<PerpMarket[]> {
   const [books, rates] = await Promise.all([
-    getJson<{ order_book_details?: LighterBook[] }>(`${LIGHTER_BASE}/api/v1/orderBookDetails`),
-    getJson<{ funding_rates?: { market_id: number; exchange: string; rate: number }[] }>(`${LIGHTER_BASE}/api/v1/funding-rates`).catch(() => ({ funding_rates: [] }))
+    getJson<{ order_book_details?: LighterBook[] }>(`${base}/api/v1/orderBookDetails`),
+    getJson<{ funding_rates?: { market_id: number; exchange: string; rate: number }[] }>(`${base}/api/v1/funding-rates`).catch(() => ({ funding_rates: [] }))
   ]);
   return normalizeLighter(books.order_book_details ?? [], rates.funding_rates ?? []);
+}
+
+const fetchLighter = () => fetchLighterFrom(LIGHTER_BASE);
+
+/** لایتر شبکهٔ رابین‌هود — همان API عمومی و همان ساختار mainnet (CORS باز)؛ فقط برای ابزارهای دلتا */
+const LIGHTER_RH_BASE = 'https://api.rh.lighter.xyz';
+
+export function useLighterRobinhoodMarkets() {
+  return useQuery({
+    queryKey: ['calc-perp-markets', 'lighter-robinhood'],
+    queryFn: () => fetchLighterFrom(LIGHTER_RH_BASE),
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+    retry: 1
+  });
 }
 
 /* ---------------- Arcus ---------------- */
