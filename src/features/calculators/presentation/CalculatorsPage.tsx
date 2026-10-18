@@ -1,9 +1,9 @@
 /**
- * Investment calculators — eleven tools, all math in domain; UI presents only.
+ * Investment calculators — twelve tools, all math in domain; UI presents only.
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { BadgeDollarSign, Bot, Radar, Scale, ShieldHalf } from 'lucide-react';
+import { BadgeDollarSign, Bot, ListChecks, Radar, Scale, ShieldHalf } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { cn } from '@/shared/lib/cn';
@@ -18,11 +18,12 @@ import { DeltaNeutralCalculator } from './delta/DeltaNeutralCalculator';
 import { DeltaProfitCalculator } from './delta/DeltaProfitCalculator';
 import { FundingScanner } from './delta/FundingScanner';
 import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
+import { PlanWizard } from './plan/PlanWizard';
 import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'delta' | 'execution' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
-const DELTA_TABS: CalcTab[] = ['delta', 'execution', 'arb', 'scanner'];
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'plan' | 'delta' | 'execution' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
+const DELTA_TABS: CalcTab[] = ['plan', 'delta', 'execution', 'arb', 'scanner'];
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
@@ -33,6 +34,12 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     label: 'ماشین‌حساب پوشش ریسک (هج)',
     description: 'اسپات + پوزیشن Short در فیوچرز — سرمایهٔ اولیه و نهایی، سود یا زیان خالص پس از هزینه‌ها و مقایسهٔ منصفانه با حالت بدون هج در ریزش و رشد بازار',
     icon: <ShieldHalf aria-hidden />
+  },
+  {
+    value: 'plan',
+    label: 'برنامهٔ من',
+    description: 'همراه قدم به قدم: یک رمزارز، تقسیم پول، دلتا نوترال برای پوینت بدون ریسک قیمت، خرید پله‌ای در ریزش با FIFO/LIFO/میانگین، و برنامهٔ نهایی',
+    icon: <ListChecks aria-hidden />
   },
   {
     value: 'delta',
@@ -110,6 +117,7 @@ export function CalculatorsPage() {
         </div>
         {venuesOpened && (
           <DeltaVenuesProvider>
+            <div {...panel('plan')}>{opened.plan && <PlanWizard onOpenExecution={openExecution} />}</div>
             <div {...panel('delta')}>{opened.delta && <DeltaNeutralCalculator onOpenExecution={openExecution} />}</div>
             <div {...panel('execution')}>{opened.execution && <DeltaExecutionTab handoff={handoff} />}</div>
             <div {...panel('arb')}>{opened.arb && <DeltaProfitCalculator onOpenScanner={() => setTab('scanner')} />}</div>
