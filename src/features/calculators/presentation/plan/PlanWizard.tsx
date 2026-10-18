@@ -87,7 +87,7 @@ const makerFee = (q: VenueQuote) => {
 
 /* ---------------- اجزای مشترک ---------------- */
 
-function Chips<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+export function Chips<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-semibold text-muted">{label}</p>
@@ -112,7 +112,7 @@ function Chips<T extends string | number>({ label, value, options, onChange }: {
   );
 }
 
-function StepCard({ n, title, sub, children }: { n: number; title: string; sub: ReactNode; children: ReactNode }) {
+export function StepCard({ n, title, sub, children }: { n: number; title: string; sub: ReactNode; children: ReactNode }) {
   return (
     <Surface as="section" aria-labelledby={`plan-step-${n}`} className="space-y-5 p-4 md:p-6">
       <div className="flex items-start gap-3">
@@ -131,7 +131,7 @@ function StepCard({ n, title, sub, children }: { n: number; title: string; sub: 
   );
 }
 
-function Bar({ value, max, textured }: { value: number; max: number; textured?: boolean }) {
+export function Bar({ value, max, textured }: { value: number; max: number; textured?: boolean }) {
   const w = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2" aria-hidden>
@@ -143,7 +143,7 @@ function Bar({ value, max, textured }: { value: number; max: number; textured?: 
   );
 }
 
-function Check({ ok, title, children }: { ok: boolean; title: string; children?: ReactNode }) {
+export function Check({ ok, title, children }: { ok: boolean; title: string; children?: ReactNode }) {
   return (
     <li className="flex items-start gap-2.5">
       {ok ? <CircleCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-positive" /> : <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-warn" />}

@@ -18,17 +18,19 @@ import { DeltaNeutralCalculator } from './delta/DeltaNeutralCalculator';
 import { DeltaProfitCalculator } from './delta/DeltaProfitCalculator';
 import { FundingScanner } from './delta/FundingScanner';
 import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
+import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
 import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'hedge' | 'plan' | 'delta' | 'execution' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'execution' | 'arb' | 'scanner' | 'cagr' | 'xirr' | 'compare';
 const DELTA_TABS: CalcTab[] = ['plan', 'delta', 'execution', 'arb', 'scanner'];
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
   { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
   { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر و آرکوس — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' },
+  { value: 'options', label: 'آپشن (Derive)', description: 'دستیار تحلیل آپشن روی بازارهای Derive — استراتژی، نمودار سود و زیان، سناریوها، ترکیب چند بازار و برنامهٔ خروج' },
   {
     value: 'hedge',
     label: 'ماشین‌حساب پوشش ریسک (هج)',
@@ -75,6 +77,9 @@ export function CalculatorsPage() {
   // PERP polls live market APIs — mount it only once it has been opened
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
+  // آپشن هم دادهٔ زندهٔ Derive می‌خواند — فقط بعد از باز شدن
+  const [optionsOpened, setOptionsOpened] = useState(false);
+  if (tab === 'options' && !optionsOpened) setOptionsOpened(true);
   // Delta tabs poll three venues and share one Ondo WebSocket — mount each only once it has been opened
   const [opened, setOpened] = useState<Partial<Record<CalcTab, true>>>({});
   if (DELTA_TABS.includes(tab) && !opened[tab]) setOpened((o) => ({ ...o, [tab]: true }));
@@ -112,6 +117,7 @@ export function CalculatorsPage() {
         <div {...panel('perp')}>
           {perpOpened && <PerpCalculator />}
         </div>
+        <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>
