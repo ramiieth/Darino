@@ -14,7 +14,7 @@ import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBa
 import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
-import { analyze, analysisSchema, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
+import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
@@ -54,7 +54,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
-  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
     if ((ALERT_OPS as readonly string[]).includes(op)) {
@@ -69,6 +69,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
     if(op==='wallet-events'&&req.method==='GET'){const addresses=(u.searchParams.get('addresses')??'').split(',').filter(Boolean);if(addresses.length>30||!(await Promise.all(addresses.map(validPublicAddress))).every(Boolean)){json(res,400,{error:'آدرس معتبر نیست'});return;}const budget=await zerionQuota();json(res,200,{refreshAfterMs:budget&&budget.level!=='normal'?budget.walletMs:60000,events:Object.fromEntries(await Promise.all(addresses.map(async a=>[a.startsWith('0x')?a.toLowerCase():a,await walletActivityAt(a)])))});return;}
     if(op==='bridge-proof' && req.method==='GET') {json(res,200,{proofs:await lookupBridge(u.searchParams.get('provider')??'',u.searchParams.get('hash')??'')});return;}
+    if (req.method === 'POST' && op === 'analyze-delta') {
+      const parsed = optionsAnalysisSchema.safeParse(await readBody(req));
+      if (!parsed.success) { json(res,400,{ error:'اطلاعات وضعیت دلتا نوترال کامل یا معتبر نیست' }); return; }
+      json(res,200,{ answer: await analyzeDelta(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
+    }
     if (req.method === 'POST' && op === 'analyze-plan') {
       const parsed = optionsAnalysisSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات برنامه کامل یا معتبر نیست' }); return; }

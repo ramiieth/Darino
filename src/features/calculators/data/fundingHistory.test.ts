@@ -109,3 +109,22 @@ describe('buildOpportunity — جهت از میانگین ۷ روز، نه نر�
     expect(o.projectedHourly).toBeCloseTo(0.00004, 12);
   });
 });
+
+describe('لایتر و لایتر رابین‌هود: فاندینگ جدا', () => {
+  it('تاریخچهٔ هر کدام از سرور خودش؛ هرگز مخلوط نمی‌شوند', async () => {
+    const { vi } = await import('vitest');
+    const { fetchFundingHistory } = await import('./fundingHistory');
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      urls.push(String(u));
+      const rate = String(u).includes('api.rh.lighter.xyz') ? '0.0004' : '0.0012';
+      return new Response(JSON.stringify({ code: 200, fundings: [{ timestamp: 1_792_321_200, value: '1', rate, direction: 'long' }] }), { status: 200 });
+    }));
+    const rh = await fetchFundingHistory('lighterRh', '12');
+    const main = await fetchFundingHistory('lighter', '12');
+    expect(urls[0]).toContain('api.rh.lighter.xyz');
+    expect(urls[1]).toContain('mainnet.zklighter.elliot.ai');
+    expect(rh[0].rate).not.toBe(main[0].rate);
+    vi.unstubAllGlobals();
+  });
+});

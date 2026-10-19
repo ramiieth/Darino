@@ -45,7 +45,7 @@ export function AssistantExplain({
   payload: () => Record<string, unknown>;
   summary?: PlainSummary;
   /** مسیر تحلیل سرور: آپشن یا «برنامهٔ من» */
-  op?: 'analyze-options' | 'analyze-plan';
+  op?: 'analyze-options' | 'analyze-plan' | 'analyze-delta';
 }) {
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
