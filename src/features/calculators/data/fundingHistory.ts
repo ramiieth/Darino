@@ -28,6 +28,8 @@ import {
 import type { DeltaVenue, VenueBook, VenueQuote } from './deltaMarkets';
 
 const LIGHTER_BASE = 'https://mainnet.zklighter.elliot.ai';
+/** لایتر رابین‌هود سرور و فاندینگ جدا دارد — هرگز با لایتر عادی مخلوط نشود */
+const LIGHTER_RH_BASE = 'https://api.rh.lighter.xyz';
 const HISTORY_HOURS = 30 * 24;
 const fin = (v: unknown): number | null => {
   if ((typeof v !== 'number' && typeof v !== 'string') || String(v).trim() === '') return null;
@@ -115,9 +117,8 @@ async function getJson(url: string): Promise<unknown> {
 }
 
 export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promise<RatePoint[]> {
-  // جفت‌های اسکنر (PAIRS) لایتر رابین‌هود ندارند؛ نباید به شاخهٔ اوندو برسد
-  if (venue === 'lighterRh') throw new Error('unsupported venue');
-  if (venue === 'lighter') {
+  // لایتر و لایتر رابین‌هود: همان API ولی سرور، بازار و نرخ فاندینگ جدا
+  if (venue === 'lighter' || venue === 'lighterRh') {
     if (!/^\d{1,6}$/.test(ref)) throw new Error('invalid market');
     const now = Math.floor(Date.now() / 1000);
     const q = new URLSearchParams({
@@ -127,7 +128,7 @@ export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promi
       end_timestamp: String(now),
       count_back: String(HISTORY_HOURS)
     });
-    return parseLighterFundings(await getJson(`${LIGHTER_BASE}/api/v1/fundings?${q}`));
+    return parseLighterFundings(await getJson(`${venue === 'lighterRh' ? LIGHTER_RH_BASE : LIGHTER_BASE}/api/v1/fundings?${q}`));
   }
   if (venue === 'arcus') return parseArcusFundings(await arcusGet('mainnet', '/v1/fundingRates', { market: ref, limit: HISTORY_HOURS }));
   return parseOndoFundings(await fetchJson(`/api/integrations?op=ondo-perps-history&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));

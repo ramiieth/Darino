@@ -36,6 +36,7 @@ import { cn } from '@/shared/lib/cn';
 import { FALLBACK_MMF, FALLBACK_TAKER_PCT } from './arbEval';
 import { CapitalFlow, SourceTag, type FlowLine } from './CapitalFlow';
 import { ScenarioTable } from './ScenarioTable';
+import { TodayStatusCard } from './TodayStatusCard';
 import { DELTA_PAIRS, pairVenues, type DeltaPair } from './pairs';
 
 type Pair = DeltaPair;
@@ -315,7 +316,23 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
   const failed = status.map((s, i) => (s === 'error' ? [va, vb][i] : null)).filter((v): v is DeltaVenue => v !== null);
 
   return (
-    <CalcShell inputs={inputs}>
+    <CalcShell
+      inputs={inputs}
+      top={
+        selected && shortQ && longQ && result ? (
+          <TodayStatusCard
+            base={selected.base}
+            shortQ={shortQ}
+            longQ={longQ}
+            net={result.net}
+            liquidationDistancePct={result.nearestLiquidationPct}
+            basisPct={result.basisPct}
+            lowLiquidity={lowLiquidity(selected)}
+            context={{ notionalPerSideUsd: n.notional, leverage: n.leverage, holdHours: n.hold, cycles: n.cycles, marginUsd: result.capital }}
+          />
+        ) : null
+      }
+    >
       {failed.length > 0 && (
         <Notice tone="warn" title={`دادهٔ ${failed.map((v) => DELTA_VENUE_LABELS[v]).join(' و ')} در دسترس نیست`}>
           اتصال به این صرافی برقرار نشد. کمی بعد دوباره امتحان کنید یا جفت صرافی دیگری انتخاب کنید.

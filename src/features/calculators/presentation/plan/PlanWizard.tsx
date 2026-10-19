@@ -168,7 +168,14 @@ export function Check({ ok, title, children }: { ok: boolean; title: string; chi
 
 /* ---------------- برنامه‌ریز ---------------- */
 
-export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<ExecutionHandoff, 'nonce'>) => void }) {
+export function PlanWizard({
+  onOpenExecution,
+  onOpenDecide
+}: {
+  onOpenExecution?: (h: Omit<ExecutionHandoff, 'nonce'>) => void;
+  /** رفتن به «درآمد دلتا نوترال ← تصمیم بگیر» (کارت وضعیت امروز) */
+  onOpenDecide?: () => void;
+}) {
   const books = useDeltaBooks();
   const topRef = useRef<HTMLDivElement>(null);
   const [s, setS] = useState<Saved>(() => ({ ...DEFAULTS, ...jsonGet<Partial<Saved>>(STORE_KEY, {}) }));
@@ -435,6 +442,11 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
                     <span className="block text-2xs text-muted">سرمایهٔ آن بیرون از برنامه نقد می‌ماند.</span>
                   </button>
                 </div>
+              )}
+              {onOpenDecide && (
+                <Button variant="secondary" size="sm" onClick={onOpenDecide}>
+                  پیش از اجرا: «وضعیت امروز» را در درآمد دلتا نوترال ببینید
+                </Button>
               )}
               <p className="text-2xs leading-5 text-subtle">
                 «پیشنهادی» = بیشترین سود خالص بین گزینه‌هایی که بعد از کارمزد منفی نیستند. فاندینگ لحظه‌ای است و ممکن است برعکس شود؛ ارزش پوینت تضمینی نیست و حدس زده نمی‌شود.

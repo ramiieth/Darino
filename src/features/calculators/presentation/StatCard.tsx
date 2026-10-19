@@ -13,14 +13,18 @@ import { cn } from '@/shared/lib/cn';
 export function CalcShell({
   inputs,
   children,
-  inputTitle = 'ورودی‌ها'
+  inputTitle = 'ورودی‌ها',
+  top
 }: {
   inputs: ReactNode;
   children: ReactNode;
   inputTitle?: string;
+  /** کارت تمام‌عرض بالای ورودی‌ها (مثلاً «وضعیت امروز») — روی موبایل اول دیده می‌شود */
+  top?: ReactNode;
 }) {
   return (
     <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+      {top && <div className="min-w-0 lg:col-span-12">{top}</div>}
       <section aria-label={inputTitle} className="min-w-0 lg:col-span-5">
         <Surface className="space-y-5 p-4 md:p-5 lg:sticky lg:top-8">
           <h2 className="text-sm font-bold text-ink">{inputTitle}</h2>

@@ -28,7 +28,7 @@ const quote = (venue: VenueQuote['venue'], o: Partial<VenueQuote>): VenueQuote =
 
 const ARCUS = quote('arcus', { fundingHourly: 0.0000998, markPrice: 142.5, makerFeePct: 0, maintenanceMarginFraction: 0.03 });
 const ONDO = quote('ondo', { fundingHourly: 0.0000063, markPrice: 142.2, makerFeePct: 0.01, takerFeePct: 0.025 });
-const fx = vi.hoisted(() => ({ opportunities: [] as unknown[] }));
+const fx = vi.hoisted(() => ({ opportunities: [] as unknown[], shortVenue: 'arcus' }));
 
 vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
   const actual = await orig<typeof import('@/features/calculators/data/deltaMarkets')>();
@@ -39,7 +39,14 @@ vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
   };
   return { ...actual, useDeltaBooks: () => books };
 });
-vi.mock('@/features/calculators/data/fundingHistory', () => ({ useFundingOpportunities: () => fx.opportunities }));
+// تاریخچهٔ فاندینگ پرداخت‌شده: طرف فروش ۰٫۰۰۰۰۳ در ساعت، طرف خرید ۰ → اختلاف حدود ۲۶٪ سالانه، بدون برعکس شدن
+vi.mock('@/features/calculators/data/fundingHistory', () => ({
+  useFundingOpportunities: () => fx.opportunities,
+  fetchFundingHistory: async (venue: string) => {
+    const now = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+    return Array.from({ length: 200 }, (_, i) => ({ hour: now - i * 3_600_000, rate: venue === fx.shortVenue ? 0.00003 : 0 }));
+  }
+}));
 vi.mock('@/features/calculators/data/spreadAlerts', () => ({ useReversalAlerts: () => undefined }));
 
 const { DeltaNeutralCalculator } = await import('./DeltaNeutralCalculator');
@@ -67,6 +74,13 @@ describe('دلتا نوترال — UI = domain', () => {
     short: { feePct: 0, fundingHourly: ARCUS.fundingHourly!, maintenanceMarginFraction: 0.03, markPrice: 142.5 },
     slippagePct: 0
   };
+
+  it('کارت «وضعیت امروز»: تصمیم از چک‌لیست با تاریخچهٔ فاندینگ پرداخت‌شده', async () => {
+    render(<DeltaNeutralCalculator />);
+    expect(screen.getByLabelText('وضعیت امروز')).toBeTruthy();
+    expect(await screen.findByText(/میانگین اختلاف فاندینگ ۷ روز اخیر: (۲۶|۲۶٫|26)/)).toBeTruthy();
+    expect(screen.getByText(/پوینت در این تصمیم حساب نمی‌شود/)).toBeTruthy();
+  });
 
   it('سود خالص، مارجین و سرمایهٔ نهایی همان خروجی calcDeltaNeutral است', () => {
     render(<DeltaNeutralCalculator />);
