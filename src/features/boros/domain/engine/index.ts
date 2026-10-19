@@ -33,6 +33,7 @@ import {
   meanReversionScenario,
   stressScenario,
   classifyRobustness,
+  forecastFloatingOf,
   type Robustness
 } from './scenarioModels';
 import { detectAnomaly, assessLiquidity, assessFreshness, type AnomalyInfo, type LiquidityReality, type DataFreshness } from './anomaly';
@@ -109,6 +110,11 @@ export interface MarketAnalysis {
   realizedShortPnl: number;
   unrealizedShortPnl: number;
   totalShortPnl: number;
+  /** نرخ شناور کالیبره مورد انتظار تا سررسید (مبنای Status/Edge/Rank — نه نرخ ثابت فعلی) */
+  forecastFloating: number;
+  /** Net مورد انتظار با forecastFloating — بک‌تست: سناریوی نرخ ثابت سودِ سیگنال‌های potential را حدود ۳۵ برابر بیش‌برآورد می‌کرد */
+  expectedLongNet: number;
+  expectedShortNet: number;
   /* Break-Even (Decimal یا null=N/A) */
   breakEvenLong: number | null;
   breakEvenShort: number | null;
@@ -204,6 +210,8 @@ export interface AnalyzeInput {
   slippageRate?: number | null;
   /** پیکربندی حداقل لبه اقتصادی (پیش‌فرض: ۱ دلار یا ۰.۱٪ نotional) */
   economicEdge?: EconomicEdgeConfig;
+  /** وزن انحراف تاریخی در پیش‌بینی نرخ شناور (پیش‌فرض DEFAULT_FORECAST_BETA) */
+  forecastBeta?: number;
 }
 
 /** سری APR تاریخی بازار (از OHLCV) — Decimal Rate */
@@ -366,10 +374,16 @@ export class BorosCalculationEngine {
       dataConfidence: dataQuality
     });
 
+    /* ---------- پیش‌بینی کالیبره (بک‌تست) — مبنای Edge/Status/Stage/Rank ---------- */
+    // لنگر = نرخ ضمنی بازار (markApr)، نه نرخ ورود فرضی کاربر (fixedApr)
+    const forecastFloating = forecastFloatingOf(m, m.markApr, input.forecastBeta);
+    const expectedLongNet = LongPnLCalculator.gross(size, implied, forecastFloating, days) - totalCosts;
+    const expectedShortNet = ShortPnLCalculator.gross(size, implied, forecastFloating, days) - totalCosts;
+
     /* ---------- Minimum Economic Edge (قابل تنظیم) ---------- */
     const edge = minEconomicEdge(size, input.economicEdge);
-    const edgeLong = totalLongPnl > edge;
-    const edgeShort = totalShortPnl > edge;
+    const edgeLong = expectedLongNet > edge;
+    const edgeShort = expectedShortNet > edge;
 
     /* ---------- سه مدل سناریو (Master §3-5) ---------- */
     const direction = input.direction ?? 'long';
@@ -406,6 +420,9 @@ export class BorosCalculationEngine {
     const stressLong = stressScenario({ ...stressInput, direction: 'long' });
     const stressShort = stressScenario({ ...stressInput, direction: 'short' });
     const stress = direction === 'long' ? stressLong : stressShort;
+    // Stress تصمیم (Status) حول همان پیش‌بینی کالیبره — نه نرخ فعلی؛ هم‌راستا با analyzeEntry
+    const decisionStressLong = stressScenario({ ...stressInput, currentFloating: forecastFloating, direction: 'long' });
+    const decisionStressShort = stressScenario({ ...stressInput, currentFloating: forecastFloating, direction: 'short' });
 
     /* ---------- Anomaly / Liquidity / Freshness ---------- */
     const anomaly = detectAnomaly({ m, nowSec });
@@ -437,8 +454,8 @@ export class BorosCalculationEngine {
       if (input.slippageRate == null || input.gasUsd === undefined) return 'conditional';
       return score > 0 ? 'potential' : 'not-attractive';
     };
-    const statusLong = statusOf(totalLongPnl, longScore, edgeLong, stressLong?.bear.netPnl ?? null);
-    const statusShort = statusOf(totalShortPnl, shortScore, edgeShort, stressShort?.bull.netPnl ?? null);
+    const statusLong = statusOf(expectedLongNet, longScore, edgeLong, decisionStressLong?.bear.netPnl ?? null);
+    const statusShort = statusOf(expectedShortNet, shortScore, edgeShort, decisionStressShort?.bull.netPnl ?? null);
 
     /* ---------- Stage سه‌مرحله‌ای (Part 6 + Edge) ---------- */
     const stageOf = (status: OpportunityStatus, net: number, score: number, edgeOk: boolean): OpportunityStage => {
@@ -454,13 +471,13 @@ export class BorosCalculationEngine {
       }
       return 'stage1-valid';
     };
-    const stageLong = stageOf(statusLong, totalLongPnl, longScore, edgeLong);
-    const stageShort = stageOf(statusShort, totalShortPnl, shortScore, edgeShort);
+    const stageLong = stageOf(statusLong, expectedLongNet, longScore, edgeLong);
+    const stageShort = stageOf(statusShort, expectedShortNet, shortScore, edgeShort);
 
     /* ---------- رتبه‌بندی (Part 17 — فقط برای موارد valid) ---------- */
     const rankFactorsLong: RankFactors = {
       spread: lSpread,
-      expectedNetPnl: totalLongPnl,
+      expectedNetPnl: expectedLongNet,
       riskScore,
       liquidityScore: liq,
       stabilityScore: stability,
@@ -470,7 +487,7 @@ export class BorosCalculationEngine {
     };
     const rankFactorsShort: RankFactors = {
       spread: sSpread,
-      expectedNetPnl: totalShortPnl,
+      expectedNetPnl: expectedShortNet,
       riskScore,
       liquidityScore: liq,
       stabilityScore: stability,
@@ -523,6 +540,9 @@ export class BorosCalculationEngine {
       realizedShortPnl,
       unrealizedShortPnl,
       totalShortPnl,
+      forecastFloating,
+      expectedLongNet,
+      expectedShortNet,
       breakEvenLong,
       breakEvenShort,
       bearLongPnl: scenLong ? scenLong.bear.net : null,

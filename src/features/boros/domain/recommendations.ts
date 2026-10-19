@@ -1,6 +1,7 @@
 import { FeeCalculator } from './engine/fees';
 import { MarginCalculator } from './engine/margin';
 import { analyzeEntry } from './entryAnalysis';
+import { forecastFloatingOf } from './engine/scenarioModels';
 import type { BorosMarket } from './types';
 export const MAX_PREVIEW_CHECKS=8;
 export type EntryCosts={feesUsd:number|null;gasUsd:number|null;slippageUsd:number|null};
@@ -19,7 +20,7 @@ export function entryCandidates(markets:BorosMarket[],tokenId:number,capitalUsd:
   const sizeYu=fraction*(capitalUsd-costs.feesUsd!-costs.gasUsd!-costs.slippageUsd!)/(margin+fraction*perYu);
   if(!Number.isFinite(sizeYu)||sizeYu<=0)return [];
   return (['long','short'] as const).flatMap(direction=>{
-   const result=analyzeEntry({m,direction,sizeYu,capitalUsd,entryRate:m.markApr,floatingRate:m.floatingApr,...recommendationCosts(m,sizeYu,costs,true,nowSec),nowSec});
+   const result=analyzeEntry({m,direction,sizeYu,capitalUsd,entryRate:m.markApr,floatingRate:forecastFloatingOf(m),...recommendationCosts(m,sizeYu,costs,true,nowSec),nowSec});
    return result&&(result.state==='positive'||result.state==='conditional')&&result.liquidity.available&&result.liquidity.executable?[{m,direction,sizeYu,result}]:[];
   });
  }).sort((a,b)=>(b.result.net??-Infinity)-(a.result.net??-Infinity)||a.m.maturity-b.m.maturity);

@@ -90,7 +90,7 @@ describe('pre-entry analysis', () => {
   });
   it('scans both directions, excluding stale, closed, unlisted and negative opportunities', () => {
     const costs = { feesUsd: 1, gasUsd: .2, slippageUsd: .3 };
-    const shortMarket = { ...m, marketId: 222, floatingApr: .02 };
+    const shortMarket = { ...m, marketId: 222, floatingApr: .02, fundingHistory: m.fundingHistory.map(p => ({ ...p, c: .02 })) };
     const results = scanEntries([m, shortMarket, { ...m, marketId: 223, status: 'CLOSE_ONLY' }, { ...m, marketId: 224, snapshotAt: (NOW - 3600) * 1000 }, { ...m, marketId: 225, isUiWhitelisted: false }], 300, 50, costs, NOW);
     expect(results.map(r => `${r.m.marketId}-${r.direction}`)).toEqual(expect.arrayContaining([`${m.marketId}-long`, '222-short']));
     expect(results).toHaveLength(2);

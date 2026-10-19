@@ -15,6 +15,7 @@ import { MarketIdentity } from './MarketIdentity';
 import { borosAssetName, borosVenueName } from './borosLabels';
 import type { BorosDirection, BorosMarket } from '../domain/types';
 import { RateHistory } from './RateHistory';
+import { forecastFloatingOf } from '../domain/engine/scenarioModels';
 export function SimulatorTab({ markets,initial,active=true,onMarkets }: { markets: BorosMarket[];active?:boolean;onMarkets?:()=>void;initial?:{marketId:number;direction:BorosDirection;entry?:EntrySelection;draft?:PreviewDraft} }) {
   const account=useBorosAccount();
   const preferred=markets.find(m=>account.data?.balances.some(b=>b.tokenId===m.tokenId&&b.freeMargin!==null&&b.freeMargin>0))??markets[0];
@@ -46,6 +47,6 @@ export function SimulatorTab({ markets,initial,active=true,onMarkets }: { market
     </Surface>
     <Disclosure summary="نمودار و تاریخچهٔ نرخ"><RateHistory market={market} /></Disclosure>
     </div>
-    <OrderPreviewPanel key={`${market.marketId}:${direction}:${revision}`} active={active} draft={draft} onMarkets={onMarkets} entry={entry} market={market} direction={direction} fixedRate={fixedRate} underlyingApr={market.floatingApr} collateralPriceUsd={market.collateralPriceUsd ?? 0} markets={markets} onSelectMarket={(id, side, selected) => { setEntry(selected);setMarketId(id); setDirection(side); setFixedRateInput(''); }} />
+    <OrderPreviewPanel key={`${market.marketId}:${direction}:${revision}`} active={active} draft={draft} onMarkets={onMarkets} entry={entry} market={market} direction={direction} fixedRate={fixedRate} underlyingApr={forecastFloatingOf(market)} collateralPriceUsd={market.collateralPriceUsd ?? 0} markets={markets} onSelectMarket={(id, side, selected) => { setEntry(selected);setMarketId(id); setDirection(side); setFixedRateInput(''); }} />
   </div>;
 }

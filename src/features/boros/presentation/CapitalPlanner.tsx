@@ -13,6 +13,7 @@ import type { BorosMarket } from '../domain/types';
 import { MarketIdentity } from './MarketIdentity';
 import { OrderPreviewPanel } from './OrderPreviewPanel';
 import { borosAssetName, borosVenueName } from './borosLabels';
+import { forecastFloatingOf } from '../domain/engine/scenarioModels';
 const number = (s: string) => /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(s) && Number.isFinite(Number(s)) ? Number(s) : null;
 export function CapitalPlanner({ markets }: { markets: BorosMarket[] }) {
   const [capital, setCapital] = useState('');
@@ -68,6 +69,6 @@ export function CapitalPlanner({ markets }: { markets: BorosMarket[] }) {
         </Surface>)}
       </div>
     </Disclosure>}
-    {detail && <section className="space-y-4" aria-label="سناریوی انتخاب‌شده"><div className="flex flex-wrap items-center justify-between gap-3"><MarketIdentity market={detail.m} /><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>بستن</Button></div><OrderPreviewPanel key={`${selected}:${capital}:${allocation}:${gas}:${entrance}:${impact}`} market={detail.m} direction={detail.direction} fixedRate={detail.entryRate} underlyingApr={detail.m.floatingApr} collateralPriceUsd={detail.m.collateralPriceUsd!} initial={{ sizeYu: detail.sizeYu, capitalUsd: input.capitalUsd, feesUsd: detail.fees.total + detail.entranceUsd, gasUsd: detail.gasUsd, slippageUsd: 0 }} /></section>}
+    {detail && <section className="space-y-4" aria-label="سناریوی انتخاب‌شده"><div className="flex flex-wrap items-center justify-between gap-3"><MarketIdentity market={detail.m} /><Button variant="ghost" size="sm" onClick={() => setSelected(null)}>بستن</Button></div><OrderPreviewPanel key={`${selected}:${capital}:${allocation}:${gas}:${entrance}:${impact}`} market={detail.m} direction={detail.direction} fixedRate={detail.entryRate} underlyingApr={forecastFloatingOf(detail.m)} collateralPriceUsd={detail.m.collateralPriceUsd!} initial={{ sizeYu: detail.sizeYu, capitalUsd: input.capitalUsd, feesUsd: detail.fees.total + detail.entranceUsd, gasUsd: detail.gasUsd, slippageUsd: 0 }} /></section>}
   </div>;
 }

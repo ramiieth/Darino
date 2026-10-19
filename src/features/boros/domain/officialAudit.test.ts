@@ -96,8 +96,10 @@ describe('official Boros accounting regressions', () => {
     expect(() => mapMarket({ ...borosRaw, config: {} })).toThrow('invalid boros market configuration');
   });
   it('the default direction evaluates both sides rather than skipping every market', () => {
-    const m = { ...market(), floatingApr: .12, volume24h: 100000, ohlcv: Array.from({ length: 20 }, (_, i) => ({ ts: NOW - i * 60, c: .08 })) };
-    const rows = rankUserCapitalOpportunities([m, { ...m, marketId: 999, floatingApr: .04 }], .1, 3000, { slippageRate: 0, gasUsd: 0, nowSec: NOW });
+    // تاریخچه فاندینگ دور از نرخ ثابت تا لبه کالیبره (β) از حداقل لبه بگذرد — تست ارزیابی هر دو جهت است
+    const funding = (c: number) => Array.from({ length: 30 }, (_, i) => ({ ts: NOW - (30 - i) * 86400, c }));
+    const m = { ...market(), floatingApr: .12, fundingHistory: funding(.5), volume24h: 100000, ohlcv: Array.from({ length: 20 }, (_, i) => ({ ts: NOW - i * 60, c: .08 })) };
+    const rows = rankUserCapitalOpportunities([m, { ...m, marketId: 999, floatingApr: .04, fundingHistory: funding(-.35) }], .1, 3000, { slippageRate: 0, gasUsd: 0, nowSec: NOW });
     expect(rows.map(r => r.direction).sort()).toEqual(['long', 'short']);
   });
   it('comparison reports annualized long scenario economics, not the mark rate', () => {
@@ -106,7 +108,8 @@ describe('official Boros accounting regressions', () => {
     expect(r.netApr).not.toBe(8);
   });
   it('unpriced execution costs keep positive economics conditional', () => {
-    const a = BorosCalculationEngine.analyze({ m: { ...market(), floatingApr: .12 }, size: 1000, nowSec: NOW });
+    const fundingHistory = Array.from({ length: 30 }, (_, i) => ({ ts: NOW - (30 - i) * 86400, c: .12 }));
+    const a = BorosCalculationEngine.analyze({ m: { ...market(), floatingApr: .12, fundingHistory }, size: 1000, nowSec: NOW, forecastBeta: 1 });
     expect(a.grossLongPnl).toBeGreaterThan(0);
     expect(a.statusLong).toBe('conditional');
   });

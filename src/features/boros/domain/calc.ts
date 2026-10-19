@@ -137,12 +137,12 @@ export function compareMarkets(markets: BorosMarket[], size: number, daysOverrid
     const a = BorosCalculationEngine.analyze({ m, size, nowSec: nowSec ?? Math.floor(Date.now() / 1000) });
     return {
       m,
-      expectedReturn: a.totalLongPnl, // جهت Long
+      expectedReturn: a.expectedLongNet, // جهت Long — پیش‌بینی کالیبره
       margin: a.marginRequired,
       riskScore: a.riskScore,
       risk: a.riskLevel,
       liquidityScore: a.liquidityScore,
-      netApr: size > 0 && a.daysToMaturity > 0 ? (a.totalLongPnl / size) * (365 / a.daysToMaturity) * 100 : 0,
+      netApr: size > 0 && a.daysToMaturity > 0 ? (a.expectedLongNet / size) * (365 / a.daysToMaturity) * 100 : 0,
       opportunity: a.statusLong === 'potential' || a.statusLong === 'conditional' ? a.longScore : 0
     };
   });

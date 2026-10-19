@@ -3,6 +3,7 @@ import type { BorosDirection, BorosMarket } from './types';
 import { MarginCalculator } from './engine/margin';
 import { FeeCalculator } from './engine/fees';
 import { analyzeEntry } from './entryAnalysis';
+import { forecastFloatingOf } from './engine/scenarioModels';
 import { recommendationCosts } from './recommendations';
 export type PreviewDraft={mode:'real'|'hypothetical';capitalUsd:number;sizeYu:number;costs:EntryCosts};
 /** Compare alternatives using one collateral budget and one cost policy, not equal notional. */
@@ -14,7 +15,7 @@ export function compareWithBudget(m:BorosMarket,direction:BorosDirection,capital
  const perFees=FeeCalculator.calc({m,size:1,unitPriceUsd:price,nowSec}).total;
  const sizeYu=fraction*(capitalUsd-costs.feesUsd!-costs.gasUsd!-costs.slippageUsd!)/(perMargin+fraction*perFees);
  if(!Number.isFinite(sizeYu)||sizeYu<=0)return null;
- const result=analyzeEntry({m,direction,sizeYu,capitalUsd,entryRate:m.markApr,floatingRate:m.floatingApr,...recommendationCosts(m,sizeYu,costs,true,nowSec),nowSec});
+ const result=analyzeEntry({m,direction,sizeYu,capitalUsd,entryRate:m.markApr,floatingRate:forecastFloatingOf(m),...recommendationCosts(m,sizeYu,costs,true,nowSec),nowSec});
  return result?{m,direction,sizeYu,result}:null;
 }
 export type MarketWarning={tone:'warn'|'stale';text:string};

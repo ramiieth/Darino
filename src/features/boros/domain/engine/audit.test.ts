@@ -262,15 +262,21 @@ describe('۵) Fee Model — Source هر هزینه', () => {
 
 /* ================= ۶) Opportunity سه مرحله‌ای ================= */
 describe('۶) Opportunity سه مرحله‌ای (Stage)', () => {
+  // forecastBeta=1 + تاریخچه funding برابر نرخ فعلی → پیش‌بینی = نرخ فعلی (منطق Stage جدا از کالیبراسیون)
+  const withFunding = (x: BorosMarket): BorosMarket => ({
+    ...x,
+    fundingHistory: Array.from({ length: 30 }, (_, i) => ({ ts: NOW - (30 - i) * 86_400, c: x.floatingApr }))
+  });
+
   it('Stage 3: Net>0 + ریسک/نقدشوندگی/هزینه منطقی', () => {
-    const a = BorosCalculationEngine.analyze({ m, size: SIZE, nowSec: NOW, gasUsd: 0 });
+    const a = BorosCalculationEngine.analyze({ m: withFunding(m), size: SIZE, nowSec: NOW, gasUsd: 0, forecastBeta: 1 });
     // floating > mark → Long مثبت و شرایط خوب
     expect(a.stageLong).toBe('stage3-attractive');
   });
 
   it('Stage 2: Net>0 ولی شرایط کامل نیست', () => {
-    const risky: BorosMarket = { ...m, dailyVolatility: 0.06, notionalOI: 5, volume24h: 1 };
-    const a = BorosCalculationEngine.analyze({ m: risky, size: SIZE, nowSec: NOW });
+    const risky: BorosMarket = withFunding({ ...m, dailyVolatility: 0.06, notionalOI: 5, volume24h: 1 });
+    const a = BorosCalculationEngine.analyze({ m: risky, size: SIZE, nowSec: NOW, forecastBeta: 1 });
     expect(a.stageLong === 'stage2-positive' || a.stageLong === 'stage3-attractive').toBe(true);
   });
 
@@ -423,13 +429,13 @@ describe('۹) تست نهایی — ۱۰+ بازار با ۸ بررسی Producti
     // Best = فقط stage3-attractive (Net>0)
     const best = analyses.filter((a) => a.stageLong === 'stage3-attractive' || a.stageShort === 'stage3-attractive');
     for (const a of best) {
-      if (a.stageLong === 'stage3-attractive') expect(a.totalLongPnl).toBeGreaterThan(0);
-      if (a.stageShort === 'stage3-attractive') expect(a.totalShortPnl).toBeGreaterThan(0);
+      if (a.stageLong === 'stage3-attractive') expect(a.expectedLongNet).toBeGreaterThan(0);
+      if (a.stageShort === 'stage3-attractive') expect(a.expectedShortNet).toBeGreaterThan(0);
     }
-    // هیچ بازار با Net منفی نباید potential باشد
+    // هیچ بازار با Net مورد انتظار منفی نباید potential باشد
     for (const a of analyses) {
-      if (a.statusLong === 'potential') expect(a.totalLongPnl).toBeGreaterThan(0);
-      if (a.statusShort === 'potential') expect(a.totalShortPnl).toBeGreaterThan(0);
+      if (a.statusLong === 'potential') expect(a.expectedLongNet).toBeGreaterThan(0);
+      if (a.statusShort === 'potential') expect(a.expectedShortNet).toBeGreaterThan(0);
     }
   });
 

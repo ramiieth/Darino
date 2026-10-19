@@ -16,6 +16,7 @@ import type { BorosMarket } from './types';
 import { BorosCalculationEngine } from './engine';
 import { MarginCalculator } from './engine/margin';
 import { FeeCalculator } from './engine/fees';
+import { forecastFloatingOf } from './engine/scenarioModels';
 import { LongPnLCalculator, ShortPnLCalculator, calcRateSensitivity, daysToMaturity } from './engine/pnl';
 import { NA_LIQUIDATION_APR, type LiquidationAPRData } from '@/features/boros/domain/liquidationApr';
 
@@ -50,7 +51,7 @@ export interface UserCapitalOpportunity {
   fixedApr: number;
   underlyingApr: number;
   markApr: number;
-  /** Rate Edge جهت‌دار = Underlying−Fixed (Long) یا Fixed−Underlying (Short) */
+  /** Rate Edge جهت‌دار با نرخ شناور پیش‌بینی‌شده = Forecast−Fixed (Long) یا Fixed−Forecast (Short) */
   rateEdge: number;
   /* ---------- Collateral (SIMULATED) ---------- */
   simulationCollateral: number;
@@ -123,6 +124,8 @@ export function userCapitalOpportunity(
 
   const fixed = m.markApr;
   const underlying = m.floatingApr;
+  // سود/Edge با پیش‌بینی کالیبره (بک‌تست) — underlying فقط برای نمایش نرخ فعلی
+  const expectedFloating = forecastFloatingOf(m);
 
   const mpu = marginPerUnitUsd(m, fixed, nowSec);
   if (mpu <= 0) return null;
@@ -137,7 +140,7 @@ export function userCapitalOpportunity(
   const collateralSufficient = marginUsd <= collateralUsd + 1e-9;
 
   const rateEdge =
-    direction === 'long' ? underlying - fixed : fixed - underlying;
+    direction === 'long' ? expectedFloating - fixed : fixed - expectedFloating;
 
   const rateSensitivityUsd = calcRateSensitivity(notional, days) * input.collateralPriceUsd;
   const fees = FeeCalculator.calc({
@@ -156,8 +159,8 @@ export function userCapitalOpportunity(
 
   const settlementPnl =
     direction === 'long'
-      ? LongPnLCalculator.gross(notional, fixed, underlying, days) * input.collateralPriceUsd
-      : ShortPnLCalculator.gross(notional, fixed, underlying, days) * input.collateralPriceUsd;
+      ? LongPnLCalculator.gross(notional, fixed, expectedFloating, days) * input.collateralPriceUsd
+      : ShortPnLCalculator.gross(notional, fixed, expectedFloating, days) * input.collateralPriceUsd;
 
   const mtmPnl =
     direction === 'long'

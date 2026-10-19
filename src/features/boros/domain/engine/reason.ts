@@ -52,24 +52,30 @@ export function explainOpportunity(a: MarketAnalysis): OpportunityExplanation {
     });
   }
 
-  // ۲) Net PnL بعد از هزینه‌ها
-  if (a.totalLongPnl > 0) {
+  // ۲) Net PnL مورد انتظار بعد از هزینه‌ها (پیش‌بینی کالیبره — نه ثابت‌ماندن نرخ فعلی)
+  if (a.expectedLongNet > 0) {
     positive.push({
       ok: true,
-      text: `سود/زیان تسویه موردانتظار بعد از هزینه‌ها مثبت است (${fmtUSD(a.totalLongPnl)}).`
+      text: `سود خالص مورد انتظار بعد از هزینه‌ها مثبت است (${fmtUSD(a.expectedLongNet)}) — با نرخ شناور پیش‌بینی‌شده ${pct(a.forecastFloating)}.`
     });
   } else {
     negative.push({
       ok: false,
-      text: `سود/زیان خالص بعد از هزینه‌ها منفی است (${fmtUSD(a.totalLongPnl)}) — هزینه‌ها (${fmtUSD((a.fees?.total ?? 0))}) مزیت نرخ را از بین برده‌اند.`
+      text: `سود خالص مورد انتظار بعد از هزینه‌ها منفی است (${fmtUSD(a.expectedLongNet)}) — نرخ شناور پیش‌بینی‌شده (${pct(a.forecastFloating)}) برای پوشش هزینه‌ها (${fmtUSD((a.fees?.total ?? 0))}) کافی نیست.`
+    });
+  }
+  if (a.totalLongPnl > 0 && a.expectedLongNet <= 0) {
+    negative.push({
+      ok: false,
+      text: `اگر نرخ شناور فعلی تا سررسید ثابت بماند سود ${fmtUSD(a.totalLongPnl)} است، اما در بک‌تست بازارهای سررسیدشده بهترین پیش‌بین نرخ شناور تا سررسید خودِ نرخ ثابت بازار بود — اسپرد فعلی معمولاً پایدار نمی‌ماند.`
     });
   }
 
   // ۳) Economic Edge
-  if (a.totalLongPnl - a.minEconomicEdge > 0) {
+  if (a.expectedLongNet - a.minEconomicEdge > 0) {
     positive.push({
       ok: true,
-      text: `مزیت اقتصادی مثبت است (خالص ${fmtUSD(a.totalLongPnl)} − حداقل مزیت ${fmtUSD(a.minEconomicEdge)} = ${fmtUSD((a.totalLongPnl - a.minEconomicEdge))}).`
+      text: `مزیت اقتصادی مثبت است (خالص مورد انتظار ${fmtUSD(a.expectedLongNet)} − حداقل مزیت ${fmtUSD(a.minEconomicEdge)} = ${fmtUSD((a.expectedLongNet - a.minEconomicEdge))}).`
     });
   } else {
     negative.push({

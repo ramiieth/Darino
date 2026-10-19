@@ -107,7 +107,7 @@ export function OrderPreviewPanel({ market, direction, fixedRate, underlyingApr,
           {field('هزینهٔ ورود اضافی', fees, setFees, 'دلار', 'اگر پرداخت نمی‌شود: صفر')}
           {field('گس کل دوره', gas, setGas, 'دلار', 'هزینهٔ ورود و برداشت')}
           {field('هزینهٔ اضافی خارج از نرخ اجرا', slippage, setSlippage, 'دلار', 'لغزش نرخ را دوباره وارد نکنید')}
-          {field('نرخ شناور فرضی', floating, setFloating, '٪', String(Number((underlyingApr * 100).toFixed(3))))}
+          {field('نرخ شناور فرضی تا سررسید', floating, setFloating, '٪', `پیش‌بینی ${Number((underlyingApr * 100).toFixed(3))} · فعلی ${Number((market.floatingApr * 100).toFixed(3))}`)}
           {field('تخصیص مارجین', allocation, setAllocation, '٪')}
           {field('حد زیان سناریوی نامساعد',risk,setRisk,'٪ سرمایه')}
           {mode==='hypothetical'&&field('مارجین اعلام‌شده در بوروس', margin, setMargin, 'دلار', 'اختیاری')}
