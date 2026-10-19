@@ -335,8 +335,8 @@ export function exitPlan(b: BuiltStrategy, daysToExpiry: number): ExitPlan {
   const debit = -credit;
   const shorts = b.legs.filter((l): l is OptionLeg => l.kind === 'option' && l.side === 'sell');
   const levels = [
-    ...shorts.map((l) => ({ label: `Strike فروخته‌شدهٔ ${l.type === 'C' ? 'Call' : 'Put'}`, price: l.strike })),
-    ...b.stats.breakevens.map((p) => ({ label: 'سربه‌سر (Breakeven)', price: p }))
+    ...shorts.map((l) => ({ label: `قیمت توافقی ${l.type === 'C' ? 'اختیار خرید (Call)' : 'اختیار فروش (Put)'} که فروخته‌اید`, price: l.strike })),
+    ...b.stats.breakevens.map((p) => ({ label: 'نقطهٔ سربه‌سر (Breakeven)', price: p }))
   ].sort((x, y) => x.price - y.price);
   return {
     // فروش پرمیوم: ۵۰٪ حداکثر سود؛ خرید آپشن: ۱۰۰٪ هزینه

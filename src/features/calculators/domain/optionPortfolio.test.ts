@@ -80,7 +80,7 @@ describe('تجزیهٔ سود و زیان', () => {
   it('فروش نوسان: جهش IV ضرر (Vega)، گذر زمان سود (Theta)', () => {
     const up = attribute(ic.legs, 2000, s.m.T, { move: 0, iv: 0.15, days: 0 });
     expect(up.vol).toBeLessThan(0);
-    expect(explainAttribution(up, 100)).toContain('IV');
+    expect(explainAttribution(up, 100)).toContain('نوسان بازار');
     const t = attribute(ic.legs, 2000, s.m.T, { move: 0, iv: 0, days: 7 });
     expect(t.time).toBeGreaterThan(0);
     expect(explainAttribution(t, 1)).toContain('سود');

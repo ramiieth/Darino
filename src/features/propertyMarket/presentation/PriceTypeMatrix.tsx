@@ -3,7 +3,8 @@
  *
  *  ستون‌ها: سال ساخت — ۱۴۰۵ (نوساز) | ۱۴۰۴ (۱ سال) … ۱۳۹۸ (۷ سال) | قبل‌تر
  *  ردیف‌ها: همه مناطق یا بازه‌های متراژ (هیچ ردیفی پنهان نمی‌شود)
- *  هر خانه: میانگین تومان + معادل دلاری تتر + تعداد آگهی (ارقام فارسی)
+ *  هر خانه: میانگین تومان + بازهٔ رایج (۲۵٪ تا ۷۵٪) + معادل دلاری تتر + تعداد آگهی
+ *  زیر نام هر ردیف: از چه قیمتی ۲۵٪ و ۱۰٪ گران‌تر بازار شروع می‌شود (پراکندگی، نه فقط بالاترین قیمت)
  *  ⚠️ فقط نمایش — اعداد از سرویس
  * ============================================================ */
 import { useState, type ReactNode } from 'react';
@@ -24,7 +25,8 @@ export function PriceTypeMatrix({
   caption,
   toolbar,
   onPick,
-  onPickRow
+  onPickRow,
+  onPickTop
 }: {
   rows: TypeMatrixRow[];
   /** سال شمسی جاری — سرستون‌ها از آن ساخته می‌شوند */
@@ -38,6 +40,8 @@ export function PriceTypeMatrix({
   onPick?: (rowKey: string, type: PriceType) => void;
   /** کلیک روی نام ردیف → همه آگهی‌های آن ردیف */
   onPickRow?: (rowKey: string) => void;
+  /** کلیک روی «بالاترین» → آگهی‌های ردیف، گران‌ترین اول */
+  onPickTop?: (rowKey: string) => void;
 }) {
   const [measure, setMeasure] = useState<Measure>('ppm');
 
@@ -72,7 +76,7 @@ export function PriceTypeMatrix({
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.key} className="h-16">
+                <tr key={r.key} className="h-24">
                   <th scope="row" className="!ps-5 text-start font-semibold text-ink">
                     {onPickRow ? (
                       <button type="button" onClick={() => onPickRow(r.key)} className="hover:text-accent">
@@ -85,6 +89,23 @@ export function PriceTypeMatrix({
                       {toFaDigits(r.total)} آگهی
                       {r.total > r.count && ` · ${toFaDigits(r.total - r.count)} بدون سال ساخت`}
                     </span>
+                    {r.spread && (
+                      <span className="block whitespace-nowrap text-2xs font-normal text-muted">
+                        ۲۵٪ گران‌تر از {toFaDigits(Math.round(r.spread.p75 / 1e6))} · ۱۰٪ از {toFaDigits(Math.round(r.spread.p90 / 1e6))} م
+                      </span>
+                    )}
+                    {r.top && (
+                      <span className="block whitespace-nowrap text-2xs font-normal text-muted">
+                        {onPickTop ? (
+                          <button type="button" onClick={() => onPickTop(r.key)} className="underline decoration-dotted hover:text-accent">
+                            بالاترین {fmtMillionToman(r.top.ppm)}
+                          </button>
+                        ) : (
+                          <>بالاترین {fmtMillionToman(r.top.ppm)}</>
+                        )}
+                        {r.top.exceptions > 0 && <span className="text-warn"> · {toFaDigits(r.top.exceptions)} استثنا</span>}
+                      </span>
+                    )}
                   </th>
                 </tr>
               ))}
@@ -104,21 +125,37 @@ export function PriceTypeMatrix({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.key} className="h-16">
+                  <tr key={r.key} className="h-24">
                     {PRICE_TYPES.map((t) => {
                       const c = r.cells[t.key];
                       if (!c) return <td key={t.key} className="col-num text-subtle">—</td>;
                       const toman = measure === 'ppm' ? c.ppmToman : c.totalToman;
                       const usd = measure === 'ppm' ? c.ppmUsd : c.totalUsd;
-                      const low = c.count < MIN_SAMPLE_FOR_CHANGE;
+                      const range = measure === 'ppm' ? c.ppmRange : c.totalRange;
+                      const fmt = measure === 'ppm' ? fmtMillionToman : fmtTotalToman;
+                      const ex = c.exceptions;
+                      const exMax = ex ? (measure === 'ppm' ? ex.maxPpm : ex.maxTotal) : null;
+                      const low = c.count < MIN_SAMPLE_FOR_CHANGE && !c.exceptions;
                       const body = (
                         <>
                           <span className="block whitespace-nowrap font-semibold text-ink">
-                            {measure === 'ppm' ? fmtMillionToman(toman) : fmtTotalToman(toman)}
+                            {c.count > 0 ? fmt(toman) : '—'}
                           </span>
-                          <span className="block whitespace-nowrap text-2xs text-muted">
-                            {fmtUsdFa(usd)} · {toFaDigits(c.count)}
-                          </span>
+                          {range && (
+                            <span className="block whitespace-nowrap text-2xs text-muted">
+                              {fmt(range[0])} تا {fmt(range[1])}
+                            </span>
+                          )}
+                          {c.count > 0 && (
+                            <span className="block whitespace-nowrap text-2xs text-muted">
+                              {fmtUsdFa(usd)} · {toFaDigits(c.count)}
+                            </span>
+                          )}
+                          {ex && (
+                            <span className="block whitespace-nowrap text-2xs text-warn">
+                              +{toFaDigits(ex.count)} استثنا تا {fmt(exMax)}
+                            </span>
+                          )}
                         </>
                       );
                       return (
@@ -146,8 +183,10 @@ export function PriceTypeMatrix({
         </div>
       )}
       <p className="border-t border-divider px-4 py-2.5 text-2xs text-muted">
-        ستون‌ها بر اساس «سال ساخت» آگهی · میانگین قیمت · زیر هر قیمت: معادل دلاری تتر و تعداد آگهی · کم‌رنگ = کمتر
-        از ۳ آگهی
+        ستون‌ها بر اساس «سال ساخت» آگهی · عدد اصلی: میانگین قیمت · زیر آن: بازهٔ رایج (نیمهٔ میانی آگهی‌ها، از ۲۵٪
+        ارزان‌تر تا ۲۵٪ گران‌تر کنار گذاشته شده)، معادل دلاری تتر و تعداد آگهی · زیر نام منطقه: از چه قیمتی هر متر (میلیون
+        تومان) ۲۵٪ و ۱۰٪ گران‌ترین آگهی‌ها شروع می‌شوند · «بالاترین» گران‌ترین آگهی منطقه است (با کلیک، آگهی‌ها
+        گران‌ترین اول) · «استثنا» = آگهی واقعی با قیمت خیلی دور از بقیهٔ منطقه؛ نمایش داده می‌شود ولی در میانگین و بازه حساب نمی‌شود · کم‌رنگ = کمتر از ۳ آگهی
       </p>
     </div>
   );

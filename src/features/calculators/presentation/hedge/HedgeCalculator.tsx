@@ -169,24 +169,24 @@ export function HedgeCalculator() {
   };
   const shortNotional = sizing === 'usd' ? v.shortUsd : (v.spot * v.ratio) / 100;
   const errors = {
-    spot: !(v.spot > 0) ? 'ارزش اسپات باید بیشتر از صفر باشد.' : null,
+    spot: !(v.spot > 0) ? 'ارزش دارایی باید بیشتر از صفر باشد.' : null,
     short:
       sizing === 'usd'
-        ? !(v.shortUsd >= 0) ? 'ارزش اسمی Short نمی‌تواند منفی یا خالی باشد.' : null
-        : !(v.ratio >= 0) ? 'نسبت هج نمی‌تواند منفی یا خالی باشد.' : null,
+        ? !(v.shortUsd >= 0) ? 'اندازهٔ موقعیت فروش نمی‌تواند منفی یا خالی باشد.' : null
+        : !(v.ratio >= 0) ? 'درصد پوشش نمی‌تواند منفی یا خالی باشد.' : null,
     collateral:
       v.collateral === null
         ? null
         : !(v.collateral >= 0)
           ? 'عدد مثبت وارد کنید یا خالی بگذارید.'
           : v.collateral === 0 && shortNotional > 0
-            ? 'برای باز کردن Short وثیقه لازم است.'
+            ? 'برای باز کردن موقعیت فروش، وثیقه لازم است.'
             : null,
     cash: !(v.cash >= 0) ? 'وجه نقد نمی‌تواند منفی باشد.' : null,
     drop: !(v.drop >= 0 && v.drop <= 100) ? 'ریزش بین ۰ تا ۱۰۰٪.' : null,
     rise: !(v.rise >= 0) ? 'رشد نمی‌تواند منفی یا خالی باشد.' : null,
     fee: !(v.fee >= 0) ? 'کارمزد نمی‌تواند منفی باشد.' : null,
-    slippage: !(v.slippage >= 0) ? 'اسلیپیج نمی‌تواند منفی باشد.' : null,
+    slippage: !(v.slippage >= 0) ? 'لغزش قیمت نمی‌تواند منفی باشد.' : null,
     funding: !Number.isFinite(v.funding) ? 'عدد معتبر وارد کنید.' : null,
     days: !(v.days >= 0) ? 'مدت نمی‌تواند منفی باشد.' : null,
     other: !(v.other >= 0) ? 'هزینه نمی‌تواند منفی باشد.' : null
@@ -291,48 +291,48 @@ export function HedgeCalculator() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-ink">{coin.name}</p>
             <p className="text-xs text-muted">
-              اسپات و Short روی{' '}
+              دارایی و موقعیت فروش (Short) روی{' '}
               <bdi dir="ltr" className="font-latin font-semibold text-ink">
                 {coin.symbol}/USDT
               </bdi>
             </p>
           </div>
         </div>
-        <Field label="ارزش دارایی اسپات" error={errors.spot}>
+        <Field label="ارزش دارایی‌ای که دارید (اسپات)" hint="ارزش دلاری امروز دارایی‌ای که می‌خواهید از آن محافظت کنید؛ از کیف پول یا صرافی خود ببینید." error={errors.spot}>
           <Input {...num(spot, track('spot', setSpot), 'دلار')} />
         </Field>
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-muted">اندازهٔ Short بر اساس</p>
+          <p className="mb-1.5 text-xs font-semibold text-muted">اندازهٔ پوشش بر اساس</p>
           <SegmentedControl<Sizing>
-            label="اندازهٔ Short بر اساس"
+            label="اندازهٔ پوشش بر اساس"
             fill
             value={sizing}
             onChange={switchSizing}
             options={[
-              { value: 'usd', label: 'ارزش اسمی (دلار)' },
-              { value: 'pct', label: 'نسبت هج (٪)' }
+              { value: 'usd', label: 'مبلغ دلاری' },
+              { value: 'pct', label: 'درصد از دارایی' }
             ]}
           />
         </div>
         {sizing === 'usd' ? (
           <Field
-            label="ارزش اسمی پوزیشن Short"
+            label="اندازهٔ دلاری موقعیت فروش (Short)"
             error={errors.short}
-            labelAside={result?.ratioPct != null ? <Badge tone="neutral">نسبت هج {fmtPct(result.ratioPct)}</Badge> : undefined}
+            labelAside={result?.ratioPct != null ? <Badge tone="neutral">پوشش {fmtPct(result.ratioPct)} دارایی</Badge> : undefined}
           >
             <Input {...num(shortUsd, track('short', setShortUsd), 'دلار')} />
           </Field>
         ) : (
           <Field
-            label="نسبت هج (ارزش Short ÷ ارزش اسپات)"
+            label="درصد پوشش (اندازهٔ موقعیت فروش ÷ ارزش دارایی)"
             error={errors.short}
-            labelAside={result ? <Badge tone="neutral">Short {toFaDigits(pctFmt.format(result.shortNotional))} دلار</Badge> : undefined}
+            labelAside={result ? <Badge tone="neutral">موقعیت فروش {toFaDigits(pctFmt.format(result.shortNotional))} دلار</Badge> : undefined}
           >
             <Input {...num(ratio, setRatio, '٪')} />
           </Field>
         )}
-        <div className="-mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="نسبت هج سریع">
-          <span className="text-2xs text-subtle">نسبت سریع:</span>
+        <div className="-mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="درصد پوشش سریع">
+          <span className="text-2xs text-subtle">انتخاب سریع:</span>
           {QUICK_RATIOS.map((p) => {
             const active = result?.ratioPct != null && Math.abs(result.ratioPct - p) < 0.05;
             return (
@@ -351,12 +351,11 @@ export function HedgeCalculator() {
             );
           })}
         </div>
-        <Field label="وثیقهٔ واقعی حساب فیوچرز" error={errors.collateral}>
+        <Field label="وثیقهٔ واریزی به حساب معاملات آتی (فیوچرز)" error={errors.collateral}>
           <Input {...num(collateral, track('collateral', setCollateral), 'دلار', 'نامشخص')} />
         </Field>
         <p className="-mt-3 text-2xs leading-5 text-subtle">
-          مبلغی که واقعاً به حساب فیوچرز واریز کرده‌اید، نه ارزش اسمی Short. با اهرم ۱ برابر ارزش اسمی است؛ با اهرم ۳ یک‌سوم آن. خالی = نامشخص (سرمایهٔ کل حساب
-          نمی‌شود).
+          مبلغی که واقعاً به حساب فیوچرز واریز کرده‌اید، نه اندازهٔ موقعیت فروش. بدون اهرم (اهرم ۱) برابر اندازهٔ موقعیت است؛ با اهرم ۳ یک‌سوم آن. اهرم یعنی معامله با مبلغی بزرگ‌تر از پولی که گذاشته‌اید. اگر خالی بماند، سرمایهٔ کل حساب نمی‌شود.
         </p>
         <Field label="وجه نقد مستقل (اختیاری)" error={errors.cash}>
           <Input {...num(cash, setCash, 'دلار', '0')} />
@@ -379,12 +378,12 @@ export function HedgeCalculator() {
           <Field label="کارمزد هر معامله" error={errors.fee}>
             <Input {...num(fee, track('fee', setFee), '٪')} />
           </Field>
-          <Field label="اسلیپیج هر معامله" error={errors.slippage}>
+          <Field label="لغزش قیمت هر معامله (اسلیپیج)" hint="فاصلهٔ قیمت انجام شدن سفارش با قیمتی که انتظار داشتید؛ معمولاً ۰٫۰۵ تا ۰٫۲٪." error={errors.slippage}>
             <Input {...num(slippage, setSlippage, '٪')} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="نرخ فاندینگ هر ۸ ساعت" error={errors.funding}>
+          <Field label="نرخ فاندینگ هر ۸ ساعت" hint="فاندینگ پرداخت دوره‌ای بین خریدارها و فروشنده‌های قرارداد دائمی است. نرخ فعلی را در صفحهٔ همان بازار در صرافی ببینید." error={errors.funding}>
             <Input {...num(funding, track('funding', setFunding), '٪')} />
           </Field>
           <Field label="مدت نگهداری" error={errors.days}>
@@ -392,8 +391,8 @@ export function HedgeCalculator() {
           </Field>
         </div>
         <p className="-mt-3 text-2xs leading-5 text-subtle">
-          فاندینگ مثبت = Short دریافت می‌کند، منفی = می‌پردازد
-          {fundingApr !== null && fundingApr !== 0 && <> (حدود {fmtPct(fundingApr)} سالانه)</>}. کارمزد روی ورود و خروج Short؛ کارمزد صرافی خود را وارد کنید.
+          فاندینگ مثبت یعنی موقعیت فروش پول دریافت می‌کند و منفی یعنی می‌پردازد
+          {fundingApr !== null && fundingApr !== 0 && <> (حدود {fmtPct(fundingApr)} سالانه)</>}. کارمزد برای باز و بسته کردن موقعیت فروش حساب می‌شود؛ کارمزد صرافی خودتان را وارد کنید.
         </p>
         <Field label="سایر هزینه‌ها (واریز، برداشت، گس)" error={errors.other}>
           <Input {...num(other, setOther, 'دلار')} />
@@ -423,19 +422,18 @@ export function HedgeCalculator() {
           <Outcome r={result} coin={coin} live={live.size > 0} />
           {result.futuresCollateral === null && (
             <Notice tone="warn" title="وثیقهٔ حساب فیوچرز نامشخص است">
-              سرمایهٔ اولیهٔ کل، موجودی فیوچرز، سرمایهٔ نهایی و بازده بدون آن حساب نمی‌شوند و از روی ارزش اسمی Short حدس زده نمی‌شوند. اثر مالی هج و ارزش اسپات همچنان
-              معلوم است.
+              بدون این عدد، سرمایهٔ اولیهٔ کل، موجودی فیوچرز، سرمایهٔ نهایی و بازده حساب نمی‌شوند و حدس هم زده نمی‌شوند. اثر پوشش و ارزش دارایی همچنان معلوم است.
             </Notice>
           )}
           {result.rise.liquidated && (
-            <Notice tone="error" title={`با رشد ${fmtPct(result.rise.movePct)} پوزیشن Short لیکویید می‌شود`}>
+            <Notice tone="error" title={`با رشد ${fmtPct(result.rise.movePct)}، موقعیت فروش به‌اجبار بسته می‌شود (لیکویید)`}>
               {exchangeLiq !== null ? 'قیمت لیکویید گزارش‌شدهٔ صرافی رد می‌شود' : 'موجودی حساب فیوچرز به صفر می‌رسد'} و کل وثیقه از دست رفته فرض می‌شود. وثیقهٔ بیشتر
-              (اهرم کمتر) یا Short کوچک‌تر این حد را دورتر می‌کند.
+              (اهرم کمتر) یا موقعیت فروش کوچک‌تر این خطر را دورتر می‌کند.
             </Notice>
           )}
           {result.ratioPct !== null && result.ratioPct > 100 && (
-            <Notice tone="warn" title="Short بزرگ‌تر از اسپات است">
-              مواجههٔ خالص پرتفوی منفی (خالص Short) است؛ این دیگر فقط پوشش ریسک نیست و در رشد بازار زیان می‌دهد.
+            <Notice tone="warn" title="موقعیت فروش از دارایی شما بزرگ‌تر است">
+              این دیگر فقط پوشش ریسک نیست؛ در مجموع روی ریزش قیمت شرط بسته‌اید و اگر قیمت بالا برود زیان می‌کنید.
             </Notice>
           )}
           <Payoff input={input!} r={result} />
@@ -458,6 +456,9 @@ function HedgeShell({ inputs, children }: { inputs: ReactNode; children: ReactNo
       <section aria-label="ورودی‌ها" className="min-w-0 lg:col-span-5">
         <Surface className="space-y-5 p-4 md:p-5 lg:sticky lg:top-8 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:overscroll-contain">
           <h2 className="text-sm font-bold text-ink">ورودی‌ها</h2>
+          <p className="text-xs leading-6 text-muted">
+            پوشش ریسک (هج) یعنی کنار دارایی‌ای که دارید (اسپات)، یک موقعیت فروش (Short) در بازار آتی باز کنید. اگر قیمت پایین بیاید، موقعیت فروش سود می‌کند و بخشی از زیان دارایی را جبران می‌کند. اگر قیمت بالا برود، برعکس: موقعیت فروش زیان می‌کند و از سود شما کم می‌شود.
+          </p>
           {inputs}
         </Surface>
       </section>
@@ -514,10 +515,10 @@ function AccountLink({
         ) : data.status === 'error' ? (
           <p className="text-xs text-warn">حساب خوانده نشد؛ کمی بعد دوباره امتحان کنید. اعداد فعلی دستی هستند.</p>
         ) : data.snapshots.every((s) => !s.shorts.length) ? (
-          <p className="text-xs leading-6 text-muted">پوزیشن Short بازی در این حساب نیست. می‌توانید Short فرضی را دستی وارد کنید.</p>
+          <p className="text-xs leading-6 text-muted">موقعیت فروش (Short) بازی در این حساب نیست. می‌توانید اعداد را دستی وارد کنید.</p>
         ) : (
           <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted">پوزیشن‌های Short این حساب</p>
+            <p className="mb-1.5 text-xs font-semibold text-muted">موقعیت‌های فروش (Short) این حساب</p>
             <ul className="divide-y divide-divider rounded-field border border-divider">
               {data.snapshots.flatMap((snap) =>
                 snap.shorts.map((s) => {
@@ -579,7 +580,7 @@ function LivePosition({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 id="hedge-live" className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink">
-            پوزیشن واقعی Short <Tag kind="live" />
+            موقعیت فروش واقعی (Short) <Tag kind="live" />
           </h3>
           <p className="mt-0.5 text-2xs text-subtle">
             {HEDGE_VENUE_LABELS[account.venue]} · {account.label} · <bdi dir="ltr">{short.market}</bdi>
@@ -593,38 +594,38 @@ function LivePosition({
       <KeyValueList
         dense
         rows={[
-          { label: 'ارزش اسمی فعلی', value: <MoneyValue value={short.notional} digits={2} /> },
+          { label: 'اندازهٔ دلاری فعلی', value: <MoneyValue value={short.notional} digits={2} /> },
           { label: 'قیمت ورود', value: <MoneyValue value={short.entry} /> },
-          { label: 'قیمت مارک فعلی', value: <MoneyValue value={short.mark} /> },
+          { label: 'قیمت مرجع صرافی (Mark)', value: <MoneyValue value={short.mark} /> },
           {
-            label: 'سود/زیان باز (تحقق‌نیافته)',
+            label: 'سود یا زیان فعلی (هنوز بسته نشده)',
             value: <MoneyValue value={short.unrealizedPnl} signed tone="auto" digits={2} />,
             hint: 'عدد صرافی؛ در ارزش خالص حساب هست و دوباره اضافه نمی‌شود'
           },
           { label: 'ارزش خالص حساب (equity)', value: <MoneyValue value={snap.equity} digits={2} /> },
           {
-            label: 'قیمت لیکویید صرافی',
+            label: 'قیمت بسته شدن اجباری (لیکویید)',
             value: short.liquidation === null ? <span className="text-xs text-subtle">گزارش نمی‌شود</span> : <MoneyValue value={short.liquidation} />,
             hint: short.liquidation !== null && liqUsed ? 'در سناریوی رشد به کار رفته' : undefined
           },
-          { label: 'فاندینگ لحظه‌ای هر ۸ ساعت', value: funding8h === null ? '—' : <PercentValue value={funding8h} digits={4} />, hint: 'مثبت = Short دریافت می‌کند؛ نرخ عوض می‌شود' },
-          { label: 'کارمزد تیکر صرافی', value: market?.takerFeePct == null ? '—' : <PercentValue value={market.takerFeePct} digits={3} signed={false} tone="none" /> }
+          { label: 'فاندینگ لحظه‌ای هر ۸ ساعت', value: funding8h === null ? '—' : <PercentValue value={funding8h} digits={4} />, hint: 'مثبت یعنی موقعیت فروش دریافت می‌کند؛ نرخ مدام عوض می‌شود' },
+          { label: 'کارمزد سفارش فوری صرافی (Taker)', value: market?.takerFeePct == null ? '—' : <PercentValue value={market.takerFeePct} digits={3} signed={false} tone="none" /> }
         ]}
       />
       {others > 0 && (
         <Notice tone="warn" title={`این حساب ${toFaDigits(others)} پوزیشن دیگر هم دارد`}>
-          ارزش خالص حساب پشتوانهٔ همهٔ پوزیشن‌هاست و سناریو فقط همین Short را حرکت می‌دهد؛ موجودی نهایی حساب تقریبی است.
+          ارزش خالص حساب پشتوانهٔ همهٔ موقعیت‌هاست، ولی سناریو فقط همین موقعیت فروش را حساب می‌کند؛ موجودی نهایی حساب تقریبی است.
         </Notice>
       )}
       {short.marginMode === 'ISOLATED' && (
-        <Notice tone="warn" title="مارجین ایزوله">
-          وثیقهٔ واقعی این پوزیشن کمتر از ارزش خالص کل حساب است؛ عدد وثیقه را با مارجین همین پوزیشن اصلاح کنید.
+        <Notice tone="warn" title="وثیقهٔ جدا برای این موقعیت (مارجین ایزوله)">
+          وثیقهٔ واقعی این موقعیت کمتر از ارزش کل حساب است؛ عدد وثیقه را با وثیقهٔ همین موقعیت اصلاح کنید.
         </Notice>
       )}
       {snap.longBases.includes(short.base) && (
-        <Notice tone="warn" title="روی همین دارایی Long هم دارید">اثر آن در این ماشین‌حساب نیست.</Notice>
+        <Notice tone="warn" title="روی همین دارایی موقعیت خرید (Long) هم دارید">اثر آن در این ماشین‌حساب حساب نشده است.</Notice>
       )}
-      {account.venue === 'arcus' && <p className="text-2xs leading-5 text-subtle">اسپات آرکوس روی کیف پول است و خوانده نمی‌شود؛ ارزش اسپات را دستی وارد کنید.</p>}
+      {account.venue === 'arcus' && <p className="text-2xs leading-5 text-subtle">دارایی شما در آرکوس روی کیف پول است و خوانده نمی‌شود؛ ارزش آن را دستی وارد کنید.</p>}
     </Surface>
   );
 }
@@ -714,8 +715,8 @@ function Outcome({ r, coin, live }: { r: HedgeResult; coin: Coin; live: boolean 
       <p className="flex flex-wrap items-center gap-1.5 text-2xs leading-5 text-subtle">
         <Tag kind="estimate" />
         {live
-          ? 'نقطهٔ شروع از حساب واقعی شما؛ نتیجه پیش‌بینی همان سناریوی قیمت است، پس از بستن فرضی Short — نه سود تحقق‌یافته.'
-          : 'نتیجهٔ سناریو با ورودی‌های شما، پس از بستن فرضی Short — نه سود تحقق‌یافته.'}
+          ? 'نقطهٔ شروع از حساب واقعی شما؛ نتیجه پیش‌بینی همان سناریوی قیمت است، اگر موقعیت فروش در پایان بسته شود. این پیش‌بینی است، نه سود قطعی.'
+          : 'نتیجهٔ سناریو با ورودی‌های شما، اگر موقعیت فروش در پایان بسته شود. این پیش‌بینی است، نه سود قطعی.'}
       </p>
     </Step>
   );
@@ -768,7 +769,7 @@ function OutcomeTile({ s, max }: { s: HedgeScenario; max: number }) {
           ))}
         </dl>
       )}
-      {s.liquidated && <p className="text-2xs font-semibold text-negative">در این سناریو Short لیکویید می‌شود.</p>}
+      {s.liquidated && <p className="text-2xs font-semibold text-negative">در این سناریو موقعیت فروش به‌اجبار بسته می‌شود (لیکویید) و وثیقه از دست می‌رود.</p>}
     </article>
   );
 }
@@ -823,19 +824,19 @@ function Composition({ r, sizing, live, exchangeLiq }: { r: HedgeResult; sizing:
             <p className="text-xs text-warn">وثیقهٔ حساب فیوچرز نامشخص است؛ سرمایهٔ کل حساب نمی‌شود.</p>
           ) : (
             <>
-              <BarRow label="دارایی اسپات" value={r.spot} of={capital} tag={tagOf('spot')} />
+              <BarRow label="دارایی شما (اسپات)" value={r.spot} of={capital} tag={tagOf('spot')} />
               <BarRow label={live.has('collateral') ? 'ارزش خالص حساب فیوچرز' : 'وثیقهٔ حساب فیوچرز'} value={r.futuresCollateral ?? 0} of={capital} tag={tagOf('collateral')} />
               <BarRow label="وجه نقد مستقل" value={r.cash} of={capital} />
             </>
           )}
         </div>
         <div className="space-y-2.5">
-          <h4 className="text-xs font-bold text-ink">مواجهه با قیمت (از ارزش اسپات)</h4>
-          <BarRow label="پوشش‌داده با Short" value={covered} of={r.spot} tag={sizing === 'usd' ? tagOf('short') : null} textured />
-          <BarRow label="بی‌پوشش (مواجههٔ خالص)" value={uncovered} of={r.spot} />
+          <h4 className="text-xs font-bold text-ink">چه مقدار از دارایی با قیمت تغییر می‌کند</h4>
+          <BarRow label="پوشش‌داده با موقعیت فروش" value={covered} of={r.spot} tag={sizing === 'usd' ? tagOf('short') : null} textured />
+          <BarRow label="بی‌پوشش (هنوز با قیمت بالا و پایین می‌رود)" value={uncovered} of={r.spot} />
           {r.shortNotional > r.spot && (
             <p className="text-2xs text-warn">
-              Short به اندازهٔ <MoneyValue value={r.shortNotional - r.spot} digits={2} /> بزرگ‌تر از اسپات است؛ پرتفوی خالص Short است.
+              موقعیت فروش <MoneyValue value={r.shortNotional - r.spot} digits={2} /> از دارایی شما بزرگ‌تر است؛ اگر قیمت بالا برود در مجموع زیان می‌کنید.
             </p>
           )}
         </div>
@@ -843,34 +844,34 @@ function Composition({ r, sizing, live, exchangeLiq }: { r: HedgeResult; sizing:
       <KeyValueList
         dense
         rows={[
-          { label: 'نسبت هج', hint: 'ارزش Short تقسیم بر ارزش اسپات', value: r.ratioPct === null ? '—' : fmtPct(r.ratioPct) },
+          { label: 'درصد پوشش', hint: 'اندازهٔ موقعیت فروش تقسیم بر ارزش دارایی', value: r.ratioPct === null ? '—' : fmtPct(r.ratioPct) },
           {
             label: (
               <span className="inline-flex flex-wrap items-center gap-1.5">
-                ارزش اسمی Short {sizing === 'usd' && tagOf('short')}
+                اندازهٔ دلاری موقعیت فروش {sizing === 'usd' && tagOf('short')}
               </span>
             ),
             hint: 'اندازهٔ پوزیشن در بازار — پول پرداختی نیست',
             value: <MoneyValue value={r.shortNotional} digits={2} />
           },
-          { label: 'اهرم مؤثر', hint: 'ارزش اسمی Short تقسیم بر وثیقه', value: r.effectiveLeverage === null ? <Unknown /> : `${toFaDigits(pctFmt.format(r.effectiveLeverage))}×` },
-          { label: 'مواجههٔ ناخالص', hint: 'اسپات + Short — اندازهٔ کل در بازار، نه سرمایه', value: <MoneyValue value={r.grossExposure} digits={2} /> },
+          { label: 'اهرم', hint: 'اندازهٔ موقعیت فروش تقسیم بر وثیقه؛ هرچه بیشتر، خطر بسته شدن اجباری بیشتر', value: r.effectiveLeverage === null ? <Unknown /> : `${toFaDigits(pctFmt.format(r.effectiveLeverage))}×` },
+          { label: 'اندازهٔ کل در بازار', hint: 'دارایی + موقعیت فروش؛ این سرمایهٔ شما نیست', value: <MoneyValue value={r.grossExposure} digits={2} /> },
           {
             label: (
               <span className="inline-flex flex-wrap items-center gap-1.5">
                 هزینهٔ تخمینی استراتژی <Tag kind="estimate" />
               </span>
             ),
-            hint: 'کارمزد + اسلیپیج + سایر − فاندینگ، بدون تغییر قیمت',
+            hint: 'کارمزد + لغزش قیمت + سایر هزینه‌ها − فاندینگ، اگر قیمت تغییر نکند',
             value: <MoneyValue value={-r.baseCosts.total} signed tone="auto" digits={2} />
           },
           {
             label: (
               <span className="inline-flex flex-wrap items-center gap-1.5">
-                {exchangeLiq ? 'حد لیکویید صرافی' : 'حد تقریبی صفر شدن وثیقه'} {exchangeLiq ? <Tag kind="live" /> : r.collateralWipeoutPct === null ? <Tag kind="unknown" /> : null}
+                {exchangeLiq ? 'رشد قیمت تا بسته شدن اجباری (لیکویید)' : 'رشد قیمت تا صفر شدن تقریبی وثیقه'} {exchangeLiq ? <Tag kind="live" /> : r.collateralWipeoutPct === null ? <Tag kind="unknown" /> : null}
               </span>
             ),
-            hint: exchangeLiq ? 'از قیمت لیکویید گزارش‌شده، نسبت به مارک فعلی' : 'بدون هزینه و مارجین نگهداری؛ لیکویید واقعی زودتر است',
+            hint: exchangeLiq ? 'از قیمت گزارش‌شدهٔ صرافی، نسبت به قیمت مرجع فعلی' : 'تقریبی؛ صرافی معمولاً زودتر از این موقعیت را می‌بندد',
             value: r.collateralWipeoutPct === null ? <Unknown /> : <span className="whitespace-nowrap">رشد {fmtPct(r.collateralWipeoutPct)}</span>
           }
         ]}
@@ -901,8 +902,8 @@ function DetailTable({ r }: { r: HedgeResult }) {
       title: 'دارایی‌ها',
       rows: [
         { label: 'تغییر قیمت', cells: both(r, (s) => <PercentValue value={s.movePct} digits={1} />) },
-        { label: 'ارزش نهایی اسپات', cells: both(r, (s) => money(s.spotEnd)) },
-        { label: 'سود/زیان ناخالص Short', hint: '−ارزش اسمی × تغییر قیمت', cells: both(r, (s) => pnl(s.shortGross)) }
+        { label: 'ارزش نهایی دارایی', cells: both(r, (s) => money(s.spotEnd)) },
+        { label: 'سود یا زیان موقعیت فروش، پیش از هزینه', hint: 'اندازهٔ موقعیت × تغییر قیمت، با علامت برعکس', cells: both(r, (s) => pnl(s.shortGross)) }
       ]
     },
     {
@@ -910,16 +911,16 @@ function DetailTable({ r }: { r: HedgeResult }) {
       rows: [
         { label: 'کارمزد ورود و خروج', cells: both(r, (s) => cost(s.fees)) },
         { label: 'فاندینگ', hint: 'مثبت = دریافتی', cells: both(r, (s) => pnl(s.funding)) },
-        { label: 'اسلیپیج', cells: both(r, (s) => cost(s.slippage)) },
+        { label: 'لغزش قیمت (اسلیپیج)', cells: both(r, (s) => cost(s.slippage)) },
         { label: 'سایر هزینه‌ها', cells: both(r, (s) => cost(s.otherCosts)) }
       ]
     },
     {
-      title: 'پس از بستن Short',
+      title: 'پس از بستن موقعیت فروش',
       rows: [
         {
           label: 'موجودی نهایی حساب فیوچرز',
-          hint: 'وثیقه + سود/زیان Short + فاندینگ − هزینه‌ها',
+          hint: 'وثیقه + سود یا زیان موقعیت فروش + فاندینگ − هزینه‌ها',
           cells: both(r, (s) => (
             <>
               {money(s.futuresEnd)}
@@ -931,16 +932,16 @@ function DetailTable({ r }: { r: HedgeResult }) {
         { label: 'سرمایهٔ نهایی کل', cells: both(r, (s) => money(s.totalEnd)), emphasis: true },
         { label: 'سود/زیان خالص کل', hint: 'سرمایهٔ نهایی − سرمایهٔ اولیه', cells: both(r, (s) => pnl(s.net)), emphasis: true },
         { label: 'بازده کل سرمایه', hint: 'نسبت به سرمایهٔ اولیهٔ کل', cells: both(r, (s) => pct(s.roiPct)) },
-        { label: 'بازده پوزیشن Short', hint: 'نسبت به وثیقهٔ فیوچرز', cells: both(r, (s) => pct(s.shortRoePct)) }
+        { label: 'بازده موقعیت فروش', hint: 'نسبت به وثیقهٔ حساب فیوچرز', cells: both(r, (s) => pct(s.shortRoePct)) }
       ]
     },
     {
       title: 'مقایسه با بدون هج (همان سرمایه)',
       rows: [
-        { label: 'ارزش نهایی بدون هج', hint: 'اسپات + وثیقه به‌صورت نقد آزاد + وجه نقد', cells: both(r, (s) => money(s.unhedgedEnd)) },
+        { label: 'ارزش نهایی بدون هج', hint: 'دارایی + وثیقه به‌صورت پول نقد + وجه نقد', cells: both(r, (s) => money(s.unhedgedEnd)) },
         { label: 'اختلاف دلاری (اثر خالص هج)', hint: 'پس از همهٔ هزینه‌ها', cells: both(r, (s) => pnl(s.hedgeEffectNet)), emphasis: true },
         { label: 'اختلاف بازده', hint: 'واحد درصد؛ مبنای هر دو سرمایهٔ اولیهٔ کل', cells: both(r, (s) => pct(s.roiDiffPp)) },
-        { label: 'اثر هج پیش از هزینه', hint: 'همان سود/زیان ناخالص Short', cells: both(r, (s) => pnl(s.hedgeEffectGross)) }
+        { label: 'اثر هج پیش از هزینه', hint: 'همان سود یا زیان موقعیت فروش پیش از هزینه', cells: both(r, (s) => pnl(s.hedgeEffectGross)) }
       ]
     }
   ];
@@ -1006,19 +1007,28 @@ function Details() {
       <Disclosure summary="اصطلاحات">
         <ul className="list-disc space-y-1.5 ps-4 text-xs leading-6 text-muted">
           <li>
-            <b className="text-ink">ارزش اسمی (Notional):</b> اندازهٔ پوزیشن Short در بازار؛ با اهرم می‌تواند بزرگ‌تر از وثیقه باشد.
+            <b className="text-ink">دارایی نقد (اسپات / Spot):</b> دارایی‌ای که واقعاً خریده‌اید و در اختیار دارید.
+          </li>
+          <li>
+            <b className="text-ink">موقعیت فروش (Short) و موقعیت خرید (Long):</b> Short با پایین آمدن قیمت سود می‌کند و Long با بالا رفتن قیمت.
+          </li>
+          <li>
+            <b className="text-ink">بسته شدن اجباری (لیکویید / Liquidation):</b> وقتی زیان موقعیت به وثیقه نزدیک شود، صرافی موقعیت را به‌اجبار می‌بندد و وثیقه از دست می‌رود.
+          </li>
+          <li>
+            <b className="text-ink">ارزش اسمی (Notional):</b> اندازهٔ دلاری موقعیت فروش در بازار؛ با اهرم می‌تواند بزرگ‌تر از وثیقه باشد.
           </li>
           <li>
             <b className="text-ink">وثیقه / مارجین:</b> پولی که در حساب فیوچرز پشتوانهٔ پوزیشن است؛ هزینه نیست و پس از بستن (با سود/زیان) برمی‌گردد.
           </li>
           <li>
-            <b className="text-ink">مواجههٔ خالص:</b> اسپات منهای Short — بخشی از دارایی که هنوز با بازار بالا و پایین می‌رود.
+            <b className="text-ink">بخش بی‌پوشش (مواجههٔ خالص):</b> ارزش دارایی منهای موقعیت فروش؛ بخشی از دارایی که هنوز با بازار بالا و پایین می‌رود.
           </li>
           <li>
             <b className="text-ink">فاندینگ (Funding):</b> پرداخت دوره‌ای بین Long و Short در قرارداد دائمی؛ نرخ مثبت یعنی Short دریافت می‌کند.
           </li>
           <li>
-            <b className="text-ink">اسلیپیج (Slippage):</b> فاصلهٔ قیمت اجرای واقعی از قیمت مورد انتظار.
+            <b className="text-ink">لغزش قیمت (اسلیپیج / Slippage):</b> فاصلهٔ قیمت اجرای واقعی از قیمت مورد انتظار.
           </li>
         </ul>
       </Disclosure>

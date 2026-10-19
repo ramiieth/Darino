@@ -21,18 +21,24 @@ import type {
 import type { ParsedListingSeed } from '../collector/parse';
 import {
   deduplicateListings,
+  fillFromStored,
   filterOutliers,
   isStaleAd,
   newCleaningReport,
   normalizeAndValidate,
+  splitExceptions,
   storedListingRejectReason
 } from '../collector/pipeline';
 import { PRICE_TYPES, jalaliYearOf, matchesPriceType } from '../domain/segments';
 import { buildAreaStats, buildCityStats, buildNeighborhoodStats, mean, median } from '../domain/stats';
 import { areaGroupName, areaGroupOf, neighborhoodDisplayName, resolveNeighborhood } from './catalog';
 
-/** آگهی‌هایی که در این بازه دیده شده‌اند «بازار فعلی» محسوب می‌شوند */
-export const MARKET_WINDOW_DAYS = 60;
+/**
+ * آگهی‌هایی که در این بازه پیش از «آخرین جمع‌آوری» دوباره دیده شده‌اند «بازار فعلی» محسوب می‌شوند.
+ * ۳۰ روز (قبلاً ۶۰ روز از امروز): آگهی فروخته‌شده یا حذف‌شده دیگر دیده نمی‌شود و نباید
+ * قیمت قدیمی‌اش تا دو ماه در میانگین بماند؛ در بازار تورمی این عقب‌ماندگی محسوس است.
+ */
+export const MARKET_WINDOW_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 export interface IngestResult {
@@ -70,31 +76,20 @@ export function ingestSeeds(opts: {
   return { listings: merged, changed, added, report };
 }
 
-/**
- * آگهی شناخته‌شده که سرور جزئیاتش را دوباره نگرفت: فیلدهای خالی (متراژ، سال ساخت،
- * طبقه، تاریخ‌ها…) از نسخه ذخیره‌شده پر می‌شوند؛ قیمت و عنوان تازه فهرست مقدم‌اند.
- */
-function fillFromStored(seed: ParsedListingSeed, prev: PropertyMarketListing | undefined): ParsedListingSeed {
-  if (!prev) return seed;
-  const out = { ...seed };
-  const fill = <K extends keyof ParsedListingSeed & keyof PropertyMarketListing>(k: K) => {
-    if (out[k] === null || out[k] === undefined) (out as Record<string, unknown>)[k] = prev[k] ?? null;
-  };
-  for (const k of ['areaSqm', 'rooms', 'yearBuilt', 'floor', 'parking', 'elevator', 'storage', 'balcony', 'listedAt', 'sourceUpdatedAt'] as const) {
-    fill(k);
-  }
-  // قیمت هر متر قدیمی فقط وقتی قیمت کل تازه نیامده (وگرنه از قیمت کل تازه ÷ متراژ)
-  if (out.totalPriceToman === null && out.pricePerSqmToman === null) out.pricePerSqmToman = prev.pricePerSqmToman;
-  return out;
-}
-
 /** آگهی‌های آنلاین داخل پنجره بازار */
 export function listingsInWindow(
   listings: PropertyMarketListing[],
   now: number = Date.now(),
-  windowDays: number = MARKET_WINDOW_DAYS
+  windowDays: number = MARKET_WINDOW_DAYS,
+  /** false → مبنا خود now (برای Snapshot: هرگز Snapshot امروز از دادهٔ کهنه ساخته نشود) */
+  anchorToLatest = true
 ): PropertyMarketListing[] {
-  const from = now - windowDays * DAY_MS;
+  // مبنا = آخرین جمع‌آوری (نه امروز): اگر مدتی جمع‌آوری نشده، آخرین بازار دیده‌شده نمایش داده
+  // می‌شود (هشدار «داده قدیمی» صفحه جدا نشان داده می‌شود) و آگهی‌های دیده‌نشده در آن کنار می‌روند
+  let latest = 0;
+  for (const l of listings) if (l.source !== 'manual-legacy' && l.scrapedAt > latest) latest = l.scrapedAt;
+  const ref = anchorToLatest && latest > 0 ? Math.min(now, latest) : now;
+  const from = ref - windowDays * DAY_MS;
   return listings.filter(
     (l) =>
       l.source !== 'manual-legacy' &&
@@ -117,7 +112,7 @@ export function buildSnapshot(opts: {
   usdt?: { rateToman: number; source: 'wallex' | 'bitpin' } | null;
 }): PropertyMarketSnapshot | null {
   const now = opts.now ?? Date.now();
-  const inWindow = listingsInWindow(opts.listings, now, opts.windowDays);
+  const inWindow = listingsInWindow(opts.listings, now, opts.windowDays, false);
   if (inWindow.length === 0) return null;
 
   const report = newCleaningReport();
@@ -127,7 +122,9 @@ export function buildSnapshot(opts: {
   report.valid = ir ? ir.valid : inWindow.length;
   report.deduplicated = ir ? ir.deduplicated : 0;
   if (ir) report.rejectReasons = { ...ir.rejectReasons };
-  const market = filterOutliers(inWindow, report);
+  // استثناها (آگهی واقعی ولی خیلی دور از بقیه) در آمار Snapshot حساب نمی‌شوند
+  const { regular: market, exceptions } = splitExceptions(filterOutliers(inWindow, report));
+  report.exceptions = exceptions.length;
   report.market = market.length;
   if (market.length === 0) return null;
 

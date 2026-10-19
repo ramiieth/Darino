@@ -73,7 +73,7 @@ export function DeepScenarios({ combo }: { combo: Combo }) {
             </div>
           );
         })}
-        <p className="text-2xs leading-5 text-subtle">احتمال‌ها از توزیع لگ‌نرمال با IV فعلی Derive است (همان چیزی که بازار قیمت کرده)، نه پیش‌بینی جهت.</p>
+        <p className="text-2xs leading-5 text-subtle">احتمال‌ها تقریبی‌اند و از نوسانی که بازار در قیمت آپشن‌ها لحاظ کرده (IV) به دست آمده‌اند؛ پیش‌بینی جهت قیمت نیستند.</p>
       </section>
 
       <section className="space-y-3">
@@ -101,7 +101,7 @@ export function DeepScenarios({ combo }: { combo: Combo }) {
           </div>
         ))}
         <p className="text-2xs leading-5 text-subtle">
-          {multi && 'حرکت هر دارایی در «کل بازار» = حرکت BTC × Beta همان دارایی (از ۴۵ روز اخیر). '}تجزیه: اثر قیمت (Delta و Gamma) ← اثر IV (Vega) ← اثر زمان (Theta)؛ جمع سه اثر دقیقاً برابر کل است.
+          {multi && 'در سناریوی «کل بازار»، حرکت هر دارایی از حرکت بیت‌کوین و میزان همراهی آن دارایی با بیت‌کوین در ۴۵ روز اخیر (Beta) تخمین زده شده. '}هر سود یا زیان به سه بخش تقسیم شده: اثر تغییر قیمت، اثر تغییر نوسان بازار (IV) و اثر گذر زمان. جمع این سه برابر کل است.
         </p>
       </section>
 
@@ -115,10 +115,10 @@ export function DeepScenarios({ combo }: { combo: Combo }) {
                 <tr className="text-2xs text-subtle">
                   <th scope="col" className="w-[40%] pb-2 text-start font-semibold" />
                   <th scope="col" className="pb-2 text-end font-semibold">
-                    نوسان = IV فعلی
+                    اگر نوسان آینده = نوسان مورد انتظار بازار (IV)
                   </th>
                   <th scope="col" className="pb-2 text-end font-semibold">
-                    نوسان = HV ۳۰ روز
+                    اگر نوسان آینده = نوسان واقعی ۳۰ روز اخیر (HV)
                   </th>
                 </tr>
               </thead>
@@ -126,10 +126,10 @@ export function DeepScenarios({ combo }: { combo: Combo }) {
                 {(
                   [
                     ['احتمال سود کل', (m: MonteCarlo) => fmtPct(m.pProfit * 100, 0)],
-                    ['میانگین سود/زیان', (m: MonteCarlo) => <MoneyValue value={cents(m.expected)} signed tone="auto" digits={2} />],
-                    ['میانگین ۵٪ بدترین', (m: MonteCarlo) => <MoneyValue value={cents(m.worst5)} signed tone="auto" digits={2} />],
-                    ['میانگین ۵٪ بهترین', (m: MonteCarlo) => <MoneyValue value={cents(m.best5)} signed tone="auto" digits={2} />],
-                    ...(multi ? [['احتمال ضرر همهٔ پاها با هم', (m: MonteCarlo) => fmtPct(m.pAllLose * 100, 0)]] : [])
+                    ['میانگین سود یا زیان', (m: MonteCarlo) => <MoneyValue value={cents(m.expected)} signed tone="auto" digits={2} />],
+                    ['میانگین ۵٪ بدترین حالت‌ها', (m: MonteCarlo) => <MoneyValue value={cents(m.worst5)} signed tone="auto" digits={2} />],
+                    ['میانگین ۵٪ بهترین حالت‌ها', (m: MonteCarlo) => <MoneyValue value={cents(m.best5)} signed tone="auto" digits={2} />],
+                    ...(multi ? [['احتمال اینکه همهٔ بخش‌ها با هم زیان کنند', (m: MonteCarlo) => fmtPct(m.pAllLose * 100, 0)]] : [])
                   ] as [string, (m: MonteCarlo) => ReactNode][]
                 ).map(([label, f]) => (
                   <tr key={label}>
@@ -147,7 +147,7 @@ export function DeepScenarios({ combo }: { combo: Combo }) {
         </section>
       )}
 
-      <Disclosure summary="احتمال حرکت‌های بزرگ تا سررسید (از IV)">
+      <Disclosure summary="احتمال حرکت‌های بزرگ قیمت تا سررسید (تقریبی)">
         <ul className="space-y-1 text-xs text-muted">
           {combo.legs.map((l) => (
             <li key={l.currency}>
@@ -188,7 +188,7 @@ function ScenarioRow({ r, multi }: { r: ComboScenario; multi: boolean }) {
           {p.why}
           <span className="text-subtle">
             {' '}
-            (قیمت {usd0(p.attribution.price)}، IV {usd0(p.attribution.vol)}، زمان {usd0(p.attribution.time)})
+            (اثر قیمت {usd0(p.attribution.price)}، اثر نوسان {usd0(p.attribution.vol)}، اثر زمان {usd0(p.attribution.time)})
           </span>
         </p>
       ))}
@@ -203,7 +203,7 @@ function EdgeNote({ combo, iv, hv }: { combo: Combo; iv: number | null; hv: numb
   const tiny = Math.max(1, combo.totalMaxLoss * 0.02);
   return (
     <p className="text-xs leading-6 text-muted">
-      با نوسان قیمت‌شدهٔ بازار (IV) میانگین نزدیک صفر است (کارمزد و اسپرد حساب نشده)؛ یعنی سود فقط وقتی می‌آید که نوسان واقعی با IV فرق کند.{' '}
+      اگر نوسان آینده همان چیزی باشد که بازار انتظار دارد (IV)، میانگین سود تقریباً صفر است (بدون کارمزد و فاصلهٔ خرید و فروش). یعنی سود فقط وقتی می‌آید که نوسان واقعی با انتظار بازار فرق کند؛ این یک احتمال است، نه پیش‌بینی.{' '}
       {Math.abs(edge) < tiny ? (
         <>اگر نوسان مثل ۳۰ روز اخیر بماند، تفاوت معناداری ندارد؛ این ترکیب «لبه» آماری خاصی ندارد و نتیجه به حرکت واقعی بستگی دارد.</>
       ) : edge > 0 ? (

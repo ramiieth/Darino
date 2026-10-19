@@ -136,7 +136,7 @@ describe('در حال اجرا — پایش', () => {
       fetchedAt: Date.now()
     } satisfies LinkedDeltaLegs;
     render(<LiveMonitor />);
-    expect(screen.getByText(/Unbalanced · ۵٫۲۶٪|Unbalanced · ۵.۲۶٪/)).toBeTruthy();
+    expect(screen.getByText(/\(Unbalanced\) · (۵٫۲۶|۵.۲۶)٪/)).toBeTruthy();
     const article = screen.getByRole('article');
     expect(article.textContent).toContain(usd(1900));
     expect(article.textContent).toContain('علامت (دریافتی یا پرداختی) در مستندات آرکوس روشن نیست');
@@ -149,8 +149,8 @@ describe('لایتر رابین‌هود در دلتا نوترال و اجرا'
     fireEvent.change(screen.getByLabelText('دو صرافی'), { target: { value: 'arcus-lighterRh' } });
     // فاندینگ آرکوس (۰٫۰۰۰۰۹۹۸) > لایتر رابین‌هود (−۰٫۰۰۰۰۲) → Short روی آرکوس، Long روی لایتر رابین‌هود
     const direction = screen.getByRole('button', { name: /جابه‌جایی/ }).parentElement!.textContent ?? '';
-    expect(direction).toMatch(/Long\s*روی لایتر رابین‌هود/);
-    expect(direction).toMatch(/Short\s*روی آرکوس/);
+    expect(direction).toMatch(/\(Long\)\s*روی لایتر رابین‌هود/);
+    expect(direction).toMatch(/\(Short\)\s*روی آرکوس/);
   });
 
   it('تب اجرا هم همین جفت را دارد و انتقال از دلتا نوترال آن را حفظ می‌کند', () => {

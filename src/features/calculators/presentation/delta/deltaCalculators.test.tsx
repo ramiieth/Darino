@@ -72,7 +72,7 @@ describe('دلتا نوترال — UI = domain', () => {
     render(<DeltaNeutralCalculator />);
     const r = calcDeltaNeutral(defaults);
     expect(flowValue('سود خالص تخمینی')).toContain(usd(r.net));
-    expect(flowValue('مارجین قفل‌شده (وثیقه)')).toContain(usd(r.capital));
+    expect(flowValue('وثیقهٔ قفل‌شده (مارجین)')).toContain(usd(r.capital));
     expect(flowValue('سرمایهٔ نهایی')).toContain(usd(r.ledger.finalEquity));
     expect(flowValue('فاندینگ خالص دورهٔ نگهداری')).toContain(usd(r.funding));
     expect(flowValue('کارمزد ورود')).toContain(usd(r.entryFees));
@@ -85,7 +85,7 @@ describe('دلتا نوترال — UI = domain', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'صفر می‌شود' }));
     const r = calcDeltaNeutral({ ...defaults, availableCapital: 2000, exit: { priceMovePct: 0, basis: 'converge' } });
     expect(r.pricePnl).toBeGreaterThan(0);
-    expect(flowValue('سود/زیان معاملاتی ناخالص')).toContain(usd(r.pricePnl));
+    expect(flowValue('سود یا زیان قیمت، پیش از هزینه')).toContain(usd(r.pricePnl));
     expect(flowValue('سرمایهٔ نهایی')).toContain(usd(r.ledger.finalEquity));
     expect(flowValue('سرمایهٔ نهایی')).toContain(usd(2000 + r.net));
   });

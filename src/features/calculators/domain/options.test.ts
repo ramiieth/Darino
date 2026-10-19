@@ -3,6 +3,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  plansForTarget,
+  TARGET_MOVES,
   black76,
   buildStrategy,
   chooseStrategies,
@@ -187,6 +189,32 @@ describe('ساخت استراتژی از زنجیره', () => {
     expect(x.takeProfitUsd).toBeCloseTo(0.5 * b.stats.maxProfit!, 9);
     expect(x.stopLossUsd).toBeCloseTo(2 * b.stats.netPremium, 9);
     expect(x.closeOrRollDaysLeft).toBe(21);
-    expect(x.priceLevels.some((l) => l.label.startsWith('Strike'))).toBe(true);
+    expect(x.priceLevels.some((l) => l.label.startsWith('قیمت توافقی'))).toBe(true);
+  });
+});
+
+describe('هدف سود (مستقل از سرمایهٔ کاربر)', () => {
+  it('برای سود ۱۰۰۰ دلار: اندازه‌ای که سود خالص پس از کارمزد ≥ هدف شود؛ سرمایه = زیان + کارمزد', () => {
+    const plans = plansForTarget(chain(), M, 1000);
+    expect(plans.length).toBeGreaterThan(0);
+    for (const p of plans) {
+      expect(p.netMaxProfit).toBeGreaterThanOrEqual(1000 - 0.005);
+      expect(p.capitalNeeded).toBeCloseTo(p.b.stats.maxLoss! + p.b.fees!, 6);
+      expect(p.b.unlimitedLoss).toBe(false);
+      expect(p.scenarios.map((r) => r.movePct)).toEqual([...TARGET_MOVES]);
+      // یک پله کوچک‌تر به هدف نمی‌رسد (کمینه بودن اندازه)
+      const perUnit = (p.b.stats.maxProfit! - p.b.fees!) / p.b.qty;
+      expect(perUnit * (p.b.qty - M.amountStep)).toBeLessThan(1000 + 1e-6);
+    }
+    // مرتب: بیشترین احتمال سود اول
+    for (let i = 1; i < plans.length; i++) expect((plans[i - 1].pop ?? -1) >= (plans[i].pop ?? -1)).toBe(true);
+  });
+
+  it('هیچ گزینه‌ای در همهٔ سناریوها سود نمی‌دهد', () => {
+    for (const p of plansForTarget(chain(), M, 1000)) expect(p.scenarios.some((r) => r.net < 0)).toBe(true);
+  });
+
+  it('هدف نامعتبر → خالی', () => {
+    expect(plansForTarget(chain(), M, 0)).toEqual([]);
   });
 });

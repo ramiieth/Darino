@@ -8,7 +8,7 @@
  *
  * ⚠️ هیچ تبدیل تومان/دلار در کامپوننت React نیست.
  * ============================================================ */
-import { mean } from '../domain/stats';
+import { mean, median, percentile } from '../domain/stats';
 import {
   AREA_BANDS,
   ageBandOf,
@@ -71,6 +71,28 @@ export interface TypeCell {
   ppmUsd: number | null;
   totalToman: number | null;
   totalUsd: number | null;
+  /** بازهٔ رایج قیمت (نیمهٔ میانی آگهی‌ها: ۲۵٪ تا ۷۵٪) — فقط با نمونهٔ کافی؛ از Snapshot نمی‌آید */
+  ppmRange?: [number, number] | null;
+  /** آگهی‌های استثنایی همین خانه (نمایش جدا، بیرون از میانگین) */
+  exceptions?: { count: number; maxPpm: number | null; maxTotal: number | null } | null;
+  totalRange?: [number, number] | null;
+}
+
+/** حداقل آگهی برای نمایش بازه (کمتر از این، بازه بی‌معناست) */
+export const MIN_SAMPLE_FOR_RANGE = 4;
+
+/** پراکندگی قیمت هر متر یک ردیف: مرز ۲۵٪ و ۱۰٪ گران‌تر بازار (میانه فقط داخلی) — نه فقط بالاترین قیمت */
+export interface RowSpread {
+  median: number;
+  p75: number;
+  p90: number;
+}
+
+function rangeOf(values: number[]): [number, number] | null {
+  if (values.length < MIN_SAMPLE_FOR_RANGE) return null;
+  const lo = percentile(values, 25);
+  const hi = percentile(values, 75);
+  return lo === null || hi === null ? null : [lo, hi];
 }
 
 export type TypeCells = Partial<Record<PriceType, TypeCell>>;
@@ -83,6 +105,10 @@ export interface TypeMatrixRow {
   /** همه آگهی‌های این ردیف (شامل بدون سال ساخت) */
   total: number;
   cells: TypeCells;
+  /** پراکندگی کل ردیف (همهٔ سال‌ها) — null با نمونهٔ کم یا از Snapshot */
+  spread?: RowSpread | null;
+  /** بالاترین قیمت هر متر ردیف، شامل استثناها — نمایش داده می‌شود ولی در میانگین نیست */
+  top?: { ppm: number; exceptions: number } | null;
 }
 
 function cellOf(count: number, ppm: number | null, total: number | null, rate: number | null): TypeCell {
@@ -103,30 +129,75 @@ export function typeCellsOf(group: ListingView[], rate: number | null, currentJa
   for (const t of PRICE_TYPES) {
     const g = group.filter((l) => matchesPriceType(l, t.key, currentJalaliYear));
     if (g.length === 0) continue;
-    const ppm = mean(g.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0));
-    const tot = mean(g.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0));
-    cells[t.key] = cellOf(g.length, ppm, tot, rate);
+    const ppmV = g.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0);
+    const totV = g.map((l) => l.totalPriceToman).filter((v): v is number => v !== null && v > 0);
+    cells[t.key] = { ...cellOf(g.length, mean(ppmV), mean(totV), rate), ppmRange: rangeOf(ppmV), totalRange: rangeOf(totV) };
   }
   return cells;
 }
 
-function rowOf(key: string, displayName: string, group: ListingView[], rate: number | null, jy: number): TypeMatrixRow {
+/** پراکندگی قیمت هر متر یک گروه آگهی */
+export function spreadOf(group: ListingView[]): RowSpread | null {
+  const v = group.map((l) => l.pricePerSqmToman).filter((x): x is number => x !== null && x > 0);
+  if (v.length < MIN_SAMPLE_FOR_RANGE) return null;
+  const m = median(v);
+  const p75 = percentile(v, 75);
+  const p90 = percentile(v, 90);
+  return m === null || p75 === null || p90 === null ? null : { median: m, p75, p90 };
+}
+
+const maxOf = (vs: (number | null)[]) => {
+  const ok = vs.filter((v): v is number => v !== null && v > 0);
+  return ok.length ? Math.max(...ok) : null;
+};
+
+/**
+ * ردیف جدول: میانگین و بازه فقط از آگهی‌های عادی؛ استثناها (چند آگهی خیلی گران/ارزان) جدا
+ * کنار همان خانه و ردیف نمایش داده می‌شوند تا دیده شوند ولی عدد منطقه را جابه‌جا نکنند.
+ */
+function rowOf(key: string, displayName: string, group: ListingView[], rate: number | null, jy: number, exceptions: ListingView[] = []): TypeMatrixRow {
   const cells = typeCellsOf(group, rate, jy);
-  return { key, displayName, count: cellsCount(cells), total: group.length, cells };
+  for (const t of PRICE_TYPES) {
+    const ex = exceptions.filter((l) => matchesPriceType(l, t.key, jy));
+    if (ex.length === 0) continue;
+    const info = { count: ex.length, maxPpm: maxOf(ex.map((l) => l.pricePerSqmToman)), maxTotal: maxOf(ex.map((l) => l.totalPriceToman)) };
+    cells[t.key] = cells[t.key] ? { ...cells[t.key]!, exceptions: info } : { ...cellOf(0, null, null, rate), exceptions: info };
+  }
+  const topPpm = maxOf([...group, ...exceptions].map((l) => l.pricePerSqmToman));
+  return {
+    key,
+    displayName,
+    // سال ساخت معتبر: عادی‌ها + استثناهای داخل ستون‌ها (برای «بدون سال ساخت» درست)
+    count: cellsCount(cells) + Object.values(cells).reduce((a, c) => a + (c?.exceptions?.count ?? 0), 0),
+    total: group.length + exceptions.length,
+    cells,
+    spread: spreadOf(group),
+    top: topPpm === null ? null : { ppm: topPpm, exceptions: exceptions.length }
+  };
 }
 
 /** ماتریس «منطقه × سال ساخت» — همه مناطق، به ترتیب تعداد آگهی */
-export function buildAreaTypeMatrix(views: ListingView[], rate: number | null, currentJalaliYear: number): TypeMatrixRow[] {
-  const groups = new Map<string, ListingView[]>();
-  for (const v of views) {
-    const k = areaKeyOf(v.neighborhoodKey);
-    if (!k) continue;
-    const g = groups.get(k) ?? [];
-    g.push(v);
-    groups.set(k, g);
-  }
+export function buildAreaTypeMatrix(
+  views: ListingView[],
+  rate: number | null,
+  currentJalaliYear: number,
+  /** آگهی‌های استثنایی (splitExceptions) — جدا نمایش، بیرون از میانگین */
+  exceptions: ListingView[] = []
+): TypeMatrixRow[] {
+  const groupBy = (list: ListingView[]) => {
+    const groups = new Map<string, ListingView[]>();
+    for (const v of list) {
+      const k = areaKeyOf(v.neighborhoodKey);
+      if (!k) continue;
+      groups.set(k, [...(groups.get(k) ?? []), v]);
+    }
+    return groups;
+  };
+  const groups = groupBy(views);
+  const exGroups = groupBy(exceptions);
+  for (const k of exGroups.keys()) if (!groups.has(k)) groups.set(k, []);
   return [...groups.entries()]
-    .map(([k, g]) => rowOf(k, neighborhoodDisplayName(k), g, rate, currentJalaliYear))
+    .map(([k, g]) => rowOf(k, neighborhoodDisplayName(k), g, rate, currentJalaliYear, exGroups.get(k) ?? []))
     .sort((a, b) => b.total - a.total);
 }
 

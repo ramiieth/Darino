@@ -56,6 +56,10 @@
     {
       "path": "/api/propertyMarket?market=car&cron=1",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/propertyMarket?market=property&cron=1",
+      "schedule": "0 5 * * *"
     }
   ]
 }

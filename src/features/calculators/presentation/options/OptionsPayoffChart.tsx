@@ -60,7 +60,7 @@ export function OptionsPayoffChart({ legs, spot, T, breakevens }: { legs: Leg[];
                 tension: 0
               },
               {
-                label: 'امروز (IV فعلی)',
+                label: 'ارزش امروز (با نوسان فعلی بازار)',
                 data: xs.map((x) => ({ x, y: valueAt(legs, x, T) })),
                 borderColor: todayColor,
                 backgroundColor: todayColor,
@@ -76,7 +76,7 @@ export function OptionsPayoffChart({ legs, spot, T, breakevens }: { legs: Leg[];
         />
       </div>
       <p className="text-xs leading-6 text-muted">
-        خط آبی سود/زیان در سررسید است و خط طلایی نقطه‌چین ارزش امروز با همین IV. بالای صفر سود، پایین صفر زیان.
+        خط آبی سود یا زیان در روز سررسید است. خط طلایی نقطه‌چین ارزش امروز معامله است، اگر نوسان مورد انتظار بازار (IV) تغییر نکند. بالای صفر یعنی سود و پایین صفر یعنی زیان.
         {breakevens.length > 0 && <> سربه‌سر: {breakevens.map((b) => usd(b)).join(' و ')} دلار.</>}
       </p>
       <Disclosure summary="نمایش به‌صورت جدول">

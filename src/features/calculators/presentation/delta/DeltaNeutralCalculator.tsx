@@ -51,7 +51,7 @@ const DRIVER_LABEL: Record<DeltaDriver, string> = {
   price: 'سود/زیان قیمت (سناریوی خروج)',
   funding: 'فاندینگ',
   fees: 'کارمزد',
-  slippage: 'اسلیپیج'
+  slippage: 'لغزش قیمت (اسلیپیج)'
 };
 
 const aprOf = (hourly: number | null) => (hourly === null ? null : hourly * 8760 * 100);
@@ -127,7 +127,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
     available: n.available !== null && !(n.available > 0) ? 'عدد مثبت وارد کنید یا خالی بگذارید.' : null,
     hold: !(n.hold >= 0) ? 'مدت نمی‌تواند منفی باشد.' : null,
     cycles: !(n.cycles >= 1) || !Number.isInteger(n.cycles) ? 'تعداد دور باید عدد صحیح ۱ یا بیشتر باشد.' : null,
-    slippage: !(n.slippage >= 0) ? 'اسلیپیج نمی‌تواند منفی باشد.' : null,
+    slippage: !(n.slippage >= 0) ? 'لغزش قیمت نمی‌تواند منفی باشد.' : null,
     move: !Number.isFinite(n.move) || n.move <= -100 ? 'حرکت قیمت باید بیشتر از −۱۰۰٪ باشد.' : null
   };
   // اهرمِ بیش از سقف هشدار است، نه مانع محاسبه
@@ -174,6 +174,9 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
 
   const inputs = (
     <>
+      <p className="text-xs leading-6 text-muted">
+        دلتا نوترال یعنی روی یک دارایی، هم‌زمان یک موقعیت خرید (Long) و یک موقعیت فروش (Short) هم‌اندازه در دو صرافی باز کنید. اگر قیمت بالا یا پایین برود، سود یک طرف تقریباً زیان طرف دیگر را جبران می‌کند. درآمد از اختلاف فاندینگ دو صرافی (پرداخت دوره‌ای قراردادهای دائمی) یا امتیاز صرافی می‌آید، نه از حرکت قیمت.
+      </p>
       <InputGroup title="بازار و جهت">
         <Field label="دو صرافی">
           <Select
@@ -206,9 +209,9 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
         {longQ && shortQ && (
           <div className="flex items-center justify-between gap-3 rounded-field bg-surface-2/70 px-3.5 py-2.5 text-sm">
             <span className="min-w-0">
-              <span className="font-semibold text-positive">Long</span> روی {DELTA_VENUE_LABELS[longQ.venue]}
+              <span className="font-semibold text-positive">خرید (Long)</span> روی {DELTA_VENUE_LABELS[longQ.venue]}
               <span className="mx-1.5 text-subtle">·</span>
-              <span className="font-semibold text-negative">Short</span> روی {DELTA_VENUE_LABELS[shortQ.venue]}
+              <span className="font-semibold text-negative">فروش (Short)</span> روی {DELTA_VENUE_LABELS[shortQ.venue]}
             </span>
             <Button variant="ghost" size="sm" className="shrink-0 text-accent" icon={<ArrowLeftRight />} onClick={() => setFlipped((f) => !f)}>
               جابه‌جایی
@@ -219,7 +222,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
 
       <InputGroup title="سرمایه و اندازه">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="ارزش اسمی هر طرف" error={errors.notional}>
+          <Field label="ارزش اسمی هر طرف" hint="اندازهٔ دلاری هر موقعیت در بازار؛ با اهرم، پولی که می‌گذارید کمتر از این است." error={errors.notional}>
             <Input dir="ltr" inputMode="decimal" value={notional} onChange={(e) => setNotional(e.target.value)} suffix="دلار" />
           </Field>
           <Field label="اهرم (هر دو طرف)" error={errors.leverage}>
@@ -237,7 +240,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
           />
         </Field>
         <p className="-mt-3 text-2xs leading-5 text-subtle">
-          مارجین لازم = ۲ × ارزش ÷ اهرم. خالی = همان مارجین لازم، مبنای بازده. با عدد بزرگ‌تر، سرمایهٔ آزاد و بازده روی کل سرمایه دیده می‌شود.
+          وثیقهٔ لازم (مارجین) = ۲ × ارزش هر طرف ÷ اهرم. اهرم یعنی معامله با مبلغی بزرگ‌تر از پولی که می‌گذارید؛ اهرم بیشتر یعنی خطر بسته شدن اجباری (لیکویید) بیشتر. اگر خالی بماند، بازده روی همان وثیقهٔ لازم حساب می‌شود.
         </p>
       </InputGroup>
 
@@ -274,16 +277,16 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
             value={order}
             onChange={setOrder}
             options={[
-              { value: 'maker', label: 'میکر / TWAP' },
-              { value: 'taker', label: 'تیکر' }
+              { value: 'maker', label: 'سفارش محدود (میکر / TWAP)' },
+              { value: 'taker', label: 'سفارش فوری (تیکر)' }
             ]}
           />
         </div>
-        <Field label="اسلیپیج هر معامله (تخمین شما)" error={errors.slippage}>
+        <Field label="لغزش قیمت هر معامله (اسلیپیج، تخمین شما)" error={errors.slippage}>
           <Input dir="ltr" inputMode="decimal" value={slippage} onChange={(e) => setSlippage(e.target.value)} suffix="٪" />
         </Field>
         <p className="-mt-3 text-2xs leading-5 text-subtle">
-          کارمزد از API همان صرافی می‌آید؛ ربیت منفی صفر فرض می‌شود. سفارش محدود (میکر/TWAP) معمولاً اسلیپیج ندارد؛ برای تیکر عددی وارد کنید. ربات Tread.fi حداقل ۵۰۰ دلار برای هر طرف می‌خواهد.
+          کارمزد مستقیم از خود صرافی خوانده می‌شود. سفارش محدود (میکر) با قیمتی که شما تعیین می‌کنید انجام می‌شود و معمولاً لغزش قیمت ندارد. سفارش فوری (تیکر) با بهترین قیمت موجود انجام می‌شود؛ برای آن عددی وارد کنید. ربات Tread.fi حداقل ۵۰۰ دلار برای هر طرف می‌خواهد.
         </p>
       </InputGroup>
 
@@ -340,7 +343,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
                 <PercentValue value={result.ledger.roiPct} digits={2} className="font-semibold" /> روی{' '}
                 {n.available !== null ? 'کل سرمایهٔ شما' : 'مارجین دو طرف'}
                 <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-2xs text-subtle">
-                  <SourceTag kind="estimate" /> نرخ فاندینگ لحظه‌ای، کارمزد صرافی و سناریوی خروج شما — نه سود تحقق‌یافته
+                  <SourceTag kind="estimate" /> تقریبی؛ بر پایهٔ نرخ فاندینگ همین لحظه، کارمزد صرافی و سناریوی خروج شما. سود قطعی نیست
                 </span>
               </>
             }
@@ -357,7 +360,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
             }
           >
             <MetricGrid cols={3}>
-              <Metric label="سود/زیان قیمت (ناخالص)" value={<MoneyValue value={result.pricePnl} signed tone="auto" digits={2} />} />
+              <Metric label="سود یا زیان از تغییر قیمت (پیش از هزینه)" value={<MoneyValue value={result.pricePnl} signed tone="auto" digits={2} />} />
               <Metric label="فاندینگ خالص" value={<MoneyValue value={result.funding} signed tone="auto" digits={2} />} />
               <Metric label="کل هزینه‌ها" value={<MoneyValue value={-result.ledger.totalCosts} tone={result.ledger.totalCosts > 0 ? 'loss' : 'none'} digits={2} />} />
               <Metric
@@ -366,7 +369,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
                 sub="روی مارجین، بدون سود قیمت"
               />
               <Metric
-                label="سربه‌سر هزینه‌ها"
+                label="زمان لازم برای جبران هزینه‌ها"
                 value={result.breakEvenHours === null ? <span className="text-negative">هرگز</span> : `${toFaDigits(result.breakEvenHours.toFixed(1))} ساعت`}
                 sub="نگهداری هر دور"
               />
@@ -411,7 +414,7 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
           <Notice tone="info" title="ریسک‌هایی که دلتا نوترال حذف نمی‌کند">
             <ul className="list-disc space-y-1 ps-4">
               <li>
-                هر طرف مارجین جدا در صرافی خودش دارد؛ با حرکت حدود {result.nearestLiquidationPct === null ? '—' : `${toFaDigits(result.nearestLiquidationPct.toFixed(1))}٪`} قیمت، طرف بازنده لیکویید می‌شود و سود طرف دیگر در صرافی دیگر می‌ماند.
+                هر طرف وثیقهٔ جدا در صرافی خودش دارد؛ با حرکت حدود {result.nearestLiquidationPct === null ? '—' : `${toFaDigits(result.nearestLiquidationPct.toFixed(1))}٪`} قیمت، صرافی طرف بازنده را به‌اجبار می‌بندد (لیکویید) و سود طرف دیگر در صرافی دیگر می‌ماند. برای جلوگیری، با تغییر قیمت وثیقه یا اندازهٔ دو طرف را دوباره متعادل کنید.
               </li>
               <li>نرخ‌های فاندینگ لحظه‌ای‌اند و هر ساعت عوض می‌شوند؛ اختلاف امروز ممکن است فردا برعکس شود.</li>
               <li>بازارهای سهام خارج از ساعت معاملات بورس سقف قیمت و مارجین متفاوت دارند؛ نقدشوندگی بازارهای کوچک کم است.</li>
@@ -430,13 +433,13 @@ function Warnings({ result, holdHours, feeAssumed, mmfAssumed }: { result: Delta
   return (
     <>
       {result.capitalShortfall && (
-        <Notice tone="error" title="سرمایهٔ در دسترس کمتر از مارجین لازم است">
-          برای این اندازه و اهرم <MoneyValue value={result.capital} digits={2} className="font-semibold text-ink" /> مارجین لازم است. اندازه را کم یا اهرم را زیاد کنید.
+        <Notice tone="error" title="سرمایهٔ در دسترس کمتر از وثیقهٔ لازم است">
+          برای این اندازه و اهرم <MoneyValue value={result.capital} digits={2} className="font-semibold text-ink" /> وثیقه (مارجین) لازم است. اندازه را کم یا اهرم را زیاد کنید.
         </Notice>
       )}
       {result.liquidated && (
-        <Notice tone="error" title="در این سناریو یک طرف لیکویید می‌شود">
-          تخمین محافظه‌کارانه: کل مارجین طرف بازنده از دست می‌رود و فاندینگ آن طرف متوقف می‌شود. عدد واقعی به زمان و قیمت لیکویید و صندوق بیمهٔ صرافی بستگی دارد.
+        <Notice tone="error" title="در این سناریو صرافی یک طرف را به‌اجبار می‌بندد (لیکویید)">
+          تخمین محتاطانه: کل وثیقهٔ طرف بازنده از دست می‌رود و فاندینگ آن طرف متوقف می‌شود. عدد واقعی به زمان و قیمت لیکویید و صندوق بیمهٔ صرافی بستگی دارد.
         </Notice>
       )}
       {result.net < 0 && !result.liquidated && (
@@ -470,25 +473,25 @@ function allocationLines(r: DeltaResult, longQ: VenueQuote, shortQ: VenueQuote, 
       source: hasAvailable ? 'input' : undefined,
       hint: hasAvailable ? undefined : 'همان مارجین لازم (سرمایهٔ کل وارد نشده)'
     },
-    { label: `مارجین Long · ${venue(longQ)}`, value: r.long.margin, as: 'money', sub: true },
-    { label: `مارجین Short · ${venue(shortQ)}`, value: r.short.margin, as: 'money', sub: true },
-    { label: 'مارجین قفل‌شده (وثیقه)', value: r.capital, as: 'money' },
+    { label: `وثیقهٔ طرف خرید (Long) · ${venue(longQ)}`, value: r.long.margin, as: 'money', sub: true },
+    { label: `وثیقهٔ طرف فروش (Short) · ${venue(shortQ)}`, value: r.short.margin, as: 'money', sub: true },
+    { label: 'وثیقهٔ قفل‌شده (مارجین)', value: r.capital, as: 'money' },
     { label: 'سرمایهٔ آزاد', value: r.freeCapital, as: r.freeCapital < 0 ? 'pnl' : 'money', hint: r.freeCapital < 0 ? 'کمبود سرمایه' : 'نقدینگی بیرون از پوزیشن' },
-    { label: 'ارزش اسمی کل در معرض بازار', value: r.grossExposure, as: 'money', hint: '۲ × ارزش هر طرف — پول پرداختی نیست' }
+    { label: 'ارزش اسمی کل در معرض بازار', value: r.grossExposure, as: 'money', hint: '۲ × ارزش هر طرف؛ این پولی نیست که پرداخت می‌کنید' }
   ];
 }
 
 function pnlLines(r: DeltaResult, longQ: VenueQuote, shortQ: VenueQuote, slipPct: number): FlowLine[] {
   const lines: FlowLine[] = [
-    { label: `سود/زیان قیمت Long · ${venue(longQ)}`, value: r.long.pricePnl, as: 'pnl', sub: true, source: 'scenario' },
-    { label: `سود/زیان قیمت Short · ${venue(shortQ)}`, value: r.short.pricePnl, as: 'pnl', sub: true, source: 'scenario' },
-    { label: 'سود/زیان معاملاتی ناخالص', value: r.pricePnl, as: 'pnl' },
-    { label: `فاندینگ Long`, value: r.long.funding, as: 'pnl', sub: true, source: 'estimate' },
-    { label: `فاندینگ Short`, value: r.short.funding, as: 'pnl', sub: true, source: 'estimate' },
+    { label: `سود یا زیان قیمت، طرف خرید · ${venue(longQ)}`, value: r.long.pricePnl, as: 'pnl', sub: true, source: 'scenario' },
+    { label: `سود یا زیان قیمت، طرف فروش · ${venue(shortQ)}`, value: r.short.pricePnl, as: 'pnl', sub: true, source: 'scenario' },
+    { label: 'سود یا زیان قیمت، پیش از هزینه', value: r.pricePnl, as: 'pnl' },
+    { label: `فاندینگ طرف خرید (Long)`, value: r.long.funding, as: 'pnl', sub: true, source: 'estimate' },
+    { label: `فاندینگ طرف فروش (Short)`, value: r.short.funding, as: 'pnl', sub: true, source: 'estimate' },
     { label: 'فاندینگ خالص دورهٔ نگهداری', value: r.funding, as: 'pnl', hint: 'نرخ لحظه‌ای ثابت فرض شده' },
     { label: 'کارمزد ورود', value: r.entryFees, as: 'cost' },
     { label: 'کارمزد خروج', value: r.exitFees, as: 'cost' },
-    { label: 'اسلیپیج', value: r.slippage, as: 'cost', source: 'input', hint: `${toFaDigits(slipPct)}٪ هر معامله، ورود و خروج` },
+    { label: 'لغزش قیمت (اسلیپیج)', value: r.slippage, as: 'cost', source: 'input', hint: `${toFaDigits(slipPct)}٪ هر معامله، ورود و خروج` },
     { label: 'سود خالص تخمینی', value: r.net, as: 'pnl', total: true }
   ];
   return lines;
@@ -500,7 +503,7 @@ function settlementLines(r: DeltaResult, longQ: VenueQuote, shortQ: VenueQuote):
     value: l.closingBalance,
     as: 'money',
     sub: true,
-    hint: l.liquidatedAtExit ? 'لیکویید — مارجین از دست رفته' : `مارجین آزادشده ${fmtUsd(l.margin)} + سود/زیان این طرف`
+    hint: l.liquidatedAtExit ? 'به‌اجبار بسته شده (لیکویید)؛ وثیقه از دست رفته' : `مارجین آزادشده ${fmtUsd(l.margin)} + سود/زیان این طرف`
   });
   return [
     bal(r.long, longQ, 'Long'),
@@ -545,33 +548,33 @@ function Position({
       </div>
 
       <MetricGrid cols={3} className="rounded-field bg-surface-2/70 px-3.5 py-3">
-        <Metric size="sm" label="دلتای دلاری خالص" value={<MoneyValue value={result.netDeltaUsd} digits={2} />} sub="ارزش برابر دو طرف" />
+        <Metric size="sm" label="دلتای دلاری خالص (حساسیت به قیمت)" value={<MoneyValue value={result.netDeltaUsd} digits={2} />} sub="ارزش برابر دو طرف" />
         <Metric
           size="sm"
           label="اختلاف مقدار دو طرف"
           value={<PercentValue value={result.quantityImbalancePct} digits={3} tone="none" />}
-          sub="مثبت = واحد Long بیشتر"
+          sub="مثبت = مقدار طرف خرید بیشتر است"
         />
         <Metric
           size="sm"
           label="اختلاف قیمت دو صرافی"
           value={<PercentValue value={result.basisPct} digits={3} tone="none" />}
-          sub={result.basisPct === null ? 'قیمت مارک نامعلوم' : result.basisPct >= 0 ? 'Short گران‌تر فروخته می‌شود' : 'Short ارزان‌تر فروخته می‌شود'}
+          sub={result.basisPct === null ? 'قیمت مارک نامعلوم' : result.basisPct >= 0 ? 'طرف فروش با قیمت بالاتری باز می‌شود' : 'طرف فروش با قیمت پایین‌تری باز می‌شود'}
         />
       </MetricGrid>
 
       <Disclosure summary="خنثی بودن دلتا، ارزش اسمی و ریسک چه فرقی دارند؟">
         <ul className="list-disc space-y-1.5 ps-4 text-xs leading-6 text-muted">
           <li>
-            <b className="text-ink">خنثی بودن ارزش اسمی:</b> ارزش دلاری Long و Short برابر است. این ماشین‌حساب همیشه همین را می‌سازد.
+            <b className="text-ink">خنثی بودن ارزش اسمی:</b> ارزش دلاری طرف خرید (Long) و فروش (Short) برابر است. این ماشین‌حساب همیشه همین را می‌سازد.
           </li>
           <li>
             <b className="text-ink">خنثی بودن دلتا:</b> اگر قیمت در هر دو صرافی به یک درصد حرکت کند، سود یک طرف زیان طرف دیگر را دقیقاً می‌پوشاند (دلتای دلاری خالص صفر). چون قیمت دو
             صرافی کمی فرق دارد، مقدار دارایی دو طرف به همان اندازه فرق دارد.
           </li>
           <li>
-            <b className="text-ink">خنثی بودن ریسک:</b> برقرار نیست. اختلاف قیمت دو صرافی می‌تواند تغییر کند (سناریوی «صفر می‌شود» را ببینید)، هر طرف جدا لیکویید می‌شود و فاندینگ ممکن
-            است برعکس شود. این مدل فقط برای پرپ خطی است، نه آپشن یا ابزار غیرخطی.
+            <b className="text-ink">خنثی بودن ریسک:</b> برقرار نیست. اختلاف قیمت دو صرافی می‌تواند تغییر کند (سناریوی «صفر می‌شود» را ببینید)، هر طرف جدا ممکن است به‌اجبار بسته شود (لیکویید) و فاندینگ ممکن
+            است برعکس شود. این مدل فقط برای قرارداد دائمی (پرپ) است، نه آپشن.
           </li>
         </ul>
       </Disclosure>
@@ -598,26 +601,26 @@ function LegCard({
       <h4 className="mb-1 flex items-center justify-between gap-2 text-sm font-bold text-ink">
         <span className={long ? 'text-positive' : 'text-negative'}>{long ? 'Long' : 'Short'}</span>
         <span className="flex items-center gap-1.5">
-          {r.liquidatedAtExit && <Badge tone="loss">لیکویید در سناریو</Badge>}
+          {r.liquidatedAtExit && <Badge tone="loss">بسته شدن اجباری (لیکویید) در سناریو</Badge>}
           <Badge tone="neutral">{DELTA_VENUE_LABELS[quote.venue]}</Badge>
         </span>
       </h4>
       <KeyValueList
         dense
         rows={[
-          { label: <LabelTag text="قیمت ورود (مارک)" kind="live" />, value: <MoneyValue value={r.entryPrice} /> },
+          { label: <LabelTag text="قیمت ورود (قیمت مرجع صرافی)" kind="live" />, value: <MoneyValue value={r.entryPrice} /> },
           { label: <LabelTag text="قیمت خروج" kind="scenario" />, value: r.liquidatedAtExit ? <span className="text-negative">لیکویید</span> : <MoneyValue value={r.exitPrice} /> },
           { label: 'مقدار دارایی', value: <QuantityValue value={r.quantity} unit={quote.base} digits={6} /> },
           { label: 'ارزش اسمی', value: <MoneyValue value={r.notional} digits={2} /> },
-          { label: 'دلتای دلاری', value: <MoneyValue value={r.deltaUsd} signed digits={2} /> },
-          { label: 'مارجین', value: <MoneyValue value={r.margin} digits={2} />, hint: share === null ? undefined : `${toFaDigits(share.toFixed(0))}٪ مارجین کل` },
+          { label: 'دلتای دلاری', hint: 'تغییر تقریبی ارزش این طرف با هر ۱٪ حرکت قیمت × ۱۰۰', value: <MoneyValue value={r.deltaUsd} signed digits={2} /> },
+          { label: 'وثیقه (مارجین)', value: <MoneyValue value={r.margin} digits={2} />, hint: share === null ? undefined : `${toFaDigits(share.toFixed(0))}٪ وثیقهٔ کل` },
           { label: <LabelTag text="فاندینگ سالانه" kind="live" />, value: <PercentValue value={aprOf(quote.fundingHourly)} digits={1} tone="none" />, hint: long ? 'مثبت = لانگ می‌پردازد' : 'مثبت = شورت دریافت می‌کند' },
           {
             label: <LabelTag text="کارمزد هر معامله" kind={fee.assumed ? 'assumed' : 'live'} />,
             value: <PercentValue value={fee.pct} digits={4} signed={false} tone="none" />
           },
           {
-            label: 'فاصله تا لیکویید',
+            label: 'فاصله تا بسته شدن اجباری (لیکویید)',
             value: r.liquidationMovePct === null ? '—' : `${long ? 'ریزش' : 'رشد'} ${toFaDigits(r.liquidationMovePct.toFixed(1))}٪`,
             emphasis: true
           }
@@ -675,7 +678,7 @@ function Sensitivity({ result, sens, move, hold }: { result: DeltaResult; sens: 
       <KeyValueList
         dense
         rows={[
-          { label: 'هر ۰٫۰۱٪ کارمزد یا اسلیپیج بیشتر در هر معامله', value: <MoneyValue value={-result.costPerBp} tone="loss" digits={2} /> },
+          { label: 'هر ۰٫۰۱٪ کارمزد یا لغزش قیمت بیشتر در هر معامله', value: <MoneyValue value={-result.costPerBp} tone="loss" digits={2} /> },
           { label: 'کارمزد هر ۱ میلیون دلار حجم', value: <MoneyValue value={result.costPerMillion} digits={2} /> },
           { label: 'بیشترین اثر روی نتیجهٔ فعلی', value: sens.driver ? DRIVER_LABEL[sens.driver] : '—' }
         ]}
@@ -732,7 +735,7 @@ function Scanner({
                     </bdi>
                     {lowLiquidity(s) && <Badge tone="warn">کم‌نقد</Badge>}
                   </span>
-                  <span className="block truncate text-xs text-muted">Short روی {DELTA_VENUE_LABELS[shortVenue]}</span>
+                  <span className="block truncate text-xs text-muted">فروش (Short) روی {DELTA_VENUE_LABELS[shortVenue]}</span>
                 </span>
                 <span className="shrink-0 text-end">
                   <PercentValue value={s.spreadApr} digits={1} signed={false} tone={s.spreadApr > 0 ? 'gain' : 'none'} className="text-sm font-bold" />

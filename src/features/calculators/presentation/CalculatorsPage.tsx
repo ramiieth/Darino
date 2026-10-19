@@ -30,11 +30,11 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
   { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
   { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر و آرکوس — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' },
-  { value: 'options', label: 'آپشن (Derive)', description: 'دستیار تحلیل آپشن روی بازارهای Derive — استراتژی، نمودار سود و زیان، سناریوها، ترکیب چند بازار و برنامهٔ خروج' },
+  { value: 'options', label: 'آپشن (Derive)', description: 'قدم به قدم: با توجه به سرمایه و نظرتان دربارهٔ بازار، یک معاملهٔ آپشن در صرافی Derive پیشنهاد می‌شود؛ همراه با بیشترین سود و زیان، سود یا زیان در هر حرکت قیمت و زمان مناسب خروج' },
   {
     value: 'hedge',
     label: 'ماشین‌حساب پوشش ریسک (هج)',
-    description: 'اسپات + پوزیشن Short در فیوچرز — سرمایهٔ اولیه و نهایی، سود یا زیان خالص پس از هزینه‌ها و مقایسهٔ منصفانه با حالت بدون هج در ریزش و رشد بازار',
+    description: 'اگر دارایی‌ای دارید و از ریزش قیمت نگرانید: یک موقعیت فروش (Short) هم‌اندازه در بازار آتی باز می‌کنید تا زیان ریزش جبران شود. اینجا می‌بینید با و بدون پوشش، پس از هزینه‌ها چه نتیجه‌ای می‌گیرید',
     icon: <ShieldHalf aria-hidden />
   },
   {
@@ -46,13 +46,13 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   {
     value: 'delta',
     label: 'دلتا نوترال',
-    description: 'Long و Short هم‌اندازه در دو صرافی (آرکوس، اوندو پرپس، لایتر، لایتر رابین‌هود) — مسیر سرمایه، سود خالص تخمینی در سناریوی خروج، کارمزد، اسلیپیج و فاصله تا لیکویید',
+    description: 'یک موقعیت خرید (Long) و یک موقعیت فروش (Short) هم‌اندازه در دو صرافی، تا تغییر قیمت تقریباً روی سود و زیان اثر نگذارد و درآمد از فاندینگ یا امتیاز بیاید. سود خالص تقریبی پس از کارمزد و فاصله تا انحلال اجباری (لیکویید) را می‌بینید',
     icon: <Scale aria-hidden />
   },
   {
     value: 'execution',
     label: 'اجرا و پایش دلتا',
-    description: 'پیش از اجرا: «محاسبهٔ ساده» در برابر اجرای ربات Tread.fi (پر شدن تدریجی، عدم توازن، حد ضرر) · در حال اجرا: پوزیشن‌های واقعی حساب‌های لایتر، لایتر رابین‌هود و آرکوس',
+    description: 'بعد از طراحی دلتا نوترال: پیش از اجرا می‌بینید اجرای تدریجی سفارش‌ها چه اثری دارد؛ در حین اجرا، موقعیت‌های واقعی حساب‌هایتان پایش می‌شود تا اگر دو طرف از تعادل خارج شدند، پوشش را دوباره تنظیم کنید',
     icon: <Bot aria-hidden />
   },
   {
@@ -71,6 +71,40 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   { value: 'xirr', label: 'بازده واقعی', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
   { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' }
 ];
+
+/** ابزارهای مرتبط با آپشن و پوشش ریسک — به ترتیب استفاده */
+const RISK_TOOLS: { tab: CalcTab; need: string }[] = [
+  { tab: 'options', need: 'می‌خواهم با آپشن روی بالا یا پایین رفتن (یا ثابت ماندن) قیمت معامله کنم.' },
+  { tab: 'hedge', need: 'دارایی دارم و می‌خواهم در برابر ریزش قیمت از آن محافظت کنم.' },
+  { tab: 'delta', need: 'می‌خواهم موقعیتی بسازم که تقریباً به تغییر قیمت حساس نباشد و درآمدش از فاندینگ بیاید.' },
+  { tab: 'execution', need: 'موقعیت دلتا نوترال را باز کرده‌ام و می‌خواهم ببینم هنوز متعادل است یا باید تنظیمش کنم.' }
+];
+
+/** راهنمای کوتاه: کدام ابزار برای کدام نیاز، و ارتباطشان */
+function RiskToolsGuide({ tab, onOpen }: { tab: CalcTab; onOpen: (t: CalcTab) => void }) {
+  return (
+    <details className="mt-3 rounded-card border border-divider bg-surface-2/40 p-3 text-xs leading-6 text-muted">
+      <summary className="cursor-pointer font-semibold text-ink">کدام ابزار برای شما مناسب است؟</summary>
+      <ul className="mt-2 space-y-1.5">
+        {RISK_TOOLS.map((r) => (
+          <li key={r.tab}>
+            {r.need}{' '}
+            {r.tab === tab ? (
+              <b className="text-accent">← همین تب</b>
+            ) : (
+              <button type="button" className="font-semibold text-accent underline" onClick={() => onOpen(r.tab)}>
+                ← {TABS.find((t) => t.value === r.tab)?.label}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-2xs text-subtle">
+        ارتباط این ابزارها: «پوشش ریسک» از دارایی موجود محافظت می‌کند. «دلتا نوترال» همین ایده را کامل‌تر می‌کند تا حساسیت به قیمت تقریباً صفر شود. «اجرا و پایش دلتا» همان موقعیت دلتا نوترال را در عمل دنبال می‌کند. «آپشن» راه جداگانه‌ای برای سود از حرکت یا آرامش بازار با زیان سقف‌دار است.
+      </p>
+    </details>
+  );
+}
 
 export function CalculatorsPage() {
   const [tab, setTab] = useState<CalcTab>('pnl');
@@ -107,6 +141,7 @@ export function CalculatorsPage() {
         <div>
           <Tabs<CalcTab> label="ماشین‌حساب‌ها" options={TABS} value={tab} onChange={setTab} />
           {current && <p className="mt-3 text-sm text-muted">{current.description}</p>}
+          {RISK_TOOLS.some((r) => r.tab === tab) && <RiskToolsGuide tab={tab} onOpen={setTab} />}
         </div>
         <div {...panel('pnl')}>
           <PnlCalculator />

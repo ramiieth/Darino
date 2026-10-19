@@ -13,8 +13,10 @@ import { areaKeyOf, neighborhoodDisplayName } from '../data/catalog';
 import { AGE_BANDS, AREA_BANDS, ageBandLabel, ageBandSub, type AgeBand, type AreaBand } from '../domain/segments';
 import type { ListingView } from '../service/propertyMarketService';
 import { fmtMillionToman, fmtTotalToman, fmtUsdFa } from './format';
+import type { Valuation } from '../domain/valuation';
+import { VerdictBadge, verdictLine } from './PriceAssistant';
 
-type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
+export type SortKey = 'recent' | 'ppm-asc' | 'ppm-desc' | 'total-asc' | 'total-desc';
 export type AgeFilter = 'all' | AgeBand;
 export type AreaFilter = 'all' | AreaBand;
 
@@ -35,8 +37,16 @@ export function ListingsExplorer({
   onExactArea,
   place = 'all',
   onPlace,
-  jalaliYear
+  jalaliYear,
+  valuations,
+  sort: sortProp,
+  onSort
 }: {
+  /** مرتب‌سازی کنترل‌شده (اختیاری) — مثلاً «گران‌ترین اول» از کلیک روی «بالاترین» */
+  sort?: SortKey;
+  onSort?: (s: SortKey) => void;
+  /** ارزیابی دستیار قیمت برای هر آگهی (اختیاری) */
+  valuations?: ReadonlyMap<string, Valuation>;
   /** سال شمسی جاری — برچسب فیلتر سال ساخت */
   jalaliYear: number;
   /** فیلتر منطقه (کلید منطقه) */
@@ -60,7 +70,9 @@ export function ListingsExplorer({
   const [localPlace, setLocalPlace] = useState<string>(place);
   const nb = onPlace ? place : localPlace;
   const setNb = onPlace ?? setLocalPlace;
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [sortLocal, setSortLocal] = useState<SortKey>('recent');
+  const sort = sortProp ?? sortLocal;
+  const setSort = (s: SortKey) => (onSort ? onSort(s) : setSortLocal(s));
   const [limit, setLimit] = useState(PAGE);
 
   const areas = useMemo(() => {
@@ -199,6 +211,12 @@ export function ListingsExplorer({
                   {l.rooms !== null && <> · {l.rooms === 0 ? 'بدون اتاق' : `${toFaDigits(l.rooms)} خواب`}</>}
                   {l.yearBuilt !== null && <> · ساخت {toFaDigits(l.yearBuilt)}</>}
                 </p>
+                {valuations?.get(l.token) && valuations.get(l.token)!.verdict !== 'unknown' && (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-2xs text-muted">
+                    <VerdictBadge v={valuations.get(l.token)} />
+                    {verdictLine(valuations.get(l.token)!)}
+                  </p>
+                )}
                 <p className="mt-0.5 text-2xs text-subtle">
                   {l.sourceUpdatedAt ? <>به‌روزرسانی آگهی: {fmtRelativeAge(l.sourceUpdatedAt)}</> : <>دیده‌شده: {fmtRelativeAge(l.scrapedAt)}</>}
                   {l.listedAt && l.sourceUpdatedAt && l.sourceUpdatedAt - l.listedAt > 86_400_000 && (

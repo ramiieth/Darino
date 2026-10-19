@@ -238,14 +238,41 @@ export function deduplicateListings(
   return [...byToken.values()];
 }
 
+/**
+ * آگهی شناخته‌شده که سرور جزئیاتش را دوباره نگرفت: فیلدهای خالی (متراژ، سال ساخت،
+ * طبقه، تاریخ‌ها…) از نسخه ذخیره‌شده پر می‌شوند؛ قیمت و عنوان تازه فهرست مقدم‌اند.
+ */
+export function fillFromStored(seed: ParsedListingSeed, prev: PropertyMarketListing | undefined): ParsedListingSeed {
+  if (!prev) return seed;
+  const out = { ...seed };
+  const fill = <K extends keyof ParsedListingSeed & keyof PropertyMarketListing>(k: K) => {
+    if (out[k] === null || out[k] === undefined) (out as Record<string, unknown>)[k] = prev[k] ?? null;
+  };
+  for (const k of ['areaSqm', 'rooms', 'yearBuilt', 'floor', 'parking', 'elevator', 'storage', 'balcony', 'listedAt', 'sourceUpdatedAt'] as const) {
+    fill(k);
+  }
+  // قیمت هر متر قدیمی فقط وقتی قیمت کل تازه نیامده (وگرنه از قیمت کل تازه ÷ متراژ)
+  if (out.totalPriceToman === null && out.pricePerSqmToman === null) out.pricePerSqmToman = prev.pricePerSqmToman;
+  return out;
+}
+
 /* ---------------- ۴) فیلتر پرت (Outlier) ---------------- */
 
 /**
- * فیلتر پرت آماری روی قیمت هر مترمربع:
- *  - بازه جهانی [P5, P95]×ضریب اطمینان نیست؛ به‌جای آن حصار IQR
- *    (Q1 − 1.5·IQR .. Q3 + 1.5·IQR) به‌صورت «منطقه‌به‌منطقه» وقتی
- *    نمونه کافی باشد، و یک حصار سراسری روی همه داده‌ها.
+ * فیلتر پرت آماری روی قیمت هر مترمربع — حصار IQR روی «لگاریتم» قیمت:
+ *  قیمت ملک چوله به راست است (چند پروژهٔ لوکس خیلی گران‌تر از میانه)؛ حصار خطی
+ *  آگهی لوکس واقعی را حذف می‌کرد (کیانپارس ۵۵۰ میلیون) ولی خطای واحد پایین
+ *  (۷ میلیون) را گاهی نگه می‌داشت. حصار لگاریتمی = حصار نسبتی: [Q1/r^k , Q3·r^k] با r = Q3/Q1.
+ *  منطقه‌به‌منطقه وقتی نمونه کافی باشد، و یک حصار سراسری برای مناطق کم‌نمونه.
  */
+function logFence(values: number[], k: number): [number, number] | null {
+  const logs = values.filter((v) => v > 0).map(Math.log);
+  const q1 = percentile(logs, 25);
+  const q3 = percentile(logs, 75);
+  if (q1 === null || q3 === null) return null;
+  // خطای گرد کردن exp(log(v)) نباید خود داده را پرت کند (مثلاً وقتی همه یک قیمت دارند)
+  return [Math.exp(q1 - k * (q3 - q1)) * (1 - 1e-9), Math.exp(q3 + k * (q3 - q1)) * (1 + 1e-9)];
+}
 export function filterOutliers(
   listings: PropertyMarketListing[],
   report: CleaningReport
@@ -253,14 +280,9 @@ export function filterOutliers(
   const all = listings
     .map((l) => l.pricePerSqmToman)
     .filter((v): v is number => v !== null && v > 0);
-  const gq1 = percentile(all, 25);
-  const gq3 = percentile(all, 75);
   // حصار سراسری برای محله‌های کم‌نمونه = «پرت شدید» توکی (۳×IQR): فقط خطای
   // ورود/واحد را می‌گیرد، نه محله گران واقعی (مثل کیانپارس با چند آگهی).
-  const globalFence: [number, number] | null =
-    gq1 !== null && gq3 !== null
-      ? [gq1 - GLOBAL_IQR_K * (gq3 - gq1), gq3 + GLOBAL_IQR_K * (gq3 - gq1)]
-      : null;
+  const globalFence = logFence(all, GLOBAL_IQR_K);
 
   // گروه‌بندی منطقه‌ها (همان سطح نمایش)
   const byNb = new Map<string, PropertyMarketListing[]>();
@@ -277,11 +299,7 @@ export function filterOutliers(
       .map((l) => l.pricePerSqmToman)
       .filter((v): v is number => v !== null && v > 0);
     let fence = globalFence;
-    if (group.length >= MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR) {
-      const q1 = percentile(values, 25);
-      const q3 = percentile(values, 75);
-      if (q1 !== null && q3 !== null) fence = [q1 - 1.5 * (q3 - q1), q3 + 1.5 * (q3 - q1)];
-    }
+    if (group.length >= MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR) fence = logFence(values, 1.5) ?? fence;
     for (const l of group) {
       const v = l.pricePerSqmToman;
       if (v !== null && fence && (v < fence[0] || v > fence[1])) {
@@ -293,6 +311,37 @@ export function filterOutliers(
     }
   }
   return kept;
+}
+
+/**
+ * جدا کردن «استثنا» از آگهی‌های عادی (بعد از filterOutliers):
+ *  آگهی واقعی که بیرون حصار خطی IQR منطقه است (Q1 − 1.5·IQR .. Q3 + 1.5·IQR)، مثل پروژهٔ
+ *  خیلی لوکس کیانپارس (۵۵۰ میلیون). حذف نمی‌شود و در فهرست آگهی‌ها می‌ماند، ولی در میانگین،
+ *  بازهٔ قیمت و مقایسهٔ دستیار حساب نمی‌شود تا یک آگهی استثنایی عدد کل منطقه را جابه‌جا نکند.
+ *  منطقهٔ کم‌نمونه (کمتر از MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR) استثنا ندارد.
+ */
+export function splitExceptions(listings: PropertyMarketListing[]): {
+  regular: PropertyMarketListing[];
+  exceptions: PropertyMarketListing[];
+} {
+  const byArea = new Map<string, PropertyMarketListing[]>();
+  for (const l of listings) {
+    const k = areaKeyOf(l.neighborhoodKey) ?? '';
+    byArea.set(k, [...(byArea.get(k) ?? []), l]);
+  }
+  const regular: PropertyMarketListing[] = [];
+  const exceptions: PropertyMarketListing[] = [];
+  for (const group of byArea.values()) {
+    const values = group.map((l) => l.pricePerSqmToman).filter((v): v is number => v !== null && v > 0);
+    const q1 = group.length >= MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR ? percentile(values, 25) : null;
+    const q3 = group.length >= MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR ? percentile(values, 75) : null;
+    for (const l of group) {
+      const v = l.pricePerSqmToman;
+      const out = q1 !== null && q3 !== null && v !== null && (v < q1 - 1.5 * (q3 - q1) || v > q3 + 1.5 * (q3 - q1));
+      (out ? exceptions : regular).push(l);
+    }
+  }
+  return { regular, exceptions };
 }
 
 /* ---------------- اجرای کامل قیف ---------------- */

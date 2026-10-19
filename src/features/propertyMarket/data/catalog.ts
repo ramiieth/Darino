@@ -149,6 +149,9 @@ export function keyFromUnknownName(raw: string): string {
  * نگاشت نام محله دیوار → (کلید، نام نمایشی).
  * ناشناخته → کلید مکانیکی + همان نام خام (هرگز حدس زده نمی‌شود).
  */
+/** محله‌های شرقی/غربی که نام کاملشان در عنوان می‌تواند محله را صریحاً تعیین کند */
+const EAST_WEST_KEYS = Object.values(EAST_WEST_FROM_TITLE).flatMap((x) => [x.east, x.west]);
+
 export function resolveNeighborhood(
   rawName: string | null | undefined,
   /** عنوان آگهی — فقط برای تفکیک صریح شرقی/غربی کیانپارس/کیان‌آباد */
@@ -158,6 +161,18 @@ export function resolveNeighborhood(
   const ew = base.key ? EAST_WEST_FROM_TITLE[base.key] : undefined;
   if (ew && title) {
     const t = norm(title);
+    // نام کامل صریح در عنوان («کیان آباد شرقی») مقدم است: محلهٔ دیوار «کیانپارس» ولی عنوان کیان‌آباد
+    // → قبلاً فقط «شرقی» دیده می‌شد و آگهی کیان‌آباد در کیانپارس شرقی می‌نشست
+    const explicit = new Set(
+      EAST_WEST_KEYS.filter((k) => {
+        const def = AHVAZ_NEIGHBORHOODS.find((d) => d.key === k);
+        return def ? [def.name, ...def.aliases].map(norm).some((n) => t.includes(n)) : false;
+      })
+    );
+    if (explicit.size === 1) {
+      const key = [...explicit][0];
+      return { key, displayName: neighborhoodDisplayName(key) };
+    }
     const east = t.includes('شرقی');
     const west = t.includes('غربی');
     // فقط اگر دقیقاً یکی از دو جهت صریحاً آمده باشد (هر دو/هیچ → نامشخص)

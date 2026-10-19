@@ -23,7 +23,7 @@ export function LiveMonitor() {
   if (!data.accounts.length) {
     return (
       <Guide title="هنوز حساب لایتر یا آرکوسی ثبت نشده است">
-        آدرس عمومی حساب را در بخش «لایتر»، «لایتر رابین‌هود» یا «آرکوس» اضافه کنید. بعد از آن، هر Long و Short روی یک دارایی (مثلاً پوزیشن‌هایی که ربات Tread.fi باز کرده) این‌جا با
+        آدرس عمومی حساب را در بخش «لایتر»، «لایتر رابین‌هود» یا «آرکوس» اضافه کنید. بعد از آن، هر موقعیت خرید (Long) و فروش (Short) روی یک دارایی (مثلاً پوزیشن‌هایی که ربات Tread.fi باز کرده) این‌جا با
         اعداد واقعی نمایش داده می‌شود. هیچ کلید یا مجوز معامله‌ای لازم نیست.
       </Guide>
     );
@@ -65,7 +65,7 @@ export function LiveMonitor() {
         </Surface>
       ) : !data.pairs.length ? (
         <Guide title="جفت دلتا نوترالی پیدا نشد">
-          در حساب‌های خوانده‌شده، هیچ دارایی‌ای هم‌زمان Long و Short ندارد.
+          در حساب‌های خوانده‌شده، هیچ دارایی‌ای هم‌زمان موقعیت خرید و فروش ندارد.
           {data.legs.length > 0 && ` (${toFaDigits(data.legs.length)} پوزیشن تک‌طرفه پیدا شد.)`} اگر یک طرف روی اوندو است، آن طرف این‌جا دیده نمی‌شود.
         </Guide>
       ) : (
@@ -103,22 +103,27 @@ function PairCard({ p }: { p: LivePair }) {
           </div>
         </div>
         {e.netPct === null ? null : e.unbalanced ? (
-          <Badge tone="warn">Unbalanced · {toFaDigits(Math.abs(e.netPct).toFixed(2))}٪</Badge>
+          <Badge tone="warn">نامتعادل (Unbalanced) · {toFaDigits(Math.abs(e.netPct).toFixed(2))}٪</Badge>
         ) : (
           <Badge tone="gain">متوازن · {toFaDigits(Math.abs(e.netPct).toFixed(2))}٪</Badge>
         )}
       </div>
 
       <MetricGrid cols={3}>
-        <Metric size="sm" label="مواجههٔ کل" value={<MoneyValue value={e.totalUsd} digits={2} />} sub="Long + Short، ارزش فعلی" />
+        <Metric size="sm" label="اندازهٔ کل دو طرف" value={<MoneyValue value={e.totalUsd} digits={2} />} sub="خرید + فروش، به ارزش فعلی" />
         <Metric
           size="sm"
           label="عدم توازن"
           value={<MoneyValue value={e.netUsd} signed digits={2} />}
-          sub={e.netUsd === 0 ? 'برابر' : e.netUsd > 0 ? 'Long بیشتر است' : 'Short بیشتر است'}
+          sub={e.netUsd === 0 ? 'برابر' : e.netUsd > 0 ? 'طرف خرید بیشتر است؛ با بالا رفتن قیمت سود و با ریزش زیان می‌کنید' : 'طرف فروش بیشتر است؛ با ریزش قیمت سود و با بالا رفتن زیان می‌کنید'}
         />
-        <Metric size="sm" label="سود/زیان باز (تحقق‌نیافته)" value={<MoneyValue value={e.unrealizedPnl} signed tone="auto" digits={2} />} sub="عدد صرافی‌ها" />
+        <Metric size="sm" label="سود یا زیان فعلی (هنوز بسته نشده)" value={<MoneyValue value={e.unrealizedPnl} signed tone="auto" digits={2} />} sub="عدد صرافی‌ها" />
       </MetricGrid>
+      {e.unbalanced && (
+        <p className="text-xs leading-6 text-warn">
+          دو طرف دیگر هم‌اندازه نیستند، پس موقعیت شما به تغییر قیمت حساس شده است. برای برگرداندن تعادل، طرف بزرگ‌تر را حدود <MoneyValue value={Math.abs(e.netUsd)} digits={0} /> کوچک کنید یا طرف کوچک‌تر را به همین اندازه بزرگ کنید. هر تنظیم کارمزد دارد.
+        </p>
+      )}
 
       <ul className="divide-y divide-divider rounded-field border border-divider">
         {p.legs.map((l, i) => (

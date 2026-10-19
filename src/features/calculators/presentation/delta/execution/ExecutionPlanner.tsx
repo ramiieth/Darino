@@ -127,7 +127,7 @@ export function ExecutionPlanner({ handoff }: { handoff: ExecutionHandoff | null
     move: move.trim() === '' ? 0 : parseNum(move)
   };
   const errors = {
-    notional: !(v.notional > 0) ? 'Notional باید بیشتر از صفر باشد.' : null,
+    notional: !(v.notional > 0) ? 'اندازهٔ کل باید بیشتر از صفر باشد.' : null,
     leverage: !(v.leverage > 0) ? 'اهرم باید بیشتر از صفر باشد.' : v.leverage > maxLev ? `حداکثر اهرم مشترک این بازار ${toFaDigits(maxLev)} برابر است.` : null,
     duration: !(v.duration > 0) ? 'مدت باید بیشتر از صفر باشد.' : v.duration > TREAD_MAX_DURATION_HOURS ? 'حداکثر مدت ربات ۲۴ ساعت است.' : null,
     builderLong: !(v.builderLong >= 0) ? 'نمی‌تواند منفی باشد.' : null,
@@ -214,20 +214,20 @@ export function ExecutionPlanner({ handoff }: { handoff: ExecutionHandoff | null
           {longQ && shortQ && (
             <div className="flex items-center justify-between gap-3 rounded-field bg-surface-2/70 px-3.5 py-2.5 text-sm">
               <span className="min-w-0">
-                <span className="font-semibold text-positive">Long</span> روی {DELTA_VENUE_LABELS[longQ.venue]}
+                <span className="font-semibold text-positive">خرید (Long)</span> روی {DELTA_VENUE_LABELS[longQ.venue]}
                 <span className="mx-1.5 text-subtle">·</span>
-                <span className="font-semibold text-negative">Short</span> روی {DELTA_VENUE_LABELS[shortQ.venue]}
+                <span className="font-semibold text-negative">فروش (Short)</span> روی {DELTA_VENUE_LABELS[shortQ.venue]}
               </span>
               <Button variant="ghost" size="sm" className="shrink-0 text-accent" icon={<ArrowLeftRight />} onClick={() => setFlipped((f) => !f)}>
                 جابه‌جایی
               </Button>
             </div>
           )}
-          <Field label="Notional کل (هر دو طرف با هم)" error={errors.notional}>
+          <Field label="Notional کل (هر دو طرف با هم)" hint="اندازهٔ دلاری کل موقعیت (Notional) در بازار، جمع دو طرف." error={errors.notional}>
             <Input {...num(notional, setNotional, 'دلار')} />
           </Field>
           <p className="-mt-3 text-2xs leading-5 text-subtle">
-            مثل Tread.fi: نصف به Long، نصف به Short. ۲۰۰۰ دلار یعنی ۱۰۰۰ دلار هر طرف (همان «ارزش هر طرف = ۱۰۰۰» در دلتا نوترال).
+            مثل Tread.fi: نصف به طرف خرید (Long)، نصف به طرف فروش (Short). ۲۰۰۰ دلار یعنی ۱۰۰۰ دلار هر طرف (همان «ارزش هر طرف = ۱۰۰۰» در دلتا نوترال).
           </p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="اهرم" error={errors.leverage}>
@@ -257,10 +257,10 @@ export function ExecutionPlanner({ handoff }: { handoff: ExecutionHandoff | null
           <Disclosure summary="پیشرفته: builder fee">
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
-                <Field label="builder fee طرف Long" error={errors.builderLong}>
+                <Field label="کارمزد سازنده (builder fee) طرف خرید" error={errors.builderLong}>
                   <Input {...num(builderLong, setBuilderLong, '٪')} />
                 </Field>
-                <Field label="builder fee طرف Short" error={errors.builderShort}>
+                <Field label="کارمزد سازنده (builder fee) طرف فروش" error={errors.builderShort}>
                   <Input {...num(builderShort, setBuilderShort, '٪')} />
                 </Field>
               </div>
@@ -320,7 +320,7 @@ function Intro({ base, nameFa, kind }: { base: string; nameFa: string; kind: 'cr
           <bdi dir="ltr">{base}</bdi> · {nameFa}
         </b>
         <br />
-        این صفحه یک اجرای ربات دلتا نوترال Tread.fi را <b className="text-ink">پیش از اجرا</b> شبیه‌سازی می‌کند و با «محاسبهٔ ساده» مقایسه می‌کند. فاندینگ و کارمزد
+        این صفحه یک اجرای ربات دلتا نوترال Tread.fi را <b className="text-ink">پیش از اجرا</b> شبیه‌سازی می‌کند و با «محاسبهٔ ساده» مقایسه می‌کند. ربات دو طرف را یک‌باره باز نمی‌کند؛ سفارش‌ها را کم‌کم در طول زمان انجام می‌دهد. برای همین ممکن است مدتی یک طرف از طرف دیگر جلوتر باشد و موقعیت کاملاً متعادل نباشد. فاندینگ و کارمزد
         زنده‌اند؛ هیچ سفارشی ثبت نمی‌شود.
       </p>
     </div>
@@ -335,11 +335,11 @@ function Comparison({ r }: { r: ExecutionResult }) {
     { title: 'محاسبهٔ ساده', how: 'همان ماشین‌حساب دلتا نوترال: هر دو طرف یک‌باره و کامل باز می‌شوند و تا پایان متوازن می‌مانند.', c: null, unverified: false },
     {
       title: 'ربات Tread.fi — پر شدن سریع',
-      how: r.quickFill.fillHours === null ? 'زمان پر شدن معلوم نیست، چون حجم ۲۴ساعتهٔ یکی از دو بازار در دسترس نیست.' : `پوزیشن در ${fmtHours(r.quickFill.fillHours)} پر می‌شود (کمترین زمان مجاز ربات)، بعد تا پایان کامل باز می‌ماند.`,
+      how: r.quickFill.fillHours === null ? 'زمان پر شدن معلوم نیست، چون حجم ۲۴ساعتهٔ یکی از دو بازار در دسترس نیست.' : `موقعیت در ${fmtHours(r.quickFill.fillHours)} کامل باز می‌شود (کمترین زمان مجاز ربات)، بعد تا پایان کامل باز می‌ماند.`,
       c: r.quickFill,
       unverified: true
     },
-    { title: 'ربات Tread.fi — پر شدن در کل مدت', how: 'پوزیشن به‌تدریج در کل مدت پر می‌شود و در پایان بسته می‌شود؛ به‌طور میانگین فقط نصفش باز است.', c: r.wholeFill, unverified: true }
+    { title: 'ربات Tread.fi — پر شدن در کل مدت', how: 'موقعیت به‌تدریج در کل مدت باز می‌شود و در پایان بسته می‌شود؛ به‌طور میانگین فقط نصفش باز است.', c: r.wholeFill, unverified: true }
   ];
   return (
     <Step n={1} title="بعد از کارمزد چقدر می‌ماند؟" sub="هر سه ستون با همین ورودی‌ها و همین نرخ فاندینگ زنده‌اند؛ فرقشان فقط در «چطور و چه زمانی پوزیشن پر می‌شود» است.">
@@ -393,17 +393,17 @@ function SizeAndVolume({ r, longQ, shortQ, feeAssumed, hours }: { r: ExecutionRe
   const pov = (q: VenueQuote, p: number | null) =>
     p === null ? <span className="text-xs text-warn">نامشخص — {DELTA_VENUE_LABELS[q.venue]} حجم ۲۴ساعته نمی‌دهد</span> : <PercentValue value={p} digits={p < 0.01 ? 4 : 2} signed={false} tone="none" />;
   return (
-    <Step n={2} title="اندازهٔ پوزیشن و سهم از حجم بازار" sub="ربات Tread.fi هر طرف را با بخشی از حجم معاملات بازار پر می‌کند (POV). سهم بالا یعنی پر شدن کندتر و خطر عقب ماندن.">
+    <Step n={2} title="اندازهٔ موقعیت و سهم از حجم بازار" sub="ربات Tread.fi هر طرف را با درصدی از حجم معاملات بازار انجام می‌دهد (POV). سهم بالا یعنی انجام شدن کندتر و خطر اینکه یک طرف عقب بماند.">
       <MetricGrid cols={3}>
-        <Metric size="sm" label="هر طرف" value={<MoneyValue value={r.legNotional} digits={2} />} sub="نصف Notional کل" />
-        <Metric size="sm" label="مارجین هر طرف" value={<MoneyValue value={r.marginPerLeg} digits={2} />} sub={<>کل <MoneyValue value={r.totalMargin} digits={2} /></>} />
+        <Metric size="sm" label="هر طرف" value={<MoneyValue value={r.legNotional} digits={2} />} sub="نصف اندازهٔ کل" />
+        <Metric size="sm" label="وثیقهٔ هر طرف (مارجین)" value={<MoneyValue value={r.marginPerLeg} digits={2} />} sub={<>کل <MoneyValue value={r.totalMargin} digits={2} /></>} />
         <Metric size="sm" label="کارمزد کل" value={<MoneyValue value={-r.fees.total} tone={r.fees.total > 0 ? 'loss' : 'none'} digits={2} />} sub="میکر، باز و بسته‌کردن هر دو طرف" />
       </MetricGrid>
       <KeyValueList
         dense
         rows={[
-          { label: <>سهم Long از حجم {DELTA_VENUE_LABELS[longQ.venue]} در {fmtHours(hours)}</>, value: pov(longQ, r.pov.long) },
-          { label: <>سهم Short از حجم {DELTA_VENUE_LABELS[shortQ.venue]} در {fmtHours(hours)}</>, value: pov(shortQ, r.pov.short) },
+          { label: <>سهم طرف خرید از حجم {DELTA_VENUE_LABELS[longQ.venue]} در {fmtHours(hours)}</>, value: pov(longQ, r.pov.long) },
+          { label: <>سهم طرف فروش از حجم {DELTA_VENUE_LABELS[shortQ.venue]} در {fmtHours(hours)}</>, value: pov(shortQ, r.pov.short) },
           {
             label: 'کمترین مدت مجاز ربات',
             hint: 'زمان پر شدن طرفِ کندتر با ۵۰٪ حجم بازار',
@@ -413,7 +413,7 @@ function SizeAndVolume({ r, longQ, shortQ, feeAssumed, hours }: { r: ExecutionRe
       />
       {r.durationTooShort && (
         <Notice tone="warn" title="مدت کمتر از حداقل مجاز ربات است">
-          Tread.fi کمترین مدت را {r.minDurationHours === null ? '—' : fmtHours(r.minDurationHours)} حساب می‌کند؛ مدت را بیشتر یا Notional را کمتر کنید.
+          Tread.fi کمترین مدت را {r.minDurationHours === null ? '—' : fmtHours(r.minDurationHours)} حساب می‌کند؛ مدت را بیشتر یا اندازهٔ کل را کمتر کنید.
         </Notice>
       )}
       {feeAssumed && <p className="text-2xs text-warn">کارمزد یکی از صرافی‌ها از API نیامد؛ {toFaDigits(FALLBACK_TAKER_PCT)}٪ فرض شد.</p>}
@@ -469,7 +469,7 @@ function Imbalance({
         <Metric size="sm" label="سود یا زیان احتمالی" value={<MoneyValue value={i.worstCaseUsd} digits={2} />} sub="در هر جهت؛ بدترین حالت زیان است" />
       </MetricGrid>
       <p className="text-xs leading-6 text-muted">
-        Tread.fi بالای {toFaDigits(TREAD_UNBALANCED_PCT)}٪ عدم توازن، پوزیشن را «Unbalanced» علامت می‌زند.
+        Tread.fi بالای {toFaDigits(TREAD_UNBALANCED_PCT)}٪ عدم توازن، موقعیت را «نامتعادل» (Unbalanced) علامت می‌زند؛ یعنی دیگر به تغییر قیمت بی‌تفاوت نیست.
         {ratio !== null && ratio >= 1 && (
           <>
             {' '}
@@ -507,7 +507,7 @@ function StopVsLiquidation({ r, stop, leverage }: { r: ExecutionResult; stop: St
     >
       {stop === 'none' ? (
         <Notice tone="warn" title="حد ضرر خاموش است">
-          پوزیشن تا پایان مدت یا بستن دستی باز می‌ماند؛ در حرکت شدید، لیکویید Long در ریزش {pct(s.long.liquidationMovePct)} و Short در رشد {pct(s.short.liquidationMovePct)} رخ می‌دهد.
+          موقعیت تا پایان مدت یا بستن دستی باز می‌ماند. در حرکت شدید، طرف خرید با ریزش {pct(s.long.liquidationMovePct)} و طرف فروش با رشد {pct(s.short.liquidationMovePct)} به‌اجبار بسته می‌شود (لیکویید).
         </Notice>
       ) : (
         <>
@@ -531,8 +531,8 @@ function StopVsLiquidation({ r, stop, leverage }: { r: ExecutionResult; stop: St
                 </tr>
               </thead>
               <tbody>
-                {row('طرف Long', 'با ریزش قیمت', s.long)}
-                {row('طرف Short', 'با رشد قیمت', s.short)}
+                {row('طرف خرید (Long)', 'با ریزش قیمت', s.long)}
+                {row('طرف فروش (Short)', 'با رشد قیمت', s.short)}
               </tbody>
             </table>
           </div>
@@ -555,8 +555,8 @@ function StopVsLiquidation({ r, stop, leverage }: { r: ExecutionResult; stop: St
               <tbody>
                 {(
                   [
-                    ['طرف Long', s.long],
-                    ['طرف Short', s.short]
+                    ['طرف خرید (Long)', s.long],
+                    ['طرف فروش (Short)', s.short]
                   ] as const
                 ).map(([label, side]) => (
                   <tr key={label}>
@@ -599,7 +599,7 @@ function Assumptions() {
       </h3>
       <Disclosure summary="قواعد Tread.fi که این صفحه از آن‌ها استفاده می‌کند">
         <ul className="list-disc space-y-1.5 ps-4 text-xs leading-6 text-muted">
-          <li>Notional کل نصف‌نصف بین دو طرف تقسیم می‌شود و هر دو طرف با TWAP (سفارش‌های محدود تقسیم‌شده در زمان) اجرا می‌شوند.</li>
+          <li>اندازهٔ کل نصف‌نصف بین دو طرف تقسیم می‌شود و هر دو طرف به‌صورت تدریجی (TWAP: سفارش‌های کوچک پخش‌شده در زمان) اجرا می‌شوند.</li>
           <li>مدت حداکثر ۱ روز است و حداقلش با ۵۰٪ سهم از حجم بازارِ طرفِ کندتر تعیین می‌شود. با پایان مدت یا حد ضرر، پوزیشن بسته می‌شود.</li>
           <li>حد ضرر ۵۰، ۷۵ (پیش‌فرض) یا ۹۰٪، یا بدون سقف. با فعال شدن، سفارش بستن reduce-only هر دو طرف را در ۵ تا ۱۰ دقیقه می‌بندد.</li>
           <li>عدم توازن بالای ۱٪ = «Unbalanced».</li>
@@ -612,7 +612,7 @@ function Assumptions() {
         <ul className="list-disc space-y-1.5 ps-4 text-xs leading-6 text-muted">
           <li>«مدت» زمان پر شدن است یا کل عمر ربات؛ برای همین دو ستون ربات آمده.</li>
           <li>مبنای دقیق حد ضرر با اهرم بیش از ۱.</li>
-          <li>ترکیب واقعی میکر و تیکر: TWAP وقتی از برنامه عقب بیفتد سفارش تیکر هم می‌فرستد. این‌جا همه میکر فرض شده.</li>
+          <li>ترکیب واقعی سفارش محدود (میکر) و فوری (تیکر): اجرای تدریجی وقتی از برنامه عقب بیفتد سفارش فوری هم می‌فرستد. این‌جا همه سفارش محدود فرض شده.</li>
           <li>تغییر نرخ فاندینگ در طول مدت؛ نرخ لحظه‌ای ثابت فرض شده.</li>
           <li>پشتیبانی Tread.fi از لایتر در مستندات دیده نشد.</li>
         </ul>
