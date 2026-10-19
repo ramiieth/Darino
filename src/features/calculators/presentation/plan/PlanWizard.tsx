@@ -36,11 +36,18 @@ import { parseNum } from '../parse';
 import { CoinLogo, CoinPicker } from '../hedge/CoinPicker';
 import { FALLBACK_MMF, FALLBACK_TAKER_PCT } from '../delta/arbEval';
 import { SourceTag } from '../delta/CapitalFlow';
+import { LadderReachCard } from './LadderReachCard';
 import { DELTA_PAIRS, pairVenues, type DeltaPair } from '../delta/pairs';
 import type { ExecutionHandoff } from '../delta/execution/ExecutionPlanner';
 import type { Coin } from '@/features/calculators/domain';
 
 const STEPS = ['ارز', 'تقسیم پول', 'دلتا نوترال', 'خرید پله‌ای', 'برنامهٔ شما'] as const;
+/** چند گزینهٔ برتر (با اختلاف خام فاندینگ) با موتور کامل رتبه‌بندی شوند */
+const DELTA_CANDIDATES = 12;
+/** بازار کم‌حجم برای دلتا نوترال کنار می‌رود (اسلیپیج و خطر برعکس شدن فاندینگ) */
+const MIN_DELTA_VOLUME_USD = 5_000_000; // همان مرز «کم‌نقد» ماشین‌حساب دلتا نوترال
+type DeltaLeg = { feePct: number; fundingHourly: number; maintenanceMarginFraction: number; markPrice: number | null };
+type DeltaChoice = DeltaOption<string> & { base: string; pair: DeltaPair; longQ: VenueQuote; shortQ: VenueQuote };
 const VENUE_ORDER: DeltaVenue[] = ['arcus', 'lighter', 'lighterRh', 'ondo'];
 /** استیبل‌کوین‌ها: دلتا نوترال و خرید در ریزش برایشان معنا ندارد */
 const STABLES = new Set(['USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'PYUSD', 'USDG', 'TUSD', 'USDS', 'USD1', 'USDT0', 'RLUSD']);
@@ -66,7 +73,8 @@ interface Saved {
   delta: string;
   lev: 1 | 2;
   holdDays: 7 | 14 | 30;
-  pair: DeltaPair | 'none' | null;
+  /** گزینهٔ دلتا نوترال: «جفت صرافی|نماد» (هر ارزی، نه فقط ارز قدم ۱)؛ none = بدون دلتا */
+  pair: string | 'none' | null;
   style: LadderStyle;
   share: 50 | 75 | 100;
   fills: 0 | 1 | 2 | 3;
@@ -207,20 +215,32 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
   const moneyOk = Object.values(moneyErrors).every((e) => e === null) && v.invest + v.delta > 0;
   const alloc = allocatePlan(v.reserve || 0, v.invest || 0, v.delta || 0, s.share);
 
-  // گزینه‌های دلتا نوترال برای همین ارز: هر جفت صرافی که هر دو بازار را دارند؛ Short روی فاندینگ بالاتر
+  // گزینه‌های دلتا نوترال روی «هر ارزی» که هر دو صرافی دارند (لازم نیست همان ارز قدم ۱ یا دارایی کاربر باشد):
+  // پیش‌غربال با اختلاف خام فاندینگ و نقدشوندگی، بعد رتبه با سود خالص پس از کارمزد (همان موتور)
   const options = useMemo(() => {
-    if (!coin) return [] as (DeltaOption<DeltaPair> & { longQ: VenueQuote; shortQ: VenueQuote })[];
-    const input = DELTA_PAIRS.flatMap((p) => {
+    type Input = { key: string; base: string; pair: DeltaPair; long: DeltaLeg; short: DeltaLeg; longQ: VenueQuote; shortQ: VenueQuote; gross: number };
+    const leg = (q: VenueQuote) => ({ feePct: makerFee(q), fundingHourly: q.fundingHourly ?? 0, maintenanceMarginFraction: q.maintenanceMarginFraction ?? FALLBACK_MMF, markPrice: q.markPrice });
+    const liquid = (q: VenueQuote) => q.volume24hUsd === null || q.volume24hUsd >= MIN_DELTA_VOLUME_USD;
+    const input: Input[] = DELTA_PAIRS.flatMap((p) => {
       const [va, vb] = pairVenues(p.value);
-      const qa = books[va].quotes.find((q) => q.base.toUpperCase() === coin.symbol);
-      const qb = books[vb].quotes.find((q) => q.base.toUpperCase() === coin.symbol);
-      if (!qa || !qb || qa.fundingHourly === null || qb.fundingHourly === null) return [];
-      const [shortQ, longQ] = qa.fundingHourly >= qb.fundingHourly ? [qa, qb] : [qb, qa];
-      const leg = (q: VenueQuote) => ({ feePct: makerFee(q), fundingHourly: q.fundingHourly ?? 0, maintenanceMarginFraction: q.maintenanceMarginFraction ?? FALLBACK_MMF, markPrice: q.markPrice });
-      return [{ key: p.value, long: leg(longQ), short: leg(shortQ), longQ, shortQ }];
+      const byBase = new Map(books[vb].quotes.map((q) => [q.base.toUpperCase(), q]));
+      return books[va].quotes.flatMap((qa): Input[] => {
+        const base = qa.base.toUpperCase();
+        const qb = byBase.get(base);
+        if (!qb || STABLES.has(base) || qa.fundingHourly === null || qb.fundingHourly === null || !liquid(qa) || !liquid(qb)) return [];
+        const [shortQ, longQ] = qa.fundingHourly >= qb.fundingHourly ? [qa, qb] : [qb, qa];
+        return [{ key: `${p.value}|${base}`, base, pair: p.value, long: leg(longQ), short: leg(shortQ), longQ, shortQ, gross: Math.abs(qa.fundingHourly - qb.fundingHourly) }];
+      });
     });
-    const ranked = rankDeltaOptions(input, alloc.delta, s.lev, s.holdDays * 24);
-    return ranked.map((r) => ({ ...r, longQ: input.find((i) => i.key === r.key)!.longQ, shortQ: input.find((i) => i.key === r.key)!.shortQ }));
+    // ارز قدم ۱ همیشه در فهرست می‌ماند تا قابل مقایسه باشد
+    const mine = coin ? input.filter((i) => i.base === coin.symbol.toUpperCase()) : [];
+    const top = [...input].sort((a, b) => b.gross - a.gross).slice(0, DELTA_CANDIDATES);
+    const pool = [...new Map([...top, ...mine].map((i) => [i.key, i])).values()];
+    const byKey = new Map(pool.map((i) => [i.key, i]));
+    return rankDeltaOptions(pool, alloc.delta, s.lev, s.holdDays * 24).map((r) => {
+      const i = byKey.get(r.key)!;
+      return { ...r, base: i.base, pair: i.pair, longQ: i.longQ, shortQ: i.shortQ };
+    });
   }, [coin?.symbol, books, alloc.delta, s.lev, s.holdDays]);
   const recommended = options.find((o) => o.result.net >= 0) ?? null;
   const chosenKey = alloc.delta <= 0 ? 'none' : s.pair === null ? (recommended?.key ?? 'none') : s.pair;
@@ -307,7 +327,7 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
                   <PriorSummary prior={prior} holding={priorHolding} symbol={coin.symbol} price={price} />
                   <p className="w-full text-2xs text-subtle">
                     روی {toFaDigits(venueCount)} صرافی پرپ بازار دارد
-                    {venueCount < 2 ? ' — دلتا نوترال برایش ممکن نیست؛ خرید پله‌ای کار می‌کند.' : '.'}
+                    {venueCount < 2 ? ' — برای دلتا نوترال در قدم ۳ ارزهای دیگر پیشنهاد می‌شود.' : '.'}
                     {nonCrypto && ' بیرون از فهرست رمزارزهای اپ (مثلاً سهام توکنی): خارج از ساعت بورس سقف قیمت و مارجین متفاوت است.'}
                   </p>
                 </div>
@@ -364,20 +384,16 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
       {s.step === 2 && (
         <StepCard
           n={3}
-          title="دلتا نوترال را روی کدام دو صرافی اجرا کنید؟"
+          title="دلتا نوترال را روی کدام ارز و کدام دو صرافی اجرا کنید؟"
           sub={
             <>
-              یک Long و یک Short هم‌اندازه روی {coin?.name}، در دو صرافی؛ قیمت هرچه شود، این دو هم را خنثی می‌کنند. سود از اختلاف فاندینگ است و پوینت از حجم و وثیقه. نیمی از سرمایه
-              به هر صرافی می‌رود.
+              یک Long و یک Short هم‌اندازه روی یک ارز، در دو صرافی؛ قیمت هرچه شود، این دو هم را خنثی می‌کنند. لازم نیست همان ارزی باشد که می‌خرید یا دارید: همهٔ ارزهای پرحجمی که هر دو
+              صرافی دارند بررسی و بر اساس سود خالص پس از کارمزد مرتب شده‌اند. نیمی از سرمایه به هر صرافی می‌رود.
             </>
           }
         >
           {alloc.delta <= 0 ? (
             <p className="text-sm text-muted">سرمایهٔ دلتا نوترال صفر است؛ این قدم رد می‌شود.</p>
-          ) : venueCount < 2 ? (
-            <p className="text-sm leading-7 text-muted">
-              {coin?.name} فقط روی یک صرافی پرپ بازار دارد؛ دلتا نوترال دو صرافی لازم دارد و این قدم رد می‌شود. سرمایهٔ دلتا نوترال در برنامه نقد می‌ماند، یا در قدم ۱ دارایی دیگری انتخاب کنید.
-            </p>
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -406,7 +422,7 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
               ) : (
                 <div role="radiogroup" aria-label="جفت صرافی" className="space-y-2.5">
                   {options.map((o) => (
-                    <DeltaOptionCard key={o.key} o={o} selected={chosenKey === o.key} recommended={recommended?.key === o.key} onPick={() => set('pair', o.key)} holdDays={s.holdDays} />
+                    <DeltaOptionCard key={o.key} o={o} isMine={o.base === coin?.symbol.toUpperCase()} selected={chosenKey === o.key} recommended={recommended?.key === o.key} onPick={() => set('pair', o.key)} holdDays={s.holdDays} />
                   ))}
                   <button
                     type="button"
@@ -467,6 +483,7 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
                 ]}
               />
               <LadderTable plan={plan} symbol={coin!.symbol} />
+              {price !== null && <LadderReachCard symbol={coin!.symbol} price={price} plan={plan} />}
               <FillScenarios prior={prior.lots} plan={plan} price={price} lotsWith={lotsWith} symbol={coin!.symbol} />
               <SaleScenario s={s} set={set} price={price} priorAvg={priorHolding.avgCost} lotsWith={lotsWith} symbol={coin!.symbol} hasPrior={prior.lots.length > 0} />
             </>
@@ -489,8 +506,8 @@ export function PlanWizard({ onOpenExecution }: { onOpenExecution?: (h: Omit<Exe
             onOpenExecution && chosen
               ? () =>
                   onOpenExecution({
-                    pair: chosen.key,
-                    base: coin.symbol,
+                    pair: chosen.pair,
+                    base: chosen.base,
                     flipped: false,
                     notionalPerSide: chosen.result.notional,
                     leverage: s.lev,
@@ -566,9 +583,12 @@ function DeltaOptionCard({
   selected,
   recommended,
   onPick,
-  holdDays
+  holdDays,
+  isMine
 }: {
-  o: DeltaOption<DeltaPair> & { longQ: VenueQuote; shortQ: VenueQuote };
+  /** همان ارز قدم ۱ */
+  isMine?: boolean;
+  o: DeltaChoice;
   selected: boolean;
   recommended: boolean;
   onPick: () => void;
@@ -590,7 +610,11 @@ function DeltaOptionCard({
     >
       <span className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-bold text-ink">
-          {DELTA_VENUE_LABELS[o.longQ.venue]} ↔ {DELTA_VENUE_LABELS[o.shortQ.venue]}
+          <bdi dir="ltr" className="font-latin">{o.base}</bdi>
+          {isMine && <span className="ms-1 text-2xs font-normal text-muted">(ارز قدم ۱)</span>}
+          <span className="block text-2xs font-normal text-muted">
+            {DELTA_VENUE_LABELS[o.longQ.venue]} ↔ {DELTA_VENUE_LABELS[o.shortQ.venue]}
+          </span>
         </span>
         <span className="flex gap-1.5">
           {recommended && <Badge tone="gain">پیشنهادی</Badge>}
@@ -836,7 +860,7 @@ function Summary({
   coin: string;
   symbol: string;
   alloc: ReturnType<typeof allocatePlan>;
-  chosen: (DeltaOption<DeltaPair> & { longQ: VenueQuote; shortQ: VenueQuote }) | null;
+  chosen: DeltaChoice | null;
   plan: ReturnType<typeof ladderPlan>;
   price: number | null;
   prior: ReturnType<typeof holdingOf>;
@@ -862,7 +886,7 @@ function Summary({
             <div className="mt-1 space-y-2 text-sm text-muted">
               <p>
                 <MoneyValue value={alloc.delta / 2} digits={0} className="font-semibold text-ink" /> به {DELTA_VENUE_LABELS[chosen.longQ.venue]} و همین مقدار به{' '}
-                {DELTA_VENUE_LABELS[chosen.shortQ.venue]}. روی <bdi dir="ltr">{symbol}</bdi>: <span className="font-semibold text-positive">Long</span> در{' '}
+                {DELTA_VENUE_LABELS[chosen.shortQ.venue]}. روی <bdi dir="ltr">{chosen.base}</bdi>: <span className="font-semibold text-positive">Long</span> در{' '}
                 {DELTA_VENUE_LABELS[chosen.longQ.venue]} و <span className="font-semibold text-negative">Short</span> در {DELTA_VENUE_LABELS[chosen.shortQ.venue]}، هر کدام{' '}
                 <MoneyValue value={chosen.result.notional} digits={0} className="font-semibold text-ink" />. یک بار باز کنید و {toFaDigits(holdDays)} روز نگه دارید؛ با سفارش محدود.
               </p>
