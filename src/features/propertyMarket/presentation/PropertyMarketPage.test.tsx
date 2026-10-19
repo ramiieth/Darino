@@ -102,8 +102,12 @@ describe('PropertyMarketPage', () => {
     expect(screen.queryByText(/قیمت هر متر در اهواز/)).toBeNull();
     expect(document.body.textContent).not.toMatch(/کلید اول/);
     // سال ساخت ۱۴۰۰ → ستون «۱۴۰۰ (۵ سال)»: میانگین ۱۵۵ میلیون = ۶۲۰ دلار (تتر ۲۵۰ هزار)
-    expect(screen.getByText('۱۵۵ میلیون')).toBeTruthy();
-    expect(screen.getByText(/۶۲۰ دلار/)).toBeTruthy();
+    // واحد یک‌بار بالای جدول؛ خانه‌ها فقط عدد
+    expect(screen.getByText('میلیون تومان برای هر متر')).toBeTruthy();
+    expect(screen.getByText('۱۵۵')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'دلار' }));
+    expect(screen.getByText('دلار (تتر) برای هر متر')).toBeTruthy();
+    expect(screen.getByText('۶۲۰')).toBeTruthy();
     // هیچ رقم لاتین در جدول
     expect(tables.map(t => t.textContent).join('')).not.toMatch(/[0-9$]/);
     // هیچ منطقه‌ای پنهان نمی‌شود — حتی با ۱ آگهی (کم‌رنگ)
@@ -121,7 +125,7 @@ describe('PropertyMarketPage', () => {
       '۱۳۹۷ و قبل‌تر۸ سال به بالا'
     ]);
     // کیانپارس: ۳ آگهی، یکی بدون سال ساخت؛ ۱۳۸۰ در «قبل‌تر» نمایش داده می‌شود (دیگر «۰ از ۳» نیست)
-    expect(screen.getByText(/۳ آگهی · ۱ بدون سال ساخت/)).toBeTruthy();
+    expect(screen.getByTitle('۱ آگهی بدون سال ساخت').textContent).toMatch(/^۳ آگهی/);
     fireEvent.click(screen.getByRole('radio', { name: 'قیمت کل' }));
     expect(screen.getAllByText(/میلیارد/).length).toBeGreaterThan(0);
   });
@@ -235,11 +239,11 @@ describe('PropertyMarketPage', () => {
     usePropertyMarketStore.setState({ listings: [...area(8), lux] });
     render(<PropertyMarketPage />);
     // ۸ آگهی عادی ۸۰ تا ۱۵۰ → میانگین ۱۱۵؛ با آگهی لوکس ۲۲۰ می‌شد ۱۲۷
-    expect((await screen.findAllByText('۱۱۵ میلیون')).length).toBeGreaterThan(0);
-    expect(screen.queryByText('۱۲۷ میلیون')).toBeNull();
+    expect((await screen.findAllByText('۱۱۵')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('۱۲۷')).toBeNull();
     // ولی دیده می‌شود: کنار همان خانه و زیر نام منطقه
-    expect(screen.getByText('+۱ استثنا تا ۲۲۰ میلیون')).toBeTruthy();
-    expect(screen.getByText(/۱ استثنا$/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /۱ آگهی استثنایی تا ۲۲۰ میلیون — در میانگین حساب نشده/ })).toBeTruthy();
+    expect(screen.getByLabelText('۱ استثنا')).toBeTruthy();
     // «بالاترین» → آگهی‌های منطقه، گران‌ترین اول
     fireEvent.click(screen.getByRole('button', { name: 'بالاترین ۲۲۰ میلیون' }));
     const first = (await screen.findAllByRole('listitem'))[0];

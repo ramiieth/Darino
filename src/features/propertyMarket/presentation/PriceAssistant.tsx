@@ -104,9 +104,11 @@ export function PriceAssistant({
     <div className="space-y-5 p-4 md:p-5">
       <div className="space-y-1.5">
         <h2 className="text-base font-bold text-ink">دستیار قیمت آگهی‌ها</h2>
-        <p className="text-xs leading-6 text-muted">
-          هر آگهی فقط با آگهی‌های مشابه خودش مقایسه می‌شود: همان منطقه و همان سال ساخت. اگر قیمت هر متر تا {toFaDigits(FAIR_BAND * 100)}٪ با میانهٔ مشابه‌ها فاصله داشته باشد «منصفانه» است؛ ارزان‌تر از آن «زیر قیمت» و گران‌تر از آن «گران». کمتر از {toFaDigits(SUSPECT_RATIO * 100)}٪ مشابه‌ها «مشکوک» است و پیشنهاد نمی‌شود.
-        </p>
+        <p className="text-xs leading-6 text-muted">هر آگهی فقط با آگهی‌های هم‌منطقه و هم‌سال ساخت خودش مقایسه می‌شود.</p>
+        <details className="text-2xs leading-5 text-subtle">
+          <summary className="cursor-pointer">قاعدهٔ برچسب‌ها</summary>
+          تا {toFaDigits(FAIR_BAND * 100)}٪ فاصله از میانهٔ آگهی‌های مشابه «منصفانه» است؛ ارزان‌تر «زیر قیمت» و گران‌تر «گران». کمتر از {toFaDigits(SUSPECT_RATIO * 100)}٪ مشابه‌ها «مشکوک» است و پیشنهاد نمی‌شود.
+        </details>
       </div>
 
       {judged > 0 && (
