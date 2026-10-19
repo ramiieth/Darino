@@ -9,7 +9,7 @@ import { black76, normCdf, type ChainOption } from '@/features/calculators/domai
 vi.mock('react-chartjs-2', () => ({ Line: () => null }));
 
 const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10).replace(/-/g, '');
-const fx = vi.hoisted(() => ({ calls: [] as unknown[] }));
+const fx = vi.hoisted(() => ({ calls: [] as unknown[], lots: [] as unknown[] }));
 
 function chainOf(currency: string, F: number, iv: number, expiry: string) {
   const T = 30 / 365;
@@ -68,7 +68,7 @@ vi.mock('@/features/markets/pipeline/useMarkets', () => ({
     error: null
   })
 }));
-vi.mock('@/features/calculators/data/plannerLots', () => ({ usePlannerLots: () => ({ lots: [], source: 'none', unreconciled: false }) }));
+vi.mock('@/features/calculators/data/plannerLots', () => ({ usePlannerLots: () => ({ lots: fx.lots, source: fx.lots.length ? 'cost-basis' : 'none', unreconciled: false }) }));
 vi.mock('@/repositories/remoteClient', async (orig) => ({
   ...(await orig<typeof import('@/repositories/remoteClient')>()),
   fetchJson: vi.fn(async (_url: string, init: unknown) => {
@@ -98,6 +98,25 @@ describe('دستیار آپشن Derive', () => {
     fireEvent.change(screen.getByPlaceholderText('اتریوم'), { target: { value: 'سولانا' } });
     fireEvent.click(screen.getByRole('button', { name: 'افزودن' }));
     expect(screen.getAllByText('سولانا').length).toBeGreaterThan(0);
+  });
+
+  it('دارایی موجود فقط با انتخاب صریح: کاربر با ۱۰۰۰ دلار معاملهٔ «روی ETH موجود» نمی‌گیرد', () => {
+    fx.lots = [{ qty: 3.29, unitCost: 2000 }];
+    render(<OptionsWizard />);
+    fireEvent.click(screen.getByRole('radio', { name: /ETH/ }));
+    next();
+    fireEvent.change(screen.getByLabelText(/سرمایهٔ این معاملات/), { target: { value: '1000' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'خنثی' }));
+    expect(screen.getByRole('radio', { name: 'خیر، فقط با سرمایهٔ بالا' }).getAttribute('aria-checked')).toBe('true');
+    next();
+    expect(screen.queryByText(/پوشش‌دار/)).toBeNull();
+    expect(screen.queryByText(/دارایی شما:/)).toBeNull();
+    // انتخاب صریح «بله» → معاملهٔ روی دارایی هم پیشنهاد می‌شود
+    fireEvent.click(screen.getByRole('button', { name: /قبلی/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'بله، از دارایی‌ام هم استفاده شود' }));
+    next();
+    expect(screen.getAllByText(/پوشش‌دار/).length).toBeGreaterThan(0);
+    fx.lots = [];
   });
 
   it('مسیر کامل: خنثی + IV گران → Iron Condor؛ سناریو، خروج، سلب مسئولیت؛ دستیار فقط اعداد را می‌گیرد', async () => {
