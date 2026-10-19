@@ -84,7 +84,7 @@ describe('برنامهٔ من', () => {
     next();
 
     // قدم ۳: یک جفت (آرکوس ↔ لایتر رابین‌هود)، Short روی آرکوس (فاندینگ بالاتر)
-    const step3 = screen.getByRole('region', { name: 'دلتا نوترال را روی کدام دو صرافی اجرا کنید؟' });
+    const step3 = screen.getByRole('region', { name: 'دلتا نوترال را روی کدام ارز و کدام دو صرافی اجرا کنید؟' });
     expect(within(step3).getByText('پیشنهادی')).toBeTruthy();
     expect(within(step3).getAllByRole('radio', { checked: true }).some((r) => r.textContent?.includes('Short آرکوس'))).toBe(true);
     next();
@@ -123,18 +123,21 @@ describe('برنامهٔ من', () => {
 });
 
 describe('برنامهٔ من — هر دارایی', () => {
-  it('سهام توکنی تک‌صرافی در «سهام و سایر»؛ استیبل‌کوین نیست؛ دلتا نوترال رد می‌شود ولی پله‌ها کار می‌کنند', () => {
+  it('سهام توکنی تک‌صرافی: خرید پله‌ای روی همان، دلتا نوترال روی ارز دیگری که سود خوبی دارد', () => {
     render(<PlanWizard />);
     expect(screen.getByRole('radio', { name: /همه \(۲\)/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: /سهام توکنی و سایر/ }));
     expect(screen.queryByRole('button', { name: /USDC/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /کوین‌بیس \(COIN\)/ }));
-    expect(screen.getByText(/روی ۱ صرافی پرپ بازار دارد — دلتا نوترال برایش ممکن نیست/)).toBeTruthy();
+    expect(screen.getByText(/روی ۱ صرافی پرپ بازار دارد — برای دلتا نوترال در قدم ۳ ارزهای دیگر پیشنهاد می‌شود/)).toBeTruthy();
     next();
     fireEvent.change(screen.getByLabelText('سرمایهٔ سرمایه‌گذاری (خرید ارز)'), { target: { value: '3000' } });
     fireEvent.change(screen.getByLabelText('سرمایهٔ دلتا نوترال (پوینت)'), { target: { value: '1000' } });
     next();
-    expect(screen.getByText(/فقط روی یک صرافی پرپ بازار دارد؛ دلتا نوترال دو صرافی لازم دارد/)).toBeTruthy();
+    // لازم نیست همان ارز باشد: ETH (دو صرافی) پیشنهاد و انتخاب می‌شود
+    const step3 = screen.getByRole('region', { name: 'دلتا نوترال را روی کدام ارز و کدام دو صرافی اجرا کنید؟' });
+    const picked = within(step3).getAllByRole('radio', { checked: true });
+    expect(picked.some((r) => r.textContent?.includes('ETH'))).toBe(true);
     next();
     const ladder = screen.getByRole('table', { name: 'سفارش‌های خرید پله‌ای' });
     const plan = ladderPlan(250, 2250, LADDER_STYLES.balanced);

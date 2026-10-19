@@ -37,7 +37,16 @@ export function PlainSummaryView({ s }: { s: PlainSummary }) {
   );
 }
 
-export function AssistantExplain({ payload, summary }: { payload: () => Record<string, unknown>; summary?: PlainSummary }) {
+export function AssistantExplain({
+  payload,
+  summary,
+  op = 'analyze-options'
+}: {
+  payload: () => Record<string, unknown>;
+  summary?: PlainSummary;
+  /** مسیر تحلیل سرور: آپشن یا «برنامهٔ من» */
+  op?: 'analyze-options' | 'analyze-plan';
+}) {
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +54,7 @@ export function AssistantExplain({ payload, summary }: { payload: () => Record<s
     setBusy(true);
     setError(null);
     try {
-      const r = await fetchJson<{ answer: string }>('/api/integrations?op=analyze-options', { method: 'POST', body: { analysis: payload() }, timeoutMs: 60_000 });
+      const r = await fetchJson<{ answer: string }>(`/api/integrations?op=${op}`, { method: 'POST', body: { analysis: payload() }, timeoutMs: 60_000 });
       setAnswer(r.answer);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'دستیار پاسخ نداد');
