@@ -86,7 +86,7 @@ export function PayoffChart({ points, marks }: { points: PayoffPoint[]; marks: n
       </div>
       <p className="text-xs leading-6 text-muted">
         خط آبی (با هج) کم‌شیب‌تر از خط طلایی نقطه‌چین (بدون هج) است: در ریزش کمتر پایین می‌آید و در رشد کمتر بالا می‌رود. نقطه‌ها دو سناریوی شما هستند.
-        {liquidatedFrom !== null && <> از رشد {moveLabel(liquidatedFrom)} به بعد، Short لیکویید فرض شده و خط آبی شکسته می‌شود.</>}
+        {liquidatedFrom !== null && <> از رشد {moveLabel(liquidatedFrom)} به بعد، موقعیت فروش به‌اجبار بسته شده (لیکویید) فرض می‌شود و خط آبی شکسته می‌شود.</>}
       </p>
       <Disclosure summary="نمایش به‌صورت جدول">
         <div className="-mx-1 overflow-x-auto px-1">

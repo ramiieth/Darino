@@ -66,9 +66,9 @@ describe('پوشش ریسک — UI = domain', () => {
 
   it('نمونهٔ مرجع پرامپت با ورودی‌های فرم: ۱۰٬۰۰۰ / ۳٬۰۰۰ / ۳٬۰۰۰', () => {
     render(<HedgeCalculator />);
-    set('ارزش دارایی اسپات', '10000');
-    set('ارزش اسمی پوزیشن Short', '3000');
-    set('وثیقهٔ واقعی حساب فیوچرز', '3000');
+    set('ارزش دارایی‌ای که دارید (اسپات)', '10000');
+    set('اندازهٔ دلاری موقعیت فروش (Short)', '3000');
+    set('وثیقهٔ واریزی به حساب معاملات آتی (فیوچرز)', '3000');
     const [dFut, rFut] = rowCells('جزئیات هر سناریو', 'موجودی نهایی حساب فیوچرز');
     expect(dFut).toContain(usd(3750));
     expect(rFut).toContain(usd(2460));
@@ -83,7 +83,7 @@ describe('پوشش ریسک — UI = domain', () => {
 
   it('وثیقهٔ خالی: سرمایه‌ها «نامشخص»، نه حدس از ارزش اسمی', () => {
     render(<HedgeCalculator />);
-    set('وثیقهٔ واقعی حساب فیوچرز', '');
+    set('وثیقهٔ واریزی به حساب معاملات آتی (فیوچرز)', '');
     expect(screen.getByText('وثیقهٔ حساب فیوچرز نامشخص است')).toBeTruthy();
     const [dEnd] = rowCells('جزئیات هر سناریو', 'سرمایهٔ نهایی کل');
     expect(dEnd).toBe('نامشخص');
@@ -93,16 +93,16 @@ describe('پوشش ریسک — UI = domain', () => {
 
   it('نسبت هج: تغییر روش اندازه، ارزش اسمی را حفظ می‌کند', () => {
     render(<HedgeCalculator />);
-    fireEvent.click(screen.getByRole('radio', { name: 'نسبت هج (٪)' }));
-    expect((screen.getByLabelText('نسبت هج (ارزش Short ÷ ارزش اسپات)') as HTMLInputElement).value).toBe('30');
-    set('نسبت هج (ارزش Short ÷ ارزش اسپات)', '50');
-    const [dShort] = rowCells('جزئیات هر سناریو', 'سود/زیان ناخالص Short');
+    fireEvent.click(screen.getByRole('radio', { name: 'درصد از دارایی' }));
+    expect((screen.getByLabelText('درصد پوشش (اندازهٔ موقعیت فروش ÷ ارزش دارایی)') as HTMLInputElement).value).toBe('30');
+    set('درصد پوشش (اندازهٔ موقعیت فروش ÷ ارزش دارایی)', '50');
+    const [dShort] = rowCells('جزئیات هر سناریو', 'سود یا زیان موقعیت فروش، پیش از هزینه');
     expect(dShort).toContain(usd(125));
   });
 
   it('ورودی نامعتبر: پیام اصلاح، بدون عدد ساختگی', () => {
     render(<HedgeCalculator />);
-    set('ارزش دارایی اسپات', '0');
+    set('ارزش دارایی‌ای که دارید (اسپات)', '0');
     expect(screen.getByText('ورودی‌های قرمزشده را اصلاح کنید تا نتیجه محاسبه شود.')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'جزئیات هر سناریو' })).toBeNull();
   });
@@ -156,12 +156,12 @@ describe('پوشش ریسک — اتصال به حساب لایتر', () => {
     fireEvent.change(screen.getByLabelText('حساب'), { target: { value: 'l1' } });
     fireEvent.click(screen.getByRole('button', { name: /استفاده/ }));
 
-    expect((screen.getByLabelText('ارزش اسمی پوزیشن Short') as HTMLInputElement).value).toBe('3000');
-    expect((screen.getByLabelText('وثیقهٔ واقعی حساب فیوچرز') as HTMLInputElement).value).toBe('3000');
-    expect((screen.getByLabelText('ارزش دارایی اسپات') as HTMLInputElement).value).toBe('10000');
+    expect((screen.getByLabelText('اندازهٔ دلاری موقعیت فروش (Short)') as HTMLInputElement).value).toBe('3000');
+    expect((screen.getByLabelText('وثیقهٔ واریزی به حساب معاملات آتی (فیوچرز)') as HTMLInputElement).value).toBe('3000');
+    expect((screen.getByLabelText('ارزش دارایی‌ای که دارید (اسپات)') as HTMLInputElement).value).toBe('10000');
     expect((screen.getByLabelText('کارمزد هر معامله') as HTMLInputElement).value).toBe('0.05');
     expect((screen.getByLabelText('نرخ فاندینگ هر ۸ ساعت') as HTMLInputElement).value).toBe('0.01');
-    expect(screen.getByRole('region', { name: /پوزیشن واقعی Short/ })).toBeTruthy();
+    expect(screen.getByRole('region', { name: /موقعیت فروش واقعی/ })).toBeTruthy();
     expect(screen.getAllByText('زنده از حساب').length).toBeGreaterThan(0);
 
     // حد لیکویید صرافی ۱۲۰٬۰۰۰ از مارک ۱۰۰٬۰۰۰ = رشد ۲۰٪ → رشد ۱۸٪ لیکویید نمی‌شود
@@ -183,7 +183,7 @@ describe('پوشش ریسک — اتصال به حساب لایتر', () => {
     fireEvent.change(screen.getByLabelText('حساب'), { target: { value: 'l1' } });
     fireEvent.click(screen.getByRole('button', { name: /استفاده/ }));
     set('رشد بازار', '25');
-    set('ارزش اسمی پوزیشن Short', '1000');
+    set('اندازهٔ دلاری موقعیت فروش (Short)', '1000');
     const [, rFut] = rowCells('جزئیات هر سناریو', 'موجودی نهایی حساب فیوچرز');
     expect(rFut).not.toContain('لیکویید');
   });
@@ -203,15 +203,15 @@ describe('پوشش ریسک — بازطراحی', () => {
   it('دکمهٔ نسبت سریع ۵۰٪: Short = نصف اسپات', () => {
     render(<HedgeCalculator />);
     fireEvent.click(screen.getByRole('button', { name: '۵۰٪' }));
-    expect((screen.getByLabelText('ارزش اسمی پوزیشن Short') as HTMLInputElement).value).toBe('500');
+    expect((screen.getByLabelText('اندازهٔ دلاری موقعیت فروش (Short)') as HTMLInputElement).value).toBe('500');
     expect(screen.getByRole('button', { name: '۵۰٪' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('ترکیب پرتفوی: سرمایه و مواجهه جدا', () => {
     render(<HedgeCalculator />);
     const s = screen.getByRole('region', { name: 'پرتفوی از چه ساخته شده؟' });
-    expect(within(s).getByText('پوشش‌داده با Short')).toBeTruthy();
-    expect(within(s).getByText('بی‌پوشش (مواجههٔ خالص)')).toBeTruthy();
+    expect(within(s).getByText('پوشش‌داده با موقعیت فروش')).toBeTruthy();
+    expect(within(s).getByText('بی‌پوشش (هنوز با قیمت بالا و پایین می‌رود)')).toBeTruthy();
     expect(s.textContent).toContain(usd(700));
   });
 

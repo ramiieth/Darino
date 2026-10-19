@@ -7,7 +7,7 @@
  *  دلار: نرخ زنده تتر (والکس/بیت‌پین) · همه اعداد فارسی
  * ============================================================ */
 import { useMemo, useState } from 'react';
-import { Building2, History, List, MapPin, Maximize2, RefreshCw, Square, Table2 } from 'lucide-react';
+import { BadgeCheck, Building2, History, List, MapPin, Maximize2, RefreshCw, Square, Table2 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
@@ -23,17 +23,19 @@ import { usePropertyMarket, usePropertyMarketStore } from '../data/store';
 import { listingsInWindow } from '../data/ingest';
 import { bandOfType, jalaliYearOf, type AreaBand } from '../domain/segments';
 import { areaTypeMatrixFromSnapshot, buildAreaTypeMatrix, toListingViews } from '../service/propertyMarketService';
-import { filterOutliers, newCleaningReport } from '../collector/pipeline';
+import { filterOutliers, newCleaningReport, splitExceptions } from '../collector/pipeline';
 import { PriceTypeMatrix } from './PriceTypeMatrix';
 import { SizePanel } from './SizePanel';
 import { PriceChangePanel } from './PriceChangePanel';
-import { ListingsExplorer, type AgeFilter, type AreaFilter } from './ListingsExplorer';
+import { ListingsExplorer, type AgeFilter, type AreaFilter, type SortKey } from './ListingsExplorer';
 import { LegacyPanel } from './LegacyPanel';
+import { PriceAssistant } from './PriceAssistant';
+import { EXCEPTION_VALUATION, valueListings } from '../domain/valuation';
 
 /** داده قدیمی‌تر از این → هشدار به‌روزرسانی */
 const STALE_DAYS = 14;
 
-type ViewTab = 'areas' | 'sizes' | 'changes' | 'listings';
+type ViewTab = 'areas' | 'sizes' | 'changes' | 'listings' | 'assistant';
 
 /** دلایل کنار گذاشتن آگهی در آخرین به‌روزرسانی (فارسی) */
 const REJECT_FA: Record<string, string> = {
@@ -60,6 +62,7 @@ export function PropertyMarketPage() {
   const [areaFilter, setAreaFilter] = useState<AreaFilter>('all');
   const [exactArea, setExactArea] = useState<number | null>(null);
   const [place, setPlace] = useState<string>('all');
+  const [sort, setSort] = useState<SortKey>('recent');
 
   const jy = useMemo(() => jalaliYearOf(Date.now()), []);
   const rate = effective.rate;
@@ -67,16 +70,25 @@ export function PropertyMarketPage() {
   const lastSnap = st.snapshots.length > 0 ? st.snapshots[st.snapshots.length - 1] : null;
   const hasAnyData = st.listings.length > 0 || st.snapshots.length > 0;
 
-  // آگهی‌های بازار (پنجره + بدون پرت) + سن/دسته/معادل دلاری تتر
-  const listingViews = useMemo(
-    () => toListingViews(filterOutliers(listingsInWindow(st.listings), newCleaningReport()), rate, jy),
-    [st.listings, rate, jy]
-  );
+  // آگهی‌های بازار (پنجره + بدون خطای داده) + سن/دسته/معادل دلاری تتر
+  //  listingViews: همه (فهرست آگهی‌ها) · statViews: بدون استثناها (میانگین، بازه، دستیار)
+  const { listingViews, statViews, exceptionViews, exceptionTokens } = useMemo(() => {
+    const { regular, exceptions } = splitExceptions(filterOutliers(listingsInWindow(st.listings), newCleaningReport()));
+    const all = toListingViews([...regular, ...exceptions], rate, jy);
+    const ex = new Set(exceptions.map((l) => l.token));
+    return { listingViews: all, statViews: all.filter((l) => !ex.has(l.token)), exceptionViews: all.filter((l) => ex.has(l.token)), exceptionTokens: ex };
+  }, [st.listings, rate, jy]);
+  // دستیار قیمت: هر آگهی در برابر آگهی‌های هم‌منطقه و هم‌سال ساخت؛ استثناها فقط برچسب می‌گیرند
+  const valuations = useMemo(() => {
+    const v = valueListings(statViews, jy);
+    for (const t of exceptionTokens) v.set(t, EXCEPTION_VALUATION);
+    return v;
+  }, [statViews, exceptionTokens, jy]);
   // جدول مناطق — از آگهی‌ها؛ نبود آگهی محلی → آخرین Snapshot
   const areaMatrix = useMemo(() => {
-    if (listingViews.length > 0) return buildAreaTypeMatrix(listingViews, rate, jy);
+    if (listingViews.length > 0) return buildAreaTypeMatrix(statViews, rate, jy, exceptionViews);
     return lastSnap ? areaTypeMatrixFromSnapshot(lastSnap, rate) : [];
-  }, [listingViews, rate, jy, lastSnap]);
+  }, [listingViews, statViews, exceptionViews, rate, jy, lastSnap]);
 
   const lastUpdate = useMemo(() => {
     const scraped = st.listings.reduce((m, l) => Math.max(m, l.scrapedAt), 0);
@@ -85,7 +97,8 @@ export function PropertyMarketPage() {
   const stale = lastUpdate !== null && Date.now() - lastUpdate > STALE_DAYS * 86_400_000;
 
   /** رفتن به آگهی‌ها با فیلترهای مشخص (بقیه فیلترها پاک می‌شوند) */
-  const showListings = (f: { place?: string; age?: AgeFilter; area?: AreaFilter; exact?: number | null }) => {
+  const showListings = (f: { place?: string; age?: AgeFilter; area?: AreaFilter; exact?: number | null; sort?: SortKey }) => {
+    setSort(f.sort ?? 'recent');
     setPlace(f.place ?? 'all');
     setAgeFilter(f.age ?? 'all');
     setAreaFilter(f.area ?? 'all');
@@ -170,7 +183,8 @@ export function PropertyMarketPage() {
                 { value: 'areas', label: 'مناطق', icon: <Table2 />, badge: areaMatrix.length },
                 { value: 'sizes', label: 'متراژ', icon: <Maximize2 /> },
                 { value: 'changes', label: 'تغییرات قیمت', icon: <History /> },
-                { value: 'listings', label: 'آگهی‌ها', icon: <List />, badge: listingViews.length }
+                { value: 'listings', label: 'آگهی‌ها', icon: <List />, badge: listingViews.length },
+                { value: 'assistant', label: 'دستیار قیمت', icon: <BadgeCheck /> }
               ]}
             />
             <div className="pt-5">
@@ -183,6 +197,7 @@ export function PropertyMarketPage() {
                     caption="قیمت مناطق به تفکیک سال ساخت"
                     onPick={canPick ? (rowKey, t) => showListings({ place: rowKey, age: bandOfType(t) }) : undefined}
                     onPickRow={canPick ? (rowKey) => showListings({ place: rowKey }) : undefined}
+                    onPickTop={canPick ? (rowKey) => showListings({ place: rowKey, sort: 'ppm-desc' }) : undefined}
                   />
                 </Surface>
               )}
@@ -190,7 +205,7 @@ export function PropertyMarketPage() {
               {tab === 'sizes' && (
                 <Surface className="overflow-hidden">
                   <SizePanel
-                    views={listingViews}
+                    views={statViews}
                     usdRate={rate}
                     jalaliYear={jy}
                     onPickBand={(band, t) => showListings({ area: band as AreaBand, age: t ? bandOfType(t) : 'all' })}
@@ -214,7 +229,20 @@ export function PropertyMarketPage() {
                     place={place}
                     onPlace={setPlace}
                     jalaliYear={jy}
+                    valuations={valuations}
+                    sort={sort}
+                    onSort={setSort}
                   />
+                </Surface>
+              )}
+
+              {tab === 'assistant' && (
+                <Surface className="overflow-hidden">
+                  {listingViews.length > 0 ? (
+                    <PriceAssistant views={statViews} valuations={valuations} jalaliYear={jy} exceptions={exceptionTokens.size} exceptionViews={exceptionViews} />
+                  ) : (
+                    <p className="py-8 text-center text-sm text-muted">برای مقایسهٔ آگهی‌ها، اول «به‌روزرسانی داده» را بزنید.</p>
+                  )}
                 </Surface>
               )}
             </div>

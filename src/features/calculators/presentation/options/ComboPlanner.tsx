@@ -106,7 +106,7 @@ export function ComboPlanner({ markets, capital, risk }: { markets: readonly Der
   if (combos.length === 0)
     return (
       <Notice tone="warn" title="ترکیبی ساخته نشد">
-        حداقل دو بازار نقد (Open Interest بیش از ۱۰۰ هزار دلار) با IV و نوسان تاریخی معتبر لازم است.
+        برای ترکیب، دست‌کم دو بازار پرمعامله لازم است (قراردادهای باز بیش از ۱۰۰ هزار دلار) که دادهٔ نوسانشان کامل باشد.
       </Notice>
     );
 
@@ -120,7 +120,7 @@ export function ComboPlanner({ markets, capital, risk }: { markets: readonly Der
             <caption className="sr-only">مقایسهٔ بازارها</caption>
             <thead>
               <tr className="text-2xs text-subtle">
-                {['بازار', 'سررسید', 'IV', 'HV ۳۰', 'IV÷HV', 'Beta به BTC', 'همبستگی'].map((h, i) => (
+                {['بازار', 'سررسید', 'نوسان مورد انتظار (IV)', 'نوسان واقعی ۳۰ روز (HV)', 'گرانی آپشن (IV÷HV)', 'همراهی با بیت‌کوین (Beta)', 'همبستگی'].map((h, i) => (
                   <th key={h} scope="col" className={i === 0 ? 'pb-2 text-start font-semibold' : 'pb-2 text-end font-semibold'}>
                     {h}
                   </th>
@@ -151,7 +151,7 @@ export function ComboPlanner({ markets, capital, risk }: { markets: readonly Der
           </table>
         </div>
         <p className="mt-1.5 text-2xs leading-5 text-subtle">
-          {toFaDigits(MAX_MARKETS)} بازار نقدتر Derive. IV÷HV بیش از ۱٫۱ = نوسان گران (مناسب فروش)، کمتر از ۰٫۹ = ارزان (مناسب خرید). همبستگی بالا یعنی در ریزش کل بازار با هم حرکت می‌کنند و تنوع واقعی کمتر است.
+          {toFaDigits(MAX_MARKETS)} بازار پرمعامله‌تر Derive. «گرانی آپشن» بیش از ۱٫۱ یعنی آپشن‌ها گران‌اند و فروششان به‌صرفه‌تر است؛ کمتر از ۰٫۹ یعنی ارزان‌اند و خریدشان به‌صرفه‌تر است. «همراهی با بیت‌کوین» ۱٫۵ یعنی وقتی بیت‌کوین ۱٪ حرکت می‌کند، این دارایی معمولاً حدود ۱٫۵٪ حرکت می‌کند. همبستگی بالا یعنی در ریزش کل بازار با هم پایین می‌آیند و ترکیب کمتر ریسک را پخش می‌کند.
         </p>
       </div>
 
@@ -188,13 +188,13 @@ export function ComboPlanner({ markets, capital, risk }: { markets: readonly Der
                 .filter((x): x is OptionLeg => x.kind === 'option')
                 .map((x) => (
                   <li key={x.name}>
-                    {x.side === 'buy' ? 'خرید' : 'فروش'} {fmtQty(x.qty)} {x.type === 'C' ? 'Call' : 'Put'} Strike {toFaDigits(x.strike.toLocaleString('en-US'))} — Limit نزدیک Mid{' '}
+                    {x.side === 'buy' ? 'خرید' : 'فروش'} {fmtQty(x.qty)} {x.type === 'C' ? 'اختیار خرید (Call)' : 'اختیار فروش (Put)'} با قیمت توافقی {toFaDigits(x.strike.toLocaleString('en-US'))} دلار — سفارش با قیمت مشخص (Limit) حدود قیمت میانه{' '}
                     <MoneyValue value={x.premium} digits={2} />
                   </li>
                 ))}
             </ul>
             <p className="mt-1 text-muted">
-              {l.strategy.stats.netPremium >= 0 ? 'پرمیوم دریافتی' : 'هزینه'} <MoneyValue value={Math.abs(l.strategy.stats.netPremium)} digits={2} /> · حداکثر ضرر{' '}
+              {l.strategy.stats.netPremium >= 0 ? 'دریافتی در شروع' : 'پرداختی در شروع'} <MoneyValue value={Math.abs(l.strategy.stats.netPremium)} digits={2} /> · بیشترین زیان{' '}
               <MoneyValue value={-(l.strategy.stats.maxLoss ?? 0)} digits={2} tone="loss" /> · حداکثر سود{' '}
               {l.strategy.stats.maxProfit === null ? 'نامحدود' : <MoneyValue value={l.strategy.stats.maxProfit} digits={2} />}
             </p>
@@ -207,7 +207,7 @@ export function ComboPlanner({ markets, capital, risk }: { markets: readonly Der
         rows={[
           { label: 'جمع حداکثر ضرر (اگر همه با هم ضرر بدهند)', value: <MoneyValue value={-combo!.totalMaxLoss} digits={2} tone="loss" /> },
           { label: 'سهم از سرمایه', value: capital > 0 ? fmtPct((combo!.totalMaxLoss / capital) * 100) : '—' },
-          { label: combo!.totalPremium >= 0 ? 'پرمیوم خالص دریافتی' : 'هزینهٔ خالص پرمیوم', value: <MoneyValue value={Math.abs(combo!.totalPremium)} digits={2} /> },
+          { label: combo!.totalPremium >= 0 ? 'جمع پولی که در شروع دریافت می‌کنید' : 'جمع پولی که در شروع پرداخت می‌کنید', value: <MoneyValue value={Math.abs(combo!.totalPremium)} digits={2} /> },
           { label: 'کارمزد تقریبی باز کردن', value: <MoneyValue value={combo!.totalFees} digits={2} /> }
         ]}
       />

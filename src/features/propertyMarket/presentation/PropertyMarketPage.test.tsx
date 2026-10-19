@@ -219,4 +219,35 @@ describe('PropertyMarketPage', () => {
     expect(screen.getAllByText('۳۰۰ دلار').length).toBeGreaterThan(0);
     expect(screen.getAllByText('۳۲۰ دلار').length).toBeGreaterThan(0);
   });
+  it('تب دستیار قیمت: پیشنهاد نوساز و یک‌ساله + هشدار «حکم نهایی نیست»', async () => {
+    usePropertyMarketStore.setState({ listings: MANY });
+    render(<PropertyMarketPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: /دستیار قیمت/ }));
+    expect(await screen.findByText('دستیار قیمت آگهی‌ها')).toBeTruthy();
+    expect(screen.getByText(/پیشنهاد برتر نوساز/)).toBeTruthy();
+    expect(screen.getByText(/پیشنهاد برتر یک‌ساله/)).toBeTruthy();
+    expect(screen.getByText('این مقایسه حکم نهایی نیست')).toBeTruthy();
+  });
+  it('آگهی استثنایی: در فهرست آگهی‌ها با برچسب می‌ماند ولی میانگین جدول را تغییر نمی‌دهد', async () => {
+    const base = MANY[0];
+    const area = (n: number) => Array.from({ length: n }, (_, i) => ({ ...base, token: `ex${i}`, neighborhoodKey: 'golestan', yearBuilt: 1400, pricePerSqmToman: (80 + i * 10) * 1e6 }));
+    const lux = { ...base, token: 'lux', neighborhoodKey: 'golestan', yearBuilt: 1400, pricePerSqmToman: 220e6, title: 'پروژهٔ خیلی لوکس' };
+    usePropertyMarketStore.setState({ listings: [...area(8), lux] });
+    render(<PropertyMarketPage />);
+    // ۸ آگهی عادی ۸۰ تا ۱۵۰ → میانگین ۱۱۵؛ با آگهی لوکس ۲۲۰ می‌شد ۱۲۷
+    expect((await screen.findAllByText('۱۱۵ میلیون')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('۱۲۷ میلیون')).toBeNull();
+    // ولی دیده می‌شود: کنار همان خانه و زیر نام منطقه
+    expect(screen.getByText('+۱ استثنا تا ۲۲۰ میلیون')).toBeTruthy();
+    expect(screen.getByText(/۱ استثنا$/)).toBeTruthy();
+    // «بالاترین» → آگهی‌های منطقه، گران‌ترین اول
+    fireEvent.click(screen.getByRole('button', { name: 'بالاترین ۲۲۰ میلیون' }));
+    const first = (await screen.findAllByRole('listitem'))[0];
+    expect(first.textContent).toContain('پروژهٔ خیلی لوکس');
+    expect(screen.getByText('استثنا؛ در میانگین حساب نشده')).toBeTruthy();
+    // دستیار: استثنا جدا نمایش داده می‌شود
+    fireEvent.click(screen.getByRole('tab', { name: /دستیار قیمت/ }));
+    expect(await screen.findByText('آگهی‌های استثنایی (جدا از میانگین)')).toBeTruthy();
+    expect(screen.getByText(/بالاتر از مرز ۲۵٪ گران‌تر منطقه/)).toBeTruthy();
+  });
 });

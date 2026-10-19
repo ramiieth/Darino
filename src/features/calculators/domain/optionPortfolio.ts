@@ -71,27 +71,27 @@ export type ComboId = 'calm' | 'vol_pair' | 'hedged_bull' | 'breakout';
 export const COMBO_FA: Record<ComboId, { title: string; idea: string; wins: string; loses: string }> = {
   calm: {
     title: 'درآمد در بازار آرام',
-    idea: 'Iron Condor روی دو بازاری که IV آن‌ها نسبت به نوسان تاریخی گران‌تر است؛ پرمیوم گران فروخته می‌شود و ضرر هر طرف سقف دارد.',
-    wins: 'قیمت‌ها در بازهٔ دو Strike فروخته‌شده بمانند، زمان بگذرد یا IV پایین بیاید.',
-    loses: 'حرکت شدید کل بازار (به‌خصوص ریزش همراه با جهش IV)؛ چون دو بازار همبسته‌اند هر دو با هم ضرر می‌دهند.'
+    idea: 'آیرون کاندور (Iron Condor) روی دو بازاری که آپشن‌هایشان نسبت به نوسان واقعی اخیر گران‌تر است؛ آپشن گران فروخته می‌شود و زیان هر طرف سقف دارد.',
+    wins: 'قیمت‌ها بین دو قیمت توافقیِ فروخته‌شده بمانند، زمان بگذرد یا نوسان مورد انتظار بازار (IV) پایین بیاید.',
+    loses: 'حرکت شدید کل بازار، به‌خصوص ریزشی که آپشن‌ها را ناگهان گران کند؛ چون دو بازار با هم حرکت می‌کنند، هر دو با هم زیان می‌دهند.'
   },
   vol_pair: {
     title: 'معاملهٔ نسبی نوسان (دوطرفه)',
-    idea: 'فروش نوسان (Iron Condor) در بازار با IV گران و خرید نوسان (Long Strangle) در بازار با IV ارزان؛ در حرکت کل بازار دو پا تا حدی همدیگر را پوشش می‌دهند.',
-    wins: 'بازار گران آرام بماند و بازار ارزان حرکت بزرگ کند، یا IV دو بازار به هم نزدیک شود.',
-    loses: 'برعکس: بازار گران حرکت کند و بازار ارزان آرام بماند؛ گذر زمان روی Strangle خریداری‌شده هزینه دارد.'
+    idea: 'فروش آپشن (آیرون کاندور) در بازاری که آپشن‌هایش گران است و خرید آپشن (خرید استرنگل) در بازاری که آپشن‌هایش ارزان است؛ در حرکت کل بازار این دو بخش تا حدی همدیگر را پوشش می‌دهند.',
+    wins: 'بازار گران آرام بماند و بازار ارزان حرکت بزرگ کند، یا گرانی آپشن‌های دو بازار به هم نزدیک شود.',
+    loses: 'برعکس: بازار گران حرکت کند و بازار ارزان آرام بماند؛ گذر زمان از ارزش استرنگلِ خریداری‌شده کم می‌کند.'
   },
   hedged_bull: {
     title: 'صعودی با بیمهٔ ریزش',
-    idea: 'Bull Put Spread روی بازار با IV گران (درآمد در صعود یا ثبات) + Bear Put Spread روی بازار با بیشترین Beta به‌عنوان بیمهٔ ریزش کل بازار.',
+    idea: 'اسپرد صعودی Put روی بازاری که آپشن‌هایش گران است (درآمد در صعود یا ثبات) + اسپرد نزولی Put روی بازاری که بیشترین همراهی را با بیت‌کوین دارد (Beta)، به‌عنوان بیمهٔ ریزش کل بازار.',
     wins: 'صعود ملایم یا ثبات؛ در ریزش شدید، بیمه بخشی از ضرر را جبران می‌کند.',
     loses: 'ریزش متوسط که بیمه هنوز کامل فعال نشده، یا وقتی بازار پرریسک بالا رود و بیمه بی‌ارزش منقضی شود.'
   },
   breakout: {
     title: 'شرط روی حرکت بزرگ',
-    idea: 'Long Strangle روی دو بازاری که IV آن‌ها نسبت به نوسان تاریخی ارزان‌تر است؛ جهت مهم نیست، اندازهٔ حرکت مهم است.',
-    wins: 'حرکت بزرگ در هر جهت یا جهش IV (مثلاً پیش از رویداد).',
-    loses: 'بازار آرام و گذر زمان (Theta منفی) یا افت IV؛ حداکثر ضرر = پرمیوم پرداختی.'
+    idea: 'خرید استرنگل (Long Strangle) روی دو بازاری که آپشن‌هایشان نسبت به نوسان واقعی اخیر ارزان‌تر است؛ جهت مهم نیست، اندازهٔ حرکت مهم است.',
+    wins: 'حرکت بزرگ در هر جهت، یا گران شدن ناگهانی آپشن‌ها (مثلاً پیش از یک خبر مهم).',
+    loses: 'بازار آرام، گذر زمان یا ارزان شدن آپشن‌ها؛ بیشترین زیان همان پولی است که در شروع پرداخته‌اید.'
   }
 };
 
@@ -149,20 +149,20 @@ export function suggestCombos(snaps: readonly MarketSnap[], riskCapPerTradeUsd: 
   const hedger = byBeta.find((s) => s.currency !== rich.currency) ?? byBeta[0];
   const candidates: (Combo | null)[] = [
     make('calm', [
-      [byRich[0], 'iron_condor', `فروش نوسان (IV ${fmtRatio(byRich[0])} × HV)`],
-      [byRich[1], 'iron_condor', `فروش نوسان (IV ${fmtRatio(byRich[1])} × HV)`]
+      [byRich[0], 'iron_condor', `فروش آپشن گران (${fmtRatio(byRich[0])} برابر نوسان واقعی)`],
+      [byRich[1], 'iron_condor', `فروش آپشن گران (${fmtRatio(byRich[1])} برابر نوسان واقعی)`]
     ]),
     make('vol_pair', [
-      [rich, 'iron_condor', `فروش نوسان گران (IV ${fmtRatio(rich)} × HV)`],
-      [cheap, 'long_strangle', `خرید نوسان ارزان (IV ${fmtRatio(cheap)} × HV)`]
+      [rich, 'iron_condor', `فروش آپشن گران (${fmtRatio(rich)} برابر نوسان واقعی)`],
+      [cheap, 'long_strangle', `خرید آپشن ارزان (${fmtRatio(cheap)} برابر نوسان واقعی)`]
     ]),
     make('hedged_bull', [
-      [rich, 'bull_put_spread', 'درآمد صعودی با Put گران'],
-      [hedger, 'bear_put_spread', `بیمهٔ ریزش (Beta ${hedger.beta === null ? '—' : hedger.beta.toFixed(2)})`]
+      [rich, 'bull_put_spread', 'درآمد در صعود یا ثبات با فروش Put گران'],
+      [hedger, 'bear_put_spread', `بیمهٔ ریزش (همراهی با بیت‌کوین ${hedger.beta === null ? '—' : hedger.beta.toFixed(2)})`]
     ]),
     make('breakout', [
-      [byCheap[0], 'long_strangle', `خرید نوسان (IV ${fmtRatio(byCheap[0])} × HV)`],
-      [byCheap[1], 'long_strangle', `خرید نوسان (IV ${fmtRatio(byCheap[1])} × HV)`]
+      [byCheap[0], 'long_strangle', `خرید آپشن ارزان (${fmtRatio(byCheap[0])} برابر نوسان واقعی)`],
+      [byCheap[1], 'long_strangle', `خرید آپشن ارزان (${fmtRatio(byCheap[1])} برابر نوسان واقعی)`]
     ])
   ];
   const combos = candidates.filter((c): c is Combo => c !== null);
@@ -212,8 +212,8 @@ export function explainAttribution(a: Attribution, scale: number): string {
   if (Math.abs(a.total) < tiny) return 'تقریباً سربه‌سر';
   const parts = [
     { k: 'price', v: a.price, up: 'حرکت قیمت به نفع پوزیشن', down: 'حرکت قیمت خلاف پوزیشن (بیرون از بازهٔ سود)' },
-    { k: 'vol', v: a.vol, up: 'تغییر IV به نفع پوزیشن (Vega)', down: 'تغییر IV خلاف پوزیشن (Vega)' },
-    { k: 'time', v: a.time, up: 'گذر زمان (Theta مثبت)', down: 'گذر زمان (Theta منفی، کاهش ارزش زمانی)' }
+    { k: 'vol', v: a.vol, up: 'تغییر نوسان بازار به نفع شما بود', down: 'تغییر نوسان بازار به ضرر شما بود' },
+    { k: 'time', v: a.time, up: 'گذر زمان به نفع شما بود', down: 'گذر زمان از ارزش آپشن‌های شما کم کرد' }
   ].sort((x, y) => Math.abs(y.v) - Math.abs(x.v));
   const main = parts[0];
   const second = parts[1];
@@ -282,13 +282,13 @@ export function comboScenarios(c: Combo): ComboScenario[] {
       { id: 'div2', group: 'divergence', label: `واگرایی: ${c.legs[0].currency} −۱۵٪، ${c.legs[1].currency} +۱۵٪`, baseMove: null, shock: (_l, i) => ({ move: i === 0 ? -0.15 : 0.15, iv: 0, days: Infinity }) }
     );
   defs.push(
-    { id: 'ivup', group: 'vol', label: 'جهش IV همه +۱۵ واحد، فوری، قیمت ثابت', baseMove: null, shock: () => ({ move: 0, iv: 0.15, days: 0 }) },
-    { id: 'ivdn', group: 'vol', label: 'ریزش IV همه −۱۵ واحد، فوری، قیمت ثابت', baseMove: null, shock: () => ({ move: 0, iv: -0.15, days: 0 }) },
-    { id: 'crash', group: 'combo', label: c.legs.length > 1 ? 'سقوط ناگهانی: BTC −۲۰٪ و IV +۲۵ واحد (فوری)' : 'سقوط ناگهانی: −۲۰٪ و IV +۲۵ واحد (فوری)', baseMove: -0.2, shock: (l) => ({ move: betaMove(-0.2, l.snap.beta), iv: 0.25, days: 0 }) },
-    { id: 'rally', group: 'combo', label: c.legs.length > 1 ? 'رالی آرام: BTC +۱۰٪ و IV −۱۰ واحد طی ۷ روز' : 'رالی آرام: +۱۰٪ و IV −۱۰ واحد طی ۷ روز', baseMove: 0.1, shock: (l) => ({ move: betaMove(0.1, l.snap.beta), iv: -0.1, days: 7 }) },
-    { id: 'chop', group: 'combo', label: c.legs.length > 1 ? 'نوسان بی‌جهت: BTC −۵٪ و IV +۱۰ واحد طی ۷ روز' : 'نوسان بی‌جهت: −۵٪ و IV +۱۰ واحد طی ۷ روز', baseMove: -0.05, shock: (l) => ({ move: betaMove(-0.05, l.snap.beta), iv: 0.1, days: 7 }) },
-    { id: 't7', group: 'time', label: 'گذر ۷ روز، قیمت و IV ثابت', baseMove: 0, shock: () => ({ move: 0, iv: 0, days: 7 }) },
-    { id: 'thalf', group: 'time', label: 'نیمهٔ راه سررسید، قیمت و IV ثابت', baseMove: 0, shock: (l) => ({ move: 0, iv: 0, days: l.snap.days / 2 }) }
+    { id: 'ivup', group: 'vol', label: 'آپشن‌ها ناگهان گران شوند (نوسان مورد انتظار +۱۵ واحد)، قیمت ثابت', baseMove: null, shock: () => ({ move: 0, iv: 0.15, days: 0 }) },
+    { id: 'ivdn', group: 'vol', label: 'آپشن‌ها ناگهان ارزان شوند (نوسان مورد انتظار −۱۵ واحد)، قیمت ثابت', baseMove: null, shock: () => ({ move: 0, iv: -0.15, days: 0 }) },
+    { id: 'crash', group: 'combo', label: c.legs.length > 1 ? 'سقوط ناگهانی: بیت‌کوین −۲۰٪ و نوسان مورد انتظار +۲۵ واحد' : 'سقوط ناگهانی: −۲۰٪ و نوسان مورد انتظار +۲۵ واحد', baseMove: -0.2, shock: (l) => ({ move: betaMove(-0.2, l.snap.beta), iv: 0.25, days: 0 }) },
+    { id: 'rally', group: 'combo', label: c.legs.length > 1 ? 'صعود آرام: بیت‌کوین +۱۰٪ و نوسان مورد انتظار −۱۰ واحد طی ۷ روز' : 'صعود آرام: +۱۰٪ و نوسان مورد انتظار −۱۰ واحد طی ۷ روز', baseMove: 0.1, shock: (l) => ({ move: betaMove(0.1, l.snap.beta), iv: -0.1, days: 7 }) },
+    { id: 'chop', group: 'combo', label: c.legs.length > 1 ? 'نوسان بی‌جهت: بیت‌کوین −۵٪ و نوسان مورد انتظار +۱۰ واحد طی ۷ روز' : 'نوسان بی‌جهت: −۵٪ و نوسان مورد انتظار +۱۰ واحد طی ۷ روز', baseMove: -0.05, shock: (l) => ({ move: betaMove(-0.05, l.snap.beta), iv: 0.1, days: 7 }) },
+    { id: 't7', group: 'time', label: 'گذر ۷ روز، قیمت و نوسان ثابت', baseMove: 0, shock: () => ({ move: 0, iv: 0, days: 7 }) },
+    { id: 'thalf', group: 'time', label: 'نیمهٔ راه تا سررسید، قیمت و نوسان ثابت', baseMove: 0, shock: (l) => ({ move: 0, iv: 0, days: l.snap.days / 2 }) }
   );
   const scale = Math.max(1, c.totalMaxLoss);
   return defs.map((d) => {

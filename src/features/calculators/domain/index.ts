@@ -16,3 +16,4 @@ export * from './planner';
 export * from './options';
 export * from './optionStrategies';
 export * from './optionPortfolio';
+export * from './targetPlan';

@@ -12,6 +12,7 @@
  * POST carPersist         → ذخیره Snapshot روزانه خودرو در Neon (best-effort)
  * GET  ?market=car        → Snapshotهای روزانه خودرو از Neon
  * GET  ?market=car&cron=1 → Cron روزانه Vercel: واکشی + ذخیره Snapshot امروز
+ * GET  ?market=property&cron=1 → Cron روزانه: جدیدترین آگهی‌های دیوار → pmListings هر کاربر (کلاینت هنگام باز شدن ادغام می‌کند)
  *
  * خودروهای وارداتی پلاک اروند (api/_arvand.ts):
  * POST arvandSearch / arvandDetails / arvandPersist · GET ?market=arvand
@@ -30,6 +31,7 @@ import { collectChunk, sanitizeCursor, COLLECT_SOURCES } from '../src/features/p
 import { fetchCities, fetchListPage, matchCity } from '../src/features/propertyMarket/collector/client.js';
 import { parseListPage } from '../src/features/propertyMarket/collector/parse.js';
 import { PROPERTY_CITIES } from '../src/features/propertyMarket/data/catalog.js';
+import { refreshNewestListings } from '../src/features/propertyMarket/collector/refresh.js';
 import type {
   ListingSource,
   PropertyMarketListing,
@@ -128,6 +130,58 @@ async function upsertCarSnapshot(s: CarSnapshot): Promise<void> {
   `;
 }
 
+/** بودجهٔ زمان Cron املاک — زیر سقف ۶۰ ثانیهٔ فانکشن، با حاشیه برای ذخیره */
+const PROPERTY_CRON_BUDGET_MS = 42_000;
+/** آگهی‌های شناخته‌شده برای پر کردن جزئیات (فقط بازهٔ اخیر) */
+const PROPERTY_CRON_KNOWN_DAYS = 90;
+
+/**
+ * Cron روزانهٔ املاک: آگهی‌ها فقط برای کاربرانی ذخیره می‌شوند که قبلاً پشتیبان Neon داشته‌اند
+ * (داده هر کاربر جداست؛ کاربر بدون پشتیبان چیزی دریافت نمی‌کند).
+ */
+async function handlePropertyCron(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!isCronRequest(req)) {
+    json(res, 401, { ok: false, error: 'unauthorized' });
+    return;
+  }
+  if (!(await isDbUsable())) {
+    json(res, 200, { ok: true, persisted: false, reason: 'no database' });
+    return;
+  }
+  try {
+    const users = (await db()`SELECT DISTINCT "userId" FROM "pmListings"`) as unknown as { userId: string }[];
+    if (users.length === 0) {
+      json(res, 200, { ok: true, persisted: false, reason: 'no users with property backup' });
+      return;
+    }
+    const since = Date.now() - PROPERTY_CRON_KNOWN_DAYS * 86_400_000;
+    const rows = (await db()`
+      SELECT DISTINCT ON (token) payload FROM "pmListings" WHERE "scrapedAt" >= ${since} ORDER BY token, "scrapedAt" DESC
+    `) as unknown as { payload: PropertyMarketListing | string }[];
+    const known = new Map<string, PropertyMarketListing>();
+    for (const r of rows) {
+      const l = fromJsonb(r.payload);
+      if (l && typeof l.token === 'string') known.set(l.token, l);
+    }
+    const r = await refreshNewestListings({ known, timeBudgetMs: PROPERTY_CRON_BUDGET_MS, pauseMs: 350 });
+    for (const { userId } of users) {
+      for (const l of r.listings) {
+        await db()`
+          INSERT INTO "pmListings" ("userId", token, city, payload, "listedAt", "scrapedAt")
+          VALUES (${userId}, ${l.token}, ${l.city ?? 'ahvaz'}, ${JSON.stringify(l)}::jsonb, ${l.listedAt ?? null}, ${l.scrapedAt})
+          ON CONFLICT ("userId", token) DO UPDATE SET
+            payload = EXCLUDED.payload,
+            "listedAt" = EXCLUDED."listedAt",
+            "scrapedAt" = GREATEST("pmListings"."scrapedAt", EXCLUDED."scrapedAt")
+        `;
+      }
+    }
+    json(res, 200, { ok: true, persisted: true, users: users.length, seen: r.seen, saved: r.listings.length, pages: r.pages, complete: r.complete });
+  } catch (e) {
+    json(res, 200, { ok: false, error: netError(e) });
+  }
+}
+
 async function handleCarGet(req: IncomingMessage, res: ServerResponse, q: URLSearchParams): Promise<void> {
   if (q.get('cron') === '1') {
     if (!isCronRequest(req)) {
@@ -169,6 +223,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const query = queryOf(req);
     if (req.method === 'GET' && query.get('market') === 'car') {
       await handleCarGet(req, res, query);
+      return;
+    }
+    if (req.method === 'GET' && query.get('market') === 'property' && query.get('cron') === '1') {
+      await handlePropertyCron(req, res);
       return;
     }
     if (req.method === 'GET' && query.get('market') === 'arvand') {

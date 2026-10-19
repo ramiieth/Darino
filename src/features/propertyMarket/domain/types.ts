@@ -108,6 +108,8 @@ export interface CleaningReport {
   valid: number;
   deduplicated: number;
   outliersRemoved: number;
+  /** آگهی واقعی ولی استثنایی (مثلاً پروژهٔ خیلی لوکس): نمایش داده می‌شود ولی در میانگین‌ها حساب نمی‌شود */
+  exceptions?: number;
   /** خروجی نهایی = داده بازار */
   market: number;
   /** دلیل رد برخی رکوردها (شمارنده) */

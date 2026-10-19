@@ -110,7 +110,16 @@ describe('دستیار آپشن Derive', () => {
     next();
     expect(screen.getAllByText(/آیرون کاندور/).length).toBeGreaterThan(0);
     expect(screen.getByText('مراحل اجرا')).toBeTruthy();
-    expect(screen.getAllByText(/سفارش Limit نزدیک Mid/).length).toBe(4);
+    expect(screen.getAllByText(/حدود قیمت میانه/).length).toBe(4);
+    // خلاصهٔ پنج‌بخشی از اعداد موتور، بدون دستیار
+    expect(screen.getByText('۱. نتیجه به زبان ساده')).toBeTruthy();
+    expect(screen.getByText('۵. قدم بعدی')).toBeTruthy();
+    expect(screen.getByText(/استراتژی پیشنهادی «آیرون کاندور/)).toBeTruthy();
+    // کادر جداگانهٔ هدف سود: مستقل از سرمایه، با هشدار صادقانه
+    expect(screen.getByRole('heading', { name: 'برای یک سود مشخص چقدر سرمایه لازم است؟' })).toBeTruthy();
+    expect(screen.getByText('هیچ استراتژی‌ای در همهٔ سناریوها سود نمی‌دهد')).toBeTruthy();
+    expect((screen.getByLabelText(/سود هدف/) as HTMLInputElement).value).toBe('1000');
+    expect(screen.getByText('قدم به قدم چه کنیم؟')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /توضیح دستیار/ }));
     await screen.findByText(/خلاصهٔ وضعیت بازار/);
     expect(screen.getByRole('columnheader', { name: 'سناریو' })).toBeTruthy();

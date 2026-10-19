@@ -73,7 +73,9 @@ import { OptionsPayoffChart } from './OptionsPayoffChart';
 import { AssistantExplain } from './AssistantExplain';
 import { ComboPlanner } from './ComboPlanner';
 import { DeepScenarios } from './DeepScenarios';
+import { TargetProfitPlanner } from './TargetProfitPlanner';
 import { atmIvOf, cents, daysTo, DAY, expiryMs, faDate, fmtPct, fmtQty } from './helpers';
+import { GLOSSARY, plainSummary, RISK_HINT, STRATEGY_PLAIN, VIEW_HINT } from './plainText';
 
 const STEPS = ['بازار', 'سرمایه و دیدگاه', 'استراتژی', 'سناریو و خروج'] as const;
 const STORE_KEY = 'calc:options:v1';
@@ -95,7 +97,7 @@ interface Saved {
 }
 const DEFAULTS: Saved = { step: 0, currency: 'ETH', capital: '', risk: 'moderate', view: 'unsure', expiry: null, pick: 0, mode: 'single' };
 
-const REGIME_FA: Record<IvRegime, string> = { rich: 'گران', cheap: 'ارزان', fair: 'منصفانه' };
+const REGIME_FA: Record<IvRegime, string> = { rich: 'گران', cheap: 'ارزان', fair: 'متعادل' };
 const VIEW_FA: Record<View, string> = { bull: 'صعودی', bear: 'نزولی', neutral: 'خنثی', unsure: 'نامطمئن' };
 const RISK_FA: Record<RiskProfile, string> = { conservative: 'محتاط', moderate: 'متعادل', aggressive: 'جسور' };
 
@@ -211,7 +213,10 @@ export function OptionsWizard() {
   return (
     <div ref={topRef} className="mx-auto w-full max-w-3xl scroll-mt-4 space-y-5">
       <Surface className="p-3.5 md:p-4">
-        <p className="mb-2.5 text-2xs text-subtle">داده از Derive (derive.xyz)؛ اعداد در اپ حساب می‌شوند و دستیار فقط توضیح می‌دهد. هیچ سفارشی ثبت نمی‌شود.</p>
+        <p className="mb-1 text-xs leading-6 text-muted">
+          آپشن قراردادی است که به شما حق می‌دهد (نه اجبار) یک دارایی را تا تاریخ مشخصی با قیمت از پیش تعیین‌شده بخرید یا بفروشید. این ابزار در چهار قدم کمک می‌کند ببینید چه معامله‌ای با هدف و سرمایهٔ شما جور است و در هر حرکت قیمت چه اتفاقی می‌افتد.
+        </p>
+        <p className="mb-2.5 text-2xs text-subtle">قیمت‌ها از صرافی Derive (derive.xyz) خوانده می‌شود. همهٔ اعداد در خود اپ حساب می‌شوند و هیچ سفارشی ثبت نمی‌شود.</p>
         <ol className="grid grid-cols-4 gap-1.5" aria-label="قدم‌ها">
           {STEPS.map((t, i) => {
             const here = i === s.step;
@@ -231,11 +236,11 @@ export function OptionsWizard() {
       </Surface>
 
       {s.step === 0 && (
-        <StepCard n={1} title="کدام بازار آپشن Derive؟" sub="فقط دارایی‌هایی که در Derive آپشن دارند. می‌توانید برای هرکدام نام و لوگوی دلخواه هم بگذارید.">
+        <StepCard n={1} title="روی کدام دارایی می‌خواهید آپشن معامله کنید؟" sub="فقط دارایی‌هایی نمایش داده می‌شوند که در Derive آپشن دارند. بازارهای پرمعامله‌تر بالاترند.">
           {marketsQ.isLoading ? (
             <Skeleton className="h-40 w-full" />
           ) : marketsQ.isError || !markets.length ? (
-            <Notice tone="warn" title="بازارهای Derive خوانده نشد">کمی بعد دوباره امتحان کنید.</Notice>
+            <Notice tone="warn" title="فهرست بازارهای Derive دریافت نشد">اتصال به Derive برقرار نشد. چند دقیقهٔ دیگر دوباره امتحان کنید.</Notice>
           ) : (
             <>
               <div role="radiogroup" aria-label="بازارهای Derive" className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -265,14 +270,16 @@ export function OptionsWizard() {
                         <MoneyValue value={m.spot} />
                       </span>
                       <span className="text-2xs text-subtle">
-                        Open Interest {oiUsd === null ? '—' : <MoneyValue value={oiUsd} compact />}
+                        قراردادهای باز {oiUsd === null ? '—' : <MoneyValue value={oiUsd} compact />}
                         {oiUsd !== null && oiUsd < LOW_MARKET_OI_USD && <Badge tone="warn" className="ms-1 text-2xs">کم‌نقد</Badge>}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-2xs text-subtle">«کم‌نقد» = Open Interest کمتر از ۱۰۰ هزار دلار (قاعدهٔ ثابت اپ).</p>
+              <p className="text-2xs leading-5 text-subtle">
+                «قراردادهای باز» (Open Interest) ارزش قراردادهایی است که الان باز هستند؛ هرچه بیشتر، خرید و فروش راحت‌تر. «کم‌نقد» یعنی کمتر از ۱۰۰ هزار دلار؛ در این بازارها خروج از معامله ممکن است سخت باشد.
+              </p>
               <AddMarket markets={markets} customs={customs} onChange={setCustoms} />
             </>
           )}
@@ -280,46 +287,59 @@ export function OptionsWizard() {
       )}
 
       {s.step === 1 && (
-        <StepCard n={2} title="سرمایه و دیدگاه شما" sub="فقط سرمایه را تایپ می‌کنید؛ بقیه انتخابی است. موجودی فعلی از «بهای تمام‌شده» خوانده می‌شود.">
-          <Field label="سرمایهٔ این معاملات (دلار)" error={s.capital.trim() !== '' && !capitalOk ? 'عدد مثبت وارد کنید.' : null}>
+        <StepCard n={2} title="سرمایه و نظر شما دربارهٔ بازار" sub="فقط مبلغ سرمایه لازم است؛ بقیهٔ گزینه‌ها پیش‌فرض دارند.">
+          <Field
+            label="سرمایهٔ این معاملات (دلار)"
+            hint="مبلغی که برای معاملات آپشن کنار گذاشته‌اید، نه کل دارایی‌تان. اگر در Derive حساب دارید، موجودی دلاری حساب را وارد کنید."
+            error={s.capital.trim() !== '' && !capitalOk ? 'یک عدد بزرگ‌تر از صفر وارد کنید.' : null}
+          >
             <Input dir="ltr" inputMode="decimal" autoComplete="off" value={s.capital} onChange={(e) => set('capital', e.target.value)} suffix="دلار" placeholder="0" />
           </Field>
           {capitalOk && (
             <p className="-mt-2 text-xs leading-6 text-muted">
-              دستهٔ سرمایه:{' '}
-              <b className="text-ink">{capitalTier(capital) === 'small' ? 'کمتر از ۱٬۰۰۰ دلار — فقط ریسک‌محدود' : capitalTier(capital) === 'medium' ? '۱٬۰۰۰ تا ۱۰٬۰۰۰ دلار — اسپردها، Covered Call و Cash-Secured Put' : 'بیش از ۱۰٬۰۰۰ دلار — ترکیب چند استراتژی و پوشش ریسک'}</b>
-              . سقف ریسک هر معامله ({fmtPct(RISK_PCT[s.risk], 1)}): <MoneyValue value={(capital * RISK_PCT[s.risk]) / 100} digits={2} className="font-semibold text-ink" />
+              <b className="text-ink">{capitalTier(capital) === 'small' ? 'سرمایهٔ کمتر از ۱٬۰۰۰ دلار: فقط معامله‌هایی پیشنهاد می‌شود که زیانشان سقف دارد.' : capitalTier(capital) === 'medium' ? 'سرمایهٔ ۱٬۰۰۰ تا ۱۰٬۰۰۰ دلار: معامله‌های ترکیبی ساده با زیان محدود هم پیشنهاد می‌شود.' : 'سرمایهٔ بیش از ۱۰٬۰۰۰ دلار: ترکیب چند معامله و پوشش ریسک هم ممکن است.'}</b>{' '}
+              بیشترین زیانی که هر معامله می‌تواند داشته باشد ({fmtPct(RISK_PCT[s.risk], 1)} سرمایه): <MoneyValue value={(capital * RISK_PCT[s.risk]) / 100} digits={2} className="font-semibold text-ink" />
             </p>
           )}
           <p className="rounded-field bg-surface-2/60 px-3 py-2 text-xs text-muted">
-            موجودی فعلی <bdi dir="ltr">{currency}</bdi>: {holdingsQty > 0 ? <b className="text-ink">{fmtQty(holdingsQty)}</b> : 'ثبت نشده'} <span className="text-subtle">· از «بهای تمام‌شده»</span>
+            مقدار <bdi dir="ltr">{currency}</bdi> که از قبل دارید: {holdingsQty > 0 ? <b className="text-ink">{fmtQty(holdingsQty)}</b> : 'ثبت نشده'}{' '}
+            <span className="text-subtle">· از بخش «بهای تمام‌شده» خوانده می‌شود. اگر دارید، معامله‌هایی که از دارایی شما محافظت می‌کنند هم پیشنهاد می‌شود.</span>
           </p>
-          <Chips label="دیدگاه شما" value={s.view} onChange={(x) => setS((p) => ({ ...p, view: x, pick: 0 }))} options={(Object.keys(VIEW_FA) as View[]).map((v) => ({ value: v, label: VIEW_FA[v] }))} />
-          <Chips label="تحمل ریسک" value={s.risk} onChange={(x) => setS((p) => ({ ...p, risk: x, pick: 0 }))} options={(Object.keys(RISK_FA) as RiskProfile[]).map((r) => ({ value: r, label: `${RISK_FA[r]} (${fmtPct(RISK_PCT[r], 1)})` }))} />
+          <div>
+            <Chips label="فکر می‌کنید قیمت تا سررسید چه می‌شود؟" value={s.view} onChange={(x) => setS((p) => ({ ...p, view: x, pick: 0 }))} options={(Object.keys(VIEW_FA) as View[]).map((v) => ({ value: v, label: VIEW_FA[v] }))} />
+            <p className="mt-1.5 text-2xs text-subtle">{VIEW_HINT[s.view]}</p>
+          </div>
+          <div>
+            <Chips label="تحمل ریسک (سهم سرمایه که هر معامله می‌تواند از دست بدهد)" value={s.risk} onChange={(x) => setS((p) => ({ ...p, risk: x, pick: 0 }))} options={(Object.keys(RISK_FA) as RiskProfile[]).map((r) => ({ value: r, label: `${RISK_FA[r]} (${fmtPct(RISK_PCT[r], 1)})` }))} />
+            <p className="mt-1.5 text-2xs text-subtle">{RISK_HINT[s.risk]}</p>
+          </div>
           {expiries.length > 0 && (
-            <Chips
-              label="سررسید (پیشنهاد: ۱۴ تا ۴۵ روز)"
-              value={expiry ?? ''}
-              onChange={(x) => set('expiry', x)}
-              options={expiries.filter((e) => daysTo(e, now) >= 1 && daysTo(e, now) <= 120).map((e) => ({ value: e, label: `${faDate(e)} · ${toFaDigits(Math.round(daysTo(e, now)))} روز` }))}
-            />
+            <div>
+              <Chips
+                label="سررسید: روزی که قرارداد تمام می‌شود"
+                value={expiry ?? ''}
+                onChange={(x) => set('expiry', x)}
+                options={expiries.filter((e) => daysTo(e, now) >= 1 && daysTo(e, now) <= 120).map((e) => ({ value: e, label: `${faDate(e)} · ${toFaDigits(Math.round(daysTo(e, now)))} روز` }))}
+              />
+              <p className="mt-1.5 text-2xs text-subtle">پیشنهاد: ۱۴ تا ۴۵ روز. سررسید خیلی نزدیک به حرکت‌های کوچک قیمت حساس است؛ سررسید خیلی دور پول را مدت طولانی‌تری قفل می‌کند.</p>
+            </div>
           )}
         </StepCard>
       )}
 
       {s.step === 2 && (
-        <StepCard n={3} title="استراتژی پیشنهادی" sub="بر اساس دیدگاه شما، IV در برابر نوسان تاریخی و اندازهٔ سرمایه؛ ۱ اصلی و حداکثر ۲ جایگزین.">
+        <StepCard n={3} title="معاملهٔ پیشنهادی" sub="بر اساس نظر شما دربارهٔ بازار، گران یا ارزان بودن آپشن‌ها و اندازهٔ سرمایه. یک پیشنهاد اصلی و حداکثر دو جایگزین.">
           {!analysis ? (
             <Skeleton className="h-60 w-full" />
           ) : (
             <>
               <MarketSummary a={analysis} currency={currency} funding={chain?.perp.fundingHourly ?? null} />
               {!analysis.built.length ? (
-                <Notice tone="warn" title="استراتژی مناسبی ساخته نشد">در این سررسید Strike با قیمت معتبر برای Deltaهای لازم پیدا نشد؛ سررسید دیگری انتخاب کنید.</Notice>
+                <Notice tone="warn" title="معاملهٔ مناسبی پیدا نشد">در این سررسید، قرارداد با قیمت معتبر برای ساختن این استراتژی‌ها وجود ندارد. سررسید دیگری را در قدم ۲ انتخاب کنید.</Notice>
               ) : (
                 <>
                   <Chips
-                    label="استراتژی"
+                    label="استراتژی (نوع معامله)"
                     value={Math.min(s.pick, analysis.built.length - 1)}
                     onChange={(x) => set('pick', x)}
                     options={analysis.built.map((b, i) => ({ value: i, label: `${i === 0 ? 'اصلی' : `جایگزین ${toFaDigits(i)}`}: ${STRATEGY_FA[b.id]}` }))}
@@ -327,20 +347,35 @@ export function OptionsWizard() {
                   {strategy && <StrategyView b={strategy} a={analysis} currency={currency} expiry={expiry!} chain={chain!} reason={reasonOf(s.view, analysis.regime, holdingsQty > 0)} />}
                   {strategy && (
                     <AssistantExplain
+                      summary={plainSummary({
+                        b: strategy,
+                        currency,
+                        capital,
+                        riskCap: analysis.riskCap,
+                        days: analysis.days,
+                        view: s.view,
+                        regime: analysis.regime,
+                        scenarios: scenarios(strategy, analysis.spot, analysis.T),
+                        missing: analysis.missing,
+                        wideSpread: strategy.worstSpreadPct !== null && strategy.worstSpreadPct > WIDE_SPREAD_PCT,
+                        lowOi: strategy.minOi !== null && strategy.minOi < LOW_OI,
+                        priceSnapshot: liveOf(currency)?.snapshot === true
+                      })}
                       payload={() => assistantPayload(strategy, analysis, { live: liveOf(currency), liveAll: markets.map((m) => ({ symbol: m.currency, a: liveOf(m.currency), deriveIndex: m.spot })), liveQuotes: live.assets, liveSyncedAt: live.lastSyncAt ?? null, currency, name: custom?.name ?? currency, capital, holdingsQty, view: s.view, risk: s.risk, expiry: expiry!, chain: chain! })}
                     />
                   )}
                 </>
               )}
+              <Glossary />
             </>
           )}
         </StepCard>
       )}
 
       {s.step === 3 && (
-        <StepCard n={4} title="سناریوها و برنامهٔ خروج" sub="کجا بفروشیم، در هر حرکت قیمت چه کنیم، و IV و زمان چه اثری دارند.">
+        <StepCard n={4} title="اگر قیمت تغییر کند چه می‌شود؟" sub="سود یا زیان در حرکت‌های مختلف قیمت، اثر تغییر نوسان بازار و گذر زمان، و اینکه کی معامله را ببندید.">
           <Chips
-            label="تحلیل"
+            label="چه چیزی را بررسی کنیم؟"
             value={s.mode}
             onChange={(x) => set('mode', x)}
             options={[
@@ -354,12 +389,12 @@ export function OptionsWizard() {
               <Education />
             </>
           ) : !analysis || !strategy ? (
-            <p className="text-sm text-muted">ابتدا در قدم ۳ استراتژی ساخته شود.</p>
+            <p className="text-sm text-muted">هنوز معامله‌ای ساخته نشده است. به قدم ۳ برگردید.</p>
           ) : (
             <>
               <ScenariosView b={strategy} a={analysis} />
               <ExitView b={strategy} days={analysis.days} />
-              <Disclosure summary="تحلیل عمیق: بازه‌های سود و زیان، ۱۶ سناریو با علت، شبیه‌سازی">
+              <Disclosure summary="تحلیل عمیق (توضیحات بیشتر): بازه‌های سود و زیان، ۱۶ سناریو با علت، شبیه‌سازی">
                 <DeepScenarios combo={singleCombo(strategy, { currency, spot: analysis.spot, days: analysis.days, expiry: expiry!, atmIv: analysis.atmIv, hv: analysis.hv, regime: analysis.regime, chain: chain!.options, m: analysis.m, beta: 1, corr: 1, oiUsd: null })} />
               </Disclosure>
               <Education />
@@ -370,6 +405,10 @@ export function OptionsWizard() {
             این تحلیل آموزشی است و توصیه مالی قطعی نیست؛ پیش از معامله ریسک خود را بسنجید و فقط با سرمایه‌ای معامله کنید که تحمل از دست دادنش را دارید.
           </p>
         </StepCard>
+      )}
+
+      {s.step >= 1 && analysis && expiry && chain && (
+        <TargetProfitPlanner chain={chain.options} m={analysis.m} currency={currency} expiry={expiry} days={analysis.days} />
       )}
 
       <div className="sticky bottom-[calc(var(--bottomnav-h)+0.75rem)] z-10 md:bottom-4">
@@ -417,9 +456,9 @@ declare function useAnalysisType(): {
 } | null;
 
 function reasonOf(view: View, regime: IvRegime | null, holder: boolean): string {
-  const iv = regime === 'rich' ? 'IV گران است، پس فروش پرمیوم (Theta مثبت) به‌صرفه‌تر است' : regime === 'cheap' ? 'IV ارزان است، پس خرید آپشن به‌صرفه‌تر است' : 'IV نزدیک نوسان تاریخی است';
-  const v = view === 'bull' ? 'دیدگاه صعودی' : view === 'bear' ? 'دیدگاه نزولی' : view === 'neutral' ? 'دیدگاه خنثی' : 'جهت نامطمئن';
-  return `${v}؛ ${iv}.${holder ? ' چون از این دارایی دارید، استراتژی‌های پوشش‌دار هم در نظر گرفته شد.' : ''} ریسک هر معامله به سقف ریسک شما محدود است.`;
+  const iv = regime === 'rich' ? 'آپشن‌ها الان گران‌اند، پس فروش آپشن و دریافت پول در شروع به‌صرفه‌تر است' : regime === 'cheap' ? 'آپشن‌ها الان ارزان‌اند، پس خرید آپشن به‌صرفه‌تر است' : 'قیمت آپشن‌ها نزدیک نوسان واقعی اخیر است';
+  const v = view === 'bull' ? 'نظر شما صعودی است' : view === 'bear' ? 'نظر شما نزولی است' : view === 'neutral' ? 'نظر شما خنثی است' : 'جهت قیمت برایتان مشخص نیست';
+  return `${v}؛ ${iv}.${holder ? ' چون از این دارایی دارید، معامله‌هایی که از دارایی شما محافظت می‌کنند هم بررسی شد.' : ''} اندازهٔ معامله طوری است که زیانش از سقف ریسک شما بیشتر نشود.`;
 }
 
 /* ---------------- افزودن دستی ---------------- */
@@ -496,28 +535,32 @@ function MarketSummary({ a, currency, funding }: { a: Analysis; currency: string
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Metric2 label="قیمت شاخص" tag={<SourceTag kind="live" />}>
+        <Metric2 label="قیمت فعلی در Derive" tag={<SourceTag kind="live" />}>
           <MoneyValue value={a.spot} />
         </Metric2>
-        <Metric2 label="روند ۷ / ۳۰ روز">
+        <Metric2 label="تغییر قیمت ۷ / ۳۰ روز اخیر">
           {a.trend.change7d === null ? '—' : <PercentValue value={a.trend.change7d} digits={1} />} / {a.trend.change30d === null ? '—' : <PercentValue value={a.trend.change30d} digits={1} />}
         </Metric2>
-        <Metric2 label="IV در پول / HV ۳۰ روز">
+        <Metric2 label="نوسان مورد انتظار (IV) / نوسان واقعی (HV)">
           {a.atmIv === null ? '—' : fmtPct(a.atmIv * 100)} / {a.hv === null ? '—' : fmtPct(a.hv * 100)}
         </Metric2>
-        <Metric2 label="IV">
+        <Metric2 label="قیمت آپشن‌ها">
           {a.regime ? <Badge tone={a.regime === 'rich' ? 'warn' : a.regime === 'cheap' ? 'gain' : 'neutral'}>{REGIME_FA[a.regime]}</Badge> : '—'}
-          {ratio !== null && <span className="ms-1 text-2xs font-normal text-subtle">{toFaDigits(ratio.toFixed(2))}× HV</span>}
+          {ratio !== null && <span className="ms-1 text-2xs font-normal text-subtle">{toFaDigits(ratio.toFixed(2))} برابر HV</span>}
         </Metric2>
       </div>
       <p className="text-xs leading-6 text-muted">
-        <bdi dir="ltr">{currency}</bdi> {a.trend.aboveMa20 === null ? '' : a.trend.aboveMa20 ? 'بالای میانگین ۲۰ روزه است' : 'زیر میانگین ۲۰ روزه است'}.{' '}
-        {a.skew !== null && <>Skew (Put با Delta ۰٫۲۵ منهای Call با Delta ۰٫۲۵): {fmtPct(a.skew * 100)} — {a.skew > 0 ? 'Putها گران‌ترند (بازار نگران ریزش است)' : 'Callها گران‌ترند'}. </>}
-        ساختار زمانی IV: {a.term.map((t) => `${faDate(t.expiry)} ${t.iv === null ? '—' : fmtPct(t.iv * 100)}`).join(' · ')}.
-        {funding !== null && <> فاندینگ Perp: {fmtPct(funding * 8760 * 100)} سالانه.</>}
+        <b className="text-ink">نوسان مورد انتظار (IV)</b> نوسانی است که بازار در قیمت آپشن‌ها لحاظ کرده و <b className="text-ink">نوسان واقعی (HV)</b> نوسانی است که قیمت در ۳۰ روز گذشته داشته. اگر IV بیش از ۱٫۱ برابر HV باشد آپشن‌ها «گران»اند و فروش آپشن به‌صرفه‌تر است؛ اگر کمتر از ۰٫۹ برابر باشد «ارزان»اند و خرید آپشن به‌صرفه‌تر است.
       </p>
-      <p className="text-2xs text-subtle">قاعده: IV بیش از ۱٫۱ برابر HV «گران»، کمتر از ۰٫۹ برابر «ارزان».</p>
-      {a.missing.length > 0 && <p className="text-2xs text-warn">داده‌های ناقص: {a.missing.join('، ')}.</p>}
+      <Disclosure summary="جزئیات بیشتر بازار">
+        <p className="text-xs leading-6 text-muted">
+          {a.trend.aboveMa20 === null ? '' : <>قیمت <bdi dir="ltr">{currency}</bdi> {a.trend.aboveMa20 ? 'بالای' : 'زیر'} میانگین ۲۰ روز اخیر است. </>}
+          {a.skew !== null && <>اختلاف قیمت بیمهٔ ریزش و صعود (Skew): {fmtPct(a.skew * 100)} — {a.skew > 0 ? 'بیمهٔ ریزش (Put) گران‌تر است؛ یعنی بازار بیشتر نگران ریزش است.' : 'آپشن‌های صعودی (Call) گران‌ترند؛ یعنی بازار بیشتر منتظر صعود است.'} </>}
+          نوسان مورد انتظار در سررسیدهای مختلف: {a.term.map((t) => `${faDate(t.expiry)} ${t.iv === null ? '—' : fmtPct(t.iv * 100)}`).join(' · ')}.
+          {funding !== null && <> نرخ فاندینگ قرارداد دائمی (Perp)، سالانه: {fmtPct(funding * 8760 * 100)}.</>}
+        </p>
+      </Disclosure>
+      {a.missing.length > 0 && <p className="text-2xs text-warn">این داده‌ها در دسترس نبود و نتیجه با دقت کمتری حساب شده: {a.missing.join('، ')}.</p>}
     </div>
   );
 }
@@ -532,18 +575,19 @@ function StrategyView({ b, a, currency, expiry, chain, reason }: { b: BuiltStrat
       <div className="rounded-card border border-accent/40 bg-accent-soft/40 p-3.5">
         <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
           {STRATEGY_FA[b.id]}
-          {PREMIUM_SELLER.has(b.id) ? <Badge tone="info">دریافت پرمیوم (Theta مثبت)</Badge> : <Badge tone="neutral">پرداخت پرمیوم</Badge>}
-          {b.unlimitedLoss && <Badge tone="loss">⚠️ ضرر نامحدود</Badge>}
+          {PREMIUM_SELLER.has(b.id) ? <Badge tone="info">در شروع پول دریافت می‌کنید</Badge> : <Badge tone="neutral">در شروع پول پرداخت می‌کنید</Badge>}
+          {b.unlimitedLoss && <Badge tone="loss">⚠️ زیان بدون سقف</Badge>}
         </p>
+        <p className="mt-1 text-xs leading-6 text-ink">{STRATEGY_PLAIN[b.id]}</p>
         <p className="mt-1 text-xs leading-6 text-muted">{reason}</p>
       </div>
 
       {b.unlimitedLoss && (
-        <Notice tone="error" title="⚠️ ضرر نامحدود">این استراتژی پوشش ندارد و ضررش سقف ندارد. فقط برای سرمایهٔ بالا و کاربر باتجربه؛ برای مبتدی ممنوع است.</Notice>
+        <Notice tone="error" title="⚠️ زیان این معامله سقف ندارد">این معامله پوشش ندارد و اگر قیمت تند حرکت کند، زیان می‌تواند از کل سرمایهٔ این معامله بیشتر شود. فقط برای سرمایهٔ زیاد و کاربر باتجربه مناسب است؛ برای شروع توصیه نمی‌شود.</Notice>
       )}
       {b.belowMinimum && (
-        <Notice tone="warn" title="سرمایه برای این اندازه کافی نیست">
-          حتی حداقل اندازهٔ قرارداد Derive ({fmtQty(a.m.minAmount)} <bdi dir="ltr">{currency}</bdi>) ریسکی بیش از سقف ریسک شما (<MoneyValue value={a.riskCap} digits={2} />) دارد. اعداد زیر برای همین حداقل‌اند؛ اسپرد باریک‌تر یا سرمایهٔ بیشتر لازم است.
+        <Notice tone="warn" title="سرمایه برای این معامله کافی نیست">
+          حتی کوچک‌ترین اندازهٔ مجاز قرارداد در Derive ({fmtQty(a.m.minAmount)} <bdi dir="ltr">{currency}</bdi>) زیان احتمالی بیشتری از سقف ریسک شما (<MoneyValue value={a.riskCap} digits={2} />) دارد. اعداد زیر برای همین کوچک‌ترین اندازه‌اند. سرمایه را بیشتر کنید یا استراتژی جایگزین را ببینید.
         </Notice>
       )}
 
@@ -551,11 +595,11 @@ function StrategyView({ b, a, currency, expiry, chain, reason }: { b: BuiltStrat
         <h3 className="mb-2 text-sm font-bold text-ink">مراحل اجرا</h3>
         <ol className="space-y-2">
           <li className="text-xs leading-6 text-muted">
-            <b className="text-ink">سررسید:</b> {faDate(expiry)} ({toFaDigits(Math.round(a.days))} روز) — بین ۱۴ و ۴۵ روز، برای تعادل Theta و ریسک.
+            <b className="text-ink">سررسید:</b> {faDate(expiry)} ({toFaDigits(Math.round(a.days))} روز دیگر).
           </li>
           {spotLeg && (
             <li className="text-xs leading-6 text-muted">
-              <b className="text-ink">دارایی پایه:</b> {fmtQty(spotLeg.qty)} <bdi dir="ltr">{currency}</bdi> که از قبل دارید (پوشش).
+              <b className="text-ink">دارایی شما:</b> {fmtQty(spotLeg.qty)} <bdi dir="ltr">{currency}</bdi> که از قبل دارید و این معامله از آن استفاده می‌کند.
             </li>
           )}
           {options.map((l, i) => {
@@ -563,11 +607,14 @@ function StrategyView({ b, a, currency, expiry, chain, reason }: { b: BuiltStrat
             return (
               <li key={l.name} className="rounded-field border border-divider p-3 text-xs leading-6">
                 <p className="font-bold text-ink">
-                  قدم {toFaDigits(i + 1)}: {l.side === 'buy' ? 'خرید' : 'فروش'} {fmtQty(l.qty)} {l.type === 'C' ? 'Call' : 'Put'} با Strike <MoneyValue value={l.strike} digits={0} />
+                  قدم {toFaDigits(i + 1)}: {l.side === 'buy' ? 'خرید' : 'فروش'} {fmtQty(l.qty)} {l.type === 'C' ? 'اختیار خرید (Call)' : 'اختیار فروش (Put)'} با قیمت توافقی (Strike) <MoneyValue value={l.strike} digits={0} />
                 </p>
                 <p className="text-muted">
-                  سفارش Limit نزدیک Mid: <MoneyValue value={l.premium} digits={2} className="font-semibold text-ink" /> هر واحد · Bid <MoneyValue value={o?.bid ?? null} digits={2} /> / Ask <MoneyValue value={o?.ask ?? null} digits={2} /> · Delta{' '}
-                  {o?.delta == null ? '—' : toFaDigits(o.delta.toFixed(2))} · IV {o?.iv == null ? '—' : fmtPct(o.iv * 100)} · OI {o?.oi == null ? '—' : toFaDigits(Math.round(o.oi).toLocaleString('en-US'))}
+                  سفارش با قیمت مشخص (Limit) حدود قیمت میانه: <MoneyValue value={l.premium} digits={2} className="font-semibold text-ink" /> برای هر واحد.
+                </p>
+                <p className="text-2xs text-subtle">
+                  بهترین قیمت خرید (Bid) <MoneyValue value={o?.bid ?? null} digits={2} /> / بهترین قیمت فروش (Ask) <MoneyValue value={o?.ask ?? null} digits={2} /> · دلتا (Delta){' '}
+                  {o?.delta == null ? '—' : toFaDigits(o.delta.toFixed(2))} · نوسان مورد انتظار (IV) {o?.iv == null ? '—' : fmtPct(o.iv * 100)} · قراردادهای باز {o?.oi == null ? '—' : toFaDigits(Math.round(o.oi).toLocaleString('en-US'))}
                 </p>
                 <p className="font-latin text-2xs text-subtle" dir="ltr">
                   {l.name}
@@ -583,15 +630,16 @@ function StrategyView({ b, a, currency, expiry, chain, reason }: { b: BuiltStrat
         <KeyValueList
           dense
           rows={[
-            { label: b.stats.netPremium >= 0 ? 'پرمیوم دریافتی' : 'هزینهٔ پرمیوم', value: <MoneyValue value={Math.abs(b.stats.netPremium)} digits={2} /> },
-            { label: 'حداکثر سود', value: b.stats.maxProfit === null ? 'نامحدود' : <MoneyValue value={b.stats.maxProfit} digits={2} className="text-positive" /> },
-            { label: 'حداکثر ضرر', value: b.stats.maxLoss === null ? <span className="text-negative">⚠️ نامحدود</span> : <MoneyValue value={-b.stats.maxLoss} digits={2} tone="loss" /> },
-            { label: 'سربه‌سر (Breakeven)', value: b.stats.breakevens.length ? b.stats.breakevens.map((x) => toFaDigits(Math.round(x).toLocaleString('en-US'))).join(' و ') : '—' },
-            { label: 'احتمال تقریبی سود', hint: 'از توزیع ضمنی با IV در پول', value: b.stats.pop === null ? '—' : fmtPct(b.stats.pop * 100) },
-            { label: 'وثیقه / مارجین تقریبی', hint: 'مدل مارجین Derive ممکن است عدد دیگری بدهد', value: <MoneyValue value={b.collateral} digits={2} /> },
+            { label: b.stats.netPremium >= 0 ? 'پولی که در شروع دریافت می‌کنید (Premium)' : 'پولی که در شروع پرداخت می‌کنید (Premium)', value: <MoneyValue value={Math.abs(b.stats.netPremium)} digits={2} /> },
+            { label: 'بیشترین سود ممکن', value: b.stats.maxProfit === null ? 'سقف ندارد' : <MoneyValue value={b.stats.maxProfit} digits={2} className="text-positive" /> },
+            { label: 'بیشترین زیان ممکن', value: b.stats.maxLoss === null ? <span className="text-negative">⚠️ سقف ندارد</span> : <MoneyValue value={-b.stats.maxLoss} digits={2} tone="loss" /> },
+            { label: 'نقطهٔ سربه‌سر (Breakeven)', hint: 'قیمتی که در سررسید نه سود دارید نه زیان', value: b.stats.breakevens.length ? b.stats.breakevens.map((x) => `${toFaDigits(Math.round(x).toLocaleString('en-US'))} دلار`).join(' و ') : '—' },
+            { label: 'احتمال تقریبی سود در سررسید', hint: 'از قیمت فعلی آپشن‌ها به دست آمده؛ پیش‌بینی نیست', value: b.stats.pop === null ? '—' : fmtPct(b.stats.pop * 100) },
+            { label: 'وثیقهٔ تقریبی (Margin)', hint: 'مبلغی که Derive قفل می‌کند؛ عدد واقعی را خود Derive تعیین می‌کند', value: <MoneyValue value={b.collateral} digits={2} /> },
             { label: 'کارمزد تقریبی باز کردن', value: <MoneyValue value={b.fees} digits={2} /> },
             {
-              label: 'Greeks کل (Delta · Theta روزانه · Vega)',
+              label: 'شاخص‌های حساسیت: دلتا · اثر روزانهٔ زمان (Theta) · حساسیت به نوسان (Vega)',
+              hint: 'دلتا: تغییر تقریبی ارزش با هر ۱ دلار تغییر قیمت. Theta: تغییر روزانه با گذر زمان. Vega: تغییر با ۱ واحد افزایش IV',
               value: (
                 <bdi dir="ltr">
                   {g.delta === null ? '—' : toFaDigits(g.delta.toFixed(3))} · {g.theta === null ? '—' : toFaDigits(g.theta.toFixed(2))} · {g.vega === null ? '—' : toFaDigits(g.vega.toFixed(2))}
@@ -604,6 +652,7 @@ function StrategyView({ b, a, currency, expiry, chain, reason }: { b: BuiltStrat
 
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink">نمودار سود و زیان</h3>
+        <p className="mb-2 text-2xs leading-5 text-subtle">محور افقی قیمت دارایی است. هرجا خط بالای صفر است سود و هرجا پایین صفر است زیان دارید.</p>
         <OptionsPayoffChart legs={b.legs} spot={a.spot} T={a.T} breakevens={b.stats.breakevens} />
       </div>
     </div>
@@ -684,10 +733,10 @@ function assistantPayload(
 /* ---------------- قدم ۴ ---------------- */
 
 function actionFor(pnl: number, tp: number | null, sl: number | null): string {
-  if (tp !== null && pnl >= tp) return 'بستن و برداشت سود';
-  if (sl !== null && pnl <= -sl) return 'بستن (حد ضرر)';
-  if (pnl < 0) return 'پایش؛ نزدیک حد ضرر Roll یا بستن';
-  return 'نگه‌داری تا هدف';
+  if (tp !== null && pnl >= tp) return 'به هدف سود رسیده؛ بستن را در نظر بگیرید';
+  if (sl !== null && pnl <= -sl) return 'به حد ضرر رسیده؛ بستن را در نظر بگیرید';
+  if (pnl < 0) return 'زیان‌ده؛ مراقب باشید و نزدیک حد ضرر ببندید یا به سررسید بعد منتقل کنید';
+  return 'سودده؛ تا رسیدن به هدف نگه دارید';
 }
 
 function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
@@ -698,6 +747,7 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-bold text-ink">سناریوها (سود/زیان در سررسید)</h3>
+      <p className="text-2xs leading-5 text-subtle">اگر قیمت تا روز سررسید به این عدد برسد، سود یا زیان تقریبی شما این است. کارمزد در این جدول کسر نشده است.</p>
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full table-fixed border-separate border-spacing-0 text-xs">
           <caption className="sr-only">سناریوهای قیمت</caption>
@@ -713,7 +763,7 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
                 سود/زیان
               </th>
               <th scope="col" className="w-[30%] pb-2 text-end font-semibold">
-                اقدام
+                چه کنیم؟
               </th>
             </tr>
           </thead>
@@ -739,12 +789,13 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
           </tbody>
         </table>
       </div>
+      <h3 className="text-sm font-bold text-ink">اگر قیمت ثابت بماند ولی شرایط دیگر عوض شود</h3>
       <KeyValueList
         dense
         rows={[
-          { label: 'افزایش IV ده واحد (IV Spike)، قیمت ثابت', value: <MoneyValue value={cents(sens.ivUp)} signed tone="auto" digits={2} /> },
-          { label: 'کاهش IV ده واحد (IV Crush)، قیمت ثابت', value: <MoneyValue value={cents(sens.ivDown)} signed tone="auto" digits={2} /> },
-          { label: 'گذر ۷ روز (Theta)، قیمت و IV ثابت', value: <MoneyValue value={cents(sens.week)} signed tone="auto" digits={2} /> }
+          { label: 'نوسان مورد انتظار (IV) ۱۰ واحد بالا برود', hint: 'مثلاً پیش از یک خبر مهم؛ قیمت ثابت فرض شده', value: <MoneyValue value={cents(sens.ivUp)} signed tone="auto" digits={2} /> },
+          { label: 'نوسان مورد انتظار (IV) ۱۰ واحد پایین بیاید', hint: 'مثلاً بعد از خبر مهم؛ قیمت ثابت فرض شده', value: <MoneyValue value={cents(sens.ivDown)} signed tone="auto" digits={2} /> },
+          { label: '۷ روز بگذرد', hint: 'اثر گذر زمان (Theta)؛ قیمت و نوسان ثابت فرض شده', value: <MoneyValue value={cents(sens.week)} signed tone="auto" digits={2} /> }
         ]}
       />
     </div>
@@ -761,17 +812,17 @@ function ExitView({ b, days }: { b: BuiltStrategy; days: number }) {
         <li>
           <b className="text-ink">حد سود:</b>{' '}
           {xp.takeProfitUsd === null ? '—' : <MoneyValue value={xp.takeProfitUsd} digits={2} className="font-semibold text-positive" />}{' '}
-          {seller ? '(۵۰٪ حداکثر سود؛ فروش پرمیوم را زودتر ببندید)' : '(۱۰۰٪ هزینهٔ پرداختی، یا رسیدن به قیمت هدف)'}
+          {seller ? '(نصف بیشترین سود ممکن؛ معمولاً بهتر است زودتر ببندید و ریسک باقی‌مانده را نگه ندارید)' : '(برابر پولی که پرداخته‌اید، یا رسیدن قیمت به هدف شما)'}
         </li>
         <li>
           <b className="text-ink">حد ضرر:</b> {xp.stopLossUsd === null ? '—' : <MoneyValue value={-xp.stopLossUsd} digits={2} tone="loss" />}{' '}
-          {seller ? '(۲ برابر پرمیوم دریافتی، یا لمس Strike فروخته‌شده)' : '(نصف هزینهٔ پرداختی)'}
+          {seller ? '(دو برابر پولی که در شروع گرفته‌اید، یا رسیدن قیمت به قیمت توافقیِ قراردادی که فروخته‌اید)' : '(نصف پولی که پرداخته‌اید)'}
         </li>
         <li>
-          <b className="text-ink">قانون زمانی:</b> {toFaDigits(xp.closeOrRollDaysLeft)} روز مانده به سررسید ببندید یا Roll کنید (رشد Gamma Risk).
+          <b className="text-ink">قانون زمانی:</b> {toFaDigits(xp.closeOrRollDaysLeft)} روز مانده به سررسید، ببندید یا به سررسید بعد منتقل کنید؛ نزدیک سررسید، حرکت‌های کوچک قیمت اثر خیلی بزرگ‌تری دارند.
         </li>
         <li>
-          <b className="text-ink">Roll:</b> اگر قیمت به Strike فروخته‌شده رسید و دیدگاهتان عوض نشده، به سررسید بعدی و Strike دورتر منتقل کنید؛ فقط وقتی پرمیوم خالص دریافتی بماند.
+          <b className="text-ink">جابه‌جایی به سررسید بعد (Roll):</b> اگر قیمت به قیمت توافقیِ قراردادی که فروخته‌اید رسید و نظرتان دربارهٔ بازار عوض نشده، قرارداد را ببندید و قرارداد مشابه با سررسید دیرتر و قیمت توافقی دورتر باز کنید؛ فقط وقتی در مجموع هنوز پول دریافت می‌کنید.
         </li>
       </ul>
       {xp.priceLevels.length > 0 && (
@@ -781,27 +832,42 @@ function ExitView({ b, days }: { b: BuiltStrategy; days: number }) {
   );
 }
 
+function Glossary() {
+  return (
+    <Disclosure summary="واژه‌ها به زبان ساده">
+      <dl className="space-y-1.5 text-xs leading-6">
+        {GLOSSARY.map((g) => (
+          <div key={g.term}>
+            <dt className="inline font-semibold text-ink">{g.term}: </dt>
+            <dd className="inline text-muted">{g.plain}</dd>
+          </div>
+        ))}
+      </dl>
+    </Disclosure>
+  );
+}
+
 function Education() {
   return (
     <Disclosure summary="چطور در صعود و نزول هر دو سود کنیم؟ (آموزشی)">
       <ol className="list-decimal space-y-1.5 ps-4 text-xs leading-6 text-muted">
         <li>
-          <b className="text-ink">استراتژی‌های دوطرفه:</b> Long Straddle/Strangle شرط روی حرکت شدید در هر جهت است؛ Iron Condor شرط روی آرامش بازار؛ Ratio Spread سود در یک بازهٔ مشخص.
+          <b className="text-ink">معامله روی حرکت یا آرامش بازار:</b> خرید استرادل یا استرنگل (Long Straddle/Strangle) وقتی سود می‌دهد که قیمت در هر جهتی تند حرکت کند. آیرون کاندور (Iron Condor) وقتی سود می‌دهد که قیمت آرام بماند.
         </li>
         <li>
-          <b className="text-ink">سود از گذر زمان:</b> وقتی IV گران است Premium بفروشید (Theta مثبت) و در ۵۰٪ حداکثر سود زودتر ببندید.
+          <b className="text-ink">سود از گذر زمان:</b> وقتی آپشن‌ها گران‌اند، فروش آپشن در شروع پول می‌دهد و ارزش آن با گذر زمان به نفع شما کم می‌شود. وقتی به نصف بیشترین سود رسیدید، بستن زودهنگام معمولاً عاقلانه است.
         </li>
         <li>
-          <b className="text-ink">سود از نوسان:</b> پیش از رویدادها (ETF، FOMC، آنلاک توکن) آپشن بخرید و بعد از ریزش IV بفروشید؛ IV Crush می‌تواند حتی با حرکت درست قیمت ضرر بدهد.
+          <b className="text-ink">اثر خبرها:</b> پیش از خبرهای مهم آپشن‌ها گران می‌شوند و بعد از خبر ارزان. حتی اگر جهت قیمت را درست حدس بزنید، ارزان شدن آپشن‌ها بعد از خبر ممکن است زیان بدهد.
         </li>
         <li>
-          <b className="text-ink">مدیریت Delta (Delta-Neutral):</b> Delta کل پوزیشن را با Perp یا Spot نزدیک صفر نگه دارید (مثلاً Delta مثبت ۰٫۳ = Short همان اندازه Perp) و روزانه یا بعد از حرکت بزرگ قیمت Rebalance کنید؛ هر Rebalance کارمزد و فاندینگ دارد.
+          <b className="text-ink">کم کردن حساسیت به قیمت (دلتا نوترال):</b> می‌توانید با یک موقعیت مخالف در قرارداد دائمی (Perp) یا خرید/فروش خود دارایی، کاری کنید که تغییرات کوچک قیمت تقریباً روی سود و زیانتان اثر نگذارد. با تغییر قیمت باید مقدار پوشش را دوباره تنظیم کنید و هر تنظیم کارمزد و فاندینگ دارد. برای محاسبهٔ دقیق آن از تب «دلتا نوترال» و برای پیگیری از تب «اجرا و پایش دلتا» استفاده کنید.
         </li>
         <li>
-          <b className="text-ink">ترکیب با دارایی:</b> در بازار خنثی Covered Call روی موجودی فعلی درآمد می‌سازد؛ در بازار نزولی Collar (Put محافظ + فروش Call) کف ضرر می‌گذارد.
+          <b className="text-ink">همراه با دارایی‌ای که دارید:</b> در بازار آرام، فروش اختیار خرید روی دارایی خودتان (Covered Call) درآمد می‌سازد. در بازار نزولی، کالر (Collar) برای زیان کف می‌گذارد.
         </li>
         <li>
-          <b className="text-ink">مدیریت سرمایه:</b> مثلاً ۵۰٪ نقد، ۳۰٪ استراتژی اصلی، ۲۰٪ پوشش ریسک؛ سررسیدها را پخش کنید؛ هرگز بیش از ۵٪ سرمایه روی یک معامله.
+          <b className="text-ink">مدیریت سرمایه:</b> مثلاً ۵۰٪ نقد، ۳۰٪ معاملهٔ اصلی، ۲۰٪ پوشش ریسک. سررسیدها را پخش کنید و هیچ‌وقت بیش از ۵٪ سرمایه را در یک معامله ریسک نکنید.
         </li>
       </ol>
     </Disclosure>
@@ -815,18 +881,18 @@ function Warnings({ b, a }: { b: BuiltStrategy; a: Analysis }) {
     <div className="space-y-2">
       <h3 className="text-sm font-bold text-ink">هشدارهای ریسک</h3>
       <ul className="space-y-2.5">
-        <Check ok={!b.unlimitedLoss} title={b.unlimitedLoss ? '⚠️ ضرر نامحدود — فقط سرمایهٔ بالا و کاربر باتجربه' : 'ضرر این استراتژی سقف دارد'} />
-        <Check ok={!b.belowMinimum} title={b.belowMinimum ? 'سرمایه برای حداقل قرارداد Derive با سقف ریسک کافی نیست' : 'اندازه در سقف ریسک شما'}>
-          سقف ریسک هر معامله <MoneyValue value={a.riskCap} digits={2} />.
+        <Check ok={!b.unlimitedLoss} title={b.unlimitedLoss ? '⚠️ زیان سقف ندارد؛ فقط برای سرمایهٔ زیاد و کاربر باتجربه' : 'زیان این معامله سقف مشخص دارد'} />
+        <Check ok={!b.belowMinimum} title={b.belowMinimum ? 'سرمایه برای کوچک‌ترین قرارداد Derive با سقف ریسک شما کافی نیست' : 'اندازهٔ معامله در سقف ریسک شماست'}>
+          سقف زیان هر معامله: <MoneyValue value={a.riskCap} digits={2} />.
         </Check>
-        <Check ok={!wide} title={wide ? `اسپرد Bid/Ask زیاد است (${fmtPct(b.worstSpreadPct!)})` : 'اسپرد Bid/Ask قابل قبول است'}>
-          قاعده: بیش از {toFaDigits(WIDE_SPREAD_PCT)}٪ Mid = زیاد؛ با سفارش Limit نزدیک Mid وارد شوید و صبر کنید.
+        <Check ok={!wide} title={wide ? `فاصلهٔ قیمت خرید و فروش زیاد است (${fmtPct(b.worstSpreadPct!)})` : 'فاصلهٔ قیمت خرید و فروش قابل قبول است'}>
+          بیش از {toFaDigits(WIDE_SPREAD_PCT)}٪ قیمت میانه یعنی زیاد. با سفارش قیمت مشخص (Limit) نزدیک قیمت میانه وارد شوید و برای انجام شدنش صبر کنید.
         </Check>
-        <Check ok={!lowOi} title={lowOi ? 'Open Interest پایین است — خروج ممکن است سخت باشد' : 'Open Interest کافی است'}>
-          قاعده: کمتر از {toFaDigits(LOW_OI)} قرارداد = پایین.
+        <Check ok={!lowOi} title={lowOi ? 'قراردادهای باز کم است؛ خروج پیش از سررسید ممکن است سخت باشد' : 'تعداد قراردادهای باز کافی است'}>
+          کمتر از {toFaDigits(LOW_OI)} قرارداد باز یعنی کم.
         </Check>
-        <Check ok={false} title="سود تضمین‌شده یا بدون ریسک نیست">
-          قیمت، IV و نقدینگی تغییر می‌کنند؛ وثیقه واقعی را مدل مارجین Derive تعیین می‌کند.
+        <Check ok={false} title="سود تضمین‌شده نیست و ریسک صفر نمی‌شود">
+          قیمت، نوسان بازار و نقدشوندگی دائم تغییر می‌کنند. اعداد این صفحه تقریبی‌اند و وثیقهٔ واقعی را Derive تعیین می‌کند.
         </Check>
       </ul>
     </div>

@@ -125,8 +125,14 @@ describe('buildSnapshot', () => {
 
   it('آگهی‌های خارج از پنجره بازار حساب نمی‌شوند؛ داده خالی → null', () => {
     const old = base.map((l) => ({ ...l, scrapedAt: NOW - (MARKET_WINDOW_DAYS + 1) * DAY }));
-    expect(listingsInWindow(old, NOW)).toEqual([]);
+    // Snapshot امروز هرگز از دادهٔ کهنه ساخته نمی‌شود
+    expect(listingsInWindow(old, NOW, MARKET_WINDOW_DAYS, false)).toEqual([]);
     expect(buildSnapshot({ listings: old, now: NOW })).toBeNull();
+    // نمایش: مبنا آخرین جمع‌آوری است → آخرین بازار دیده‌شده می‌ماند
+    expect(listingsInWindow(old, NOW)).toHaveLength(old.length);
+    // آگهی‌ای که در آخرین جمع‌آوری‌ها دیگر دیده نشده (فروخته/حذف) کنار می‌رود
+    const mixed = [{ ...base[0], scrapedAt: NOW }, { ...base[1], scrapedAt: NOW - (MARKET_WINDOW_DAYS + 1) * DAY }];
+    expect(listingsInWindow(mixed, NOW).map((l) => l.token)).toEqual([base[0].token]);
     expect(buildSnapshot({ listings: [], now: NOW })).toBeNull();
   });
 
