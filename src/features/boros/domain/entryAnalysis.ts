@@ -3,7 +3,7 @@ import type { BorosDirection, BorosMarket } from './types';
 import { orderPreview } from './preview';
 import { MarginCalculator } from './engine/margin';
 import { assessLiquidity } from './engine/anomaly';
-import { stressScenario } from './engine/scenarioModels';
+import { forecastFloatingOf, stressScenario } from './engine/scenarioModels';
 
 export type EntryState = 'unavailable' | 'incomplete' | 'underfunded' | 'negative' | 'positive' | 'conditional';
 
@@ -100,7 +100,7 @@ export function scanEntries(markets: BorosMarket[], capitalUsd: number, allocati
     const sizeYu = sizeFromBudget(m, capitalUsd, allocationPct, reserve, nowSec);
     if (!sizeYu || !m.isUiWhitelisted) return [];
     return (['long', 'short'] as const).flatMap(direction => {
-      const result = analyzeEntry({ m, direction, sizeYu, capitalUsd, entryRate: m.markApr, floatingRate: m.floatingApr, ...costs, nowSec });
+      const result = analyzeEntry({ m, direction, sizeYu, capitalUsd, entryRate: m.markApr, floatingRate: forecastFloatingOf(m), ...costs, nowSec });
       return result && !(result.liquidity.available && !result.liquidity.executable) && (result.state === 'positive' || result.state === 'conditional') ? [{ m, direction, sizeYu, result }] : [];
     });
   }).sort((a, b) => (b.result.scenarioMin ?? -Infinity) - (a.result.scenarioMin ?? -Infinity) || b.result.net! - a.result.net!);

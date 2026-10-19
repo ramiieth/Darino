@@ -440,9 +440,19 @@ describe('تست نمونه HYPE — Implied 7.91٪ / Underlying 10.95٪ / 19 Da
   });
 
   it('Status Long = conditional (execution costs unknown) — Short = not-attractive', () => {
-    const a = BorosCalculationEngine.analyze({ m: hype, size: 1000, nowSec: NOW_H, gasUsd: 0 });
+    // forecastBeta=1 + تاریخچه funding برابر نرخ فعلی → پیش‌بینی = نرخ فعلی (منطق Status جدا از کالیبراسیون)
+    const fundingHistory = Array.from({ length: 30 }, (_, i) => ({ ts: NOW_H - (30 - i) * 86_400, c: hype.floatingApr }));
+    const a = BorosCalculationEngine.analyze({ m: { ...hype, fundingHistory }, size: 1000, nowSec: NOW_H, gasUsd: 0, forecastBeta: 1 });
     expect(a.statusLong).toBe('conditional');
     expect(a.statusShort).toBe('not-attractive');
+  });
+
+  it('بدون تاریخچه funding → پیش‌بینی = Implied → اسپرد فعلی به‌تنهایی «فرصت» نمی‌سازد', () => {
+    const a = BorosCalculationEngine.analyze({ m: { ...hype, fundingHistory: [] }, size: 1000, nowSec: NOW_H, gasUsd: 0 });
+    expect(a.forecastFloating).toBeCloseTo(hype.markApr, 12);
+    expect(a.expectedLongNet).toBeLessThanOrEqual(0);
+    expect(a.grossLongPnl).toBeGreaterThan(0); // سناریوی نرخ ثابت همچنان برای نمایش محاسبه می‌شود
+    expect(a.statusLong).toBe('not-attractive');
   });
 });
 

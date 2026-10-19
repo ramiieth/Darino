@@ -8,7 +8,7 @@
  *     — اولویت: historical volatility ← rate distribution ← 7D/30D range ← N/A
  * ============================================================ */
 import { mean, sampleStdDev } from './stats';
-import type { BorosDirection } from '../types';
+import type { BorosDirection, BorosMarket } from '../types';
 
 /* ---------------- A) Constant Current Rate ---------------- */
 
@@ -122,6 +122,48 @@ export function meanReversionScenario(input: {
     roiOnMargin: input.margin > 0 ? (netPnl / input.margin) * 100 : 0,
     note: `حرکت تدریجی از نرخ فعلی به میانگین ${(target * 100).toFixed(2)}٪ (میانگین وزنی ۷، ۳۰ و ۹۰ روزه)`
   };
+}
+
+/* ---------------- پیش‌بینی کالیبره نرخ شناور (مبنای Status/Edge/Rank) ---------------- */
+
+/**
+ * وزن انحراف تاریخی از نرخ ضمنی — از بک‌تست ۱۹۳ بازار سررسیدشده (scripts/boros-backtest.ts):
+ *  بهترین پیش‌بین میانگین شناورِ تحقق‌یافته تا سررسید، خودِ نرخ ضمنی بود (MAE ≈ ۳.۰ / ۵.۴ واحد درصد در دوره اول/دوم)؛
+ *  نرخ شناور فعلی بدترین بود (MAE ≈ ۶.۱ / ۱۲.۱). بتای بهینه در زمان افت کرده (۰.۲۴ → ۰.۰۴، کل ۰.۰۸) → ۰.۱ محافظه‌کارانه.
+ *  β روی همین داده برازش شده (درون‌نمونه) — با داده بازارهای جدید دوباره بسنجید.
+ */
+export const DEFAULT_FORECAST_BETA = 0.1;
+
+/**
+ * نرخ شناور مورد انتظار تا سررسید = Implied + β × (میانگین وزنی تاریخی − Implied)
+ *  بدون تاریخچه funding → خودِ Implied (هیچ لبه‌ای فرض نمی‌شود)
+ */
+export function calibratedFloatingForecast(input: {
+  impliedRate: number;
+  avg7d: number | null;
+  avg30d: number | null;
+  avg90d: number | null;
+  beta?: number;
+}): number {
+  const parts: { v: number; w: number }[] = [];
+  if (input.avg7d !== null && Number.isFinite(input.avg7d)) parts.push({ v: input.avg7d, w: 0.5 });
+  if (input.avg30d !== null && Number.isFinite(input.avg30d)) parts.push({ v: input.avg30d, w: 0.3 });
+  if (input.avg90d !== null && Number.isFinite(input.avg90d)) parts.push({ v: input.avg90d, w: 0.2 });
+  if (parts.length === 0) return input.impliedRate;
+  const target = parts.reduce((s, p) => s + p.v * p.w, 0) / parts.reduce((s, p) => s + p.w, 0);
+  return input.impliedRate + (input.beta ?? DEFAULT_FORECAST_BETA) * (target - input.impliedRate);
+}
+
+/** پیش‌بینی کالیبره برای یک بازار — از fundingHistory واقعی و نرخ ورود (پیش‌فرض markApr) */
+export function forecastFloatingOf(m: BorosMarket, impliedRate = m.markApr, beta?: number): number {
+  const h = (m.fundingHistory ?? []).map((p) => p.c).filter(Number.isFinite);
+  return calibratedFloatingForecast({
+    impliedRate,
+    avg7d: h.length > 0 ? mean(h.slice(-7)) : null,
+    avg30d: h.length > 0 ? mean(h.slice(-30)) : null,
+    avg90d: h.length > 7 ? mean(h.slice(-90)) : null,
+    beta
+  });
 }
 
 /* ---------------- C) Stress Scenario ---------------- */

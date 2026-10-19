@@ -1,5 +1,6 @@
 import type { BorosDirection, BorosMarket } from './types';
 import { analyzeEntry } from './entryAnalysis';
+import { forecastFloatingOf } from './engine/scenarioModels';
 import { FeeCalculator } from './engine/fees';
 import { MarginCalculator } from './engine/margin';
 
@@ -30,7 +31,7 @@ export function planCapital(markets: BorosMarket[], input: CapitalPlanInput, now
       if (!Number.isFinite(perUnit) || perUnit <= 0 || feesOne.total < 0) return [];
       const sizeYu = budget / perUnit;
       const fees = FeeCalculator.calc({ m, size: sizeYu, nowSec, unitPriceUsd: price });
-      const result = analyzeEntry({ m, direction, sizeYu, capitalUsd, entryRate, floatingRate: m.floatingApr, gasUsd, feesUsd: fees.total + entranceUsd!, slippageUsd: 0, nowSec });
+      const result = analyzeEntry({ m, direction, sizeYu, capitalUsd, entryRate, floatingRate: forecastFloatingOf(m), gasUsd, feesUsd: fees.total + entranceUsd!, slippageUsd: 0, nowSec });
       if (!result || result.state === 'unavailable' || result.state === 'underfunded' || result.net == null) return [];
       return [{ m, direction, sizeYu, entryRate, result, fees, entranceUsd: entranceUsd!, gasUsd: gasUsd!, impactPoints: impactPoints! }];
     });

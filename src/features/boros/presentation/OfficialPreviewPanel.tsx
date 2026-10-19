@@ -15,6 +15,7 @@ import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 import { toFaDigits } from '@/shared/utils/formatters';
 import type { BorosDirection, BorosMarket } from '../domain/types';
 import { HttpError } from '@/repositories/remoteClient';
+import { forecastFloatingOf } from '../domain/engine/scenarioModels';
 const label=(fa:string,en:string)=><span className="flex flex-col gap-1"><span>{fa}</span><bdi dir="ltr" className="text-[10px] font-normal text-muted">{en}</bdi></span>;
 export function OfficialPreviewPanel({market,direction,size,onApply,marginMode,onMarginMode,appliedQuote}:{market:BorosMarket;direction:BorosDirection;size:string;appliedQuote?:OfficialPreview|null;marginMode?:string;onMarginMode?:(mode:string)=>void;onApply?:(preview:OfficialPreview)=>void}) {
  const s=useBorosAccount();const [localMode,setLocalMode]=useState('cross');const mode=marginMode??localMode;const setMode=onMarginMode??setLocalMode;
@@ -28,7 +29,7 @@ export function OfficialPreviewPanel({market,direction,size,onApply,marginMode,o
  const shown=resultIdentity===identity?result:null;
  const valid=quoteUsable(shown,shown?.handle===budget.handle,budget.available,market.marketId,direction,Number(size),market.maturity,now)?shown:null;
  const price=budget.price;const unit=assetDisplayName(market.collateralSymbol??market.asset).name;
- const model=orderPreview({m:market,direction,notional:valid?.matchedSize??Number(size),availableCollateral:budget.freeCollateral,collateralPriceUsd:price,fixedApr:valid?.matchedApr??market.markApr,underlyingApr:market.floatingApr,nowSec:Math.floor(now/1000)});
+ const model=orderPreview({m:market,direction,notional:valid?.matchedSize??Number(size),availableCollateral:budget.freeCollateral,collateralPriceUsd:price,fixedApr:valid?.matchedApr??market.markApr,underlyingApr:forecastFloatingOf(market),nowSec:Math.floor(now/1000)});
  useEffect(()=>{void hydrateBorosAccount();},[]);
  usePublishInsight('borosOfficialPreview','پیش‌نمایش رسمی بوروس',valid?{marketId:valid.marketId,requestedSizeYu:valid.requestedSize,matchedSizeYu:valid.matchedSize,matchedApr:valid.matchedApr,marginCollateral:valid.margin,liquidationApr:valid.liquidationApr,priceImpact:valid.priceImpact,success:Number(valid.success),collateralPriceUsd:price}:null,'simulation','partial',valid?.fetchedAt,budget.scope);
  const preview=async()=>{

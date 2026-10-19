@@ -13,6 +13,7 @@ import {MoneyValue,PercentValue,QuantityValue} from '@/shared/components/ui/Fina
 import {MarketIdentity} from './MarketIdentity';
 import {borosAssetName,borosVenueName} from './borosLabels';
 import {Button,buttonClass} from '@/shared/components/ui/Button';
+import { forecastFloatingOf } from '../domain/engine/scenarioModels';
 type Candidate=ReturnType<typeof scanEntries>[number];
 export type EntrySelection={marketId:number;direction:BorosDirection;sizeYu:number;quote:OfficialPreview;identity:string;marginMode:string;costs:EntryCosts;extraEntranceUsd?:number|null};
 type Verified={candidate:Candidate;quote:OfficialPreview;net:number;adverse:number;remaining:number;costs:EntryCosts};
@@ -43,7 +44,7 @@ export function VerifiedOpportunities({candidates,market,marginMode,capitalUsd,r
      if(!q.success||q.handle!==handle||q.liquidationApr===null||q.matchedApr===null||q.margin===null||q.matchedSize===null||q.matchedSize<=0||q.marketId!==c.m.marketId||q.side!==c.direction||Date.now()<q.fetchedAt||Date.now()-q.fetchedAt>=60000){reject('دادهٔ پیش‌نمایش رسمی کامل نبود');continue;}
      const b=accountBudget(current.data,false,c.m,marginMode);if(!b.available||b.currentMargin===null||b.price===null){reject('دادهٔ وثیقه کافی نبود');continue;}
      const candidateCosts=recommendationCosts(c.m,q.matchedSize,costs,modelFees);
-     const a=analyzeEntry({m:c.m,direction:c.direction,sizeYu:q.matchedSize,capitalUsd,entryRate:q.matchedApr,floatingRate:c.m.floatingApr,...candidateCosts});
+     const a=analyzeEntry({m:c.m,direction:c.direction,sizeYu:q.matchedSize,capitalUsd,entryRate:q.matchedApr,floatingRate:forecastFloatingOf(c.m),...candidateCosts});
      const remaining=previewBudgetRemaining(capitalUsd,Math.max(0,q.margin-b.currentMargin)*b.price,a?.costs??Infinity,a?.preview.expectedMtm??-Infinity);
      if(!a||a.state==='unavailable'||a.state==='incomplete'||a.net===null){reject('داده یا هزینهٔ محاسبه کامل نبود');continue;}
      if(a.net<=0){reject('پس از هزینه‌ها سود مثبت نبود');continue;}

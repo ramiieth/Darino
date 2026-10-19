@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { borosRaw } from '../../../../tests/fixtures/boros';
 import { mapMarket } from '../data/borosService';
 import { planCapital, recommendCapital } from './capitalPlan';
+import { forecastFloatingOf } from './engine/scenarioModels';
 const NOW = 1800000000;
-const m = { ...mapMarket(borosRaw, NOW * 1000), collateralSymbol: 'ETH', collateralPriceUsd: 3000, maturity: NOW + 54 * 86400, status: 'GOOD' as const, volume24h: 1e8, notionalOI: 1e8, markApr: .084, floatingApr: .1095, marginFloor: .06, kIM: .5, kMM: .06, ytmFloor: 5 / 365, fundingHistory: [{ ts: NOW - 86400, c: .1 }, { ts: NOW, c: .11 }] };
+const m = { ...mapMarket(borosRaw, NOW * 1000), collateralSymbol: 'ETH', collateralPriceUsd: 3000, maturity: NOW + 54 * 86400, status: 'GOOD' as const, volume24h: 1e8, notionalOI: 1e8, markApr: .084, floatingApr: .1095, marginFloor: .06, kIM: .5, kMM: .06, ytmFloor: 5 / 365, fundingHistory: [{ ts: NOW - 86400, c: .3 }, { ts: NOW, c: .31 }] }; // رژیم فاندینگ بالا → لبه کالیبره مثبت
 const input = { capitalUsd: 300, allocationPct: 50, gasUsd: 1, entranceUsd: 1, impactPoints: .22 };
 describe('capital planner', () => {
   it('uses execution impact in APR exactly once and computes fees for each market', () => {
     const row = planCapital([m], input, NOW).find(r => r.direction === 'long')!;
     expect(row.entryRate).toBeCloseTo(.0862);
-    const gross = row.sizeYu * 3000 * (.1095 - .0862) * 54 / 365;
+    const gross = row.sizeYu * 3000 * (forecastFloatingOf(m) - .0862) * 54 / 365; // پیش‌بینی کالیبره، نه floatingApr ثابت
     expect(row.result.net).toBeCloseTo(gross - row.fees.total - 2);
     expect(row.result.costs).toBeCloseTo(row.fees.total + 2);
     expect(row.result.capitalRemaining!).toBeGreaterThan(0);
@@ -44,7 +45,7 @@ describe('capital planner', () => {
     expect(recommendCapital(rows)).toBeNull();
   });
   it('equal floating and reference rates have negative net after costs', () => {
-    const rows = planCapital([{ ...m, floatingApr: m.markApr }], { ...input, impactPoints: 0 }, NOW);
+    const rows = planCapital([{ ...m, floatingApr: m.markApr, fundingHistory: m.fundingHistory.map(p => ({ ...p, c: m.markApr })) }], { ...input, impactPoints: 0 }, NOW);
     expect(rows.every(r => r.result.net! < 0)).toBe(true);
     expect(recommendCapital(rows)).toBeNull();
   });

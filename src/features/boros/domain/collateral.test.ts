@@ -15,7 +15,7 @@ import {
   DEFAULT_SIMULATION_COLLATERAL_ETH,
   marginPerUnitUsd
 } from '@/features/boros/domain/collateral';
-import { BorosCalculationEngine } from '@/features/boros/domain/engine';
+import { BorosCalculationEngine, forecastFloatingOf } from '@/features/boros/domain/engine';
 import { explainOpportunity } from '@/features/boros/domain/engine/reason';
 import { isLiquidationAPRAvailable, makePositionLiquidationAPR } from '@/features/boros/domain/liquidationApr';
 import type { BorosMarket } from '@/features/boros/domain/types';
@@ -167,15 +167,19 @@ describe('Collateral Scaling — 0.102 → 0.25 → 0.5 → 1 ETH', () => {
 
 /* ================= Rate Edge و Settlement (§11-13) ================= */
 describe('Rate Edge + Settlement — Long/Short جهت‌دار', () => {
-  it('Long: Edge = Underlying − Fixed = +4.33% (Fixed 6.62% / Underlying 10.95%)', () => {
+  // Edge با نرخ شناور پیش‌بینی‌شده (کالیبره) — نه ثابت‌ماندن Underlying فعلی ۱۰.۹۵٪
+  const forecast = forecastFloatingOf(M);
+
+  it('Long: Edge = Forecast − Fixed (کوچک‌تر از اسپرد خام Underlying − Fixed = 4.33%)', () => {
     const o = userCapitalOpportunity({ m: M, direction: 'long', collateralAsset: 0.102, collateralPriceUsd: 2820, nowSec: NOW });
-    expect(o!.rateEdge).toBeCloseTo(0.1095 - 0.0662, 9);
-    expect(o!.rateEdge).toBeGreaterThan(0);
+    expect(o!.rateEdge).toBeCloseTo(forecast - 0.0662, 9);
+    expect(o!.rateEdge).toBeLessThan(0.1095 - 0.0662);
+    expect(o!.underlyingApr).toBe(0.1095); // نرخ فعلی همچنان برای نمایش
   });
 
-  it('Short: Edge = Fixed − Underlying = -4.33% (نامطلوب — هرگز فرصت معرفی نمی‌شود)', () => {
+  it('Short: Edge = Fixed − Forecast (نامطلوب — هرگز فرصت معرفی نمی‌شود)', () => {
     const o = userCapitalOpportunity({ m: M, direction: 'short', collateralAsset: 0.102, collateralPriceUsd: 2820, nowSec: NOW });
-    expect(o!.rateEdge).toBeCloseTo(0.0662 - 0.1095, 9);
+    expect(o!.rateEdge).toBeCloseTo(0.0662 - forecast, 9);
     expect(o!.rateEdge).toBeLessThan(0);
     // Net منفی → در rank قرار نمی‌گیرد
     const ranked = rankUserCapitalOpportunities([M], 0.102, 2820, { direction: 'short', nowSec: NOW, slippageRate: 0.001 });
@@ -184,7 +188,7 @@ describe('Rate Edge + Settlement — Long/Short جهت‌دار', () => {
 
   it('Settlement = Notional × Edge × YTM (Long)', () => {
     const o = userCapitalOpportunity({ m: M, direction: 'long', collateralAsset: 0.102, collateralPriceUsd: 2820, nowSec: NOW });
-    expect(o!.settlementPnl).toBeCloseTo(o!.notional * 0.0433 * (19 / 365) * 2820, 6);
+    expect(o!.settlementPnl).toBeCloseTo(o!.notional * (forecast - 0.0662) * (19 / 365) * 2820, 6);
   });
 });
 
@@ -193,6 +197,8 @@ describe('Opportunity Ranking — کاربر-آگاه (چندبعدی)', () => {
   const mkMarket = (id: number, mark: number, floating: number, oi: number, vol: number): BorosMarket => ({
     ...M, marketId: id, venue: `Venue${id}`, markApr: mark, floatingApr: floating,
     notionalOI: oi, volume24h: vol,
+    // تاریخچه فاندینگ پایدار در سطح نرخ شناور → پیش‌بینی کالیبره بالاتر از نرخ ثابت
+    fundingHistory: Array.from({ length: 60 }, (_, i) => ({ ts: NOW - (59 - i) * 86_400, c: floating })),
     // تاریخچه نزدیک به نرخ شناور — بدون anomaly مصنوعی؛ آخرین نقطه = NOW (تازه)
     ohlcv: Array.from({ length: 60 }, (_, i) => ({
       ts: NOW - (59 - i) * 3600,
@@ -202,9 +208,11 @@ describe('Opportunity Ranking — کاربر-آگاه (چندبعدی)', () => {
 
   it('بازار با Spread عظیم ولی غیرقابل اجرا → هرگز رتبه اول (Spread ≠ Opportunity)', () => {
     // حجم ۲M → ظرفیت اجرای ۱۰۰K YU — برای Collateral 5 ETH (نهional ~2515 YU) کافی است
+    // تاریخچه فاندینگ بسیار بالاتر (۴۰٪) تا لبه کالیبره از حداقل لبه اقتصادی بگذرد — تست فیلتر قابلیت اجراست
+    const strong = (x: BorosMarket): BorosMarket => ({ ...x, fundingHistory: x.fundingHistory!.map((p) => ({ ...p, c: 0.4 })) });
     const markets = [
-      mkMarket(1, 0.0662, 0.1095, 19183, 2_000_000), // Spread +4.33% · قابل اجرا
-      mkMarket(2, 0.03, 0.1095, 100, 0)              // Spread +7.95% ولی حجم ۰ → غیرقابل اجرا
+      strong(mkMarket(1, 0.0662, 0.1095, 19183, 2_000_000)), // Spread +4.33% · قابل اجرا
+      strong(mkMarket(2, 0.03, 0.1095, 100, 0))              // Spread +7.95% ولی حجم ۰ → غیرقابل اجرا
     ];
     const ranked = rankUserCapitalOpportunities(markets, 5, 2820, { direction: 'long', nowSec: NOW, slippageRate: 0.0005 });
     expect(ranked.length).toBeGreaterThan(0);
