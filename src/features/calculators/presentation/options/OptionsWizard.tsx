@@ -26,6 +26,8 @@ import {
   capitalTier,
   chooseStrategies,
   exitPlan,
+  exitAdvice,
+  type ExitAction,
   historicalVol,
   holdingOf,
   ivRegime,
@@ -94,8 +96,10 @@ interface Saved {
   pick: number;
   /** قدم ۴: تحلیل همین استراتژی یا ترکیب چند بازار */
   mode: 'single' | 'combo';
+  /** دارایی موجود (از «بهای تمام‌شده») در معامله استفاده شود؟ پیش‌فرض خیر: معامله فقط با سرمایهٔ واردشده */
+  useHoldings: boolean;
 }
-const DEFAULTS: Saved = { step: 0, currency: 'ETH', capital: '', risk: 'moderate', view: 'unsure', expiry: null, pick: 0, mode: 'single' };
+const DEFAULTS: Saved = { step: 0, currency: 'ETH', capital: '', risk: 'moderate', view: 'unsure', expiry: null, pick: 0, mode: 'single', useHoldings: false };
 
 const REGIME_FA: Record<IvRegime, string> = { rich: 'گران', cheap: 'ارزان', fair: 'متعادل' };
 const VIEW_FA: Record<View, string> = { bull: 'صعودی', bear: 'نزولی', neutral: 'خنثی', unsure: 'نامطمئن' };
@@ -159,7 +163,9 @@ export function OptionsWizard() {
   const termQ = useDeriveChains(currency, termExp);
   const history = useDeriveHistory(currency);
   const prior = usePlannerLots(currency);
-  const holdingsQty = holdingOf(prior.lots).qty;
+  const ownedQty = holdingOf(prior.lots).qty;
+  // فقط با انتخاب صریح کاربر؛ وگرنه کاربری که با ۱۰۰۰ دلار آمده معاملهٔ «روی ETH موجود» نمی‌گیرد
+  const holdingsQty = s.useHoldings ? ownedQty : 0;
 
   const capital = s.capital.trim() === '' ? NaN : parseNum(s.capital);
   const capitalOk = capital > 0;
@@ -301,10 +307,24 @@ export function OptionsWizard() {
               بیشترین زیانی که هر معامله می‌تواند داشته باشد ({fmtPct(RISK_PCT[s.risk], 1)} سرمایه): <MoneyValue value={(capital * RISK_PCT[s.risk]) / 100} digits={2} className="font-semibold text-ink" />
             </p>
           )}
-          <p className="rounded-field bg-surface-2/60 px-3 py-2 text-xs text-muted">
-            مقدار <bdi dir="ltr">{currency}</bdi> که از قبل دارید: {holdingsQty > 0 ? <b className="text-ink">{fmtQty(holdingsQty)}</b> : 'ثبت نشده'}{' '}
-            <span className="text-subtle">· از بخش «بهای تمام‌شده» خوانده می‌شود. اگر دارید، معامله‌هایی که از دارایی شما محافظت می‌کنند هم پیشنهاد می‌شود.</span>
-          </p>
+          {ownedQty > 0 && (
+            <div className="rounded-field bg-surface-2/60 px-3 py-2.5">
+              <Chips
+                label={`از ${fmtQty(ownedQty)} ${currency} که در «بهای تمام‌شده» ثبت کرده‌اید، در این معامله هم استفاده شود؟`}
+                value={s.useHoldings ? 'yes' : 'no'}
+                onChange={(x) => setS((p) => ({ ...p, useHoldings: x === 'yes', pick: 0 }))}
+                options={[
+                  { value: 'no', label: 'خیر، فقط با سرمایهٔ بالا' },
+                  { value: 'yes', label: 'بله، از دارایی‌ام هم استفاده شود' }
+                ]}
+              />
+              <p className="mt-1.5 text-2xs leading-5 text-subtle">
+                {s.useHoldings
+                  ? 'معامله‌هایی هم پیشنهاد می‌شود که روی همین دارایی درآمد می‌سازند یا از آن در برابر ریزش محافظت می‌کنند (مثل فروش اختیار خرید روی دارایی).'
+                  : 'معامله فقط با سرمایه‌ای ساخته می‌شود که بالا وارد کردید؛ دارایی موجود شما دست نمی‌خورد.'}
+              </p>
+            </div>
+          )}
           <div>
             <Chips label="فکر می‌کنید قیمت تا سررسید چه می‌شود؟" value={s.view} onChange={(x) => setS((p) => ({ ...p, view: x, pick: 0 }))} options={(Object.keys(VIEW_FA) as View[]).map((v) => ({ value: v, label: VIEW_FA[v] }))} />
             <p className="mt-1.5 text-2xs text-subtle">{VIEW_HINT[s.view]}</p>
@@ -393,7 +413,7 @@ export function OptionsWizard() {
           ) : (
             <>
               <ScenariosView b={strategy} a={analysis} />
-              <ExitView b={strategy} days={analysis.days} />
+              <ExitView b={strategy} a={analysis} />
               <Disclosure summary="تحلیل عمیق (توضیحات بیشتر): بازه‌های سود و زیان، ۱۶ سناریو با علت، شبیه‌سازی">
                 <DeepScenarios combo={singleCombo(strategy, { currency, spot: analysis.spot, days: analysis.days, expiry: expiry!, atmIv: analysis.atmIv, hv: analysis.hv, regime: analysis.regime, chain: chain!.options, m: analysis.m, beta: 1, corr: 1, oiUsd: null })} />
               </Disclosure>
@@ -720,6 +740,8 @@ function assistantPayload(
       scenarios: scenarios(b, a.spot, a.T).map((s) => ({ movePct: s.movePct, price: r2(s.price), pnlAtExpiry: r2(s.atExpiry), pnlMidway: r2(s.midway) })),
       sensitivities: Object.fromEntries(Object.entries(sensitivities(b, a.spot, a.T)).map(([k, v]) => [k, r2(v)])),
       exitPlan: xp,
+      // برنامهٔ خروج سناریومحور صفحه: در هر حرکت قیمت، زود بستن یا نگه داشتن (همان پیشنهاد صفحه)
+      exitScenarios: exitAdvice(b, a.spot, a.T).scenarios.map((x) => ({ movePct: x.movePct, price: r2(x.price), closeMidway: r2(x.closeMidway), closeMidwayIvUp: r2(x.closeMidwayIvUp), holdToExpiry: r2(x.holdToExpiry), action: x.action })),
       profitZones: pnlZones(b.legs, a.forward, a.T, a.atmIv).map((z) => ({ from: r2(z.lo), to: r2(z.hi), profit: z.profit, probability: z.prob })),
       deepScenarios: comboScenarios(one).map((r) => ({ scenario: r.label, pnl: r2(r.total.total), priceEffect: r2(r.total.price), ivEffect: r2(r.total.vol), timeEffect: r2(r.total.time), why: r.perLeg[0]?.why })),
       replayScenarios: replayScenarios(one, ctx.liveQuotes).map((r) => ({ scenario: r.label, movePct: r2((r.perLeg[0]?.move ?? 0) * 100), pnl: r2(r.total.total), why: r.perLeg[0]?.why })),
@@ -732,16 +754,8 @@ function assistantPayload(
 
 /* ---------------- قدم ۴ ---------------- */
 
-function actionFor(pnl: number, tp: number | null, sl: number | null): string {
-  if (tp !== null && pnl >= tp) return 'به هدف سود رسیده؛ بستن را در نظر بگیرید';
-  if (sl !== null && pnl <= -sl) return 'به حد ضرر رسیده؛ بستن را در نظر بگیرید';
-  if (pnl < 0) return 'زیان‌ده؛ مراقب باشید و نزدیک حد ضرر ببندید یا به سررسید بعد منتقل کنید';
-  return 'سودده؛ تا رسیدن به هدف نگه دارید';
-}
-
 function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
   const rows = scenarios(b, a.spot, a.T);
-  const xp = exitPlan(b, a.days);
   const sens = sensitivities(b, a.spot, a.T);
   const label: Record<number, string> = { 20: 'صعود شدید', 5: 'صعود ملایم', 0: 'خنثی / بدون حرکت', [-5]: 'نزول ملایم', [-20]: 'نزول شدید' };
   return (
@@ -753,7 +767,7 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
           <caption className="sr-only">سناریوهای قیمت</caption>
           <thead>
             <tr className="text-2xs text-subtle">
-              <th scope="col" className="w-[28%] pb-2 text-start font-semibold">
+              <th scope="col" className="w-[40%] pb-2 text-start font-semibold">
                 سناریو
               </th>
               <th scope="col" className="pb-2 text-end font-semibold">
@@ -761,9 +775,6 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
               </th>
               <th scope="col" className="pb-2 text-end font-semibold">
                 سود/زیان
-              </th>
-              <th scope="col" className="w-[30%] pb-2 text-end font-semibold">
-                چه کنیم؟
               </th>
             </tr>
           </thead>
@@ -783,7 +794,6 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
                 <td className="border-t border-divider py-2 text-end font-bold">
                   <MoneyValue value={cents(r.atExpiry)} signed tone="auto" digits={2} />
                 </td>
-                <td className="border-t border-divider py-2 text-end text-2xs text-muted">{actionFor(r.atExpiry, xp.takeProfitUsd, xp.stopLossUsd)}</td>
               </tr>
             ))}
           </tbody>
@@ -802,32 +812,108 @@ function ScenariosView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
   );
 }
 
-function ExitView({ b, days }: { b: BuiltStrategy; days: number }) {
-  const xp = exitPlan(b, days);
+const EXIT_LABEL: Record<number, string> = { 20: 'صعود شدید', 10: 'صعود', 5: 'صعود ملایم', 0: 'بدون حرکت', [-5]: 'نزول ملایم', [-10]: 'نزول', [-20]: 'نزول شدید' };
+
+const ACTION: Record<ExitAction, { title: string; tone: 'gain' | 'loss' | 'warn' | 'info'; why: (edge: ReactNode) => ReactNode }> = {
+  'close-early-profit': { title: 'سود را زودتر بردارید', tone: 'gain', why: (e) => <>بستن در نیمهٔ راه {e} بیشتر از نگه داشتن سود می‌دهد.</> },
+  'hold-profit': { title: 'تا سررسید نگه دارید', tone: 'gain', why: (e) => <>نگه داشتن تا سررسید {e} سود بیشتری دارد.</> },
+  'close-early-flip': { title: 'حتماً زودتر ببندید', tone: 'warn', why: () => <>اگر تا سررسید نگه دارید، این سود به زیان تبدیل می‌شود.</> },
+  'close-early-cut': { title: 'زودتر ببندید تا زیان کمتر شود', tone: 'loss', why: (e) => <>زیان با بستن زودهنگام {e} کمتر است.</> },
+  'hold-recover': { title: 'عجله نکنید؛ فقط با رسیدن به حد ضرر ببندید', tone: 'info', why: (e) => <>بستن در نیمهٔ راه {e} زیان بیشتری دارد (کارمزد بستن و ارزش زمانی باقی‌مانده).</> }
+};
+
+function ExitView({ b, a }: { b: BuiltStrategy; a: Analysis }) {
+  const xp = exitPlan(b, a.days);
+  const adv = exitAdvice(b, a.spot, a.T);
   const seller = PREMIUM_SELLER.has(b.id);
+  const money = (v: number) => <MoneyValue value={cents(v)} signed tone="auto" digits={2} />;
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h3 className="text-sm font-bold text-ink">برنامهٔ خروج (کجا بفروشیم)</h3>
-      <ul className="space-y-2 text-xs leading-6 text-muted">
-        <li>
-          <b className="text-ink">حد سود:</b>{' '}
-          {xp.takeProfitUsd === null ? '—' : <MoneyValue value={xp.takeProfitUsd} digits={2} className="font-semibold text-positive" />}{' '}
-          {seller ? '(نصف بیشترین سود ممکن؛ معمولاً بهتر است زودتر ببندید و ریسک باقی‌مانده را نگه ندارید)' : '(برابر پولی که پرداخته‌اید، یا رسیدن قیمت به هدف شما)'}
-        </li>
-        <li>
-          <b className="text-ink">حد ضرر:</b> {xp.stopLossUsd === null ? '—' : <MoneyValue value={-xp.stopLossUsd} digits={2} tone="loss" />}{' '}
-          {seller ? '(دو برابر پولی که در شروع گرفته‌اید، یا رسیدن قیمت به قیمت توافقیِ قراردادی که فروخته‌اید)' : '(نصف پولی که پرداخته‌اید)'}
-        </li>
-        <li>
-          <b className="text-ink">قانون زمانی:</b> {toFaDigits(xp.closeOrRollDaysLeft)} روز مانده به سررسید، ببندید یا به سررسید بعد منتقل کنید؛ نزدیک سررسید، حرکت‌های کوچک قیمت اثر خیلی بزرگ‌تری دارند.
-        </li>
-        <li>
-          <b className="text-ink">جابه‌جایی به سررسید بعد (Roll):</b> اگر قیمت به قیمت توافقیِ قراردادی که فروخته‌اید رسید و نظرتان دربارهٔ بازار عوض نشده، قرارداد را ببندید و قرارداد مشابه با سررسید دیرتر و قیمت توافقی دورتر باز کنید؛ فقط وقتی در مجموع هنوز پول دریافت می‌کنید.
-        </li>
-      </ul>
+
+      <div className="rounded-card border border-accent/40 bg-accent-soft/40 p-3.5 text-xs leading-6 text-muted">
+        <p className="font-bold text-ink">خلاصه</p>
+        <p>
+          در {toFaDigits(adv.earlyBetterCount)} سناریو از {toFaDigits(adv.scenarios.length)} سناریو، بستن زودتر بهتر از نگه داشتن تا سررسید است. اگر طبق پیشنهادهای زیر عمل کنید، بدترین نتیجه
+          تقریباً {money(adv.worstFollowingAdvice)} است؛ اگر کاری نکنید و تا سررسید نگه دارید، بدترین نتیجه {money(adv.worstDoingNothing)}.
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-field border border-divider bg-card p-3">
+          <p className="text-2xs font-semibold text-muted">حد سود: ببندید وقتی سود رسید به</p>
+          <p className="mt-1 text-sm font-bold">{xp.takeProfitUsd === null ? '—' : <MoneyValue value={xp.takeProfitUsd} digits={2} className="text-positive" />}</p>
+          <p className="text-2xs leading-5 text-subtle">{seller ? 'نصف بیشترین سود ممکن؛ بقیهٔ سود ارزش ریسک باقی‌مانده را ندارد.' : 'برابر پولی که پرداخته‌اید.'}</p>
+        </div>
+        <div className="rounded-field border border-divider bg-card p-3">
+          <p className="text-2xs font-semibold text-muted">حد ضرر: ببندید وقتی زیان رسید به</p>
+          <p className="mt-1 text-sm font-bold">{xp.stopLossUsd === null ? '—' : <MoneyValue value={-xp.stopLossUsd} digits={2} tone="loss" />}</p>
+          <p className="text-2xs leading-5 text-subtle">{seller ? 'دو برابر پولی که در شروع گرفته‌اید.' : 'نصف پولی که پرداخته‌اید؛ بقیه را نجات دهید.'}</p>
+        </div>
+        <div className="rounded-field border border-divider bg-card p-3">
+          <p className="text-2xs font-semibold text-muted">خروج زمانی</p>
+          <p className="mt-1 text-sm font-bold text-ink">{toFaDigits(xp.closeOrRollDaysLeft)} روز مانده به سررسید</p>
+          <p className="text-2xs leading-5 text-subtle">اگر هیچ‌کدام از دو حد بالا نخورد، همین روز ببندید؛ نزدیک سررسید حرکت کوچک قیمت اثر بزرگی دارد.</p>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs font-bold text-ink">در هر سناریو چه کنیم؟</p>
+        <ul className="space-y-2">
+          {adv.scenarios.map((sc) => {
+            const act = ACTION[sc.action];
+            const ivDiff = Math.abs(sc.closeMidwayIvUp - sc.closeMidway) >= Math.max(1, Math.abs(sc.closeMidway) * 0.05);
+            return (
+              <li key={sc.movePct} className="rounded-field border border-divider p-3 text-xs leading-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-ink">
+                    {EXIT_LABEL[sc.movePct]}{' '}
+                    <span className="text-2xs font-normal text-muted">
+                      ({sc.movePct > 0 ? '+' : ''}
+                      {toFaDigits(sc.movePct)}٪ · قیمت <MoneyValue value={sc.price} digits={0} />)
+                    </span>
+                  </p>
+                  <Badge tone={act.tone}>{act.title}</Badge>
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  <p className={cn('rounded-control px-2 py-1', sc.action.startsWith('close') && 'bg-accent-soft/60')}>
+                    <span className="block text-2xs text-muted">بستن در نیمهٔ راه</span>
+                    <b>{money(sc.closeMidway)}</b>
+                  </p>
+                  <p className={cn('rounded-control px-2 py-1', sc.action.startsWith('hold') && 'bg-accent-soft/60')}>
+                    <span className="block text-2xs text-muted">نگه داشتن تا سررسید</span>
+                    <b>{money(sc.holdToExpiry)}</b>
+                  </p>
+                </div>
+                <p className="mt-1 text-2xs text-muted">{act.why(<MoneyValue value={cents(sc.edge)} digits={2} />)}</p>
+                {ivDiff && (
+                  <p className="text-2xs text-subtle">
+                    اگر هم‌زمان ترس بازار بالا برود (نوسان مورد انتظار +۱۰ واحد)، بستن در نیمهٔ راه: {money(sc.closeMidwayIvUp)}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
       {xp.priceLevels.length > 0 && (
-        <KeyValueList dense rows={xp.priceLevels.map((l) => ({ label: l.label, value: <MoneyValue value={l.price} digits={0} /> }))} />
+        <div>
+          <p className="mb-1 text-xs font-bold text-ink">قیمت‌هایی که باید زیر نظر داشته باشید</p>
+          <KeyValueList dense rows={xp.priceLevels.map((l) => ({ label: l.label, value: <MoneyValue value={l.price} digits={0} /> }))} />
+        </div>
       )}
+
+      <Disclosure summary="جابه‌جایی به سررسید بعد (Roll) به‌جای بستن">
+        <p className="text-xs leading-6 text-muted">
+          اگر قیمت به قیمت توافقیِ قراردادی که فروخته‌اید رسید ولی نظرتان دربارهٔ بازار عوض نشده، می‌توانید به‌جای پذیرفتن زیان، قرارداد را ببندید و قرارداد مشابهی با سررسید دیرتر و قیمت توافقی دورتر باز
+          کنید. فقط وقتی این کار را بکنید که در مجموع هنوز پول دریافت می‌کنید؛ وگرنه بستن بهتر است.
+        </p>
+      </Disclosure>
+
+      <p className="text-2xs leading-5 text-subtle">
+        اعداد تقریبی‌اند و از قیمت‌گذاری همین صفحه می‌آیند. «نیمهٔ راه» یعنی وقتی نصف زمان تا سررسید گذشته و نوسان بازار تغییر نکرده. کارمزد بستن تقریباً برابر کارمزد باز کردن فرض شده.
+      </p>
     </div>
   );
 }
