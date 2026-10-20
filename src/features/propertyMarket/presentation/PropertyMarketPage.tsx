@@ -44,7 +44,7 @@ const REJECT_FA: Record<string, string> = {
   'missing-price': 'بدون قیمت',
   'neighborhood-conflict': 'محله آگهی با متنش نمی‌خواند',
   'missing-neighborhood': 'بدون محله',
-  'stale-ad': 'به‌روز نشده بیش از ۴۵ روز',
+  'stale-ad': 'به‌روز نشده ۴ روز یا بیشتر',
   'other-city': 'ملک شهر دیگر',
   'not-apartment': 'غیرآپارتمان',
   'ppm-out-of-range': 'قیمت هر متر نامعقول',

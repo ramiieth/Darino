@@ -28,13 +28,13 @@ export const MIN_YEAR = 1330;
 export const MAX_YEAR = 1410;
 /** حداقل تعداد نمونه منطقه برای فیلتر پرت آماری (کمتر → فقط حصار سراسری) */
 export const MIN_NEIGHBORHOOD_SAMPLE_FOR_IQR = 6;
-/** آگهی که آخرین به‌روزرسانی‌اش قدیمی‌تر از این باشد «کهنه» است و در تحلیل نمی‌آید */
-export const STALE_AD_DAYS = 45;
+/** آگهی که این تعداد روز یا بیشتر به‌روز نشده «کهنه» است و از بازار (فهرست و تحلیل) حذف می‌شود */
+export const STALE_AD_DAYS = 4;
 const DAY_MS = 86_400_000;
 
 /** آیا آگهی نسبت به زمان مرجع کهنه است؟ (بدون تاریخ منبع → کهنه حساب نمی‌شود) */
 export function isStaleAd(sourceUpdatedAt: number | null | undefined, ref: number): boolean {
-  return typeof sourceUpdatedAt === 'number' && ref - sourceUpdatedAt > STALE_AD_DAYS * DAY_MS;
+  return typeof sourceUpdatedAt === 'number' && ref - sourceUpdatedAt >= STALE_AD_DAYS * DAY_MS;
 }
 /** ضریب حصار سراسری (محله‌های کم‌نمونه) — پرت شدید */
 export const GLOBAL_IQR_K = 3;
@@ -105,7 +105,7 @@ export function normalizeAndValidate(
     return null;
   }
 
-  // آگهی کهنه: آخرین به‌روزرسانی در منبع قدیمی‌تر از ۴۵ روز
+  // آگهی کهنه: ۴ روز یا بیشتر از آخرین به‌روزرسانی در منبع گذشته
   if (isStaleAd(listing.sourceUpdatedAt, scrapedAt)) {
     reject(report, 'stale-ad');
     return null;

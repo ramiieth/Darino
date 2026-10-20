@@ -136,6 +136,24 @@ describe('buildSnapshot', () => {
     expect(buildSnapshot({ listings: [], now: NOW })).toBeNull();
   });
 
+  it('آگهی کهنه (۴ روز یا بیشتر) حذف؛ بدون تاریخ منبع → آخرین دیده‌شدن ملاک است', () => {
+    const [a, b, c] = base;
+    const updatedOld = { ...a, sourceUpdatedAt: NOW - 4 * DAY, scrapedAt: NOW };
+    const unseen = { ...b, sourceUpdatedAt: null, scrapedAt: NOW - 4 * DAY };
+    const seenRecently = { ...c, sourceUpdatedAt: null, scrapedAt: NOW - 3 * DAY };
+    expect(listingsInWindow([updatedOld, unseen, seenRecently], NOW).map((l) => l.token)).toEqual([c.token]);
+  });
+
+  it('کهنگی نسبت به آخرین جمع‌آوری سنجیده می‌شود (جمع‌آوری متوقف → بازار خالی نمی‌شود)', () => {
+    const [a, b] = base;
+    const last = NOW - 10 * DAY;
+    const seenLast = { ...a, sourceUpdatedAt: null, scrapedAt: last };
+    const unseenBefore = { ...b, sourceUpdatedAt: null, scrapedAt: last - 4 * DAY };
+    expect(listingsInWindow([seenLast, unseenBefore], NOW).map((l) => l.token)).toEqual([a.token]);
+    // Snapshot امروز (بدون لنگر) از دادهٔ کهنه ساخته نمی‌شود
+    expect(listingsInWindow([seenLast], NOW, MARKET_WINDOW_DAYS, false)).toEqual([]);
+  });
+
   it('گزارش ورود همین اجرا در قیف Snapshot منعکس می‌شود', () => {
     const ing = ingestSeeds({ existing: [], seeds: [seed('z', 'گلستان', 100, 90e6), emptySeed('no')], city: 'ahvaz', now: NOW });
     const snap = buildSnapshot({ listings: ing.listings, now: NOW, ingestReport: ing.report })!;

@@ -250,12 +250,18 @@ describe('آگهی کهنه', () => {
     s.totalPriceToman = 9e9;
     return s;
   };
-  it('آخرین به‌روزرسانی قدیمی‌تر از ۴۵ روز → رد «stale-ad»', () => {
+  it('۴ روز یا بیشتر بدون به‌روزرسانی → رد «stale-ad»', () => {
+    expect(STALE_AD_DAYS).toBe(4);
     const r = newCleaningReport();
     const s = base();
-    s.sourceUpdatedAt = now - (STALE_AD_DAYS + 1) * 86_400_000;
+    s.sourceUpdatedAt = now - STALE_AD_DAYS * 86_400_000;
     expect(normalizeAndValidate(s, 'ahvaz', '7', now, r)).toBeNull();
     expect(r.rejectReasons['stale-ad']).toBe(1);
+  });
+  it('کمتر از ۴ روز از آخرین به‌روزرسانی → معتبر', () => {
+    const s = base();
+    s.sourceUpdatedAt = now - (STALE_AD_DAYS * 86_400_000 - 3600_000);
+    expect(normalizeAndValidate(s, 'ahvaz', '7', now, newCleaningReport())).not.toBeNull();
   });
   it('انتشار قدیمی ولی به‌روزرسانی/نردبان اخیر → معتبر', () => {
     const s = base();
