@@ -95,8 +95,9 @@ export function listingsInWindow(
       l.source !== 'manual-legacy' &&
       l.scrapedAt >= from &&
       l.pricePerSqmToman !== null &&
-      // آخرین به‌روزرسانی آگهی در منبع — آگهی کهنه در بازار فعلی حساب نمی‌شود
-      !isStaleAd(l.sourceUpdatedAt, now)
+      // آخرین به‌روزرسانی آگهی در منبع — آگهی کهنه در بازار فعلی حساب نمی‌شود؛
+      // بدون تاریخ منبع، آخرین باری که در فهرست دیوار دیده شده ملاک است (نسبت به همان مبنا)
+      !isStaleAd(l.sourceUpdatedAt ?? l.scrapedAt, ref)
   );
 }
 
