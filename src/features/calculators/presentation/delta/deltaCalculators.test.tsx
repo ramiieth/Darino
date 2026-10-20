@@ -35,7 +35,9 @@ vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
   const books = {
     arcus: { status: 'ready', quotes: [ARCUS] },
     ondo: { status: 'ready', quotes: [ONDO] },
-    lighter: { status: 'ready', quotes: [] }
+    lighter: { status: 'ready', quotes: [] },
+    lighterRh: { status: 'ready', quotes: [] },
+    hyperliquid: { status: 'ready', quotes: [] }
   };
   return { ...actual, useDeltaBooks: () => books };
 });

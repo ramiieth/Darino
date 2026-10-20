@@ -103,6 +103,15 @@ export function arbScenarios(o: Opportunity, i: ArbInputs, holds: readonly numbe
   });
 }
 
+/**
+ * فارم پوینت: هزینهٔ خالص هر ۱۰۰ هزار دلار حجم روی صرافی پوینت (یک دور باز و بسته = ۲ × ارزش).
+ * مثبت = هزینه، منفی = سود؛ null وقتی سود خالص معلوم نیست.
+ */
+export function farmCostPer100k(net: number | null, notionalPerSide: number): number | null {
+  if (net === null || !(notionalPerSide > 0)) return null;
+  return (-net / (2 * notionalPerSide)) * 100_000;
+}
+
 export const venueName = (v: DeltaVenue) => DELTA_VENUE_LABELS[v];
 
 export const STABILITY: Record<Stability, { label: string; tone: Tone }> = {

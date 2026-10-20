@@ -128,3 +128,64 @@ describe('لایتر و لایتر رابین‌هود: فاندینگ جدا', 
     vi.unstubAllGlobals();
   });
 });
+
+describe('فارم پوینت: جفت‌ها و نامزدها', () => {
+  const q = (venue: VenueQuote['venue'], base: string, fundingHourly: number, volume24hUsd: number | null): VenueQuote => ({
+    venue,
+    ref: base,
+    base,
+    display: base,
+    nameFa: base,
+    category: 'crypto',
+    markPrice: 100,
+    fundingHourly,
+    makerFeePct: 0,
+    takerFeePct: 0,
+    maxLeverage: 10,
+    maintenanceMarginFraction: 0.05,
+    volume24hUsd
+  });
+  const book = (quotes: VenueQuote[]) => ({ status: 'ready' as const, quotes });
+
+  it('farmPairs: صرافی پوینت در یک طرف، همهٔ صرافی‌های دیگر در طرف دیگر', async () => {
+    const { farmPairs } = await import('./fundingHistory');
+    expect(farmPairs('arcus')).toEqual([
+      ['arcus', 'ondo'],
+      ['arcus', 'lighter'],
+      ['arcus', 'lighterRh'],
+      ['arcus', 'hyperliquid']
+    ]);
+    expect(farmPairs('lighterRh').every(([a, b]) => a === 'lighterRh' && b !== 'lighterRh')).toBe(true);
+  });
+
+  it('حالت farm: بازار کم‌حجم کنار می‌رود و نیمی از فهرست پرحجم‌ترین‌هاست، نه فقط بیشترین اختلاف', async () => {
+    const { pickCandidates } = await import('./fundingHistory');
+    const books = {
+      arcus: book([q('arcus', 'SPIKE', 0.01, 50_000), q('arcus', 'HOT', 0.0002, 2e6), q('arcus', 'BTC', 0.00001, 9e8), q('arcus', 'ETH', 0.00001, 5e8)]),
+      hyperliquid: book([q('hyperliquid', 'SPIKE', 0, 9e6), q('hyperliquid', 'HOT', 0, 3e6), q('hyperliquid', 'BTC', 0.000012, 2e9), q('hyperliquid', 'ETH', 0.000011, 1e9)]),
+      ondo: book([]),
+      lighter: book([]),
+      lighterRh: book([])
+    };
+    const pairs = [['arcus', 'hyperliquid']] as const;
+    expect(pickCandidates(books, 2, pairs, 'spread').map((c) => c.base)).toEqual(['SPIKE', 'HOT']);
+    expect(pickCandidates(books, 2, pairs, 'farm').map((c) => c.base)).toEqual(['HOT', 'BTC']);
+  });
+
+  it('دفتر سفارش لایتر رابین‌هود از سرور خودش', async () => {
+    const { vi } = await import('vitest');
+    const { fetchOrderBook } = await import('./fundingHistory');
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (u: string) => {
+        urls.push(String(u));
+        return new Response(JSON.stringify({ bids: [{ price: '99', remaining_base_amount: '1' }], asks: [{ price: '101', remaining_base_amount: '1' }] }), { status: 200 });
+      })
+    );
+    const b = await fetchOrderBook('lighterRh', '16');
+    expect(urls[0]).toContain('api.rh.lighter.xyz/api/v1/orderBookOrders');
+    expect(b.mid).toBe(100);
+    vi.unstubAllGlobals();
+  });
+});

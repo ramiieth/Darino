@@ -48,7 +48,7 @@ const DELTA_CANDIDATES = 12;
 const MIN_DELTA_VOLUME_USD = 5_000_000; // همان مرز «کم‌نقد» ماشین‌حساب دلتا نوترال
 type DeltaLeg = { feePct: number; fundingHourly: number; maintenanceMarginFraction: number; markPrice: number | null };
 type DeltaChoice = DeltaOption<string> & { base: string; pair: DeltaPair; longQ: VenueQuote; shortQ: VenueQuote };
-const VENUE_ORDER: DeltaVenue[] = ['arcus', 'lighter', 'lighterRh', 'ondo'];
+const VENUE_ORDER: DeltaVenue[] = ['arcus', 'lighter', 'lighterRh', 'ondo', 'hyperliquid'];
 /** استیبل‌کوین‌ها: دلتا نوترال و خرید در ریزش برایشان معنا ندارد */
 const STABLES = new Set(['USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'PYUSD', 'USDG', 'TUSD', 'USDS', 'USD1', 'USDT0', 'RLUSD']);
 const TRADFI = new Set(['equity', 'commodity', 'index']);

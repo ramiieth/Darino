@@ -69,7 +69,7 @@ export function DeltaProfitCalculator({ onOpenScanner }: { onOpenScanner?: () =>
   const best = pickedRow ?? stable.find((x) => (x.r.net ?? 0) > 0) ?? ranked[0] ?? null;
   const others = ranked.filter((x) => x !== best).slice(0, 5);
   const checking = opportunities.filter((o) => o.historyStatus === 'loading' || o.bookStatus === 'loading').length;
-  const venuesDown = (['arcus', 'ondo', 'lighter'] as const).filter((v) => books[v].status === 'error');
+  const venuesDown = (['arcus', 'ondo', 'lighter', 'hyperliquid'] as const).filter((v) => books[v].status === 'error');
   const scenarios = useMemo(() => (best ? arbScenarios(best.o, inputs, HOLDS) : []), [best, inputs.capitalPerSide, inputs.leverage, inputs.transferCostUsd]);
 
   usePublishInsight(

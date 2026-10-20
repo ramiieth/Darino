@@ -1,8 +1,9 @@
 /**
- * تاریخچهٔ فاندینگ تسویه‌شده و دفتر سفارش — آرکوس، اوندو پرپس، لایتر (فقط دادهٔ عمومی؛ بدون حساب/کلید)
+ * تاریخچهٔ فاندینگ تسویه‌شده و دفتر سفارش — آرکوس، اوندو پرپس، لایتر، لایتر رابین‌هود، هایپرلیکوئید (فقط دادهٔ عمومی؛ بدون حساب/کلید)
  *
  *  Lighter  GET /api/v1/fundings?resolution=1h   rate = درصد ساعتی (۴ رقم اعشار)، direction=long → لانگ می‌پردازد
- *           GET /api/v1/orderBookOrders           سفارش‌های باز (حداکثر ۱۰۰ در هر سمت)
+ *           GET /api/v1/orderBookOrders           سفارش‌های باز (حداکثر ۱۰۰ در هر سمت) — رابین‌هود همان مسیر روی سرور خودش
+ *  Hyperliquid  POST /info fundingHistory · l2Book  (hyperliquidMarkets.ts)
  *  Arcus    GET /v1/fundingRates?market&limit     نرخ ساعتی کسری، time به میکروثانیه
  *           GET /v1/l2OrderBook/{market}          [قیمت، حجم]
  *  Ondo     /api/integrations?op=ondo-perps-history | ondo-perps-depth   (REST اوندو CORS ندارد)
@@ -26,6 +27,7 @@ import {
   type Stability
 } from '@/features/calculators/domain';
 import type { DeltaVenue, VenueBook, VenueQuote } from './deltaMarkets';
+import { fetchHyperliquidBook, fetchHyperliquidFundingHistory } from './hyperliquidMarkets';
 
 const LIGHTER_BASE = 'https://mainnet.zklighter.elliot.ai';
 /** لایتر رابین‌هود سرور و فاندینگ جدا دارد — هرگز با لایتر عادی مخلوط نشود */
@@ -131,15 +133,17 @@ export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promi
     return parseLighterFundings(await getJson(`${venue === 'lighterRh' ? LIGHTER_RH_BASE : LIGHTER_BASE}/api/v1/fundings?${q}`));
   }
   if (venue === 'arcus') return parseArcusFundings(await arcusGet('mainnet', '/v1/fundingRates', { market: ref, limit: HISTORY_HOURS }));
+  if (venue === 'hyperliquid') return fetchHyperliquidFundingHistory(ref, Date.now() - HISTORY_HOURS * 3_600_000);
   return parseOndoFundings(await fetchJson(`/api/integrations?op=ondo-perps-history&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
 }
 
 export async function fetchOrderBook(venue: DeltaVenue, ref: string): Promise<OrderBook> {
-  if (venue === 'lighterRh') throw new Error('unsupported venue');
-  if (venue === 'lighter') {
+  if (venue === 'lighter' || venue === 'lighterRh') {
     if (!/^\d{1,6}$/.test(ref)) throw new Error('invalid market');
-    return parseLighterBook(await getJson(`${LIGHTER_BASE}/api/v1/orderBookOrders?${new URLSearchParams({ market_id: ref, limit: '100' })}`));
+    const host = venue === 'lighterRh' ? LIGHTER_RH_BASE : LIGHTER_BASE;
+    return parseLighterBook(await getJson(`${host}/api/v1/orderBookOrders?${new URLSearchParams({ market_id: ref, limit: '100' })}`));
   }
+  if (venue === 'hyperliquid') return fetchHyperliquidBook(ref);
   if (venue === 'arcus') return parseTupleBook(await arcusOrderBook('mainnet', ref));
   return parseTupleBook(await fetchJson(`/api/integrations?op=ondo-perps-depth&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
 }
@@ -172,16 +176,50 @@ export interface Opportunity {
   bookStatus: 'loading' | 'ready' | 'error';
 }
 
-const PAIRS: [DeltaVenue, DeltaVenue][] = [
+export type ScanPair = readonly [DeltaVenue, DeltaVenue];
+
+/** جفت‌های پیش‌فرض اسکنر و سود واقعی */
+export const SCAN_PAIRS: readonly ScanPair[] = [
   ['arcus', 'ondo'],
   ['arcus', 'lighter'],
-  ['ondo', 'lighter']
+  ['ondo', 'lighter'],
+  ['arcus', 'hyperliquid'],
+  ['ondo', 'hyperliquid'],
+  ['hyperliquid', 'lighter']
 ];
 
-/** نامزدها: بیشترین اختلاف لحظه‌ای در هر سه جفت صرافی (تکراری حذف) */
-export function pickCandidates(books: Record<DeltaVenue, VenueBook>, limit: number) {
-  const all = PAIRS.flatMap(([a, b]) => fundingSpreads(books[a].quotes, books[b].quotes));
-  return all.sort((x, y) => y.spreadApr - x.spreadApr).slice(0, limit);
+/** صرافی‌هایی که برای حجم معامله پوینت می‌دهند (هدف فارم) */
+export type PointsVenue = 'arcus' | 'lighterRh';
+export const POINTS_VENUES: readonly PointsVenue[] = ['arcus', 'lighterRh'];
+const ALL_VENUES: readonly DeltaVenue[] = ['arcus', 'ondo', 'lighter', 'lighterRh', 'hyperliquid'];
+
+/** فارم پوینت: یک طرف روی صرافی پوینت، طرف پوشش روی هر صرافی دیگر (از جمله صرافی پوینت دیگر) */
+export const farmPairs = (farm: PointsVenue): ScanPair[] => ALL_VENUES.filter((v) => v !== farm).map((v): ScanPair => [farm, v]);
+
+/** بازار با حجم ۲۴ساعتهٔ کمتر از این برای فارم کنار می‌رود (اسلیپیج ورود و خروج مکرر) */
+export const MIN_FARM_VOLUME_USD = 1_000_000;
+
+export type CandidateRank = 'spread' | 'farm';
+
+/**
+ * نامزدها از جفت‌های داده‌شده (تکراری حذف)
+ *  spread → بیشترین اختلاف لحظه‌ای
+ *  farm   → فقط بازارهای پرحجم؛ نیمی با بیشترین اختلاف، نیمی پرحجم‌ترین‌ها (کمترین اسلیپیج و فاندینگ آرام‌تر)
+ */
+export function pickCandidates(books: Record<DeltaVenue, VenueBook>, limit: number, pairs: readonly ScanPair[] = SCAN_PAIRS, rank: CandidateRank = 'spread') {
+  const all = pairs.flatMap(([a, b]) => fundingSpreads(books[a].quotes, books[b].quotes));
+  const bySpread = (list: typeof all) => [...list].sort((x, y) => y.spreadApr - x.spreadApr);
+  if (rank === 'spread') return bySpread(all).slice(0, limit);
+  const liquidity = (c: (typeof all)[number]) => Math.min(c.a.volume24hUsd ?? Infinity, c.b.volume24hUsd ?? Infinity);
+  const liquid = all.filter((c) => liquidity(c) >= MIN_FARM_VOLUME_USD);
+  const keyOf = (c: (typeof all)[number]) => `${c.base}|${c.a.venue}|${c.b.venue}`;
+  const picked = new Map<string, (typeof all)[number]>();
+  for (const c of bySpread(liquid).slice(0, Math.ceil(limit / 2))) picked.set(keyOf(c), c);
+  for (const c of [...liquid].sort((x, y) => liquidity(y) - liquidity(x))) {
+    if (picked.size >= limit) break;
+    picked.set(keyOf(c), c);
+  }
+  return [...picked.values()];
 }
 
 /** میانگین ۷ روز تعیین‌کنندهٔ جهت است؛ بدون تاریخچهٔ کافی جهت لحظه‌ای */
@@ -228,18 +266,27 @@ const qStatus = (q: { data?: unknown; isError: boolean }) => (q.data ? 'ready' :
 /** فهرست نامزدها ۱۰ دقیقه ثابت می‌ماند تا هر تیک فاندینگ درخواست‌های تازه (و ۴۲۹) نسازد */
 const CANDIDATE_TTL_MS = 10 * 60_000;
 
-export function useFundingOpportunities(books: Record<DeltaVenue, VenueBook>, limit = 10): Opportunity[] {
+export function useFundingOpportunities(
+  books: Record<DeltaVenue, VenueBook>,
+  limit = 10,
+  pairs: readonly ScanPair[] = SCAN_PAIRS,
+  rank: CandidateRank = 'spread'
+): Opportunity[] {
   const frozen = useRef<{ keys: string[]; at: number; ready: string } | null>(null);
-  const ready = (['arcus', 'ondo', 'lighter'] as const).map((v) => `${v}:${books[v].quotes.length > 0}`).join();
+  const venues = [...new Set(pairs.flat())];
+  // جفت‌ها و حالت رتبه هم جزو کلید‌اند تا با عوض شدن حالت اسکنر، نامزدها تازه شوند
+  const ready = `${rank}|${pairs.map((p) => p.join('-')).join()}|${venues.map((v) => `${v}:${books[v].quotes.length > 0}`).join()}`;
   const candidates = useMemo(() => {
     const keyOf = (c: { base: string; a: VenueQuote; b: VenueQuote }) => `${c.base}|${c.a.venue}:${c.a.ref}|${c.b.venue}:${c.b.ref}`;
     const f = frozen.current;
     if (!f || !f.keys.length || f.ready !== ready || Date.now() - f.at > CANDIDATE_TTL_MS) {
-      frozen.current = { keys: pickCandidates(books, limit).map(keyOf), at: Date.now(), ready };
+      frozen.current = { keys: pickCandidates(books, limit, pairs, rank).map(keyOf), at: Date.now(), ready };
     }
     // همان جفت‌ها با تازه‌ترین نرخ لحظه‌ای
-    const all = new Map(pickCandidates(books, Number.MAX_SAFE_INTEGER).map((c) => [keyOf(c), c]));
+    const all = new Map(pickCandidates(books, Number.MAX_SAFE_INTEGER, pairs).map((c) => [keyOf(c), c]));
     return frozen.current!.keys.flatMap((k) => all.get(k) ?? []);
+    // pairs و rank در ready آمده‌اند
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [books, limit, ready]);
   const legs = useMemo(() => {
     const seen = new Map<string, VenueQuote>();
