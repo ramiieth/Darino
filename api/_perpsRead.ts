@@ -3,8 +3,14 @@ import { ProviderError } from './_zerion.js';
 const MAINNET='https://mainnet.zklighter.elliot.ai';
 const LIGHTER = 'https://api.rh.lighter.xyz';
 const ONDO = 'https://api.ondoperps.xyz';
+/** پاسخ لایتر برای آدرسی که هیچ حسابی ندارد: HTTP 400 با {"code":21100,"message":"account not found"} */
+const LIGHTER_ACCOUNT_NOT_FOUND = 21100;
 async function read(url: string, timeoutMs = 8000): Promise<Record<string, unknown>> {
   const response = await fetch(url, { method: 'GET', headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
+  if (response.status === 400) {
+    const body = await response.json().catch(() => null) as { code?: unknown } | null;
+    if (body?.code === LIGHTER_ACCOUNT_NOT_FOUND) throw new ProviderError(404, 'حسابی برای این آدرس پیدا نشد');
+  }
   if (!response.ok) throw new ProviderError(response.status === 429 ? 429 : 502, 'دریافت اطلاعات پلتفرم انجام نشد');
   const raw: unknown = await response.json();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ProviderError(502, 'پاسخ پلتفرم معتبر نیست');
@@ -123,7 +129,11 @@ export async function getPerpsRead(op: string, address: string): Promise<unknown
   for (let page = 0; page < 10; page++) {
     const query = new URLSearchParams({ by: 'l1_address', value: address, active_only: 'true' });
     if (cursor) query.set('cursor', cursor);
-    const data = await read(`${host}/api/v1/account?${query}`);
+    // آدرس بدون حساب = فهرست خالی، نه خطا (فقط صفحهٔ اول؛ وسط صفحه‌بندی یعنی پاسخ ناسازگار)
+    const data = await read(`${host}/api/v1/account?${query}`).catch((e: unknown): Record<string, unknown> => {
+      if (!cursor && e instanceof ProviderError && e.status === 404) return { accounts: [] };
+      throw e;
+    });
     if (!Array.isArray(data.accounts)) throw new ProviderError(502, 'پاسخ حساب معتبر نیست');
     accounts.push(...data.accounts);
     if (!data.next_cursor) return { accounts, fetchedAt: Date.now() };
