@@ -1,5 +1,5 @@
 /**
- * ⑥ PERP — isolated-margin perpetual calculator on live Lighter / Arcus markets.
+ * ⑥ PERP — isolated-margin perpetual calculator on live Lighter / Arcus / QFEX / TxFlow markets.
  * INPUT (venue · market · margin · leverage · entry/target · hold · funding · fee)
  * → RESULT (position size) → LONG vs SHORT (liquidation, funding, PnL) → SCENARIOS.
  * Calculations in domain (calcPerp, perpScenarios, fundingPeriods).
@@ -21,6 +21,8 @@ import { CalcShell, ResultHero, ResultPlaceholder } from './StatCard';
 import { parseNum, priceInput } from './parse';
 import {
   usePerpMarkets,
+  useTxflowMarginTier,
+  PERP_VENUES,
   PERP_VENUE_LABELS,
   PERP_CATEGORY_LABELS,
   type PerpCategory,
@@ -70,8 +72,8 @@ function MarketPicker({
       .slice(0, 80);
   }, [q.data, query, cat]);
 
-  // keep the selected market's figures live
-  const live = value ? (q.data?.find((m) => m.id === value.id) ?? value) : null;
+  // value is already the live market (PerpCalculator reads the same query and merges the margin tier)
+  const live = value;
 
   if (live && !browsing) {
     return (
@@ -203,7 +205,17 @@ export function PerpCalculator() {
   const [venue, setVenue] = useState<PerpVenue>('lighter');
   const [market, setMarket] = useState<PerpMarket | null>(null);
   const markets = usePerpMarkets(venue);
-  const live = market ? (markets.data?.find((m) => m.id === market.id && m.venue === market.venue) ?? market) : null;
+  const fresh = market ? (markets.data?.find((m) => m.id === market.id && m.venue === market.venue) ?? market) : null;
+  // TxFlow: سقف اهرم و مارجین نگهداری واقعی از ردهٔ اول جدول مارجین همان بازار
+  const tier = useTxflowMarginTier(fresh);
+  const live: PerpMarket | null =
+    fresh && tier.data
+      ? {
+          ...fresh,
+          maxLeverage: tier.data.maxLeverage && fresh.maxLeverage ? Math.min(fresh.maxLeverage, tier.data.maxLeverage) : (tier.data.maxLeverage ?? fresh.maxLeverage),
+          maintenanceMarginFraction: tier.data.maintenanceMarginFraction ?? fresh.maintenanceMarginFraction
+        }
+      : fresh;
 
   const [margin, setMargin] = useState('1000');
   const [lev, setLev] = useState('5');
@@ -287,7 +299,7 @@ export function PerpCalculator() {
         fill
         value={venue}
         onChange={switchVenue}
-        options={(['lighter', 'arcus'] as PerpVenue[]).map((v) => ({ value: v, label: PERP_VENUE_LABELS[v] }))}
+        options={PERP_VENUES.map((v) => ({ value: v, label: PERP_VENUE_LABELS[v] }))}
       />
       <MarketPicker key={venue} venue={venue} value={live} onChange={pick} />
 
@@ -406,6 +418,9 @@ export function PerpCalculator() {
               </Field>
             </div>
             {live.takerFeePct === null && <p className="mt-2 text-2xs text-subtle">کارمزد {PERP_VENUE_LABELS[venue]} از API عمومی در دسترس نیست؛ نرخ حساب خود را وارد کنید.</p>}
+            {live.maintenanceMarginFraction === null && mmf === '' && (
+              <p className="mt-2 text-2xs text-subtle">مارجین نگهداری {PERP_VENUE_LABELS[venue]} از API عمومی در دسترس نیست و ۱٪ فرض شده؛ برای قیمت لیکویید دقیق نرخ صرافی را وارد کنید.</p>
+            )}
             {(fee !== '' || mmf !== '') && (
               <Button
                 variant="ghost"

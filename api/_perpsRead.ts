@@ -72,19 +72,19 @@ export async function getOndoPublicMarkets(): Promise<{ markets: OndoPublicMarke
   }
 }
 const ONDO_MARKET_RE = /^[A-Z0-9]{1,20}-USD\.P$/;
-const ondoCache = new Map<string, { at: number; data: unknown }>();
-async function cachedOndo<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
-  const hit = ondoCache.get(key);
+const publicCache = new Map<string, { at: number; data: unknown }>();
+async function cachedPublic<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  const hit = publicCache.get(key);
   if (hit && Date.now() - hit.at < ttlMs) return hit.data as T;
   const data = await load();
-  if (ondoCache.size > 200) ondoCache.clear();
-  ondoCache.set(key, { at: Date.now(), data });
+  if (publicCache.size > 400) publicCache.clear();
+  publicCache.set(key, { at: Date.now(), data });
   return data;
 }
 /** Settled hourly funding for the last 30 days: [{t: epoch ms, r: hourly fraction}] — public, no credentials. */
 export async function getOndoFundingHistory(market: string): Promise<{ market: string; rates: { t: number; r: number }[] }> {
   if (!ONDO_MARKET_RE.test(market)) throw new ProviderError(400, 'بازار نامعتبر است');
-  return cachedOndo(`h:${market}`, 10 * 60_000, async () => {
+  return cachedPublic(`h:${market}`, 10 * 60_000, async () => {
     const q = new URLSearchParams({ market, limit: '720', startTime: String(Date.now() - 30 * 86_400_000) });
     const data = await read(`${ONDO}/v1/perps/funding_rate_history?${q}`, 15_000);
     const rates = (Array.isArray(data.result) ? data.result : []).map(asRow).flatMap((x) => {
@@ -105,10 +105,80 @@ const levels = (v: unknown): Level[] =>
 /** Public order book (100 levels per side) for slippage estimates. */
 export async function getOndoDepth(market: string): Promise<{ market: string; bids: Level[]; asks: Level[] }> {
   if (!ONDO_MARKET_RE.test(market)) throw new ProviderError(400, 'بازار نامعتبر است');
-  return cachedOndo(`d:${market}`, 15_000, async () => {
+  return cachedPublic(`d:${market}`, 15_000, async () => {
     const data = await read(`${ONDO}/v1/perps/depth?${new URLSearchParams({ market, depth: '100' })}`, 15_000);
     const book = asRow(data.result);
     return { market, bids: levels(book.bids), asks: levels(book.asks) };
+  });
+}
+/* ---------------- QFEX (public market data; api.qfex.com has no CORS for browsers) ---------------- */
+const QFEX = 'https://api.qfex.com';
+const QFEX_MARKET_RE = /^[A-Z0-9]{1,20}-[A-Z]{3}$/;
+export interface QfexPublicMarket {
+  market: string; base: string;
+  /** refdata product_category: EQUITY · COMMODITY · INDEX · FX */
+  category: string;
+  maxLeverage: number | null;
+  /** last trade (REST has no mark price) → index price */
+  markPrice: number | null;
+  /** current-window hourly fraction; positive = longs pay (matches premium sign) */
+  fundingHourly: number | null;
+  volume24hUsd: number | null;
+}
+/** contracts (price, funding, volume) + refdata (status, category, leverage) → only active perps */
+export function trimQfexMarkets(contracts: unknown, refdata: unknown): QfexPublicMarket[] {
+  const ref = new Map((Array.isArray(asRow(refdata).data) ? (asRow(refdata).data as unknown[]) : []).map(asRow).map((r) => [String(r.symbol ?? ''), r]));
+  return (Array.isArray(asRow(contracts).data) ? (asRow(contracts).data as unknown[]) : []).map(asRow).flatMap((c) => {
+    const market = typeof c.ticker_id === 'string' ? c.ticker_id : '';
+    const r = ref.get(market);
+    const base = String(c.base_currency ?? '');
+    if (!QFEX_MARKET_RE.test(market) || !/^[A-Z0-9]{1,20}$/.test(base) || !r || r.status !== 'ACTIVE' || c.product_type !== 'Perpetual') return [];
+    return [{
+      market, base, category: String(r.product_category ?? '').slice(0, 20),
+      maxLeverage: fin(r.default_max_leverage),
+      markPrice: fin(c.last_price) || fin(c.index_price),
+      fundingHourly: Number(c.funding_interval_minutes) === 60 ? fin(c.funding_rate) : null,
+      volume24hUsd: fin(c.target_volume)
+    }];
+  });
+}
+let qfexPublic: { at: number; data: { markets: QfexPublicMarket[]; fetchedAt: number } } | null = null;
+/** Same caching contract as Ondo: 30s fresh, last good answer (≤ 30 min) on upstream failure. */
+export async function getQfexPublicMarkets(): Promise<{ markets: QfexPublicMarket[]; fetchedAt: number }> {
+  if (qfexPublic && Date.now() - qfexPublic.at < 30_000) return qfexPublic.data;
+  try {
+    const [contracts, refdata] = await Promise.all([read(`${QFEX}/md/contracts`, 15_000), read(`${QFEX}/refdata`, 15_000)]);
+    const data = { markets: trimQfexMarkets(contracts, refdata), fetchedAt: Date.now() };
+    if (!data.markets.length) throw new ProviderError(502, 'پاسخ پلتفرم معتبر نیست');
+    qfexPublic = { at: data.fetchedAt, data };
+    return data;
+  } catch (e) {
+    if (qfexPublic && Date.now() - qfexPublic.at < 30 * 60_000) return qfexPublic.data;
+    throw e;
+  }
+}
+/** Settled hourly funding, last 30 days: [{t: epoch ms, r: hourly fraction}] — same shape as Ondo. */
+export async function getQfexFundingHistory(market: string): Promise<{ market: string; rates: { t: number; r: number }[] }> {
+  if (!QFEX_MARKET_RE.test(market)) throw new ProviderError(400, 'بازار نامعتبر است');
+  return cachedPublic(`qh:${market}`, 10 * 60_000, async () => {
+    const to = new Date();
+    const q = new URLSearchParams({ intervalMinutes: '60', fromISO: new Date(to.getTime() - 30 * 86_400_000).toISOString(), toISO: to.toISOString() });
+    const data = await read(`${QFEX}/funding/${market}?${q}`, 15_000);
+    const rates = (Array.isArray(data.data) ? data.data : []).map(asRow).flatMap((x) => {
+      const t = Date.parse(String(x.windowStart ?? ''));
+      const r = fin(x.rate);
+      return Number.isFinite(t) && r !== null ? [{ t, r }] : [];
+    });
+    return { market, rates };
+  });
+}
+/** Public order book; QFEX lists empty price levels too, so they are dropped before the 100-level cap. */
+export async function getQfexDepth(market: string): Promise<{ market: string; bids: Level[]; asks: Level[] }> {
+  if (!QFEX_MARKET_RE.test(market)) throw new ProviderError(400, 'بازار نامعتبر است');
+  return cachedPublic(`qd:${market}`, 15_000, async () => {
+    const data = await read(`${QFEX}/md/orderbook/${market}`, 15_000);
+    const side = (v: unknown) => levels((Array.isArray(v) ? v : []).filter((l) => Array.isArray(l) && Number(l[1]) > 0));
+    return { market, bids: side(data.bids), asks: side(data.asks) };
   });
 }
 export async function getPerpsRead(op: string, address: string): Promise<unknown> {

@@ -53,3 +53,47 @@ describe('تاریخچهٔ فاندینگ و عمق عمومی Ondo برای ا�
  it('فقط مسیر ثابت تاریخچه، ۷۲۰ ساعت، خروجی خلاصه',async()=>{const f=vi.fn().mockResolvedValue(ok({success:true,result:[{market:'ETH-USD.P',time:'2026-10-17T14:00:00.007Z',fundingRate:'0.0000125'},{time:'bad',fundingRate:'1'}]}));vi.stubGlobal('fetch',f);const { getOndoFundingHistory } = await import('../../api/_perpsRead');const data=await getOndoFundingHistory('ETH-USD.P');expect(data).toEqual({market:'ETH-USD.P',rates:[{t:Date.parse('2026-10-17T14:00:00.007Z'),r:0.0000125}]});const url=new URL(f.mock.calls[0][0]);expect(url.origin+url.pathname).toBe('https://api.ondoperps.xyz/v1/perps/funding_rate_history');expect(url.searchParams.get('market')).toBe('ETH-USD.P');expect(url.searchParams.get('limit')).toBe('720');expect(f.mock.calls[0][1].method).toBe('GET');});
  it('عمق: حداکثر ۱۰۰ سطح معتبر',async()=>{const f=vi.fn().mockResolvedValue(ok({success:true,result:{bids:[['100','1'],['x','2'],['99','0']],asks:[['101','2']]}}));vi.stubGlobal('fetch',f);const { getOndoDepth } = await import('../../api/_perpsRead');expect(await getOndoDepth('SOL-USD.P')).toEqual({market:'SOL-USD.P',bids:[[100,1]],asks:[[101,2]]});expect(new URL(f.mock.calls[0][0]).searchParams.get('depth')).toBe('100');});
 });
+
+describe('عملیات عمومی QFEX برای ماشین‌حساب‌ها', () => {
+ const contracts={data:[
+  {ticker_id:'AAPL-USD',base_currency:'AAPL',product_type:'Perpetual',last_price:'344.05',index_price:'344.2',target_volume:'5256087.5',funding_rate:'-0.0000023',funding_interval_minutes:60},
+  {ticker_id:'EUR-USD',base_currency:'EUR',product_type:'Perpetual',last_price:'1.1',funding_rate:'0',funding_interval_minutes:60},
+  {ticker_id:'https://evil.example',base_currency:'X',product_type:'Perpetual'},
+  {ticker_id:'CL-USD',base_currency:'CL',product_type:'Perpetual',last_price:'',index_price:'99.5',funding_rate:'0.00001',funding_interval_minutes:480}
+ ]};
+ const refdata={type:'x',data:[
+  {symbol:'AAPL-USD',status:'ACTIVE',product_category:'EQUITY',default_max_leverage:10},
+  {symbol:'EUR-USD',status:'DELISTED',product_category:'FX',default_max_leverage:50},
+  {symbol:'CL-USD',status:'ACTIVE',product_category:'COMMODITY',default_max_leverage:10}
+ ]};
+ it('فقط بازارهای فعال؛ فاندینگ فقط وقتی بازهٔ تسویه ۶۰ دقیقه است',async()=>{
+  const { trimQfexMarkets } = await import('../../api/_perpsRead');
+  expect(trimQfexMarkets(contracts,refdata)).toEqual([
+   {market:'AAPL-USD',base:'AAPL',category:'EQUITY',maxLeverage:10,markPrice:344.05,fundingHourly:-0.0000023,volume24hUsd:5256087.5},
+   {market:'CL-USD',base:'CL',category:'COMMODITY',maxLeverage:10,markPrice:99.5,fundingHourly:null,volume24hUsd:null}
+  ]);
+ });
+ it('فقط دو آدرس ثابت عمومی QFEX با GET و کش',async()=>{
+  vi.resetModules();
+  const { getQfexPublicMarkets } = await import('../../api/_perpsRead');
+  const f=vi.fn().mockImplementation(url=>Promise.resolve(ok(String(url).endsWith('/refdata')?refdata:contracts)));vi.stubGlobal('fetch',f);
+  const a=await getQfexPublicMarkets();const b=await getQfexPublicMarkets();
+  expect(a).toBe(b);expect(a.markets).toHaveLength(2);
+  expect(f.mock.calls.map(c=>c[0]).sort()).toEqual(['https://api.qfex.com/md/contracts','https://api.qfex.com/refdata']);
+  for(const [,opts] of f.mock.calls){expect(opts.method).toBe('GET');expect(opts.headers).toEqual({accept:'application/json'});}
+ });
+ it('بازار نامعتبر پیش از هر درخواست رد می‌شود',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);const { getQfexFundingHistory, getQfexDepth } = await import('../../api/_perpsRead');await expect(getQfexFundingHistory('../refdata')).rejects.toMatchObject({status:400});await expect(getQfexDepth('AAPL-USD?x=1')).rejects.toMatchObject({status:400});expect(f).not.toHaveBeenCalled();});
+ it('تاریخچه: مسیر ثابت، ساعتی، ۳۰ روز، خروجی خلاصه',async()=>{
+  const f=vi.fn().mockResolvedValue(ok({count:2,data:[{symbol:'TSLA-USD',intervalMinutes:60,windowStart:'2026-10-19T10:00:00Z',rate:4.8e-7},{windowStart:'bad',rate:1}]}));vi.stubGlobal('fetch',f);
+  const { getQfexFundingHistory } = await import('../../api/_perpsRead');
+  expect(await getQfexFundingHistory('TSLA-USD')).toEqual({market:'TSLA-USD',rates:[{t:Date.parse('2026-10-19T10:00:00Z'),r:4.8e-7}]});
+  const url=new URL(f.mock.calls[0][0]);expect(url.origin+url.pathname).toBe('https://api.qfex.com/funding/TSLA-USD');expect(url.searchParams.get('intervalMinutes')).toBe('60');
+  expect(Date.parse(url.searchParams.get('toISO')!)-Date.parse(url.searchParams.get('fromISO')!)).toBe(30*86_400_000);
+ });
+ it('عمق: سطوح با حجم صفر حذف می‌شوند',async()=>{
+  const f=vi.fn().mockResolvedValue(ok({ticker_id:'NVDA-USD',timestamp:1,bids:[['100','0'],['99.9','2']],asks:[['100.1','0'],['100.2','1']]}));vi.stubGlobal('fetch',f);
+  const { getQfexDepth } = await import('../../api/_perpsRead');
+  expect(await getQfexDepth('NVDA-USD')).toEqual({market:'NVDA-USD',bids:[[99.9,2]],asks:[[100.2,1]]});
+  expect(f.mock.calls[0][0]).toBe('https://api.qfex.com/md/orderbook/NVDA-USD');
+ });
+});

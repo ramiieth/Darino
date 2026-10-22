@@ -1,5 +1,5 @@
 /**
- * تاریخچهٔ فاندینگ تسویه‌شده و دفتر سفارش — آرکوس، اوندو پرپس، لایتر، لایتر رابین‌هود، هایپرلیکوئید (فقط دادهٔ عمومی؛ بدون حساب/کلید)
+ * تاریخچهٔ فاندینگ تسویه‌شده و دفتر سفارش — آرکوس، اوندو پرپس، لایتر، لایتر رابین‌هود، هایپرلیکوئید، کیوفکس، تی‌اکس‌فلو (فقط دادهٔ عمومی؛ بدون حساب/کلید)
  *
  *  Lighter  GET /api/v1/fundings?resolution=1h   rate = درصد ساعتی (۴ رقم اعشار)، direction=long → لانگ می‌پردازد
  *           GET /api/v1/orderBookOrders           سفارش‌های باز (حداکثر ۱۰۰ در هر سمت) — رابین‌هود همان مسیر روی سرور خودش
@@ -7,6 +7,8 @@
  *  Arcus    GET /v1/fundingRates?market&limit     نرخ ساعتی کسری، time به میکروثانیه
  *           GET /v1/l2OrderBook/{market}          [قیمت، حجم]
  *  Ondo     /api/integrations?op=ondo-perps-history | ondo-perps-depth   (REST اوندو CORS ندارد)
+ *  QFEX     /api/integrations?op=qfex-perps-history | qfex-perps-depth   (همان قالب اوندو؛ CORS ندارد)
+ *  TxFlow   POST /info l2Book (۲۰ سطح هر سمت) — تاریخچهٔ عمومی فاندینگ ندارد → فرصت با نرخ لحظه‌ای سنجیده می‌شود
  *
  * همه نرخ‌ها به «کسری ساعتی، مثبت = لانگ می‌پردازد» نرمال می‌شوند.
  */
@@ -28,6 +30,7 @@ import {
 } from '@/features/calculators/domain';
 import type { DeltaVenue, VenueBook, VenueQuote } from './deltaMarkets';
 import { fetchHyperliquidBook, fetchHyperliquidFundingHistory } from './hyperliquidMarkets';
+import { txflowInfo } from './perpMarkets';
 
 const LIGHTER_BASE = 'https://mainnet.zklighter.elliot.ai';
 /** لایتر رابین‌هود سرور و فاندینگ جدا دارد — هرگز با لایتر عادی مخلوط نشود */
@@ -104,6 +107,18 @@ export function parseTupleBook(body: unknown): OrderBook {
   return book(tupleLevels(b?.bids), tupleLevels(b?.asks));
 }
 
+/** TxFlow l2Book: levels = [bids, asks] با {px, sz, n} */
+export function parseTxflowBook(body: unknown): OrderBook {
+  const levels = (body as { levels?: unknown } | null)?.levels;
+  const side = (v: unknown) =>
+    rows(v).flatMap((l) => {
+      const price = fin(l.px);
+      const size = fin(l.sz);
+      return price !== null && size !== null && price > 0 && size > 0 ? [{ price, size }] : [];
+    });
+  return Array.isArray(levels) ? book(side(levels[0]), side(levels[1])) : book([], []);
+}
+
 /* ---------------- دریافت ---------------- */
 
 async function getJson(url: string): Promise<unknown> {
@@ -134,7 +149,11 @@ export async function fetchFundingHistory(venue: DeltaVenue, ref: string): Promi
   }
   if (venue === 'arcus') return parseArcusFundings(await arcusGet('mainnet', '/v1/fundingRates', { market: ref, limit: HISTORY_HOURS }));
   if (venue === 'hyperliquid') return fetchHyperliquidFundingHistory(ref, Date.now() - HISTORY_HOURS * 3_600_000);
-  return parseOndoFundings(await fetchJson(`/api/integrations?op=ondo-perps-history&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
+  // TxFlow فقط فاندینگ تسویه‌شدهٔ حساب خود کاربر را می‌دهد (userFundings)؛ بدون تاریخچه، buildOpportunity نرخ لحظه‌ای را مبنا می‌گیرد
+  if (venue === 'txflow') return [];
+  // قالب پاسخ QFEX در سرور به قالب اوندو ({rates: [{t, r}]}) خلاصه می‌شود
+  const op = venue === 'qfex' ? 'qfex-perps-history' : 'ondo-perps-history';
+  return parseOndoFundings(await fetchJson(`/api/integrations?op=${op}&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
 }
 
 export async function fetchOrderBook(venue: DeltaVenue, ref: string): Promise<OrderBook> {
@@ -145,7 +164,12 @@ export async function fetchOrderBook(venue: DeltaVenue, ref: string): Promise<Or
   }
   if (venue === 'hyperliquid') return fetchHyperliquidBook(ref);
   if (venue === 'arcus') return parseTupleBook(await arcusOrderBook('mainnet', ref));
-  return parseTupleBook(await fetchJson(`/api/integrations?op=ondo-perps-depth&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
+  if (venue === 'txflow') {
+    if (!/^\d{1,6}$/.test(ref)) throw new Error('invalid market');
+    return parseTxflowBook(await txflowInfo({ type: 'l2Book', coin: ref }));
+  }
+  const op = venue === 'qfex' ? 'qfex-perps-depth' : 'ondo-perps-depth';
+  return parseTupleBook(await fetchJson(`/api/integrations?op=${op}&market=${encodeURIComponent(ref)}`, { timeoutMs: 15_000 }));
 }
 
 /* ---------------- فرصت‌ها ---------------- */
@@ -185,13 +209,22 @@ export const SCAN_PAIRS: readonly ScanPair[] = [
   ['ondo', 'lighter'],
   ['arcus', 'hyperliquid'],
   ['ondo', 'hyperliquid'],
-  ['hyperliquid', 'lighter']
+  ['hyperliquid', 'lighter'],
+  // کیوفکس فقط سهام/شاخص/کالا دارد → جفت با صرافی‌های دارای بازار سنتی
+  ['qfex', 'ondo'],
+  ['qfex', 'arcus'],
+  ['qfex', 'hyperliquid'],
+  ['qfex', 'txflow'],
+  ['txflow', 'arcus'],
+  ['txflow', 'ondo'],
+  ['txflow', 'lighter'],
+  ['txflow', 'hyperliquid']
 ];
 
 /** صرافی‌هایی که برای حجم معامله پوینت می‌دهند (هدف فارم) */
 export type PointsVenue = 'arcus' | 'lighterRh';
 export const POINTS_VENUES: readonly PointsVenue[] = ['arcus', 'lighterRh'];
-const ALL_VENUES: readonly DeltaVenue[] = ['arcus', 'ondo', 'lighter', 'lighterRh', 'hyperliquid'];
+const ALL_VENUES: readonly DeltaVenue[] = ['arcus', 'ondo', 'lighter', 'lighterRh', 'hyperliquid', 'qfex', 'txflow'];
 
 /** فارم پوینت: یک طرف روی صرافی پوینت، طرف پوشش روی هر صرافی دیگر (از جمله صرافی پوینت دیگر) */
 export const farmPairs = (farm: PointsVenue): ScanPair[] => ALL_VENUES.filter((v) => v !== farm).map((v): ScanPair => [farm, v]);

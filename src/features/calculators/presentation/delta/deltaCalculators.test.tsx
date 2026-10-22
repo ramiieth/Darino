@@ -37,7 +37,9 @@ vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
     ondo: { status: 'ready', quotes: [ONDO] },
     lighter: { status: 'ready', quotes: [] },
     lighterRh: { status: 'ready', quotes: [] },
-    hyperliquid: { status: 'ready', quotes: [] }
+    hyperliquid: { status: 'ready', quotes: [] },
+    qfex: { status: 'ready', quotes: [] },
+    txflow: { status: 'ready', quotes: [] }
   };
   return { ...actual, useDeltaBooks: () => books };
 });

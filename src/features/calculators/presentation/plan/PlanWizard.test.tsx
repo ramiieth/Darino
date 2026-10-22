@@ -40,7 +40,9 @@ vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
     lighterRh: { status: 'ready', quotes: [quote('lighterRh', { fundingHourly: 0, makerFeePct: 0 })] },
     lighter: { status: 'ready', quotes: [] },
     ondo: { status: 'ready', quotes: [] },
-    hyperliquid: { status: 'ready', quotes: [] }
+    hyperliquid: { status: 'ready', quotes: [] },
+    qfex: { status: 'ready', quotes: [] },
+    txflow: { status: 'ready', quotes: [] }
   };
   return { ...actual, useDeltaBooks: () => books };
 });

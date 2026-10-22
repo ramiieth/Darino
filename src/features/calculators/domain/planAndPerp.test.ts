@@ -14,7 +14,7 @@ import {
   perpScenarios,
   type PerpInput
 } from '@/features/calculators/domain';
-import { normalizeArcus, normalizeLighter } from '@/features/calculators/data/perpMarkets';
+import { normalizeArcus, normalizeLighter, normalizeQfex, normalizeTxflow, parseTxflowCtxs, txflowFirstTier } from '@/features/calculators/data/perpMarkets';
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day).getTime();
 
@@ -221,5 +221,61 @@ describe('نرمال‌سازی بازارهای لایتر و آرکوس', () =
     ]);
     expect(m.takerFeePct).toBeCloseTo(0.0225, 12);
     expect(m.makerFeePct).toBe(0);
+  });
+});
+
+describe('نرمال‌سازی بازارهای کیوفکس و تی‌اکس‌فلو', () => {
+  it('کیوفکس: دسته از refdata، کارمزد پایهٔ هر دسته، مارجین نگهداری نامعلوم', () => {
+    const [eq, fx] = normalizeQfex([
+      { market: 'AAPL-USD', base: 'AAPL', category: 'EQUITY', maxLeverage: 10, markPrice: 344.05, fundingHourly: -0.0000023, volume24hUsd: 5_256_087 },
+      { market: 'USD-JPY', base: 'USD', category: 'FX', maxLeverage: 50, markPrice: 150, fundingHourly: null, volume24hUsd: null }
+    ]);
+    expect(eq).toMatchObject({ venue: 'qfex', id: 'AAPL-USD', display: 'AAPL-USD', category: 'equity', takerFeePct: 0.1, makerFeePct: 0.05, maxLeverage: 10, fundingHourly: -0.0000023 });
+    expect(eq.maintenanceMarginFraction).toBeNull();
+    expect(fx.category).toBe('other');
+    expect(fx.takerFeePct).toBeNull();
+  });
+
+  it('تی‌اکس‌فلو: فاندینگ درصدی ÷ ۱۰۰، قیمت مارک زنده، دسته از برچسب، بازار متوقف حذف', () => {
+    const live = parseTxflowCtxs({
+      channel: 'allAssetCtxs',
+      data: { ctxs: [{ coin: '59', ctx: { funding: '0.00125000', markPx: '410.5' } }, { coin: 'x', ctx: { funding: '1' } }, { coin: '1', ctx: { funding: '', markPx: '0' } }] }
+    });
+    expect(live['59'].fundingHourly).toBeCloseTo(0.0000125, 15);
+    expect(live['1']).toEqual({ fundingHourly: null, markPrice: null });
+    expect(live.x).toBeUndefined();
+    expect(parseTxflowCtxs({ channel: 'error', message: 'bad' })).toEqual({});
+
+    const markets = normalizeTxflow(
+      [
+        { index: 1, name: 'BTC-USDC', baseCurrency: 'BTC', maxLeverage: 75 },
+        { index: 59, name: 'TSLA-USDC', baseCurrency: 'TSLA', maxLeverage: 20 },
+        { index: 7, name: 'OLD-USDC', baseCurrency: 'OLD', haltTrading: true }
+      ],
+      [
+        { instrumentId: 1, dayNtlVlm: '98000000', lastPrice: '82000', prevDayPx: '80000' },
+        { instrumentId: 59, dayNtlVlm: '1000', lastPrice: '400', prevDayPx: '400' }
+      ],
+      { l2: [{ id: 1, name: 'Stocks' }, { id: 4, name: 'Layer 1' }], instrumentTags: [{ instrumentId: 1, businessLine: 'perp', tagIds: [4] }, { instrumentId: 59, businessLine: 'perp', tagIds: [1] }] },
+      live
+    );
+    expect(markets.map((m) => m.id)).toEqual(['1', '59']);
+    const [btc, tsla] = markets;
+    expect(btc).toMatchObject({ venue: 'txflow', category: 'crypto', markPrice: 82000, fundingHourly: null, volume24hUsd: 98_000_000, takerFeePct: 0.045 });
+    expect(btc.change24hPct).toBeCloseTo(2.5, 9);
+    expect(tsla).toMatchObject({ category: 'equity', markPrice: 410.5, maxLeverage: 20 });
+    expect(tsla.fundingHourly).toBeCloseTo(0.0000125, 15);
+  });
+
+  it('تی‌اکس‌فلو: ردهٔ اول جدول مارجین همان instrument', () => {
+    const body = {
+      instruments: [
+        { perp: { instrumentId: 99 }, marginTable: { tiers: [{ tier: 1, maxLeverage: 10, mmr: '0.1' }] } },
+        { perp: { instrumentId: 59 }, marginTable: { tiers: [{ tier: 2, maxLeverage: 4, mmr: '0.1' }, { tier: 1, maxLeverage: 5, mmr: '0.05' }] } }
+      ]
+    };
+    expect(txflowFirstTier(body, '59')).toEqual({ maxLeverage: 5, maintenanceMarginFraction: 0.05 });
+    expect(txflowFirstTier(body, '1')).toBeNull();
+    expect(txflowFirstTier({ instruments: [{ perp: { instrumentId: 1 }, marginTable: null }] }, '1')).toBeNull();
   });
 });
