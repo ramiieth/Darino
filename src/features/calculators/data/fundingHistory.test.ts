@@ -9,7 +9,8 @@ import {
   parseLighterBook,
   parseLighterFundings,
   parseOndoFundings,
-  parseTupleBook
+  parseTupleBook,
+  parseTxflowBook
 } from './fundingHistory';
 import type { VenueQuote } from './deltaMarkets';
 
@@ -153,7 +154,9 @@ describe('فارم پوینت: جفت‌ها و نامزدها', () => {
       ['arcus', 'ondo'],
       ['arcus', 'lighter'],
       ['arcus', 'lighterRh'],
-      ['arcus', 'hyperliquid']
+      ['arcus', 'hyperliquid'],
+      ['arcus', 'qfex'],
+      ['arcus', 'txflow']
     ]);
     expect(farmPairs('lighterRh').every(([a, b]) => a === 'lighterRh' && b !== 'lighterRh')).toBe(true);
   });
@@ -165,7 +168,9 @@ describe('فارم پوینت: جفت‌ها و نامزدها', () => {
       hyperliquid: book([q('hyperliquid', 'SPIKE', 0, 9e6), q('hyperliquid', 'HOT', 0, 3e6), q('hyperliquid', 'BTC', 0.000012, 2e9), q('hyperliquid', 'ETH', 0.000011, 1e9)]),
       ondo: book([]),
       lighter: book([]),
-      lighterRh: book([])
+      lighterRh: book([]),
+      qfex: book([]),
+      txflow: book([])
     };
     const pairs = [['arcus', 'hyperliquid']] as const;
     expect(pickCandidates(books, 2, pairs, 'spread').map((c) => c.base)).toEqual(['SPIKE', 'HOT']);
@@ -186,6 +191,45 @@ describe('فارم پوینت: جفت‌ها و نامزدها', () => {
     const b = await fetchOrderBook('lighterRh', '16');
     expect(urls[0]).toContain('api.rh.lighter.xyz/api/v1/orderBookOrders');
     expect(b.mid).toBe(100);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('کیوفکس و تی‌اکس‌فلو', () => {
+  it('دفتر TxFlow: levels = [bids, asks]، سطح خالی حذف', () => {
+    const b = parseTxflowBook({ levels: [[{ px: '99', sz: '1', n: 1 }, { px: '98', sz: '0', n: 0 }], [{ px: '101', sz: '2', n: 1 }]] });
+    expect(b.bids).toEqual([{ price: 99, size: 1 }]);
+    expect(b.asks).toEqual([{ price: 101, size: 2 }]);
+    expect(b.mid).toBe(100);
+    expect(parseTxflowBook({ message: 'invalid request' }).mid).toBeNull();
+  });
+
+  it('TxFlow تاریخچهٔ عمومی ندارد (بدون درخواست)؛ QFEX از پروکسی خودش، نه اوندو', async () => {
+    const { vi } = await import('vitest');
+    const { fetchFundingHistory, fetchOrderBook } = await import('./fundingHistory');
+    const calls: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (u: string, init?: RequestInit) => {
+        calls.push({ url: String(u), init });
+        const body = String(u).includes('qfex-perps-history')
+          ? { market: 'AAPL-USD', rates: [{ t: 1792245600_000, r: 0.000003 }] }
+          : String(u).includes('qfex-perps-depth')
+            ? { bids: [[99, 1]], asks: [[101, 1]] }
+            : { levels: [[{ px: '9', sz: '1' }], [{ px: '11', sz: '1' }]] };
+        return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+      })
+    );
+    expect(await fetchFundingHistory('txflow', '59')).toEqual([]);
+    expect(calls).toHaveLength(0);
+    expect(await fetchFundingHistory('qfex', 'AAPL-USD')).toEqual([{ hour: 1792245600_000, rate: 0.000003 }]);
+    expect(calls[0].url).toContain('op=qfex-perps-history&market=AAPL-USD');
+    expect((await fetchOrderBook('qfex', 'AAPL-USD')).mid).toBe(100);
+    expect(calls[1].url).toContain('op=qfex-perps-depth');
+    expect((await fetchOrderBook('txflow', '59')).mid).toBe(10);
+    expect(calls[2].url).toBe('https://rpc.txflow.com/info');
+    expect(JSON.parse(String(calls[2].init?.body))).toEqual({ type: 'l2Book', coin: '59' });
+    await expect(fetchOrderBook('txflow', '1&x')).rejects.toThrow('invalid market');
     vi.unstubAllGlobals();
   });
 });

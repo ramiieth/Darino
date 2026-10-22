@@ -32,7 +32,7 @@ const LIGHTER_RH = quote('lighterRh', { ref: '7', fundingHourly: -0.00002, markP
 const fx = vi.hoisted(() => ({ live: null as unknown }));
 vi.mock('@/features/calculators/data/deltaMarkets', async (orig) => {
   const actual = await orig<typeof import('@/features/calculators/data/deltaMarkets')>();
-  const books = { arcus: { status: 'ready', quotes: [ARCUS] }, ondo: { status: 'ready', quotes: [ONDO] }, lighter: { status: 'ready', quotes: [] }, lighterRh: { status: 'ready', quotes: [LIGHTER_RH] }, hyperliquid: { status: 'ready', quotes: [] } };
+  const books = { arcus: { status: 'ready', quotes: [ARCUS] }, ondo: { status: 'ready', quotes: [ONDO] }, lighter: { status: 'ready', quotes: [] }, lighterRh: { status: 'ready', quotes: [LIGHTER_RH] }, hyperliquid: { status: 'ready', quotes: [] }, qfex: { status: 'ready', quotes: [] }, txflow: { status: 'ready', quotes: [] } };
   return { ...actual, useDeltaBooks: () => books };
 });
 vi.mock('@/features/calculators/data/deltaPositions', async (orig) => ({

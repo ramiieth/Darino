@@ -12,7 +12,7 @@ import { ALERT_OPS, handleAlertsOp, neonAlertsStore, runTick, verifyTickKey } fr
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
-import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth } from './_perpsRead.js';
+import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
@@ -46,6 +46,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
   const publicOndo=webhookUrl.searchParams.get('op');
   if((publicOndo==='ondo-perps-history'||publicOndo==='ondo-perps-depth')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{res.setHeader('Cache-Control',publicOndo==='ondo-perps-history'?'public, max-age=300, s-maxage=600':'public, max-age=10, s-maxage=15');json(res,200,publicOndo==='ondo-perps-history'?await getOndoFundingHistory(market):await getOndoDepth(market));}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
+  if(publicOndo?.startsWith('qfex-perps-')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{const load=publicOndo==='qfex-perps-public'?getQfexPublicMarkets:publicOndo==='qfex-perps-history'?()=>getQfexFundingHistory(market):publicOndo==='qfex-perps-depth'?()=>getQfexDepth(market):null;if(!load){json(res,400,{error:'درخواست ناشناخته'});return;}res.setHeader('Cache-Control',publicOndo==='qfex-perps-history'?'public, max-age=300, s-maxage=600':publicOndo==='qfex-perps-depth'?'public, max-age=10, s-maxage=15':'public, max-age=30, s-maxage=30');json(res,200,await load());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(webhookUrl.searchParams.get('op')==='ondo-perps-public'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getOndoPublicMarkets());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');

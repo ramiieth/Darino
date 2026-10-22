@@ -55,7 +55,7 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     icon: <ShieldHalf aria-hidden />
   },
   { value: 'options', label: 'آپشن (Derive)', description: 'قدم به قدم: با توجه به سرمایه و نظرتان دربارهٔ بازار، یک معاملهٔ آپشن در صرافی Derive پیشنهاد می‌شود؛ همراه با بیشترین سود و زیان، سود یا زیان در هر حرکت قیمت و زمان مناسب خروج' },
-  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر و آرکوس — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' }
+  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' }
 ];
 
 /** سه گروه به‌جای سیزده تب کنار هم */

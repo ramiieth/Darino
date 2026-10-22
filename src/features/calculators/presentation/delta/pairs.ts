@@ -9,7 +9,15 @@ export type DeltaPair =
   | 'ondo-lighterRh'
   | 'arcus-hyperliquid'
   | 'lighterRh-hyperliquid'
-  | 'lighterRh-lighter';
+  | 'lighterRh-lighter'
+  | 'qfex-ondo'
+  | 'qfex-arcus'
+  | 'qfex-hyperliquid'
+  | 'txflow-arcus'
+  | 'txflow-ondo'
+  | 'txflow-lighter'
+  | 'txflow-hyperliquid'
+  | 'txflow-qfex';
 
 export const DELTA_PAIRS: { value: DeltaPair; label: string }[] = [
   { value: 'arcus-ondo', label: 'آرکوس ↔ اوندو پرپس' },
@@ -19,7 +27,15 @@ export const DELTA_PAIRS: { value: DeltaPair; label: string }[] = [
   { value: 'arcus-lighterRh', label: 'آرکوس ↔ لایتر رابین‌هود' },
   { value: 'ondo-lighterRh', label: 'اوندو پرپس ↔ لایتر رابین‌هود' },
   { value: 'lighterRh-hyperliquid', label: 'لایتر رابین‌هود ↔ هایپرلیکوئید' },
-  { value: 'lighterRh-lighter', label: 'لایتر رابین‌هود ↔ لایتر' }
+  { value: 'lighterRh-lighter', label: 'لایتر رابین‌هود ↔ لایتر' },
+  { value: 'qfex-ondo', label: 'کیوفکس ↔ اوندو پرپس' },
+  { value: 'qfex-arcus', label: 'کیوفکس ↔ آرکوس' },
+  { value: 'qfex-hyperliquid', label: 'کیوفکس ↔ هایپرلیکوئید' },
+  { value: 'txflow-arcus', label: 'تی‌اکس‌فلو ↔ آرکوس' },
+  { value: 'txflow-ondo', label: 'تی‌اکس‌فلو ↔ اوندو پرپس' },
+  { value: 'txflow-lighter', label: 'تی‌اکس‌فلو ↔ لایتر' },
+  { value: 'txflow-hyperliquid', label: 'تی‌اکس‌فلو ↔ هایپرلیکوئید' },
+  { value: 'txflow-qfex', label: 'تی‌اکس‌فلو ↔ کیوفکس' }
 ];
 
 export const pairVenues = (p: DeltaPair) => p.split('-') as [DeltaVenue, DeltaVenue];

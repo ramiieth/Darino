@@ -1,13 +1,14 @@
 /**
- * بازارهای دلتا نوترال — آرکوس، اوندو پرپس، لایتر (mainnet)، لایتر رابین‌هود و هایپرلیکوئید (فقط دادهٔ عمومی بازار؛ بدون حساب/کلید)
+ * بازارهای دلتا نوترال — آرکوس، اوندو پرپس، لایتر (mainnet)، لایتر رابین‌هود، هایپرلیکوئید، کیوفکس و تی‌اکس‌فلو (فقط دادهٔ عمومی بازار؛ بدون حساب/کلید)
  *
  *  Arcus · Lighter   usePerpMarkets (مستقیم از مرورگر، CORS باز)
+ *  QFEX · TxFlow     usePerpMarkets (QFEX از پروکسی سرور؛ TxFlow مستقیم + WebSocket) — perpMarkets.ts
  *  Lighter رابین‌هود  useLighterRobinhoodMarkets — api.rh.lighter.xyz، همان ساختار mainnet
  *  Hyperliquid       useHyperliquidMarkets — بازارهای اصلی + HIP-3 (مستقیم از مرورگر، CORS باز)
  *  Ondo  تنظیمات     /api/integrations?op=ondo-perps-public  (کارمزد، مارجین، قیمت مارک — REST اوندو CORS ندارد)
  *  Ondo  فاندینگ     wss://api.ondoperps.xyz/ws  کانال عمومی fundingRatesPerps (WebSocket محدودیت CORS ندارد)
  *
- * نرخ‌ها همه «ساعتی» هستند: Arcus و Ondo و Hyperliquid ساعتی تسویه می‌کنند؛ نرخ ۸ساعتهٔ Lighter در usePerpMarkets ÷ ۸ شده است.
+ * نرخ‌ها همه «ساعتی» هستند: Arcus، Ondo، Hyperliquid، QFEX و TxFlow ساعتی تسویه می‌کنند؛ نرخ ۸ساعتهٔ Lighter در usePerpMarkets ÷ ۸ شده است.
  */
 import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -16,19 +17,21 @@ import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 import { useLighterRobinhoodMarkets, usePerpMarkets, type PerpCategory, type PerpMarket } from './perpMarkets';
 import { useHyperliquidMarkets, type HyperliquidMarket } from './hyperliquidMarkets';
 
-export type DeltaVenue = 'arcus' | 'ondo' | 'lighter' | 'lighterRh' | 'hyperliquid';
+export type DeltaVenue = 'arcus' | 'ondo' | 'lighter' | 'lighterRh' | 'hyperliquid' | 'qfex' | 'txflow';
 
 export const DELTA_VENUE_LABELS: Record<DeltaVenue, string> = {
   arcus: 'آرکوس',
   ondo: 'اوندو پرپس',
   lighter: 'لایتر',
   lighterRh: 'لایتر رابین‌هود',
-  hyperliquid: 'هایپرلیکوئید'
+  hyperliquid: 'هایپرلیکوئید',
+  qfex: 'کیوفکس',
+  txflow: 'تی‌اکس‌فلو'
 };
 
 export interface VenueQuote {
   venue: DeltaVenue;
-  /** شناسهٔ بازار در API همان صرافی: Lighter market_id · Arcus BTC-USD · Ondo BTC-USD.P · Hyperliquid BTC / xyz:TSLA */
+  /** شناسهٔ بازار در API همان صرافی: Lighter market_id · Arcus BTC-USD · Ondo BTC-USD.P · Hyperliquid BTC / xyz:TSLA · QFEX AAPL-USD · TxFlow instrumentId */
   ref: string;
   base: string;
   display: string;
@@ -54,12 +57,12 @@ export interface VenueBook {
   quotes: VenueQuote[];
 }
 
-/* ---------------- Arcus · Lighter ---------------- */
+/* ---------------- Arcus · Lighter · QFEX · TxFlow ---------------- */
 
 export function fromPerpMarket(m: PerpMarket): VenueQuote {
   return {
     venue: m.venue,
-    ref: m.venue === 'lighter' ? m.id : m.display,
+    ref: m.venue === 'lighter' || m.venue === 'txflow' ? m.id : m.display,
     base: m.base.toUpperCase(),
     display: m.display,
     nameFa: m.nameFa,
@@ -258,6 +261,8 @@ export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
   const lighter = usePerpMarkets('lighter');
   const lighterRh = useLighterRobinhoodMarkets();
   const hyperliquid = useHyperliquidMarkets();
+  const qfex = usePerpMarkets('qfex');
+  const txflow = usePerpMarkets('txflow');
   const ondoMarkets = useOndoMarkets(true);
   const ondoFunding = useOndoFunding(true);
 
@@ -270,6 +275,8 @@ export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
       // همان نرمال‌سازی لایتر، با برچسب صرافی رابین‌هود
       lighterRh: { status: statusOf(lighterRh), quotes: (lighterRh.data ?? []).map((m) => ({ ...fromPerpMarket(m), venue: 'lighterRh' as const })) },
       hyperliquid: { status: statusOf(hyperliquid), quotes: (hyperliquid.data ?? []).map(fromHyperliquid) },
+      qfex: { status: statusOf(qfex), quotes: (qfex.data ?? []).map(fromPerpMarket) },
+      txflow: { status: statusOf(txflow), quotes: (txflow.data ?? []).map(fromPerpMarket) },
       ondo: { status: ondoStatus, quotes: ondoMarkets.data ? normalizeOndo(ondoMarkets.data.markets, ondoFunding.rates) : [] }
     };
   }, [
@@ -285,6 +292,12 @@ export function useDeltaVenues(): Record<DeltaVenue, VenueBook> {
     hyperliquid.data,
     hyperliquid.isError,
     hyperliquid.isPending,
+    qfex.data,
+    qfex.isError,
+    qfex.isPending,
+    txflow.data,
+    txflow.isError,
+    txflow.isPending,
     ondoMarkets.data,
     ondoMarkets.isError,
     ondoFunding.rates,
