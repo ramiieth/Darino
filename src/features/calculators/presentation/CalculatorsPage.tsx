@@ -3,7 +3,7 @@
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { BadgeDollarSign, Bot, ListChecks, Radar, Scale, ShieldHalf } from 'lucide-react';
+import { BadgeDollarSign, Bot, Layers, ListChecks, Radar, Scale, ShieldHalf } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { toFaDigits } from '@/shared/utils/formatters';
@@ -21,10 +21,11 @@ import { FundingScanner } from './delta/FundingScanner';
 import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
 import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
+import { FundingStrategiesCalculator } from './strategies/FundingStrategiesCalculator';
 import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'cagr' | 'xirr' | 'compare';
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'strategies' | 'cagr' | 'xirr' | 'compare';
 type Group = 'invest' | 'income' | 'risk';
 /** قدم‌های تب «درآمد دلتا نوترال»: پیدا کن ← تصمیم بگیر ← اجرا و پایش */
 type HubStep = 'find' | 'decide' | 'run';
@@ -49,6 +50,12 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     icon: <Scale aria-hidden />
   },
   {
+    value: 'strategies',
+    label: 'استراتژی‌های فاندینگ',
+    description: 'هفت استراتژی آربیتراژ فاندینگ با مدل کامل هزینه، سناریوی بهترین/پایه/استرس، حساسیت و مقایسه با همان سرمایه',
+    icon: <Layers aria-hidden />
+  },
+  {
     value: 'hedge',
     label: 'پوشش ریسک (هج)',
     description: 'اگر دارایی‌ای دارید و از ریزش قیمت نگرانید: یک موقعیت فروش (Short) هم‌اندازه در بازار آتی باز می‌کنید تا زیان ریزش جبران شود. اینجا می‌بینید با و بدون پوشش، پس از هزینه‌ها چه نتیجه‌ای می‌گیرید',
@@ -61,7 +68,7 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
 /** سه گروه به‌جای سیزده تب کنار هم */
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
   { value: 'invest', label: 'سرمایه‌گذاری', tabs: ['pnl', 'dca', 'cagr', 'xirr', 'compare', 'plan'] },
-  { value: 'income', label: 'درآمد دلتا نوترال', tabs: ['delta'] },
+  { value: 'income', label: 'درآمد دلتا نوترال', tabs: ['delta', 'strategies'] },
   { value: 'risk', label: 'پوشش ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] }
 ];
 const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.value;
@@ -150,6 +157,9 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
         <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
+        <div {...panel('strategies')}>
+          <FundingStrategiesCalculator />
+        </div>
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>
