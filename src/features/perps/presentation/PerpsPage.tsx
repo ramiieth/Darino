@@ -12,11 +12,12 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { fetchJson, HttpError } from '@/repositories/remoteClient';
 import { useCustody } from '@/features/custody/data/useCustody';
 import { saveHolding, getCustodySnapshot } from '@/features/custody/data/repository';
+import { lighterAccountQuery } from '../data/lighterAccount';
 import { lighterAccounts, lighterMarkets, ondoMarkets, type PerpMarket } from '../domain/model';
 const fmt = (n: number | null) => n === null || !Number.isFinite(n) ? 'نامشخص' : faNumber(n, { maximumFractionDigits: 6 });
 const message = (e: unknown) => e instanceof HttpError && e.status===429 ? 'درخواست‌های زیادی ارسال شده؛ کمی بعد دوباره تلاش کنید' : 'دریافت اطلاعات انجام نشد';
 function Account({ address, label, onRemove,mainnet=false }: { address: string; label: string; onRemove: () => Promise<void>;mainnet?:boolean }) {
- const q = useQuery({queryKey:[mainnet?'lighter-mainnet-account':'lighter-robinhood-account',address.toLowerCase()],queryFn:()=>fetchJson<unknown>(`/api/integrations?op=${mainnet?'lighter-mainnet-account':'lighter-account'}&address=${encodeURIComponent(address)}`,{timeoutMs:15000}),staleTime:30000,refetchInterval:30000,retry:1});
+ const q = useQuery(lighterAccountQuery(address,mainnet?'mainnet':'robinhood'));
  const [removing,setRemoving]=useState(false),[error,setError]=useState('');
  const accounts = lighterAccounts(q.data,address);
  return <Surface className="p-5 space-y-4"><div className="flex flex-wrap justify-between gap-3"><div className="min-w-0"><h2 className="font-bold">{label}</h2><p dir="ltr" className="mt-2 break-all text-xs text-muted">{address}</p></div><div className="flex gap-2"><Button size="sm" variant="outline" loading={q.isFetching} onClick={()=>void q.refetch()}>به‌روزرسانی</Button><Button size="sm" variant="outline" loading={removing} onClick={async()=>{setRemoving(true);try{await onRemove();}catch{setError('حذف اتصال انجام نشد');}finally{setRemoving(false);}}}>حذف اتصال</Button></div></div>

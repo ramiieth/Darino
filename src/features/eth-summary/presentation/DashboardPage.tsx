@@ -3,6 +3,7 @@ import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { PortfolioSummary } from '@/features/connected/presentation/PortfolioSummary';
 import { useConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
 import { useCustodySync } from '@/features/custody/data/sync';
+import { PerpPortfolioSection } from '@/features/perps/presentation/PerpPortfolioSection';
 
 export function DashboardPage() {
   useCustodySync();
@@ -11,6 +12,9 @@ export function DashboardPage() {
     <Page>
       <PageHeader title="داشبورد" subtitle="دارایی‌ها، ارزش روز و فعالیت‌های کیف پول‌های شما" />
       <PortfolioSummary portfolio={portfolio} />
+      <div className="mt-6">
+        <PerpPortfolioSection arcus={portfolio.arcus} />
+      </div>
     </Page>
   );
 }
