@@ -42,6 +42,7 @@ vi.mock('@/features/calculators/data/deltaPositions', async (orig) => ({
 
 const { ExecutionPlanner } = await import('./ExecutionPlanner');
 const { LiveMonitor } = await import('./LiveMonitor');
+const { OrderTicket } = await import('./OrderTicket');
 const { DeltaNeutralCalculator } = await import('../DeltaNeutralCalculator');
 
 afterEach(cleanup);
@@ -121,6 +122,7 @@ describe('در حال اجرا — پایش', () => {
       side,
       base: 'ETH',
       market: 'ETH-USD',
+      quantity: notional / 3000,
       notional,
       unrealizedPnl: 1,
       entry: 3000,
@@ -169,5 +171,29 @@ describe('لایتر رابین‌هود در دلتا نوترال و اجرا'
     // هر دو حجم معلوم‌اند → ستون پر شدن سریع هم عدد دارد
     expect(card('ربات Tread.fi — پر شدن سریع')).toContain(usd(r.quickFill.net!));
     expect(card('محاسبهٔ ساده')).toContain(usd(r.simple.net));
+  });
+});
+
+describe('برگهٔ سفارش دستی', () => {
+  const account = { id: 'a', venue: 'arcus', label: 'آرکوس', address: '0x1' };
+  const liveLeg = (venue: 'arcus' | 'lighterRh', side: 'long' | 'short', quantity: number) => ({
+    accountId: venue, accountLabel: venue, venue, sub: 0, side, base: 'MSTR', market: 'MSTR', quantity, notional: quantity * 142.4, unrealizedPnl: 0, entry: 142.4, mark: 142.4, liquidation: null, rawFundingSinceOpen: null
+  });
+  const setLive = (legs: ReturnType<typeof liveLeg>[]) => (fx.live = { accounts: [{ account, status: 'ready' }], legs, pairs: [], fetchedAt: Date.now() } as unknown as LinkedDeltaLegs);
+
+  it('تعداد برابر هر طرف، پای اول کم‌حجم و پیشرفت از حساب', () => {
+    setLive([]);
+    const { rerender } = render(<OrderTicket />);
+    // پیش‌فرض: آرکوس ↔ لایتر رابین‌هود؛ شورت آرکوس (فاندینگ بالاتر)، لانگ لایتر رابین‌هود (حجم کمتر → پای اول)
+    fireEvent.change(screen.getByLabelText('گام سفارش لایتر رابین‌هود'), { target: { value: '0.1' } });
+    // ۱۰۰۰ ÷ ۱۴۲٫۴ = ۷٫۰۲ → گام ۰٫۱ → ۷؛ چهار تکه ۱٫۷ + ۱٫۷ + ۱٫۷ + ۱٫۹
+    expect(screen.getByText(/باز کردن — تعداد هر طرف/).nextElementSibling!.textContent).toContain('۷');
+    expect(document.body.textContent).toContain('تکهٔ ۴ · ۱.۹');
+    expect(screen.getAllByText(/لایتر رابین‌هود: limit خرید/)).toHaveLength(4);
+    fireEvent.click(screen.getByRole('button', { name: 'شروع و پایش از حساب' }));
+    setLive([liveLeg('lighterRh', 'long', 1.7), liveLeg('arcus', 'short', 1)]);
+    rerender(<OrderTicket />);
+    expect(screen.getByText('اول توازن را برگردانید')).toBeTruthy();
+    expect(screen.getByText(/آرکوس: فروش/).textContent).toContain('۰.۷');
   });
 });
