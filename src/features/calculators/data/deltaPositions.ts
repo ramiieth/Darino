@@ -31,6 +31,8 @@ export interface AccountLeg extends LiveLeg {
   sub: number;
   base: string;
   market: string;
+  /** تعداد دارایی (مثبت)؛ null = نامعلوم */
+  quantity: number | null;
   entry: number | null;
   mark: number | null;
   liquidation: number | null;
@@ -68,6 +70,7 @@ export function lighterLegs(acc: DeltaAccount, accounts: readonly LighterAccount
         side: p.side,
         base,
         market: p.symbol,
+        quantity: p.size,
         notional: price !== null && price > 0 ? p.size * price : null,
         unrealizedPnl: p.pnl,
         entry: p.entry,
@@ -83,6 +86,8 @@ export function arcusLegs(acc: DeltaAccount, positions: readonly ArcusPosition[]
   return positions.map((p): AccountLeg => {
     const base = baseOf(p.marketDisplayName);
     const notional = num(p.positionValueNotional);
+    const mark = positive(p.markPx) ?? markOf(base);
+    const price = mark ?? positive(p.averageEntryPrice);
     return {
       accountId: acc.id,
       accountLabel: acc.label,
@@ -91,10 +96,12 @@ export function arcusLegs(acc: DeltaAccount, positions: readonly ArcusPosition[]
       side: p.side === 'SHORT' ? 'short' : 'long',
       base,
       market: p.marketDisplayName,
+      // مقیاس size آرکوس در مستندات صریح نیست → تعداد از ارزش اسمی ÷ قیمت
+      quantity: notional !== null && notional !== 0 && price !== null ? Math.abs(notional) / price : null,
       notional: notional === null || notional === 0 ? null : Math.abs(notional),
       unrealizedPnl: num(p.unrealizedPnl),
       entry: positive(p.averageEntryPrice),
-      mark: positive(p.markPx) ?? markOf(base),
+      mark,
       liquidation: null,
       rawFundingSinceOpen: p.cumulativeFunding ? num(p.cumulativeFunding.sinceOpen) : null
     };
