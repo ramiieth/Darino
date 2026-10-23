@@ -1,0 +1,32 @@
+// @vitest-environment jsdom
+import { cleanup,render,screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
+import { afterEach,expect,it,vi } from 'vitest';
+import { PerpPortfolioSection } from './PerpPortfolioSection';
+import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
+const ADDR='0x00000000000000000000000000000000000000aa';
+const holdings=vi.hoisted(()=>({list:[] as unknown[]}));
+vi.mock('@/features/custody/data/useCustody',()=>({useCustody:()=>({holdings:holdings.list,loaded:true})}));
+vi.mock('@/repositories/remoteClient',()=>({fetchJson:vi.fn(()=>new Promise(()=>{})),HttpError:class extends Error{}}));
+afterEach(()=>{cleanup();holdings.list=[];});
+const res=<T,>(data:T)=>({data,fetchedAt:1,error:null,loading:false});
+const arcus=[{holding:{id:'a1',label:'آرکوس من',arcus:{env:'mainnet',address:ADDR,accountIndex:0}},stale:false,value:1200,state:{account:res({equity:'1200',netDeposits:'1000'}),positions:res([{marketDisplayName:'BTC-USD',side:'LONG',size:'0.1',averageEntryPrice:'100000',unrealizedPnl:'30',markPx:'100300'}])}}] as unknown as ConnectedPortfolio['arcus'];
+const renderWith=(client:QueryClient,a=arcus)=>render(<MemoryRouter><QueryClientProvider client={client}><PerpPortfolioSection arcus={a}/></QueryClientProvider></MemoryRouter>);
+
+it('total perp PnL and one card per platform (Arcus + Lighter Robinhood)',()=>{
+ holdings.list=[{id:'h1',kind:'platform',platformId:'lighter-robinhood',address:ADDR,label:'لایتر من',archivedAt:null}];
+ const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+ client.setQueryData(['lighter-robinhood-account',ADDR],{accounts:[{account_index:7,l1_address:ADDR,total_asset_value:'500',positions:[{symbol:'USO',sign:-1,position:'3',avg_entry_price:'145',unrealized_pnl:'-10',liquidation_price:'190'}]}]});
+ const {container}=renderWith(client);
+ expect(screen.getByRole('heading',{name:'سود/زیان باز کل پرپچوال'})).toBeTruthy();
+ expect(screen.getByText('آرکوس من')).toBeTruthy();expect(screen.getByText('لایتر من')).toBeTruthy();
+ expect(screen.getAllByText('۱ پوزیشن باز')).toHaveLength(2);
+ expect(container.textContent).toContain('+۲۰');      // ۳۰ − ۱۰
+ expect(container.textContent).toContain('۱,۷۰۰');    // ۱۲۰۰ + ۵۰۰
+});
+
+it('renders nothing without perp accounts; testnet Arcus is excluded',()=>{
+ const testnet=[{...arcus[0],holding:{...arcus[0].holding,arcus:{env:'testnet',address:ADDR,accountIndex:0}}}] as unknown as ConnectedPortfolio['arcus'];
+ expect(renderWith(new QueryClient(),testnet).container.textContent).toBe('');
+});
