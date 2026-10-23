@@ -31,9 +31,12 @@ function Amount({ value }: { value: number | null }) {
 export function ScenarioTable({
   caption,
   cols,
-  rows
+  rows,
+  unit = 'دلار'
 }: {
   caption: string;
+  /** واحد خانه‌ها در سرستون اول */
+  unit?: string;
   cols: ReactNode[];
   rows: { head: ReactNode; cells: ScenarioCell[] }[];
 }) {
@@ -44,7 +47,7 @@ export function ScenarioTable({
         <thead>
           <tr>
             <th scope="col" className="w-[4.5rem] py-1.5 text-start text-2xs font-semibold text-subtle">
-              دلار
+              {unit}
             </th>
             {cols.map((c, i) => (
               <th key={i} scope="col" className="py-1.5 text-2xs font-semibold text-subtle">
