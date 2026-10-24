@@ -1,6 +1,6 @@
 /** Public-data adapters; equity and position notional are deliberately separate. */
 export interface PerpMarket { symbol: string; name?:string; price: number | null; change: number | null; logo?:string|null;quote?:string; }
-export interface PerpPosition { symbol: string; side: 'long' | 'short'; size: number; entry: number | null; pnl: number | null; liquidation: number | null; }
+export interface PerpPosition { symbol: string; side: 'long' | 'short'; size: number; entry: number | null; pnl: number | null; liquidation: number | null; /** position_value ÷ size (قیمت مارک) */ mark?: number | null; }
 export interface LighterAccount { index: number; equity: number | null; available: number | null; positions: PerpPosition[]; assets:LighterSpotAsset[]; }
 export interface LighterSpotAsset {symbol:string;balance:number|null;locked:number|null;margin:number|null}
 export const numeric = (v: unknown): number | null => {
@@ -25,6 +25,7 @@ export function ondoMarkets(payload: unknown, prices: unknown): PerpMarket[] {
   const marks = row(row(prices).result);
   return rows(row(row(row(payload).result).perps).tradingPairs).map(m => ({symbol: String(m.market ?? ''), ...(typeof m.longName==='string'?{name:m.longName}:{}), price: numeric(row(marks[String(m.market)]).markPrice), change: null,...(typeof m.logoUrl==='string'?{logo:m.logoUrl}:{})})).filter(m => m.symbol);
 }
+const markOf = (value: unknown, size: number) => { const v = numeric(value); return v === null || size <= 0 ? null : Math.abs(v) / size; };
 export function lighterAccounts(payload: unknown, address: string): LighterAccount[] {
   const seen = new Set<number>();
   return rows(row(payload).accounts).filter(a => {
@@ -33,6 +34,6 @@ export function lighterAccounts(payload: unknown, address: string): LighterAccou
     seen.add(index); return true;
   }).map(a => ({index: Number(a.account_index ?? a.index), equity: numeric(a.total_asset_value), available: numeric(a.available_balance), assets:rows(a.assets).map(t=>({symbol:String(t.symbol??''),balance:numeric(t.balance),locked:numeric(t.locked_balance),margin:numeric(t.margin_balance)})).filter(t=>t.symbol&&[t.balance,t.locked,t.margin].some(v=>v!==null&&v>0)), positions: rows(a.positions).flatMap(p => {
     const size = numeric(p.position); if (size === null || size <= 0 || ![1, -1].includes(Number(p.sign))) return [];
-    return [{symbol: String(p.symbol ?? ''), side: Number(p.sign) === -1 ? 'short' as const : 'long' as const, size, entry: numeric(p.avg_entry_price), pnl: numeric(p.unrealized_pnl), liquidation: numeric(p.liquidation_price)}];
+    return [{symbol: String(p.symbol ?? ''), side: Number(p.sign) === -1 ? 'short' as const : 'long' as const, size, entry: numeric(p.avg_entry_price), pnl: numeric(p.unrealized_pnl), liquidation: numeric(p.liquidation_price), mark: markOf(p.position_value, size)}];
   })}));
 }

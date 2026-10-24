@@ -12,7 +12,7 @@ import { ALERT_OPS, handleAlertsOp, neonAlertsStore, runTick, verifyTickKey } fr
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
-import { getPerpsRead, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
+import { getPerpsRead, getLighterPnl, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
@@ -89,6 +89,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if(op==='pendle-logos' && req.method==='GET'){json(res,200,await getPendleLogos());return;}
     if(op==='directory' && req.method==='GET'){json(res,200,await getDirectory());return;}
     if(['lighter-markets','lighter-account','lighter-mainnet-markets','lighter-mainnet-account','ondo-markets'].includes(op) && req.method==='GET'){json(res,200,await getPerpsRead(op,u.searchParams.get('address')?.trim()??''));return;}
+    if(['lighter-pnl','lighter-mainnet-pnl'].includes(op) && req.method==='GET'){json(res,200,await getLighterPnl(op,u.searchParams.get('index')?.trim()??''));return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if(op==='shop-img' && req.method==='GET'){const img=await fetchImage(u.searchParams.get('u')??'');res.statusCode=200;res.setHeader('Content-Type',img.type);res.setHeader('Cache-Control','private, max-age=86400');res.setHeader('X-Content-Type-Options','nosniff');res.end(img.body);return;}
     if(op==='shop-ask' && req.method==='GET'){const q=(u.searchParams.get('q')??'').trim();const home=u.searchParams.get('home')??'';if(q.length<3||q.length>300||(home&&!/^[a-z-]{2,30}$/.test(home))){json(res,400,{error:'درخواست را در ۳ تا ۳۰۰ حرف بنویسید'});return;}json(res,200,await shopAsk(q,home||null));return;}

@@ -14,16 +14,22 @@ const res=<T,>(data:T)=>({data,fetchedAt:1,error:null,loading:false});
 const arcus=[{holding:{id:'a1',label:'آرکوس من',arcus:{env:'mainnet',address:ADDR,accountIndex:0}},stale:false,value:1200,state:{account:res({equity:'1200',netDeposits:'1000'}),positions:res([{marketDisplayName:'BTC-USD',side:'LONG',size:'0.1',averageEntryPrice:'100000',unrealizedPnl:'30',markPx:'100300'}])}}] as unknown as ConnectedPortfolio['arcus'];
 const renderWith=(client:QueryClient,a=arcus)=>render(<MemoryRouter><QueryClientProvider client={client}><PerpPortfolioSection arcus={a}/></QueryClientProvider></MemoryRouter>);
 
-it('total perp PnL and one card per platform (Arcus + Lighter Robinhood)',()=>{
+it('closed, open and all-time PnL across Arcus + Lighter Robinhood, one card per platform',()=>{
  holdings.list=[{id:'h1',kind:'platform',platformId:'lighter-robinhood',address:ADDR,label:'لایتر من',archivedAt:null}];
  const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
  client.setQueryData(['lighter-robinhood-account',ADDR],{accounts:[{account_index:7,l1_address:ADDR,total_asset_value:'500',positions:[{symbol:'USO',sign:-1,position:'3',avg_entry_price:'145',unrealized_pnl:'-10',liquidation_price:'190'}]}]});
+ const now=Math.floor(Date.now()/1000);
+ client.setQueryData(['lighter-pnl','robinhood',7],{hourly:[[now,-60]],daily:[[now,-60]]});
  const {container}=renderWith(client);
- expect(screen.getByRole('heading',{name:'سود/زیان باز کل پرپچوال'})).toBeTruthy();
+ expect(screen.getByRole('heading',{name:'سود/زیان پرپچوال'})).toBeTruthy();
  expect(screen.getByText('آرکوس من')).toBeTruthy();expect(screen.getByText('لایتر من')).toBeTruthy();
  expect(screen.getAllByText('۱ پوزیشن باز')).toHaveLength(2);
- expect(container.textContent).toContain('+۲۰');      // ۳۰ − ۱۰
- expect(container.textContent).toContain('۱,۷۰۰');    // ۱۲۰۰ + ۵۰۰
+ const text=container.textContent!;
+ expect(text).toContain('+۱۴۰');      // از ابتدا: ۲۰۰ + (−۶۰)
+ expect(text).toContain('+۱۲۰');      // بسته‌شده: (۲۰۰ − ۳۰) + (−۶۰ + ۱۰)
+ expect(text).toContain('-۵۰');       // بسته‌شدهٔ لایتر
+ expect(text).toContain('+۲۰');       // باز: ۳۰ − ۱۰
+ expect(text).toContain('۱,۷۰۰');     // ۱۲۰۰ + ۵۰۰
 });
 
 it('renders nothing without perp accounts; testnet Arcus is excluded',()=>{

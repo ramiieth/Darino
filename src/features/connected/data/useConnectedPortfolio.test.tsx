@@ -8,7 +8,7 @@ vi.mock('@/features/custody/data/useCustody', () => ({ useCustody: () => ({holdi
 vi.mock('@/features/custody/data/repository', () => ({ getPref: () => ({value:fixtures.enabled}) }));
 vi.mock('@/features/arcus/data/useArcusAccount', () => ({
   accountKey: (r:any) => `${r.env}:${r.address.toLowerCase()}:${r.accountIndex}`,
-  getArcusState: (k:string) => fixtures.arcus.get(k), refreshSummary:vi.fn(), useArcusStoreVersion:vi.fn(),
+  getArcusState: (k:string) => fixtures.arcus.get(k), refreshSummary:vi.fn(), refreshPortfolio:vi.fn(), useArcusStoreVersion:vi.fn(),
   isStale: (r:any) => !!r.error
 }));
 const address='0x'+'ab'.repeat(20);

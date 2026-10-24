@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
-import { fromArcus, fromLighter, perpTotals, positionsPnl, sumKnown } from './perpPortfolio';
+import type { ArcusPortfolio } from '@/features/arcus/api/types';
+import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown } from './perpPortfolio';
 
 const arcusPos = (o: Partial<ArcusPosition>): ArcusPosition =>
   ({ marketDisplayName: 'BTC-USD', side: 'LONG', size: '0.1', averageEntryPrice: '100000', unrealizedPnl: '25.5', markPx: '100255', ...o }) as ArcusPosition;
@@ -38,8 +39,55 @@ describe('perpPortfolio', () => {
     const arcus = fromArcus('a', 'x', arcusAcc('1200', '1000'), [arcusPos({})], 'ready', false);
     const lighter = fromLighter('l', 'y', 'lighter-robinhood', [{ index: 1, equity: 500, available: null, assets: [], positions: [{ symbol: 'USO', side: 'long', size: 1, entry: 1, pnl: -5.5, liquidation: null }] }], 'ready', false);
     const t = perpTotals([arcus, lighter]);
-    expect(t).toMatchObject({ equity: 1700, unrealizedPnl: 20, allTimePnl: 200, positions: 2, accounts: 2, partial: false });
+    // سری سود/زیان لایتر هنوز نیامده → کل فقط از آرکوس و partial
+    expect(t).toMatchObject({ equity: 1700, unrealizedPnl: 20, allTimePnl: 200, realizedPnl: 174.5, positions: 2, accounts: 2, partial: true });
     const loading = fromLighter('z', 'z', 'lighter-mainnet', null, 'loading', false);
     expect(perpTotals([arcus, lighter, loading])).toMatchObject({ equity: 1700, unrealizedPnl: 20, partial: true });
+  });
+
+  it('آرکوس: بسته‌شده = کل − باز؛ دوره‌ها از آخرین نقطهٔ perpDay/Week/Month', () => {
+    const portfolio = { data: [
+      ['totalDay', { pnlHistory: [[1, '0'], [2, '99']] }],
+      ['perpDay', { pnlHistory: [[1, '0'], [2, '-8.25']] }],
+      ['perpWeek', { pnlHistory: [[1, '0'], [2, '8.3']] }],
+      ['perpMonth', { pnlHistory: [] }]
+    ] } as unknown as ArcusPortfolio;
+    expect(arcusPeriodPnl(portfolio)).toEqual({ day: -8.25, week: 8.3, month: null });
+    expect(arcusPeriodPnl(null)).toEqual({ day: null, week: null, month: null });
+    // همهٔ پوزیشن‌ها بسته: بسته‌شده = کل
+    const closed = fromArcus('a', 'x', arcusAcc('3.8', '141.9'), [], 'ready', false, portfolio);
+    expect(closed.realizedPnl).toBeCloseTo(-138.1, 9);
+    expect(closed.periodPnl.day).toBe(-8.25);
+    const open = fromArcus('a', 'x', arcusAcc('1200', '1000'), [arcusPos({ unrealizedPnl: '30' })], 'ready', false);
+    expect(open).toMatchObject({ allTimePnl: 200, realizedPnl: 170 });
+  });
+
+  it('لایتر: trade_pnl تجمعی → کل و تغییر دوره‌ای؛ حساب جدید مبنای صفر', () => {
+    const now = 1_000_000;
+    const h = 3600;
+    const s = {
+      hourly: [[now - 8 * 86400, 50], [now - 7 * 86400, 60], [now - 86400 - h, 90], [now - 86400, 100], [now - h, 115], [now, 120]] as [number, number][],
+      daily: [[now - 31 * 86400, 10], [now - 30 * 86400, 20], [now - 86400, 100], [now, 120]] as [number, number][]
+    };
+    expect(lighterSeriesPnl(s, now)).toEqual({ allTime: 120, day: 20, week: 60, month: 100 });
+    const young = { hourly: [[now - 2 * h, 0], [now, -7]] as [number, number][], daily: [[now, -7]] as [number, number][] };
+    expect(lighterSeriesPnl(young, now)).toEqual({ allTime: -7, day: -7, week: -7, month: -7 });
+    expect(lighterSeriesPnl({ hourly: [], daily: [] }, now).allTime).toBeNull();
+  });
+
+  it('لایتر: زیرحساب‌ها جمع می‌شوند؛ سری نامعلوم یکی → نامعلوم', () => {
+    const now = 1_000_000;
+    const p = { symbol: 'ETH', side: 'long' as const, size: 1, entry: 2000, pnl: 15, liquidation: null, mark: 2015 };
+    const subs = [
+      { index: 1, equity: 1000, available: null, assets: [], positions: [p] },
+      { index: 2, equity: 50, available: null, assets: [], positions: [] }
+    ];
+    const series = (v: number) => ({ hourly: [[now, v]] as [number, number][], daily: [[now, v]] as [number, number][] });
+    const l = fromLighter('l', 'x', 'lighter-robinhood', subs, 'ready', false, [series(100), series(-40)], now);
+    expect(l).toMatchObject({ allTimePnl: 60, unrealizedPnl: 15, realizedPnl: 45 });
+    expect(l.positions[0].mark).toBe(2015);
+    expect(fromLighter('l', 'x', 'lighter-robinhood', subs, 'ready', false, [series(100), undefined], now).allTimePnl).toBeNull();
+    // آدرس بدون حساب = صفر
+    expect(fromLighter('l', 'x', 'lighter-robinhood', [], 'ready', false, [], now)).toMatchObject({ allTimePnl: 0, realizedPnl: 0, periodPnl: { day: 0, week: 0, month: 0 } });
   });
 });
