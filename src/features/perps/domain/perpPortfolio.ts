@@ -1,16 +1,26 @@
 /**
  * پرتفوی پرپچوال — حساب‌های آرکوس و لایتر (رابین‌هود/اصلی) در یک مدل مشترک
  *
- *   سود/زیان باز حساب   = Σ سود/زیان باز پوزیشن‌ها؛ یکی نامعلوم → null (حدس زده نمی‌شود)
- *   سود/زیان کل حساب    = ارزش حساب − خالص واریز   (فقط وقتی پلتفرم خالص واریز می‌دهد؛ آرکوس)
- *   جمع کل             = جمع مقادیر معلوم + پرچم partial
+ *   سود/زیان باز حساب     = Σ سود/زیان باز پوزیشن‌ها؛ یکی نامعلوم → null (حدس زده نمی‌شود)
+ *   سود/زیان کل حساب      آرکوس: ارزش − خالص واریز (مستند؛ برابر آخرین نقطهٔ perpAll)
+ *                         لایتر: آخرین trade_pnl تجمعی سری /api/v1/pnl (فقط پرپ؛ اسپات جداست)
+ *   سود/زیان بسته‌شده      = سود/زیان کل − سود/زیان باز
+ *                         (معاملات بسته‌شده + فاندینگ − کارمزد؛ پس از بستن همهٔ پوزیشن‌ها = سود/زیان کل)
+ *   سود/زیان ۲۴ ساعت/۷/۳۰ روز
+ *                         آرکوس: آخرین نقطهٔ pnlHistory سری perpDay/perpWeek/perpMonth (از صفر شروع می‌شود)
+ *                         لایتر: trade_pnl اکنون − trade_pnl ابتدای بازه (حساب جدیدتر از بازه → مبنا صفر)
+ *   جمع کل               = جمع مقادیر معلوم + پرچم partial
  * واحد حساب‌ها USDC/USDG است و ≈ ۱ دلار در نظر گرفته می‌شود.
  */
-import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
+import type { ArcusAccount, ArcusPortfolio, ArcusPosition } from '@/features/arcus/api/types';
 import type { LighterAccount } from './model';
 
 export type PerpVenue = 'arcus' | 'lighter-robinhood' | 'lighter-mainnet';
 export type PerpStatus = 'loading' | 'ready' | 'error';
+export type PnlPeriod = 'day' | 'week' | 'month';
+export const PNL_PERIODS: readonly PnlPeriod[] = ['day', 'week', 'month'];
+export type PeriodPnl = Record<PnlPeriod, number | null>;
+const NO_PERIODS: PeriodPnl = { day: null, week: null, month: null };
 
 export interface PerpVenuePosition {
   symbol: string;
@@ -30,6 +40,9 @@ export interface PerpVenueAccount {
   equity: number | null;
   unrealizedPnl: number | null;
   allTimePnl: number | null;
+  /** سود/زیان کل − باز */
+  realizedPnl: number | null;
+  periodPnl: PeriodPnl;
   positions: PerpVenuePosition[];
   status: PerpStatus;
   stale: boolean;
@@ -39,10 +52,18 @@ export interface PerpTotals {
   equity: number | null;
   unrealizedPnl: number | null;
   allTimePnl: number | null;
+  realizedPnl: number | null;
+  periodPnl: PeriodPnl;
   positions: number;
   accounts: number;
   /** حداقل یک مقدار نامعلوم از جمع کنار گذاشته شده */
   partial: boolean;
+}
+
+/** سری trade_pnl تجمعی یک زیرحساب لایتر: [زمان ثانیه، مقدار] — خروجی op=lighter-pnl */
+export interface LighterPnlSeries {
+  hourly: [number, number][];
+  daily: [number, number][];
 }
 
 const num = (v: unknown): number | null => {
@@ -50,6 +71,7 @@ const num = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+const diff = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
 
 /** جمع مقادیر معلوم؛ null فقط وقتی هیچ مقداری معلوم نیست */
 export function sumKnown(values: readonly (number | null)[]): { sum: number | null; partial: boolean } {
@@ -57,8 +79,39 @@ export function sumKnown(values: readonly (number | null)[]): { sum: number | nu
   return { sum: known.length ? known.reduce((a, b) => a + b, 0) : null, partial: known.length !== values.length };
 }
 
+/** جمع سخت‌گیرانه: یک مقدار نامعلوم → کل نامعلوم */
+const sumAll = (values: readonly (number | null)[]) => (values.some((v) => v === null) ? null : values.reduce<number>((a, b) => a + (b as number), 0));
+
 export function positionsPnl(positions: readonly PerpVenuePosition[]): number | null {
-  return positions.some((p) => p.pnl === null) ? null : positions.reduce((s, p) => s + (p.pnl as number), 0);
+  return sumAll(positions.map((p) => p.pnl));
+}
+
+/** آخرین نقطهٔ pnlHistory سری‌های perpDay/perpWeek/perpMonth آرکوس */
+export function arcusPeriodPnl(portfolio: ArcusPortfolio | null | undefined): PeriodPnl {
+  if (!portfolio || !Array.isArray(portfolio.data)) return NO_PERIODS;
+  const last = (name: string) => {
+    const series = portfolio.data.find(([n]) => n === name)?.[1]?.pnlHistory;
+    return Array.isArray(series) && series.length ? num(series[series.length - 1][1]) : null;
+  };
+  return { day: last('perpDay'), week: last('perpWeek'), month: last('perpMonth') };
+}
+
+const WINDOW_S: Record<PnlPeriod, number> = { day: 86400, week: 7 * 86400, month: 30 * 86400 };
+
+/** سود/زیان کل و دوره‌ای یک زیرحساب لایتر از سری تجمعی trade_pnl */
+export function lighterSeriesPnl(s: LighterPnlSeries, nowSec: number): { allTime: number | null } & PeriodPnl {
+  const all = [...s.hourly, ...s.daily];
+  if (!all.length) return { allTime: null, ...NO_PERIODS };
+  const latest = all.reduce((a, b) => (b[0] > a[0] ? b : a))[1];
+  const change = (period: PnlPeriod) => {
+    const series = period === 'month' ? s.daily : s.hourly;
+    if (!series.length) return null;
+    const start = nowSec - WINDOW_S[period];
+    const before = series.filter(([t]) => t <= start);
+    // سری از ایجاد حساب شروع می‌شود: نقطه‌ای پیش از بازه نیست → حساب در همین بازه ساخته شده (مبنا صفر)
+    return latest - (before.length ? before[before.length - 1][1] : 0);
+  };
+  return { allTime: latest, day: change('day'), week: change('week'), month: change('month') };
 }
 
 export function fromArcus(
@@ -67,7 +120,8 @@ export function fromArcus(
   account: ArcusAccount | null | undefined,
   positions: readonly ArcusPosition[] | null | undefined,
   status: PerpStatus,
-  stale: boolean
+  stale: boolean,
+  portfolio?: ArcusPortfolio | null
 ): PerpVenueAccount {
   const rows: PerpVenuePosition[] = (positions ?? []).flatMap((p) => {
     const size = num(p.size);
@@ -86,41 +140,57 @@ export function fromArcus(
   // حساب بدون فعالیت (404 مستند) = ارزش صفر
   const equity = account === null ? 0 : num(account?.equity);
   const deposits = account === null ? 0 : num(account?.netDeposits);
+  const unrealizedPnl = positions ? positionsPnl(rows) : null;
+  const allTimePnl = diff(equity, deposits);
   return {
     id,
     venue: 'arcus',
     label,
     unit: 'USDC',
     equity,
-    unrealizedPnl: positions ? positionsPnl(rows) : null,
-    allTimePnl: equity !== null && deposits !== null ? equity - deposits : null,
+    unrealizedPnl,
+    allTimePnl,
+    realizedPnl: diff(allTimePnl, unrealizedPnl),
+    periodPnl: account === null ? { day: 0, week: 0, month: 0 } : arcusPeriodPnl(portfolio),
     positions: rows,
     status,
     stale
   };
 }
 
-/** یک آدرس لایتر می‌تواند چند زیرحساب داشته باشد → یکی شده در یک کارت */
+/**
+ * یک آدرس لایتر می‌تواند چند زیرحساب داشته باشد → یکی شده در یک کارت.
+ * pnl هم‌ترتیب با accounts است؛ سری نامعلوم یک زیرحساب → جمع آن مقدار نامعلوم.
+ */
 export function fromLighter(
   id: string,
   label: string,
   venue: 'lighter-robinhood' | 'lighter-mainnet',
   accounts: readonly LighterAccount[] | null,
   status: PerpStatus,
-  stale: boolean
+  stale: boolean,
+  pnl: readonly (LighterPnlSeries | null | undefined)[] = [],
+  nowSec = Date.now() / 1000
 ): PerpVenueAccount {
   const rows: PerpVenuePosition[] = (accounts ?? []).flatMap((a) =>
-    a.positions.map((p) => ({ symbol: p.symbol, side: p.side, size: p.size, entry: p.entry, mark: null, pnl: p.pnl, liquidation: p.liquidation || null }))
+    a.positions.map((p) => ({ symbol: p.symbol, side: p.side, size: p.size, entry: p.entry, mark: p.mark ?? null, pnl: p.pnl, liquidation: p.liquidation || null }))
   );
   const equity = accounts ? sumKnown(accounts.map((a) => a.equity)) : null;
+  const unrealizedPnl = accounts ? positionsPnl(rows) : null;
+  // آدرس بدون حساب = همه صفر
+  const per = (accounts ?? []).map((_, i) => (pnl[i] ? lighterSeriesPnl(pnl[i]!, nowSec) : null));
+  const pick = (k: 'allTime' | PnlPeriod) => (accounts ? sumAll(per.map((p) => (p ? p[k] : null))) : null);
+  const allTimePnl = pick('allTime');
   return {
     id,
     venue,
     label,
     unit: venue === 'lighter-mainnet' ? 'USDC' : 'USDG',
     equity: equity && !equity.partial ? equity.sum : null,
-    unrealizedPnl: accounts ? positionsPnl(rows) : null,
-    allTimePnl: null,
+    unrealizedPnl,
+    allTimePnl,
+    realizedPnl: diff(allTimePnl, unrealizedPnl),
+    periodPnl: { day: pick('day'), week: pick('week'), month: pick('month') },
     positions: rows,
     status,
     stale
@@ -130,14 +200,17 @@ export function fromLighter(
 export function perpTotals(accounts: readonly PerpVenueAccount[]): PerpTotals {
   const equity = sumKnown(accounts.map((a) => a.equity));
   const upnl = sumKnown(accounts.map((a) => a.unrealizedPnl));
-  // سود/زیان کل فقط روی حساب‌هایی که پلتفرم خالص واریز می‌دهد؛ نبودنش partial نیست
-  const allTime = sumKnown(accounts.filter((a) => a.venue === 'arcus').map((a) => a.allTimePnl));
+  const allTime = sumKnown(accounts.map((a) => a.allTimePnl));
+  const realized = sumKnown(accounts.map((a) => a.realizedPnl));
+  const periods = PNL_PERIODS.map((k) => [k, sumKnown(accounts.map((a) => a.periodPnl[k]))] as const);
   return {
     equity: equity.sum,
     unrealizedPnl: upnl.sum,
     allTimePnl: allTime.sum,
+    realizedPnl: realized.sum,
+    periodPnl: Object.fromEntries(periods.map(([k, v]) => [k, v.sum])) as PeriodPnl,
     positions: accounts.reduce((n, a) => n + a.positions.length, 0),
     accounts: accounts.length,
-    partial: equity.partial || upnl.partial || allTime.partial
+    partial: [equity, upnl, allTime, realized, ...periods.map(([, v]) => v)].some((v) => v.partial)
   };
 }

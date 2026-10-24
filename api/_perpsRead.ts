@@ -181,6 +181,28 @@ export async function getQfexDepth(market: string): Promise<{ market: string; bi
     return { market, bids: side(data.bids), asks: side(data.asks) };
   });
 }
+/**
+ * تاریخچهٔ سود/زیان معاملات یک زیرحساب لایتر (عمومی، بدون امضا)
+ * trade_pnl تجمعی از ایجاد حساب است و آخرین نقطه «اکنون» است (شامل سود/زیان باز، فاندینگ و کارمزد).
+ * فقط [زمان ثانیه، trade_pnl] برگردانده می‌شود: ساعتی ۷ روز + روزانه ۳۱ روز.
+ */
+export async function getLighterPnl(op: string, index: string): Promise<{ hourly: [number, number][]; daily: [number, number][]; fetchedAt: number }> {
+  if (!['lighter-pnl', 'lighter-mainnet-pnl'].includes(op)) throw new ProviderError(400, 'درخواست ناشناخته');
+  if (!/^\d{1,18}$/.test(index)) throw new ProviderError(400, 'شمارهٔ حساب معتبر نیست');
+  const host = op === 'lighter-mainnet-pnl' ? MAINNET : LIGHTER;
+  const now = Math.floor(Date.now() / 1000);
+  const series = async (resolution: '1h' | '1d', seconds: number, count: number) => {
+    const query = new URLSearchParams({ by: 'index', value: index, resolution, start_timestamp: String(now - seconds), end_timestamp: String(now), count_back: String(count) });
+    const data = await read(`${host}/api/v1/pnl?${query}`);
+    if (!Array.isArray(data.pnl)) throw new ProviderError(502, 'پاسخ سود و زیان معتبر نیست');
+    return data.pnl.map(asRow).flatMap((p): [number, number][] => {
+      const t = fin(p.timestamp), v = fin(p.trade_pnl);
+      return t === null || v === null ? [] : [[t, v]];
+    });
+  };
+  const [hourly, daily] = await Promise.all([series('1h', 7 * 86400 + 3600, 170), series('1d', 31 * 86400, 33)]);
+  return { hourly, daily, fetchedAt: Date.now() };
+}
 export async function getPerpsRead(op: string, address: string): Promise<unknown> {
   if (op === 'lighter-mainnet-markets'||op === 'lighter-markets') {
     const host=op==='lighter-mainnet-markets'?MAINNET:LIGHTER;

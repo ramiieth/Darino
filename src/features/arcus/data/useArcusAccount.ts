@@ -130,9 +130,14 @@ export function refreshExtras(r: AccountRef): Promise<unknown> {
   const p = { address: r.address, accountIndex: r.accountIndex };
   return Promise.all([
     load(key, 'leverages', async () => (await arcusGet<{ leverages?: ArcusLeverage[] }>(r.env, '/v1/leverages', p)).leverages ?? []),
-    load(key, 'portfolio', () => arcusGet<ArcusPortfolio>(r.env, '/v1/portfolio', p)),
+    refreshPortfolio(r),
     loadMarkets(r.env)
   ]);
+}
+
+/** سری‌های ارزش و سود/زیان دوره‌ای (روز/هفته/ماه/کل) */
+export function refreshPortfolio(r: AccountRef): Promise<void> {
+  return load(accountKey(r), 'portfolio', () => arcusGet<ArcusPortfolio>(r.env, '/v1/portfolio', { address: r.address, accountIndex: r.accountIndex }));
 }
 
 export async function loadMarkets(env: ArcusEnv): Promise<void> {

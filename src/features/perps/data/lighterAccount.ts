@@ -7,3 +7,9 @@ export const lighterAccountQuery=(address:string,network:LighterNetwork)=>({
  queryFn:()=>fetchJson<unknown>(`/api/integrations?op=${network==='mainnet'?'lighter-mainnet-account':'lighter-account'}&address=${encodeURIComponent(address)}`,{timeoutMs:15000}),
  staleTime:30000,refetchInterval:30000,retry:1
 });
+/** سری سود/زیان معاملات یک زیرحساب (ساعتی ۷ روز + روزانه ۳۱ روز) */
+export const lighterPnlQuery=(index:number,network:LighterNetwork)=>({
+ queryKey:['lighter-pnl',network,index],
+ queryFn:()=>fetchJson<{hourly:[number,number][];daily:[number,number][]}>(`/api/integrations?op=${network==='mainnet'?'lighter-mainnet-pnl':'lighter-pnl'}&index=${index}`,{timeoutMs:15000}),
+ staleTime:60000,refetchInterval:60000,retry:1
+});
