@@ -1,6 +1,7 @@
 /**
- * ⑩ استراتژی‌های آربیتراژ فاندینگ — فرم، راهنما و مقایسه از داده (data/fundingStrategies) ساخته می‌شوند؛
- * همهٔ محاسبات در evaluateStrategy. استراتژی جدید هیچ تغییری در این فایل نمی‌خواهد.
+ * ⑩ استراتژی‌های آربیتراژ فاندینگ
+ *  پیش‌فرض: برنامه‌ریز روی صرافی‌های دارینو (FundingPlanner) — نماد را انتخاب کنید، برنامه‌ها خودکار ساخته می‌شوند
+ *  حالت دستی: فرم، راهنما و مقایسه از داده (data/fundingStrategies)؛ همهٔ محاسبات در evaluateStrategy
  */
 import { useMemo, useState } from 'react';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
@@ -14,6 +15,7 @@ import { toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 import { CalcShell, ResultHero } from '../StatCard';
 import { ScenarioTable } from '../delta/ScenarioTable';
+import { FundingPlanner } from './FundingPlanner';
 import { numOr, parseNum } from '../parse';
 import {
   aprToInterval,
@@ -76,7 +78,34 @@ function fromForm(f: Form, fallback: StrategyInputs): StrategyInputs {
 
 const scenarioOf = (s: StrategyContent, kind: ScenarioKind) => s.scenarios.find((x) => x.kind === kind) ?? { stress: {}, overrides: undefined, title: '', note: '', kind };
 
+type View = 'planner' | 'manual';
+
 export function FundingStrategiesCalculator() {
+  const [view, setView] = useState<View>('planner');
+  return (
+    <div className="space-y-5">
+      <Notice tone="warn">توصیهٔ مالی نیست؛ نرخ‌های فاندینگ دائماً تغییر می‌کنند و نتیجه فقط برآورد با فرض‌های شماست.</Notice>
+      <SegmentedControl<View>
+        label="روش"
+        fill
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'planner', label: 'روی صرافی‌های من' },
+          { value: 'manual', label: 'ماشین‌حساب دستی' }
+        ]}
+      />
+      <div className={cn(view !== 'planner' && 'hidden')} inert={view !== 'planner' ? '' : undefined}>
+        <FundingPlanner />
+      </div>
+      <div className={cn(view !== 'manual' && 'hidden')} inert={view !== 'manual' ? '' : undefined}>
+        <ManualStrategies />
+      </div>
+    </div>
+  );
+}
+
+function ManualStrategies() {
   const [id, setId] = useState<StrategyId>('spotPerp');
   const strategy = strategyById(id);
   const [form, setForm] = useState<Form>(() => toForm(strategy.defaults));
@@ -186,7 +215,7 @@ export function FundingStrategiesCalculator() {
 
   return (
     <div className="space-y-6">
-      <Notice tone="warn">توصیهٔ مالی نیست؛ نرخ‌های فاندینگ دائماً تغییر می‌کنند و نتیجه فقط برآورد با فرض‌های شماست.</Notice>
+      <p className="text-xs leading-6 text-muted">برای استراتژی‌هایی که در صرافی‌های دارینو نیستند (لندینگ، استیکینگ، فیوچرز سررسیددار، کوین‌مارجین): نرخ‌ها را خودتان وارد کنید.</p>
       <CalcShell inputs={inputPanel}>
         {!result ? (
           <Notice tone="error">ورودی‌های نامعتبر را اصلاح کنید.</Notice>
