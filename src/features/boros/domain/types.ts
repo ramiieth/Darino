@@ -14,6 +14,8 @@ export interface BorosMarket {
   venue: string; // Hyperliquid | Binance | OKX | Gate ...
   asset: string; // BTC | ETH | SOL ...
   fundingRateSymbol: string;
+  /** بازار اسپرد فاندینگ دو صرافی (مثلاً HL − Gate)؛ نرخ شناور = اختلاف فاندینگ دو صرافی */
+  isSpreadMarket?: boolean;
   maturity: number; // ثانیه
   marginFloor: number; // rateFloor
   /** config.tThresh / seconds-per-year */

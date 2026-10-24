@@ -22,3 +22,4 @@ export * from './targetPlan';
 export * from './exitAdvice';
 export * from './fundingStrategies';
 export * from './orderTicket';
+export * from './fundingPlanner';

@@ -58,6 +58,7 @@ export function mapMarket(raw: Record<string, any>, snapshotAt?: number): BorosM
     venue: platform.name ?? '',
     asset: md.underlyingSymbol ?? '',
     fundingRateSymbol: md.fundingRateSymbol ?? '',
+    isSpreadMarket: md.isSpreadMarket === true || String(md.fundingRateSymbol ?? '').startsWith('spread-'),
     maturity: im.maturity ?? 0,
     marginFloor: im.marginFloor ?? Number.NaN,
     tickStep: im.tickStep ?? 2,

@@ -52,7 +52,7 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   {
     value: 'strategies',
     label: 'استراتژی‌های فاندینگ',
-    description: 'هفت استراتژی آربیتراژ فاندینگ با مدل کامل هزینه، سناریوی بهترین/پایه/استرس، حساسیت و مقایسه با همان سرمایه',
+    description: 'یک نماد انتخاب کنید؛ همهٔ راه‌های گرفتن فاندینگ روی صرافی‌های شما، با نرخ ثابت Boros، محاسبه و رتبه‌بندی می‌شود.',
     icon: <Layers aria-hidden />
   },
   {
@@ -90,8 +90,8 @@ export function CalculatorsPage() {
   const [optionsOpened, setOptionsOpened] = useState(false);
   if (tab === 'options' && !optionsOpened) setOptionsOpened(true);
   // ابزارهای دلتا سه صرافی را می‌خوانند — هر کدام فقط بعد از اولین باز شدن mount می‌شود و بعد زنده می‌ماند
-  const [opened, setOpened] = useState<Partial<Record<'plan' | HubStep | FindView, true>>>({});
-  const visibleKeys: ('plan' | HubStep | FindView)[] = tab === 'plan' ? ['plan'] : tab === 'delta' ? (step === 'find' ? ['find', findView] : [step]) : [];
+  const [opened, setOpened] = useState<Partial<Record<'plan' | 'strategies' | HubStep | FindView, true>>>({});
+  const visibleKeys: ('plan' | 'strategies' | HubStep | FindView)[] = tab === 'plan' ? ['plan'] : tab === 'strategies' ? ['strategies'] : tab === 'delta' ? (step === 'find' ? ['find', findView] : [step]) : [];
   if (visibleKeys.some((k) => !opened[k])) setOpened((o) => ({ ...o, ...Object.fromEntries(visibleKeys.map((k) => [k, true])) }));
   const venuesOpened = Object.keys(opened).length > 0;
   // انتقال انتخاب به «اجرا و پایش»
@@ -157,14 +157,12 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
         <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
-        <div {...panel('strategies')}>
-          <FundingStrategiesCalculator />
-        </div>
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>
         {venuesOpened && (
           <DeltaVenuesProvider>
+            <div {...panel('strategies')}>{opened.strategies && <FundingStrategiesCalculator />}</div>
             <div {...panel('plan')}>
               {opened.plan && (
                 <PlanWizard
