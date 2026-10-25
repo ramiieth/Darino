@@ -205,6 +205,8 @@ export interface Platform {
 export const PLATFORMS: Platform[] = [
   {id:'lighter-mainnet',name:'لایتر',nameEn:'Lighter',url:'https://app.lighter.xyz/',logo:'/logos/platform-lighter.png',roles:['venue']},
   {id:'lighter-robinhood',name:'لایتر رابین‌هود',nameEn:'Lighter Robinhood',url:'https://robinhoodchain.lighter.xyz/',logo:'/logos/platform-lighter.png',roles:['venue']},
+  {id:'hyperliquid',name:'هایپرلیکوئید',nameEn:'Hyperliquid',url:'https://app.hyperliquid.xyz/trade',logo:'/logos/token-hype.png',roles:['venue']},
+  {id:'txflow',name:'تی‌اکس‌فلو',nameEn:'TxFlow',url:'https://app.txflow.com/',logo:'/logos/platform-txflow.png',roles:['venue']},
   { id: 'relay', name: 'ریلی', nameEn: 'Relay', url: 'https://relay.link/', logo: '/logos/platform-relay.png', roles: ['bridge', 'swap'] },
   { id: 'arcus', name: 'آرکوس', nameEn: 'Arcus', url: 'https://arcus.xyz/', logo: '/logos/platform-arcus.png', roles: ['venue'] }
 ];

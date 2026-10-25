@@ -31,7 +31,7 @@ vi.mock('../../api/_neon.js', async (orig) => {
   };
 });
 
-import handler from '../../api/propertyMarket';
+import handler from '../../api/_propertyMarketRoute';
 
 const PARSED = {
   rows: [{ id: '1', modelId: '9', brand: 'kia', model: 'کیا', year: '2025', option: null, market: 3e9, dealer: null, marketUpdatedAt: null, srcChangePct: null }],

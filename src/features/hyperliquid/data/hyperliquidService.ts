@@ -149,6 +149,21 @@ export async function hlUserFills(user: string): Promise<HlFill[]> {
   return infoCached<HlFill[]>(`fills:${user}`, { type: 'userFills', user });
 }
 
+/** آخرین ۲۰۰۰ fill هر آدرس، fillهای جزئی هم‌زمان یک سفارش ادغام‌شده — بدون کش (کش در لایهٔ تریدرها) */
+export async function hlRecentFills(user: string): Promise<HlFill[]> {
+  return info<HlFill[]>({ type: 'userFills', user, aggregateByTime: true });
+}
+
+/** منحنی ارزش حساب و سود تجمعی (روز، هفته، ماه، کل؛ پرپ و کل) */
+export async function hlPortfolio<T = unknown>(user: string): Promise<T> {
+  return info<T>({ type: 'portfolio', user });
+}
+
+/** تاریخچهٔ نرخ فاندینگ ساعتی یک بازار (حداکثر ۵۰۰ ردیف در هر پاسخ، از startTime به بعد) */
+export async function hlFundingHistory(coin: string, startTime: number, endTime?: number): Promise<{ coin: string; fundingRate: string; premium: string; time: number }[]> {
+  return info({ type: 'fundingHistory', coin, startTime, ...(endTime ? { endTime } : {}) });
+}
+
 /** Funding پرداختی/دریافتی */
 export async function hlUserFunding(user: string): Promise<HlFundingPoint[]> {
   return infoCached<HlFundingPoint[]>(`funding:${user}`, { type: 'userFunding', user });

@@ -36,7 +36,7 @@ vi.mock('../../api/_neon.js', async (orig) => {
   };
 });
 
-import handler from '../../api/propertyMarket';
+import handler from '../../api/_propertyMarketRoute';
 
 function call(method: string, body?: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve) => {

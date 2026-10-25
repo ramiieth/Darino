@@ -35,9 +35,9 @@ vi.mock('../../api/_neon.js', async (orig) => {
   return { ...actual, isDbConfigured: () => true, db: () => { throw new Error('db must not be called in tests'); } };
 });
 
-import handler from '../../api/auth';
-import accountingHandler from '../../api/accounting';
-import custodyHandler, { __setCustodyStoreForTests, memoryCustodyStore } from '../../api/custody';
+import handler from '../../api/_authRoute';
+import accountingHandler from '../../api/_accountingRoute';
+import custodyHandler, { __setCustodyStoreForTests, memoryCustodyStore } from '../../api/_custodyRoute';
 import { __setAuthStoreForTests } from '../../api/_authCore';
 import { memoryAuthStore } from '../../api/_authStore';
 

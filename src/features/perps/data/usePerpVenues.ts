@@ -2,12 +2,19 @@
  * حساب‌های پرپچوال کاربر در مدل مشترک domain/perpPortfolio
  *   آرکوس: همان store داشبورد (حساب، پوزیشن‌ها، سری portfolio)
  *   لایتر: همان کش صفحهٔ لایتر + سری سود/زیان هر زیرحساب
+ *   هایپرلیکوئید: info/clearinghouseState + info/portfolio (عمومی، فقط آدرس)
+ *   تی‌اکس‌فلو: rpc.txflow.com/info clearinghouseState + دفتر واریز/برداشت (API سازگار با هایپرلیکوئید)
+ *   آستر، کیوفکس، اوندو پرپس: /api/integrations?op=keyed-perps با کلید فقط‌خواندنی در env ورسل (فقط کاربر واردشده)
+ * هر حساب «پلتفرم» با آدرس عمومی در مدیریت کیف پول‌ها ثبت می‌شود؛ بدون کلید یا امضا.
  */
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { fetchJson } from '@/repositories/remoteClient';
 import { useCustody } from '@/features/custody/data/useCustody';
 import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
 import { lighterAccounts } from '../domain/model';
-import { fromArcus, fromLighter, type PerpVenueAccount } from '../domain/perpPortfolio';
+import { fromArcus, fromHlLike, fromKeyed, fromLighter, type HlLikeState, type HlPortfolioSeries, type LedgerUpdate, type PerpVenueAccount } from '../domain/perpPortfolio';
+import { hlClearinghouseState, hlPortfolio } from '@/features/hyperliquid/data/hyperliquidService';
+import { txflowInfo } from '@/features/calculators/data/perpMarkets';
 import { LIGHTER_PLATFORM, lighterAccountQuery, lighterPnlQuery, type LighterNetwork } from './lighterAccount';
 
 export function useLighterVenues(): PerpVenueAccount[] {
@@ -30,6 +37,67 @@ export function useLighterVenues(): PerpVenueAccount[] {
   });
 }
 
+export const HL_LIKE_PLATFORMS = { hyperliquid: 'hyperliquid', txflow: 'txflow' } as const;
+type HlLikeVenue = keyof typeof HL_LIKE_PLATFORMS;
+
+/** وضعیت حساب + دادهٔ سود/زیان کل (portfolio هایپرلیکوئید یا دفتر واریز تی‌اکس‌فلو) */
+export const hlLikeAccountQuery = (venue: HlLikeVenue, address: string) => ({
+  queryKey: ['perp-account', venue, address.toLowerCase()],
+  queryFn: async () => {
+    if (venue === 'hyperliquid') {
+      const [state, portfolio] = await Promise.all([
+        hlClearinghouseState(address) as Promise<HlLikeState>,
+        hlPortfolio<HlPortfolioSeries>(address).catch(() => null)
+      ]);
+      return { state, portfolio, ledger: null };
+    }
+    const [state, ledger] = await Promise.all([
+      txflowInfo<HlLikeState>({ type: 'clearinghouseState', user: address }),
+      txflowInfo<LedgerUpdate[]>({ type: 'userNonFundingLedgerUpdates', user: address }).catch(() => null)
+    ]);
+    return { state, portfolio: null, ledger };
+  },
+  staleTime: 30_000,
+  refetchInterval: 60_000,
+  retry: 1
+});
+
+export function useHlLikeVenues(): PerpVenueAccount[] {
+  const custody = useCustody();
+  const linked = custody.holdings.flatMap((h) => {
+    if (h.kind !== 'platform' || h.archivedAt || !h.address) return [];
+    const venue = (Object.keys(HL_LIKE_PLATFORMS) as HlLikeVenue[]).find((v) => HL_LIKE_PLATFORMS[v] === h.platformId);
+    return venue ? [{ id: h.id, label: h.label, address: h.address, venue }] : [];
+  });
+  const queries = useQueries({ queries: linked.map((l) => hlLikeAccountQuery(l.venue, l.address)) });
+  return linked.map((l, i) => {
+    const q = queries[i];
+    const status = q.isPending ? 'loading' : q.isError && !q.data ? 'error' : 'ready';
+    return fromHlLike(l.id, l.label, l.venue, l.address, q.data?.state ?? null, status, q.isError && !!q.data, { portfolio: q.data?.portfolio, ledger: q.data?.ledger });
+  });
+}
+
+const KEYED_LABEL = { aster: 'حساب آستر', qfex: 'حساب کیوفکس', ondo: 'حساب اوندو پرپس' } as const;
+
+/**
+ * پلتفرم‌هایی که کلیدشان در env ورسل تنظیم شده؛ بدون کلید یا بدون ورود → هیچ کارتی (خطا نشان داده نمی‌شود)
+ */
+export function useKeyedVenues(): PerpVenueAccount[] {
+  const q = useQuery({
+    queryKey: ['perp-keyed'],
+    queryFn: () => fetchJson<{ venues: Parameters<typeof fromKeyed>[0][] }>('/api/integrations?op=keyed-perps', { timeoutMs: 20_000 }),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 0
+  });
+  return (q.data?.venues ?? []).map((r) => ({ ...fromKeyed(r, KEYED_LABEL[r.venue]), stale: q.isError && !!q.data }));
+}
+
+/** پوزیشن‌های پلتفرمی (لایتر، هایپرلیکوئید، تی‌اکس‌فلو، آستر، کیوفکس، اوندو) برای «پوزیشن‌های واقعی» */
+export function usePlatformPerpVenues(): PerpVenueAccount[] {
+  return [...useLighterVenues(), ...useHlLikeVenues(), ...useKeyedVenues()];
+}
+
 export function arcusVenues(arcus: ConnectedPortfolio['arcus']): PerpVenueAccount[] {
   return arcus
     .filter((s) => s.holding.arcus!.env === 'mainnet')
@@ -41,5 +109,5 @@ export function arcusVenues(arcus: ConnectedPortfolio['arcus']): PerpVenueAccoun
 }
 
 export function usePerpVenues(arcus: ConnectedPortfolio['arcus']): PerpVenueAccount[] {
-  return [...arcusVenues(arcus), ...useLighterVenues()];
+  return [...arcusVenues(arcus), ...usePlatformPerpVenues()];
 }

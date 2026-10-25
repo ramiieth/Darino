@@ -13,7 +13,7 @@ vi.mock('../../api/_neon.js', async (orig) => {
   return { ...actual, isDbConfigured: () => false, db: () => { throw new Error('no db'); } };
 });
 
-import handler from '../../api/propertyMarket';
+import handler from '../../api/_propertyMarketRoute';
 
 function call(method: string, opts: { url?: string; body?: unknown } = {}): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve) => {

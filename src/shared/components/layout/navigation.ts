@@ -10,7 +10,7 @@
  *   ابزارها    what-if tools
  *   دستیار و راهنمای خرید   Iranian shops, food, travel, doctors (read-only)
  */
-import { Activity, Bell, BookOpenText, Boxes, Calculator, CandlestickChart, Car, Home, Layers, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, Bell, BookOpenText, Boxes, Calculator, CandlestickChart, Car, Home, Layers, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -57,6 +57,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها',
         icon: Boxes,
         primary: true
+      },
+      {
+        id: 'intel',
+        to: '/intel',
+        label: 'هاب اطلاعات',
+        description: 'تریدرهای برتر، پوزیشن‌هایشان، بازار مشتقات، میم‌کوین و امنیت توکن',
+        icon: Telescope,
+        match: ['/traders']
       }
     ]
   },

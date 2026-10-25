@@ -5,7 +5,7 @@ import { isStale, accountKey } from '@/features/arcus/data/useArcusAccount';
 import type { PerpVenueAccount } from '@/features/perps/domain/perpPortfolio';
 const number=(v:unknown)=>v!=null&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
 const logos:Record<string,string>={BTC:'/logos/token-btc.png',ETH:'/logos/token-eth.svg',SOL:'/logos/chain-solana.svg',BNB:'/logos/chain-56.svg',HYPE:'/logos/token-hype.jpg'};
-const LIGHTER:Record<string,{name:string;chain:string}>={'lighter-robinhood':{name:'لایتر رابین‌هود',chain:'robinhood'},'lighter-mainnet':{name:'لایتر',chain:'ethereum'}};
+const LIGHTER:Record<string,{name:string;chain:string}>={'lighter-robinhood':{name:'لایتر رابین‌هود',chain:'robinhood'},'lighter-mainnet':{name:'لایتر',chain:'ethereum'},hyperliquid:{name:'هایپرلیکوئید',chain:'hyperliquid'},txflow:{name:'تی‌اکس‌فلو',chain:'txflow'},aster:{name:'آستر',chain:'aster'},qfex:{name:'کیوفکس',chain:'qfex'},ondo:{name:'اوندو پرپس',chain:'ondo'}};
 export function platformPositions(portfolio:ConnectedPortfolio,boros:{data:BorosAccountSnapshot|null;stale:boolean},markets:BorosMarket[],lighter:readonly PerpVenueAccount[]=[]){
  const rows:{key:string;symbol:string;logo:string|null;source:string;chain:string;side:string;size:number|null;entry:number|null;rate:boolean;mark:number|null;pnl:number|null;margin:number|null;stale:boolean}[]=[];
  for(const a of portfolio.arcus.filter(a=>a.holding.arcus?.env==='mainnet'))for(const p of a.state?.positions.data??[]){

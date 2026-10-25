@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
 import type { ArcusPortfolio } from '@/features/arcus/api/types';
-import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown } from './perpPortfolio';
+import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries } from './perpPortfolio';
 
 const arcusPos = (o: Partial<ArcusPosition>): ArcusPosition =>
   ({ marketDisplayName: 'BTC-USD', side: 'LONG', size: '0.1', averageEntryPrice: '100000', unrealizedPnl: '25.5', markPx: '100255', ...o }) as ArcusPosition;
@@ -89,5 +89,51 @@ describe('perpPortfolio', () => {
     expect(fromLighter('l', 'x', 'lighter-robinhood', subs, 'ready', false, [series(100), undefined], now).allTimePnl).toBeNull();
     // آدرس بدون حساب = صفر
     expect(fromLighter('l', 'x', 'lighter-robinhood', [], 'ready', false, [], now)).toMatchObject({ allTimePnl: 0, realizedPnl: 0, periodPnl: { day: 0, week: 0, month: 0 } });
+  });
+});
+
+describe('هایپرلیکوئید و تی‌اکس‌فلو', () => {
+  const A = '0x' + '1'.repeat(40);
+  const state = {
+    marginSummary: { accountValue: '12000' },
+    assetPositions: [
+      { position: { coin: 'BTC', szi: '0.5', entryPx: '80000', positionValue: '41000', unrealizedPnl: '1000', liquidationPx: '60000' } },
+      { position: { coin: 'ETH-USDC', szi: '-2', entryPx: '2400', positionValue: '4600', unrealizedPnl: '200', liquidationPx: null } },
+      { position: { coin: 'SOL', szi: '0', positionValue: '0', unrealizedPnl: '0' } }
+    ]
+  };
+
+  it('هایپرلیکوئید: پوزیشن‌ها، ارزش، سود/زیان کل و دوره‌ای از portfolio', () => {
+    const portfolio: HlPortfolioSeries = [
+      ['perpDay', { pnlHistory: [[1, '0'], [2, '150']] }],
+      ['perpWeek', { pnlHistory: [[1, '0'], [2, '-300']] }],
+      ['perpMonth', { pnlHistory: [[1, '0'], [2, '900']] }],
+      ['perpAllTime', { pnlHistory: [[1, '0'], [2, '5000']] }]
+    ];
+    const a = fromHlLike('h1', 'اصلی', 'hyperliquid', A, state, 'ready', false, { portfolio });
+    expect(a).toMatchObject({ venue: 'hyperliquid', address: A, equity: 12000, unrealizedPnl: 1200, allTimePnl: 5000, realizedPnl: 3800, periodPnl: { day: 150, week: -300, month: 900 } });
+    expect(a.positions).toEqual([
+      { symbol: 'BTC', side: 'long', size: 0.5, entry: 80000, mark: 82000, pnl: 1000, liquidation: 60000 },
+      { symbol: 'ETH', side: 'short', size: 2, entry: 2400, mark: 2300, pnl: 200, liquidation: null }
+    ]);
+    expect(hlPortfolioPnl(null)).toEqual({ allTime: null, day: null, week: null, month: null });
+  });
+
+  it('تی‌اکس‌فلو: سود کل = ارزش − خالص واریز؛ دوره‌ای نامعلوم (حدس زده نمی‌شود)', () => {
+    const ledger = [
+      { time: 1, delta: { type: 'deposit', usdc: '10000' } },
+      { time: 2, delta: { type: 'withdraw', usdc: '1000', fee: '1' } }
+    ];
+    const a = fromHlLike('t1', 'تی‌اکس', 'txflow', A, state, 'ready', false, { ledger });
+    expect(ledgerNetDeposits(ledger)).toBe(8999);
+    expect(a).toMatchObject({ equity: 12000, allTimePnl: 3001, realizedPnl: 1801, periodPnl: { day: null, week: null, month: null } });
+  });
+
+  it('رویداد ناشناخته در دفتر یا state دریافت‌نشده → نامعلوم، نه صفر', () => {
+    expect(ledgerNetDeposits([{ time: 1, delta: { type: 'deposit', usdc: '5' } }, { time: 2, delta: { type: 'internalTransfer', usdc: '5' } }])).toBeNull();
+    expect(ledgerNetDeposits(null)).toBeNull();
+    const a = fromHlLike('t2', 'x', 'txflow', A, null, 'error', false);
+    expect(a).toMatchObject({ equity: null, unrealizedPnl: null, allTimePnl: null, positions: [] });
+    expect(perpTotals([a, fromHlLike('h', 'y', 'hyperliquid', A, state, 'ready', false)]).partial).toBe(true);
   });
 });
