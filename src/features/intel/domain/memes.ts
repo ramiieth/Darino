@@ -9,6 +9,8 @@ export interface MemeToken {
   name: string;
   image: string | null;
   poolAddress: string;
+  /** شناسهٔ DEX در GeckoTerminal؛ «pump-fun» یعنی هنوز روی بوندینگ‌کرو */
+  dex: string | null;
   priceUsd: number | null;
   marketCap: number | null;
   liquidityUsd: number | null;
@@ -38,6 +40,7 @@ export function parsePools(raw: unknown): MemeToken[] {
   for (const pool of body.data ?? []) {
     const a = (pool?.attributes ?? {}) as Raw;
     const baseId = ((pool?.relationships as Raw | undefined)?.base_token as Raw | undefined)?.data as Raw | undefined;
+    const dexRef = ((pool?.relationships as Raw | undefined)?.dex as Raw | undefined)?.data as Raw | undefined;
     const t = tokens.get(String(baseId?.id ?? ''));
     const address = typeof t?.address === 'string' ? t.address : '';
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || SKIP.has(address) || out.some((m) => m.address === address)) continue;
@@ -51,6 +54,7 @@ export function parsePools(raw: unknown): MemeToken[] {
       name: String(t?.name ?? '').slice(0, 60),
       image,
       poolAddress: String(a.address ?? ''),
+      dex: typeof dexRef?.id === 'string' ? dexRef.id : null,
       priceUsd: n(a.base_token_price_usd),
       marketCap: n(a.market_cap_usd) ?? n(a.fdv_usd),
       liquidityUsd: n(a.reserve_in_usd),

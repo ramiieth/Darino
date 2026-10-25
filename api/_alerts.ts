@@ -25,6 +25,8 @@ import {
 import { getPerpsRead } from './_perpsRead.js';
 import { hlInfo, pool } from './_hyperliquid.js';
 import { warmSummaries } from './_tradersRoute.js';
+import { readMemeScreen, warmMemeScreen } from './_memeScreen.js';
+import { sanitizeWatch, watchEvents, watchMessage, type MemeWatchState } from '../src/features/intel/domain/memeWatch.js';
 import { followMessage, positionEvents, sanitizeSaved, shortAddr, type SavedTrader } from '../src/features/traders/domain/follow.js';
 import type { Fill } from '../src/features/traders/domain/types.js';
 import { generateVapidKeys, sendPush, validSubscription, type PushMessage, type PushSubscriptionRecord, type VapidKeys } from './_webpush.js';
@@ -253,6 +255,7 @@ export async function checkUser(store: AlertsStore, userId: string, now = Date.n
     if (!errors.some((e) => e.endsWith('-account'))) await store.put(userId, 'state', nextState);
   }
   sent += await checkFollowedTraders(store, userId, now, errors);
+  sent += await checkMemeWatch(store, userId, errors);
   return { sent, flips: flips.length, nearLiquidation: near, exposures, errors: [...new Set(errors)] };
 }
 
@@ -288,6 +291,19 @@ async function checkFollowedTraders(store: AlertsStore, userId: string, now: num
   return sent;
 }
 
+/** فهرست انتظار میم‌کوین: کوینی که همهٔ فیلترها را رد کند و بازار هم صعودی باشد → یک اعلان */
+async function checkMemeWatch(store: AlertsStore, userId: string, errors: string[]): Promise<number> {
+  const state = await store.get<MemeWatchState>(userId, 'memeWatch');
+  const ids = sanitizeWatch(state?.ids);
+  if (!ids.length) return 0;
+  const screen = await readMemeScreen().catch(() => null);
+  if (!screen) { errors.push('meme-screen'); return 0; }
+  const { alerts, next } = watchEvents(ids, screen, state?.last ?? {});
+  for (const c of alerts) await notify(store, userId, { ...watchMessage(c), url: '/intel?tab=memes', tag: `meme-${c.id}` });
+  await store.put(userId, 'memeWatch', { ids, last: next });
+  return alerts.length;
+}
+
 /** ذخیرهٔ «آدرس‌های من» از هر دستگاه؛ تریدر تازه دنبال‌شده از «الان» پایش می‌شود، نه از گذشته */
 export async function saveTraders(store: AlertsStore, userId: string, raw: unknown, now = Date.now()): Promise<SavedTrader[]> {
   const saved = sanitizeSaved(raw);
@@ -315,6 +331,8 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
   }
   // خلاصهٔ کارنامهٔ چند تریدر برتر را هم گرم می‌کند تا فهرست بدون باز بودن صفحه آماده باشد
   await warmSummaries().catch(() => { errors.push('traders-warm'); });
+  // غربال میم‌کوین را چند کوین در هر تیک تازه می‌کند (سقف درخواست CoinGecko)
+  await warmMemeScreen().catch(() => { errors.push('meme-warm'); });
   const latest = (await store.get<TickInfo>(SYSTEM, 'tick')) ?? info;
   await store.put(SYSTEM, 'tick', { ...latest, lastAt: now, lastResult: { users: users.length, sent, errors: [...new Set(errors)] } });
   return { skipped: false, users: users.length, sent };
@@ -353,12 +371,13 @@ export async function removeDevice(store: AlertsStore, userId: string, id: strin
 
 /* ---------------- مسیرهای احراز‌شده ---------------- */
 
-export const ALERT_OPS = ['alerts-status', 'alerts-rules', 'alerts-test', 'alerts-check', 'alerts-tick-key', 'push-subscribe', 'push-unsubscribe', 'traders-get', 'traders-put'] as const;
+export const ALERT_OPS = ['alerts-status', 'alerts-rules', 'alerts-test', 'alerts-check', 'alerts-tick-key', 'push-subscribe', 'push-unsubscribe', 'traders-get', 'traders-put', 'memes-watch-get', 'memes-watch-put'] as const;
 
 /** فقط با نشست معتبر؛ userId از نشست. پاسخ: [status, body] */
 export async function handleAlertsOp(store: AlertsStore, op: string, method: string, userId: string, readBody: () => Promise<Record<string, unknown>>): Promise<[number, unknown]> {
   if (op === 'alerts-status' && method === 'GET') return [200, await status(store, userId)];
   if (op === 'traders-get' && method === 'GET') return [200, { saved: (await getTradersState(store, userId)).saved }];
+  if (op === 'memes-watch-get' && method === 'GET') return [200, { ids: sanitizeWatch((await store.get<MemeWatchState>(userId, 'memeWatch'))?.ids) }];
   if (method !== 'POST') return [405, { error: 'روش درخواست مجاز نیست' }];
   const body = await readBody();
   switch (op) {
@@ -382,6 +401,17 @@ export async function handleAlertsOp(store: AlertsStore, op: string, method: str
       return [200, await checkUser(store, userId)];
     case 'traders-put':
       return [200, { saved: await saveTraders(store, userId, body.saved) }];
+    case 'memes-watch-put': {
+      const ids = sanitizeWatch(body.ids);
+      const prev = (await store.get<MemeWatchState>(userId, 'memeWatch'))?.last ?? {};
+      // کوین تازه با وضعیت فعلی‌اش شروع می‌شود تا اگر همین الان آماده است، اعلان «تازه» نرود
+      const screen = await readMemeScreen().catch(() => null);
+      const now = screen ? watchEvents(ids, screen, {}).next : {};
+      const last: Record<string, boolean> = {};
+      for (const id of ids) last[id] = prev[id] ?? now[id] ?? false;
+      await store.put(userId, 'memeWatch', { ids, last });
+      return [200, { ids }];
+    }
     case 'alerts-tick-key':
       return [200, { key: await rotateTickKey(store) }];
     default:
