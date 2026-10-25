@@ -6,6 +6,10 @@
  *   QFEX_PUBLIC_KEY · QFEX_SECRET_KEY                   (کیوفکس: HMAC-SHA256 روی nonce:unix_ts)
  *   ASTER_USER · ASTER_SIGNER · ASTER_SIGNER_PRIVATE_KEY (آستر V3: امضای EIP-712 کیف پول API)
  * فقط endpointهای خواندنی صدا زده می‌شوند. پلتفرمی که کلیدش تنظیم نشده اصلاً نمایش داده نمی‌شود.
+ *
+ * آدرس عمومی حساب‌هایی که با آدرس خوانده می‌شوند (بدون فیلد آدرس در UI؛ چند آدرس با کاما):
+ *   HYPERLIQUID_ADDRESS · LIGHTER_ADDRESS · LIGHTER_ROBINHOOD_ADDRESS · TXFLOW_ADDRESS
+ * سرور فقط آدرس را برمی‌گرداند؛ خواندن حساب مثل حساب‌های ثبت‌شده در مرورگر انجام می‌شود.
  * ============================================================ */
 import { createHmac, randomBytes } from 'node:crypto';
 import { addressOf, signMessage } from './_eip712.js';
@@ -106,6 +110,25 @@ async function aster(): Promise<KeyedSnapshot> {
   const positions = await get('/fapi/v3/positionRisk');
   const incomes = await get('/fapi/v3/income', { startTime: String(Date.now() - 30 * 86_400_000), limit: String(ASTER_INCOME_LIMIT) }).catch(() => []);
   return asterSnapshot({ account, positions, incomes });
+}
+
+/* ---------------- آدرس‌های env ---------------- */
+
+export type AddressVenue = 'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow';
+const ADDRESS_ENV: Record<AddressVenue, string> = {
+  hyperliquid: 'HYPERLIQUID_ADDRESS',
+  'lighter-mainnet': 'LIGHTER_ADDRESS',
+  'lighter-robinhood': 'LIGHTER_ROBINHOOD_ADDRESS',
+  txflow: 'TXFLOW_ADDRESS'
+};
+
+/** آدرس‌های معتبر EVM هر پلتفرم از env (نامعتبرها بی‌صدا کنار می‌روند؛ حداکثر ۵ برای هر پلتفرم) */
+export function envAddresses(): Record<AddressVenue, string[]> {
+  const out = {} as Record<AddressVenue, string[]>;
+  for (const [venue, key] of Object.entries(ADDRESS_ENV) as [AddressVenue, string][]) {
+    out[venue] = [...new Set(env(key).split(/[,\s]+/).filter((a) => EVM.test(a)).map((a) => a.toLowerCase()))].slice(0, 5);
+  }
+  return out;
 }
 
 /* ---------------- همه ---------------- */
