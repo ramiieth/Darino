@@ -14,7 +14,7 @@ import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBa
 import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getLighterPnl, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
-import { getKeyedPerps } from './_keyedPerps.js';
+import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
 import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
@@ -65,7 +65,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       json(res,status,body); return;
     }
     // حساب‌های آستر/کیوفکس/اوندو با کلید فقط‌خواندنی env؛ فقط کاربر واردشده، بدون کش عمومی
-    if (op === 'keyed-perps' && req.method === 'GET') { res.setHeader('Cache-Control','private, no-store'); json(res,200,{ venues: await getKeyedPerps() }); return; }
+    if (op === 'keyed-perps' && req.method === 'GET') { res.setHeader('Cache-Control','private, no-store'); json(res,200,{ venues: await getKeyedPerps(), addresses: envAddresses() }); return; }
     if (req.method === 'POST' && op === 'analyze') {
       const parsed = analysisSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات تحلیل کامل یا معتبر نیست' }); return; }

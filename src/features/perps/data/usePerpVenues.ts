@@ -5,6 +5,7 @@
  *   هایپرلیکوئید: info/clearinghouseState + info/portfolio (عمومی، فقط آدرس)
  *   تی‌اکس‌فلو: rpc.txflow.com/info clearinghouseState + دفتر واریز/برداشت (API سازگار با هایپرلیکوئید)
  *   آستر، کیوفکس، اوندو پرپس: /api/integrations?op=keyed-perps با کلید فقط‌خواندنی در env ورسل (فقط کاربر واردشده)
+ *   آدرس‌های env (HYPERLIQUID_ADDRESS، LIGHTER_ADDRESS، …) از همان پاسخ؛ مثل حساب ثبت‌شده خوانده می‌شوند
  * هر حساب «پلتفرم» با آدرس عمومی در مدیریت کیف پول‌ها ثبت می‌شود؛ بدون کلید یا امضا.
  */
 import { useQueries, useQuery } from '@tanstack/react-query';
@@ -17,13 +18,36 @@ import { hlClearinghouseState, hlPortfolio } from '@/features/hyperliquid/data/h
 import { txflowInfo } from '@/features/calculators/data/perpMarkets';
 import { LIGHTER_PLATFORM, lighterAccountQuery, lighterPnlQuery, type LighterNetwork } from './lighterAccount';
 
+type KeyedResponse = { venues: Parameters<typeof fromKeyed>[0][]; addresses?: Partial<Record<'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow', string[]>> };
+
+/** یک درخواست برای حساب‌های کلیددار و آدرس‌های env؛ بدون ورود یا بدون env → خالی */
+const keyedPerpsQuery = {
+  queryKey: ['perp-keyed'],
+  queryFn: () => fetchJson<KeyedResponse>('/api/integrations?op=keyed-perps', { timeoutMs: 20_000 }),
+  staleTime: 30_000,
+  refetchInterval: 60_000,
+  retry: 0
+} as const;
+
+const ENV_LABEL = { hyperliquid: 'حساب هایپرلیکوئید', 'lighter-mainnet': 'حساب لایتر', 'lighter-robinhood': 'حساب لایتر رابین‌هود', txflow: 'حساب تی‌اکس‌فلو' } as const;
+
+/** آدرس‌های عمومی env یک پلتفرم که هنوز به‌عنوان حساب ثبت نشده‌اند */
+function useEnvAddresses(platform: keyof typeof ENV_LABEL, registered: readonly string[]): { id: string; label: string; address: string }[] {
+  const q = useQuery(keyedPerpsQuery);
+  const seen = new Set(registered.map((a) => a.toLowerCase()));
+  return (q.data?.addresses?.[platform] ?? []).filter((a) => !seen.has(a.toLowerCase())).map((address) => ({ id: `env:${platform}:${address}`, label: ENV_LABEL[platform], address }));
+}
+
 export function useLighterVenues(): PerpVenueAccount[] {
   const custody = useCustody();
-  const linked = custody.holdings.flatMap((h) => {
+  const fromHoldings = custody.holdings.flatMap((h) => {
     if (h.kind !== 'platform' || h.archivedAt || !h.address) return [];
     const network = (Object.keys(LIGHTER_PLATFORM) as LighterNetwork[]).find((n) => LIGHTER_PLATFORM[n] === h.platformId);
     return network ? [{ id: h.id, label: h.label, address: h.address, network }] : [];
   });
+  const envMain = useEnvAddresses('lighter-mainnet', fromHoldings.filter((l) => l.network === 'mainnet').map((l) => l.address));
+  const envRh = useEnvAddresses('lighter-robinhood', fromHoldings.filter((l) => l.network === 'robinhood').map((l) => l.address));
+  const linked = [...fromHoldings, ...envMain.map((e) => ({ ...e, network: 'mainnet' as const })), ...envRh.map((e) => ({ ...e, network: 'robinhood' as const }))];
   const queries = useQueries({ queries: linked.map((l) => lighterAccountQuery(l.address, l.network)) });
   const accounts = linked.map((l, i) => (queries[i].data ? lighterAccounts(queries[i].data, l.address) : null));
   const subs = linked.flatMap((l, i) => (accounts[i] ?? []).map((a) => ({ link: i, index: a.index, network: l.network })));
@@ -64,11 +88,14 @@ export const hlLikeAccountQuery = (venue: HlLikeVenue, address: string) => ({
 
 export function useHlLikeVenues(): PerpVenueAccount[] {
   const custody = useCustody();
-  const linked = custody.holdings.flatMap((h) => {
+  const fromHoldings = custody.holdings.flatMap((h) => {
     if (h.kind !== 'platform' || h.archivedAt || !h.address) return [];
     const venue = (Object.keys(HL_LIKE_PLATFORMS) as HlLikeVenue[]).find((v) => HL_LIKE_PLATFORMS[v] === h.platformId);
     return venue ? [{ id: h.id, label: h.label, address: h.address, venue }] : [];
   });
+  const envHl = useEnvAddresses('hyperliquid', fromHoldings.filter((l) => l.venue === 'hyperliquid').map((l) => l.address));
+  const envTx = useEnvAddresses('txflow', fromHoldings.filter((l) => l.venue === 'txflow').map((l) => l.address));
+  const linked = [...fromHoldings, ...envHl.map((e) => ({ ...e, venue: 'hyperliquid' as const })), ...envTx.map((e) => ({ ...e, venue: 'txflow' as const }))];
   const queries = useQueries({ queries: linked.map((l) => hlLikeAccountQuery(l.venue, l.address)) });
   return linked.map((l, i) => {
     const q = queries[i];
@@ -83,13 +110,7 @@ const KEYED_LABEL = { aster: 'حساب آستر', qfex: 'حساب کیوفکس',
  * پلتفرم‌هایی که کلیدشان در env ورسل تنظیم شده؛ بدون کلید یا بدون ورود → هیچ کارتی (خطا نشان داده نمی‌شود)
  */
 export function useKeyedVenues(): PerpVenueAccount[] {
-  const q = useQuery({
-    queryKey: ['perp-keyed'],
-    queryFn: () => fetchJson<{ venues: Parameters<typeof fromKeyed>[0][] }>('/api/integrations?op=keyed-perps', { timeoutMs: 20_000 }),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    retry: 0
-  });
+  const q = useQuery(keyedPerpsQuery);
   return (q.data?.venues ?? []).map((r) => ({ ...fromKeyed(r, KEYED_LABEL[r.venue]), stale: q.isError && !!q.data }));
 }
 

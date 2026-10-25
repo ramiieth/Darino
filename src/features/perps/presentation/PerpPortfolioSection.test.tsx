@@ -54,3 +54,19 @@ it('Hyperliquid and TxFlow accounts get their own cards; Hyperliquid links to it
  expect(text).toContain('+۵۰۰');   // از ابتدا: ۴۰۰ + (۱۰۰۰ − ۹۰۰)
  expect(text).toContain('۴,۰۰۰');  // ارزش کل: ۳۰۰۰ + ۱۰۰۰
 });
+
+it('addresses from Vercel env (HYPERLIQUID_ADDRESS / LIGHTER_ADDRESS) get cards without any registered holding; registered addresses are not duplicated',()=>{
+ const HL='0x00000000000000000000000000000000000000bb';
+ holdings.list=[{id:'tx',kind:'platform',platformId:'txflow',address:ADDR,label:'تی‌اکس من',archivedAt:null}];
+ const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+ client.setQueryData(['perp-keyed'],{venues:[],addresses:{hyperliquid:[HL],'lighter-mainnet':[ADDR],'lighter-robinhood':[],txflow:[ADDR]}});
+ client.setQueryData(['perp-account','hyperliquid',HL],{state:{marginSummary:{accountValue:'2500'},assetPositions:[]},portfolio:[['perpAllTime',{pnlHistory:[[1,'0'],[2,'300']]}]],ledger:null});
+ client.setQueryData(['perp-account','txflow',ADDR],{state:{marginSummary:{accountValue:'0'},assetPositions:[]},portfolio:null,ledger:[]});
+ client.setQueryData(['lighter-mainnet-account',ADDR],{accounts:[{account_index:3,l1_address:ADDR,total_asset_value:'700',positions:[]}]});
+ renderWith(client,[] as unknown as ConnectedPortfolio['arcus']);
+ expect(screen.getByText('حساب هایپرلیکوئید')).toBeTruthy();
+ expect(screen.getByText('حساب لایتر')).toBeTruthy();
+ expect(screen.getByText('تی‌اکس من')).toBeTruthy();
+ expect(screen.queryByText('حساب تی‌اکس‌فلو')).toBeNull();   // همان آدرس قبلاً ثبت شده
+ expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/intel?a=${HL}`);
+});

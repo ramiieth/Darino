@@ -66,3 +66,13 @@ describe('getKeyedPerps', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('آدرس‌های env', () => {
+  it('چند آدرس با کاما/فاصله، حروف کوچک، بدون تکرار؛ نامعتبر کنار می‌رود', async () => {
+    const A = '0x' + 'A'.repeat(40), B = '0x' + 'b'.repeat(40);
+    Object.assign(process.env, { HYPERLIQUID_ADDRESS: `${A}, ${A.toLowerCase()} bad`, LIGHTER_ADDRESS: B });
+    const { envAddresses } = await load();
+    expect(envAddresses()).toEqual({ hyperliquid: [A.toLowerCase()], 'lighter-mainnet': [B], 'lighter-robinhood': [], txflow: [] });
+    delete process.env.HYPERLIQUID_ADDRESS; delete process.env.LIGHTER_ADDRESS;
+  });
+});

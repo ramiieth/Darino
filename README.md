@@ -446,7 +446,10 @@ External API → Server Fetch → Normalize → Validate → Cache مرکزی �
 
 - **اوندو پرپس:** `ONDO_PERPS_KEY_ID` (با پیشوند `ondoKeyId_`) و `ONDO_PERPS_API_SECRET` (با پیشوند `ondoApiSecret_`) — در app.ondoperps.xyz → API Keys فقط مجوز خواندن را انتخاب کنید؛ IP Whitelist را خالی بگذارید (IP ورسل ثابت نیست).
 - **کیوفکس:** `QFEX_PUBLIC_KEY` و `QFEX_SECRET_KEY` — در qfex.com → Developer Settings فقط View positions و View balance؛ Execute orders و Deposit/withdraw خاموش.
-- **آستر (V3):** `ASTER_USER` (آدرس کیف پول اصلی)، `ASTER_SIGNER` (آدرس کیف پول API) و `ASTER_SIGNER_PRIVATE_KEY` (کلید خصوصی همان کیف پول API، نه کیف پول اصلی) — از asterdex.com/en/api-wallet. کلید V1 از مارس ۲۰۲۶ دیگر صادر نمی‌شود.
+- **آستر (V3):** `ASTER_USER` (آدرس کیف پول اصلی)، `ASTER_SIGNER` (آدرس کیف پول API) و `ASTER_SIGNER_PRIVATE_KEY` (کلید خصوصی همان کیف پول API، نه کیف پول اصلی). آستر V3 «API Key/Secret» ندارد (V1 از مارس ۲۰۲۶ صادر نمی‌شود): در asterdex.com/en/api-wallet بالای صفحه **Pro API** را انتخاب کنید و یک API Wallet (Agent) بسازید؛ اسپات، پرپ و برداشت را خاموش بگذارید و تاریخ انقضای دور بدهید (بعد از انقضا کارت «دریافت نشد» می‌شود).
+
+**حساب‌هایی که با آدرس عمومی خوانده می‌شوند** (بدون فیلد آدرس در اپ؛ چند آدرس را با کاما جدا کنید):
+`HYPERLIQUID_ADDRESS` · `LIGHTER_ADDRESS` · `LIGHTER_ROBINHOOD_ADDRESS` · `TXFLOW_ADDRESS` — همان آدرس کیف پولی که با آن روی پلتفرم معامله می‌کنید. اگر همان آدرس از «مدیریت کیف پول‌ها» هم اضافه شده باشد، کارت تکراری ساخته نمی‌شود.
 
 پیشوند `VITE_` نگذارید. برای بقیهٔ اتصال‌ها هیچ کلید خصوصی کیف پول، امضا، مجوز انتقال یا اتصال CLI لازم نیست. مسیر `/api/integrations` نیازمند نشست معتبر است؛ درخواست تحلیل به کنترل Origin و CSRF موجود اپ نیز وابسته است. کلیدها تنها به هدر درخواست سرور ارائه‌دهنده اضافه می‌شوند. حالت وضعیت اتصال فقط تنظیم‌بودن کلید را نشان می‌دهد و صحت یا سهمیهٔ آن را تضمین نمی‌کند.
 
