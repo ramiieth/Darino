@@ -4,7 +4,7 @@ const h=vi.hoisted(()=>({book:null as unknown,sql:vi.fn(),status:0,body:{} as Re
 vi.mock('../../api/_authCore',()=>({requireSession:vi.fn(async()=>({userId:'owner-only'}))}));
 vi.mock('../../api/_schema',()=>({ensureSchema:vi.fn(async()=>true)}));
 vi.mock('../../api/_neon',()=>({isDbConfigured:()=>true,db:()=>h.sql,readBody:async()=>({entries:[{id:1}]}),json:(_res:unknown,status:number,body:Record<string,unknown>)=>{h.status=status;h.body=body;}}));
-import handler from '../../api/accounting';
+import handler from '../../api/_accountingRoute';
 beforeEach(()=>{h.book=null;h.sql.mockReset();h.sql.mockImplementation(async(strings:TemplateStringsArray)=>strings.join('').includes('SELECT payload')?(h.book?[{payload:{value:h.book}}]:[]):[]);});
 const call=(method:string,url='/api/accounting')=>handler({method,url} as never,{} as never);
 describe('retirement of the obsolete cash ledger',()=>{

@@ -4,36 +4,14 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
   "functions": {
-    "api/boros.ts": {
+    "api/data.ts": {
       "includeFiles": "db/schema.sql"
     },
-    "api/borosAccount.ts": {
+    "api/markets.ts": {
       "includeFiles": "db/schema.sql",
       "maxDuration": 60
     },
-    "api/health.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/accounting.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/portfolio.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/dashboard.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/propertyMarket.ts": {
-      "includeFiles": "db/schema.sql",
-      "maxDuration": 60
-    },
-    "api/auth.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/custody.ts": {
-      "includeFiles": "db/schema.sql"
-    },
-    "api/integrations.ts": {
+    "api/services.ts": {
       "includeFiles": "db/schema.sql",
       "maxDuration": 60
     }
@@ -41,24 +19,80 @@
   "rewrites": [
     {
       "source": "/api/zerionWebhook",
-      "destination": "/api/integrations?op=zerion-webhook"
+      "destination": "/api/services?__fn=integrations&op=zerion-webhook"
     },
     {
       "source": "/api/cg/:path*",
-      "destination": "/api/cg?__p=/:path*"
+      "destination": "/api/markets?__fn=cg&__p=/:path*"
     },
     {
       "source": "/api/boros/:path*",
-      "destination": "/api/boros?__p=/:path*"
+      "destination": "/api/markets?__fn=boros&__p=/:path*"
+    },
+    {
+      "source": "/api/auth",
+      "destination": "/api/data?__fn=auth"
+    },
+    {
+      "source": "/api/accounting",
+      "destination": "/api/data?__fn=accounting"
+    },
+    {
+      "source": "/api/portfolio",
+      "destination": "/api/data?__fn=portfolio"
+    },
+    {
+      "source": "/api/dashboard",
+      "destination": "/api/data?__fn=dashboard"
+    },
+    {
+      "source": "/api/custody",
+      "destination": "/api/data?__fn=custody"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/data?__fn=health"
+    },
+    {
+      "source": "/api/cg",
+      "destination": "/api/markets?__fn=cg"
+    },
+    {
+      "source": "/api/usdt",
+      "destination": "/api/markets?__fn=usdt"
+    },
+    {
+      "source": "/api/boros",
+      "destination": "/api/markets?__fn=boros"
+    },
+    {
+      "source": "/api/propertyMarket",
+      "destination": "/api/markets?__fn=propertyMarket"
+    },
+    {
+      "source": "/api/traders",
+      "destination": "/api/markets?__fn=traders"
+    },
+    {
+      "source": "/api/intel",
+      "destination": "/api/markets?__fn=intel"
+    },
+    {
+      "source": "/api/integrations",
+      "destination": "/api/services?__fn=integrations"
+    },
+    {
+      "source": "/api/borosAccount",
+      "destination": "/api/services?__fn=borosAccount"
     }
   ],
   "crons": [
     {
-      "path": "/api/propertyMarket?market=car&cron=1",
+      "path": "/api/markets?__fn=propertyMarket&market=car&cron=1",
       "schedule": "30 6 * * *"
     },
     {
-      "path": "/api/propertyMarket?market=property&cron=1",
+      "path": "/api/markets?__fn=propertyMarket&market=property&cron=1",
       "schedule": "0 5 * * *"
     }
   ]

@@ -23,6 +23,10 @@ import {
   type LiqState
 } from '../src/features/alerts/domain/rules.js';
 import { getPerpsRead } from './_perpsRead.js';
+import { hlInfo, pool } from './_hyperliquid.js';
+import { warmSummaries } from './_tradersRoute.js';
+import { followMessage, positionEvents, sanitizeSaved, shortAddr, type SavedTrader } from '../src/features/traders/domain/follow.js';
+import type { Fill } from '../src/features/traders/domain/types.js';
 import { generateVapidKeys, sendPush, validSubscription, type PushMessage, type PushSubscriptionRecord, type VapidKeys } from './_webpush.js';
 
 const SYSTEM = '__system';
@@ -32,6 +36,13 @@ const ONDO = 'https://api.ondoperps.xyz';
 const MIN_TICK_GAP_MS = 60_000;
 const MAX_SUBSCRIPTIONS = 10;
 const LOG_SIZE = 20;
+/** اعلان تریدر دنبال‌شده در هر تیک برای هر کاربر */
+const MAX_TRADER_ALERTS = 5;
+/** بعد از قطعی طولانی تیک، فقط رویدادهای این بازهٔ اخیر اعلان می‌شوند (نه سیل اعلان قدیمی) */
+const FOLLOW_LOOKBACK_MS = 3_600_000;
+
+/** «آدرس‌های من» در حساب کاربر + آخرین fill دیده‌شدهٔ هر تریدر دنبال‌شده */
+export interface TradersState { saved: SavedTrader[]; cursors: Record<string, number> }
 
 export interface StoredSubscription extends PushSubscriptionRecord { label: string | null; createdAt: number }
 export interface LogEntry { at: number; title: string; body: string; push: number; bale: 'sent' | 'off' | 'failed' }
@@ -43,7 +54,7 @@ export interface AlertsStore {
   subscriptions(userId: string): Promise<StoredSubscription[]>;
   addSubscription(userId: string, sub: PushSubscriptionRecord, label: string | null): Promise<void>;
   removeSubscription(userId: string, endpoint: string): Promise<void>;
-  /** کاربرانی که قاعده ذخیره کرده‌اند */
+  /** کاربرانی که قاعده یا تریدر دنبال‌شده دارند */
   users(): Promise<string[]>;
   holdings(userId: string): Promise<unknown[]>;
 }
@@ -70,7 +81,7 @@ export function neonAlertsStore(sql: NeonQueryFunction<false, false>): AlertsSto
       await sql`DELETE FROM "pushSubscriptions" WHERE "userId"=${userId} AND endpoint=${endpoint}`;
     },
     async users() {
-      const rows = (await sql`SELECT "userId" FROM "alertsStore" WHERE "key"='rules' AND "userId"<>${SYSTEM}`) as { userId: string }[];
+      const rows = (await sql`SELECT DISTINCT "userId" FROM "alertsStore" WHERE "key" IN ('rules','traders') AND "userId"<>${SYSTEM}`) as { userId: string }[];
       return rows.map((r) => r.userId);
     },
     async holdings(userId) {
@@ -241,7 +252,50 @@ export async function checkUser(store: AlertsStore, userId: string, now = Date.n
     // فقط خطای دریافت نداشته باشیم وضعیت را جایگزین می‌کنیم؛ وگرنه هشدار تکراری می‌شود
     if (!errors.some((e) => e.endsWith('-account'))) await store.put(userId, 'state', nextState);
   }
+  sent += await checkFollowedTraders(store, userId, now, errors);
   return { sent, flips: flips.length, nearLiquidation: near, exposures, errors: [...new Set(errors)] };
+}
+
+export async function getTradersState(store: AlertsStore, userId: string): Promise<TradersState> {
+  const raw = await store.get<TradersState>(userId, 'traders');
+  return { saved: sanitizeSaved(raw?.saved), cursors: raw?.cursors && typeof raw.cursors === 'object' ? raw.cursors : {} };
+}
+
+/** fillهای تازهٔ تریدرهای دنبال‌شده → یک اعلان برای هر تریدر (باز/بسته/برگشت/تغییر بزرگ) */
+async function checkFollowedTraders(store: AlertsStore, userId: string, now: number, errors: string[]): Promise<number> {
+  const state = await getTradersState(store, userId);
+  const followed = state.saved.filter((s) => s.follow);
+  if (!followed.length) return 0;
+  const cursors = { ...state.cursors };
+  const results = await pool(followed, 3, async (t) => {
+    const since = cursors[t.address];
+    if (!since) return { t, fills: null as Fill[] | null };
+    const fills = await hlInfo<Fill[]>({ type: 'userFillsByTime', user: t.address, startTime: Math.max(since + 1, now - FOLLOW_LOOKBACK_MS), aggregateByTime: true });
+    return { t, fills: Array.isArray(fills) ? fills : [] };
+  });
+  let sent = 0;
+  for (const [i, r] of results.entries()) {
+    const t = followed[i];
+    if (!r) { errors.push('trader-fills'); continue; }
+    if (!r.fills) { cursors[t.address] = now; continue; }
+    if (r.fills.length) cursors[t.address] = Math.max(...r.fills.map((f) => f.time));
+    const events = positionEvents(r.fills);
+    if (!events.length || sent >= MAX_TRADER_ALERTS) continue;
+    await notify(store, userId, { ...followMessage(t.label ?? shortAddr(t.address), events), url: `/intel?tab=traders&a=${t.address}`, tag: `trader-${t.address}` });
+    sent++;
+  }
+  await store.put(userId, 'traders', { saved: state.saved, cursors });
+  return sent;
+}
+
+/** ذخیرهٔ «آدرس‌های من» از هر دستگاه؛ تریدر تازه دنبال‌شده از «الان» پایش می‌شود، نه از گذشته */
+export async function saveTraders(store: AlertsStore, userId: string, raw: unknown, now = Date.now()): Promise<SavedTrader[]> {
+  const saved = sanitizeSaved(raw);
+  const prev = await getTradersState(store, userId);
+  const cursors: Record<string, number> = {};
+  for (const s of saved) if (s.follow) cursors[s.address] = prev.cursors[s.address] ?? now;
+  await store.put(userId, 'traders', { saved, cursors });
+  return saved;
 }
 
 /** بررسی دوره‌ای همهٔ کاربران؛ اجرای پشت‌سرهم کمتر از یک دقیقه نادیده گرفته می‌شود */
@@ -259,6 +313,8 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
       errors.push('check-failed');
     }
   }
+  // خلاصهٔ کارنامهٔ چند تریدر برتر را هم گرم می‌کند تا فهرست بدون باز بودن صفحه آماده باشد
+  await warmSummaries().catch(() => { errors.push('traders-warm'); });
   const latest = (await store.get<TickInfo>(SYSTEM, 'tick')) ?? info;
   await store.put(SYSTEM, 'tick', { ...latest, lastAt: now, lastResult: { users: users.length, sent, errors: [...new Set(errors)] } });
   return { skipped: false, users: users.length, sent };
@@ -297,11 +353,12 @@ export async function removeDevice(store: AlertsStore, userId: string, id: strin
 
 /* ---------------- مسیرهای احراز‌شده ---------------- */
 
-export const ALERT_OPS = ['alerts-status', 'alerts-rules', 'alerts-test', 'alerts-check', 'alerts-tick-key', 'push-subscribe', 'push-unsubscribe'] as const;
+export const ALERT_OPS = ['alerts-status', 'alerts-rules', 'alerts-test', 'alerts-check', 'alerts-tick-key', 'push-subscribe', 'push-unsubscribe', 'traders-get', 'traders-put'] as const;
 
 /** فقط با نشست معتبر؛ userId از نشست. پاسخ: [status, body] */
 export async function handleAlertsOp(store: AlertsStore, op: string, method: string, userId: string, readBody: () => Promise<Record<string, unknown>>): Promise<[number, unknown]> {
   if (op === 'alerts-status' && method === 'GET') return [200, await status(store, userId)];
+  if (op === 'traders-get' && method === 'GET') return [200, { saved: (await getTradersState(store, userId)).saved }];
   if (method !== 'POST') return [405, { error: 'روش درخواست مجاز نیست' }];
   const body = await readBody();
   switch (op) {
@@ -323,6 +380,8 @@ export async function handleAlertsOp(store: AlertsStore, op: string, method: str
     }
     case 'alerts-check':
       return [200, await checkUser(store, userId)];
+    case 'traders-put':
+      return [200, { saved: await saveTraders(store, userId, body.saved) }];
     case 'alerts-tick-key':
       return [200, { key: await rotateTickKey(store) }];
     default:

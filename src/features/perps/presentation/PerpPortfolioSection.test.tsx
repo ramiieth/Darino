@@ -36,3 +36,21 @@ it('renders nothing without perp accounts; testnet Arcus is excluded',()=>{
  const testnet=[{...arcus[0],holding:{...arcus[0].holding,arcus:{env:'testnet',address:ADDR,accountIndex:0}}}] as unknown as ConnectedPortfolio['arcus'];
  expect(renderWith(new QueryClient(),testnet).container.textContent).toBe('');
 });
+
+it('Hyperliquid and TxFlow accounts get their own cards; Hyperliquid links to its trader report',()=>{
+ holdings.list=[
+  {id:'hl',kind:'platform',platformId:'hyperliquid',address:ADDR,label:'هایپر من',archivedAt:null},
+  {id:'tx',kind:'platform',platformId:'txflow',address:ADDR,label:'تی‌اکس من',archivedAt:null}
+ ];
+ const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});
+ const state={marginSummary:{accountValue:'3000'},assetPositions:[{position:{coin:'ETH',szi:'1',entryPx:'2300',positionValue:'2400',unrealizedPnl:'100',liquidationPx:'1500'}}]};
+ client.setQueryData(['perp-account','hyperliquid',ADDR],{state,portfolio:[['perpAllTime',{pnlHistory:[[1,'0'],[2,'400']]}]],ledger:null});
+ client.setQueryData(['perp-account','txflow',ADDR],{state:{marginSummary:{accountValue:'1000'},assetPositions:[]},portfolio:null,ledger:[{time:1,delta:{type:'deposit',usdc:'900'}}]});
+ const {container}=renderWith(client,[] as unknown as ConnectedPortfolio['arcus']);
+ expect(screen.getByText('هایپر من')).toBeTruthy();expect(screen.getByText('تی‌اکس من')).toBeTruthy();
+ expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/intel?a=${ADDR}`);
+ expect(screen.getByRole('link',{name:/باز کردن تی‌اکس‌فلو/}).getAttribute('href')).toBe('https://app.txflow.com/');
+ const text=container.textContent!;
+ expect(text).toContain('+۵۰۰');   // از ابتدا: ۴۰۰ + (۱۰۰۰ − ۹۰۰)
+ expect(text).toContain('۴,۰۰۰');  // ارزش کل: ۳۰۰۰ + ۱۰۰۰
+});

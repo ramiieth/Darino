@@ -1,6 +1,7 @@
 /**
  * داشبورد — بخش پرپچوال: سود/زیان همهٔ پلتفرم‌ها در بازهٔ انتخابی (۲۴ ساعت/۷ روز/۳۰ روز/از ابتدا)
- * + سود/زیان بسته‌شده، باز و ارزش حساب؛ یک کارت برای هر حساب (آرکوس، لایتر رابین‌هود، لایتر).
+ * + سود/زیان بسته‌شده، باز و ارزش حساب؛ یک کارت برای هر حساب (آرکوس، لایتر رابین‌هود، لایتر، هایپرلیکوئید،
+ * تی‌اکس‌فلو، و با کلید فقط‌خواندنی env: آستر، کیوفکس، اوندو پرپس).
  * محاسبات در domain/perpPortfolio؛ داده در data/usePerpVenues.
  */
 import { useState } from 'react';
@@ -20,10 +21,16 @@ import { perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } fro
 import { usePerpVenues } from '../data/usePerpVenues';
 import { MarketAssetIdentity } from './MarketAssetIdentity';
 
-const VENUE: Record<PerpVenue, { name: string; logo: string; network?: string; to: string }> = {
-  arcus: { name: 'آرکوس', logo: '/logos/platform-arcus.png', to: '/arcus' },
-  'lighter-robinhood': { name: 'لایتر رابین‌هود', logo: '/logos/platform-lighter.png', network: '/logos/chain-4663.svg', to: '/lighter-robinhood' },
-  'lighter-mainnet': { name: 'لایتر', logo: '/logos/platform-lighter.png', to: '/lighter' }
+/** to: مسیر داخلی (کارنامهٔ هایپرلیکوئید در هاب اطلاعات) · href: پلتفرم بیرونی */
+const VENUE: Record<PerpVenue, { name: string; logo: string; network?: string; to?: (a: PerpVenueAccount) => string; href?: string; cta?: string }> = {
+  arcus: { name: 'آرکوس', logo: '/logos/platform-arcus.png', to: () => '/arcus' },
+  'lighter-robinhood': { name: 'لایتر رابین‌هود', logo: '/logos/platform-lighter.png', network: '/logos/chain-4663.svg', to: () => '/lighter-robinhood' },
+  'lighter-mainnet': { name: 'لایتر', logo: '/logos/platform-lighter.png', to: () => '/lighter' },
+  hyperliquid: { name: 'هایپرلیکوئید', logo: '/logos/token-hype.png', to: (a) => `/intel?a=${a.address ?? ''}`, cta: 'کارنامه و تاریخچهٔ معاملات' },
+  txflow: { name: 'تی‌اکس‌فلو', logo: '/logos/platform-txflow.png', href: 'https://app.txflow.com/' },
+  aster: { name: 'آستر', logo: '/logos/platform-aster.png', href: 'https://www.asterdex.com/en/trade/pro/futures/BTCUSDT' },
+  qfex: { name: 'کیوفکس', logo: '/logos/platform-qfex.png', href: 'https://www.qfex.com/' },
+  ondo: { name: 'اوندو پرپس', logo: '/logos/platform-ondo.png', href: 'https://app.ondoperps.xyz/' }
 };
 type Range = PnlPeriod | 'all';
 const RANGES: { value: Range; label: string; title: string }[] = [
@@ -98,10 +105,17 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
         ) : (
           <p className="py-2 text-xs text-muted">{a.status === 'ready' ? 'پوزیشن بازی وجود ندارد؛ کل سود/زیان این حساب بسته‌شده است.' : ' '}</p>
         )}
-        <Link to={v.to} className={cn(buttonClass('ghost', 'sm'), 'w-full justify-between')}>
-          تاریخچه و جزئیات {v.name}
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-        </Link>
+        {v.to ? (
+          <Link to={v.to(a)} className={cn(buttonClass('ghost', 'sm'), 'w-full justify-between')}>
+            {v.cta ?? `تاریخچه و جزئیات ${v.name}`}
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+          </Link>
+        ) : v.href ? (
+          <a href={v.href} target="_blank" rel="noopener noreferrer" className={cn(buttonClass('ghost', 'sm'), 'w-full justify-between')}>
+            باز کردن {v.name}
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+          </a>
+        ) : null}
       </div>
     </Surface>
   );
@@ -123,7 +137,7 @@ export function PerpPortfolioSection({ arcus }: { arcus: ConnectedPortfolio['arc
               <MoneyValue value={pnlIn(t, range)} signed tone="auto" state={loading} />
             </div>
             <p className="mt-1.5 text-xs text-muted">
-              {rangeTitle(range)} · {toFaDigits(t.accounts)} حساب · {toFaDigits(t.positions)} پوزیشن باز{t.partial && ' · برخی مقادیر هنوز دریافت نشده‌اند'}
+              {rangeTitle(range)} · {toFaDigits(t.accounts)} حساب · {toFaDigits(t.positions)} پوزیشن باز{t.partial && ' · برخی مقادیر در دسترس نیست و در جمع نیامده'}
             </p>
           </div>
           <SegmentedControl label="بازهٔ سود/زیان" size="sm" options={RANGES.map(({ value, label }) => ({ value, label }))} value={range} onChange={setRange} />

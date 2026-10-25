@@ -24,6 +24,7 @@ const AlertsPage = lazy(() => import('@/features/alerts/presentation/AlertsPage'
 const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboard'));
 const ShoppingPage = lazy(() => import('@/features/shopping/presentation/ShoppingPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
+const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
 function Private({ children, label }: { children: React.ReactNode; label?: string }) {
@@ -62,6 +63,8 @@ export function App() {
             }
           />
           <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
+          <Route path="/intel" element={<Lazy label="هاب اطلاعات"><IntelHubPage /></Lazy>} />
+          <Route path="/traders" element={<Navigate to="/intel" replace />} />
           <Route
             path="/simulation"
             element={

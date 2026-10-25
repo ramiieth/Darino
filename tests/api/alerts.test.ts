@@ -93,3 +93,41 @@ describe('مسیرهای احراز‌شده', () => {
     expect((await handleAlertsOp(store, 'alerts-rules', 'GET', 'u1', async () => ({})))[0]).toBe(405);
   });
 });
+
+describe('تریدرهای دنبال‌شده و «آدرس‌های من»', () => {
+  const T = '0x' + 'a'.repeat(40);
+
+  it('ذخیره از دستگاه دیگر برگردانده می‌شود؛ دنبال کردن از «الان» پایش می‌شود', async () => {
+    const store = memoryStore();
+    const [status, body] = await handleAlertsOp(store, 'traders-put', 'POST', 'u1', async () => ({ saved: [{ address: T.toUpperCase().replace('0X', '0x'), label: 'نهنگ', follow: true }, { address: 'bad' }] }));
+    expect(status).toBe(200);
+    expect((body as { saved: unknown[] }).saved).toHaveLength(1);
+    const [, got] = await handleAlertsOp(store, 'traders-get', 'GET', 'u1', async () => ({}));
+    expect(got).toEqual({ saved: [expect.objectContaining({ address: T, label: 'نهنگ', follow: true })] });
+    expect((await store.get<{ cursors: Record<string, number> }>('u1', 'traders'))!.cursors[T]).toBeGreaterThan(0);
+    expect(await store.users()).toEqual([]); // memory mock only lists rules; neon lists traders too
+  });
+
+  it('fill تازهٔ تریدر دنبال‌شده → یک اعلان با جزئیات؛ تکرار نمی‌شود', async () => {
+    const store = memoryStore();
+    const t0 = Date.UTC(2026, 9, 25, 10);
+    await store.put('u1', 'rules', { funding: [], liquidation: { enabled: false, thresholdPct: 15 } });
+    await store.put('u1', 'traders', { saved: [{ address: T, label: 'نهنگ', addedAt: t0, follow: true }], cursors: { [T]: t0 } });
+    const live = browserSub();
+    await store.addSubscription('u1', live, null);
+    const fills = [{ coin: 'BTC', side: 'B', sz: '2', px: '80000', startPosition: '0', time: t0 + 60_000, dir: 'Open Long', closedPnl: '0', tid: 1 }];
+    const hlBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === 'https://api.hyperliquid.xyz/info') { const b = JSON.parse(String(init?.body)); hlBodies.push(b); return ok(b.startTime > t0 + 60_000 ? [] : fills); }
+      if (url.startsWith('https://fcm.googleapis.com/')) return new Response(null, { status: 201 });
+      throw new Error(`unexpected ${url}`);
+    }));
+    expect((await checkUser(store, 'u1', t0 + 120_000)).sent).toBe(1);
+    expect(hlBodies[0]).toMatchObject({ type: 'userFillsByTime', user: T, startTime: t0 + 1 });
+    const log = (await store.get<{ title: string; body: string }[]>('u1', 'log'))!;
+    expect(log[0].title).toBe('تریدر دنبال‌شده: نهنگ');
+    expect(log[0].body).toContain('لانگ BTC باز کرد $160.0k @ 80,000');
+    expect((await checkUser(store, 'u1', t0 + 180_000)).sent).toBe(0);
+    expect(hlBodies[1].startTime).toBe(t0 + 60_001);
+  });
+});

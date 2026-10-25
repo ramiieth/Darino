@@ -10,8 +10,8 @@ vi.mock('../../api/_neon.js', async (orig) => {
   return { ...actual, isDbConfigured: () => true, db: () => { throw new Error('db must not be called in tests'); } };
 });
 
-import handler from '../../api/auth';
-import accountingHandler from '../../api/accounting';
+import handler from '../../api/_authRoute';
+import accountingHandler from '../../api/_accountingRoute';
 import { __setAuthStoreForTests } from '../../api/_authCore';
 import { memoryAuthStore } from '../../api/_authStore';
 import { base32Encode, hashPassword, lockDurationMs, normalizePassword, totpAt, totpStep, verifyPassword, verifyTotp } from '../../api/_password';

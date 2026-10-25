@@ -5,6 +5,7 @@ import path from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { groupOf, ROUTE_PARAM } from './api/_routes';
 
 /**
  * پروکسی سرور-سمت برای Providerهای بازار:
@@ -55,7 +56,8 @@ function alphaVantageServer(): Plugin {
 /**
  * پلاگین اجرای محلی Vercel Functions (api/*.ts) در dev و preview:
  *  - /api/health ، /api/propertyMarket و … دقیقاً مثل Production توسط همان
- *    هندلرهای تایپ‌اسکریپت پاسخ داده می‌شوند (باندل درون‌فرآیندی با esbuild —
+ *    فانکشن‌های گروهی (api/data.ts ، api/markets.ts ، api/services.ts — نقشه در
+ *    api/_routes.ts) پاسخ داده می‌شوند (باندل درون‌فرآیندی با esbuild —
  *    همان روش `scripts/collect-property-market.mjs`).
  *  - بدون DATABASE_URL هندلرها در «حالت بدون دیتابیس» کار می‌کنند؛ بنابراین
  *    کلکشن دیوار در توسعه/پیش‌نمایش هم از مسیر سرور قابل اجراست.
@@ -96,7 +98,7 @@ function localServerlessApi(): Plugin {
   function middleware(req: { url?: string }, res: { statusCode?: number; setHeader(k: string, v: string): void; end(b: string): void }, next: (e?: unknown) => void): void {
     const url = req.url ?? '/';
     const pathname = url.split('?')[0];
-    if (!pathname.startsWith('/api/') || EXCLUDED.some((p) => pathname.startsWith(p))) {
+    if (!pathname.startsWith('/api/') || EXCLUDED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
       next();
       return;
     }
@@ -105,11 +107,14 @@ function localServerlessApi(): Plugin {
       next();
       return;
     }
-    const file = path.resolve(__dirname, 'api', `${name}.ts`);
+    // مسیر عمومی (/api/usdt) → فانکشن گروهی (api/markets.ts?__fn=usdt) — همان rewrite ورسل
+    const group = groupOf(name);
+    const file = path.resolve(__dirname, 'api', `${group ?? name}.ts`);
     if (!existsSync(file)) {
       next();
       return;
     }
+    if (group) req.url = `/api/${group}?${ROUTE_PARAM}=${name}${url.includes('?') ? '&' + url.slice(url.indexOf('?') + 1) : ''}`;
     loadHandler(file)
       .then((handler) => handler(req, res))
       .catch((e) => {
@@ -170,7 +175,7 @@ function marketProxies(): Record<string, ProxyOptions> {
     },
     // مسیر Production-like: پیش‌نمایش بیلد (vite preview) که کلاینت در PROD
     // به /api/cg صدا می‌زند؛ اینجا همان مسیر به upstream نگاشت می‌شود
-    // (روی Vercel این مسیر توسط Serverless Function /api/cg.ts پاسخ داده می‌شود).
+    // (روی Vercel این مسیر توسط api/_cgRoute.ts در فانکشن گروهی api/markets.ts پاسخ داده می‌شود).
     '/api/cg': {
       target: 'https://api.coingecko.com',
       changeOrigin: true,

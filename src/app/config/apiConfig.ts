@@ -29,7 +29,7 @@ export const ALPHA_VANTAGE_BASE = 'https://www.alphavantage.co/query';
 /**
  * CoinGecko — همیشه از طریق پروکسی سرور-سمت (same-origin):
  *  - Dev (Vite):   /coingecko-api  ← پروکسی vite.config.ts (کلید سرور-سمت)
- *  - Prod (Vercel): /api/cg        ← Serverless Function (api/cg.ts — کلید سرور-سمت)
+ *  - Prod (Vercel): /api/cg        ← Serverless Function (api/_cgRoute.ts در api/markets.ts — کلید سرور-سمت)
  * همه مصرف‌کننده‌ها از این ثابت استفاده می‌کنند؛ در Production هم مثل سندباکس کار می‌کند.
  */
 export const COINGECKO_BASE = import.meta.env.PROD ? '/api/cg' : '/coingecko-api';

@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 vi.mock('../../api/_authCore',()=>({requireSession:vi.fn()}));
 vi.mock('../../api/_borosAccount',()=>({readBorosAccount:vi.fn(),readBorosPreview:vi.fn(),readBorosHistory:vi.fn(),BorosReadError:class extends Error{status=502;}}));
-import handler from '../../api/borosAccount';
+import handler from '../../api/_borosAccountRoute';
 import { requireSession } from '../../api/_authCore';
 import { readBorosAccount, readBorosPreview, readBorosHistory } from '../../api/_borosAccount';
 import { borosRoot, borosHandle } from '../fixtures/borosAccount';
