@@ -14,6 +14,8 @@ const UPSTREAM = 'https://api.coingecko.com';
 const PREFIX = '/api/cg';
 /** fallback کلید demo — سرور-سمت (مانند vite.config.ts)؛ با env جایگزین می‌شود */
 const FALLBACK_KEY = process.env.COINGECKO_API_KEY ?? 'CG-1fJVsdhGGY6Jrb5DTZazvScK';
+/** برای فراخوانی‌های سرور-سمت دیگر (مثل غربال میم‌کوین) */
+export const CG_KEY = FALLBACK_KEY;
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {

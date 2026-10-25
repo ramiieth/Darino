@@ -111,3 +111,18 @@ export function aggregatePositions(positions: TraderPosition[]): CoinPositioning
   }
   return out.sort((a, b) => b.longUsd + b.shortUsd - (a.longUsd + a.shortUsd));
 }
+
+/**
+ * «اکثراً لانگ/شورت» فقط وقتی هم دلار و هم سرشماری هم‌جهت‌اند؛ یک نهنگ به‌تنهایی برچسب نمی‌سازد.
+ * دلار: خالص ≥ ۴۰٪ کل · سرشماری: دست‌کم ۶۰٪ تریدرها و حداقل ۳ نفر در همان سمت.
+ */
+export function consensus(c: Pick<CoinPositioning, 'longUsd' | 'shortUsd' | 'longCount' | 'shortCount'>): 'long' | 'short' | null {
+  const usd = c.longUsd + c.shortUsd;
+  const heads = c.longCount + c.shortCount;
+  if (!(usd > 0) || heads === 0) return null;
+  const bias = (c.longUsd - c.shortUsd) / usd;
+  const side = bias >= 0.4 ? 'long' : bias <= -0.4 ? 'short' : null;
+  if (!side) return null;
+  const count = side === 'long' ? c.longCount : c.shortCount;
+  return count >= 3 && count / heads >= 0.6 ? side : null;
+}

@@ -9,7 +9,7 @@ import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
 import { EmptyState, ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
-import { aggregatePositions, type CoinPositioning } from '@/features/traders/domain/positions';
+import { aggregatePositions, consensus, type CoinPositioning } from '@/features/traders/domain/positions';
 import { usePositions } from '@/features/traders/data/useTraders';
 import { LiqLadder, SplitBar, fmtPrice } from './parts';
 
@@ -37,7 +37,7 @@ export function PositionsTab({ onCoin }: { onCoin: (coin: string) => void }) {
         <p className="text-xs text-muted">به‌روز {fmtRelativeAge(q.data.fetchedAt)} · هر ۵ دقیقه</p>
       </div>
       <Notice tone="neutral" className="mb-5">
-        زمینه است، نه سیگنال خرید: بخشی از این پوزیشن‌ها جای دیگری هج شده‌اند. نقطه‌های قرمز و سبز روی نوار، قیمت لیکوئید پوزیشن‌ها نسبت به قیمت فعلی است — تجمع نزدیک قیمت یعنی احتمال آبشار لیکوئید.
+        زمینه است، نه سیگنال خرید: بخشی از این پوزیشن‌ها جای دیگری هج شده‌اند. نقطه‌های قرمز و سبز روی نوار، قیمت لیکوئید <b>فقط همین تریدرهای برتر</b> است، نه کل بازار؛ سوخت آبشارهای بزرگ پوزیشن‌های پراهرم بقیهٔ بازار است که اینجا دیده نمی‌شود. «اکثراً لانگ/شورت» فقط وقتی می‌آید که هم حجم دلاری و هم بیشتر تریدرها هم‌جهت باشند. قبل از ورود، «چک قبل از ورود» را بزنید.
       </Notice>
       {coins.length === 0 ? (
         <EmptyState message={scope === 'steady' && q.data.steadyTraders === 0 ? 'هنوز کارنامهٔ تریدرها روی سرور کامل نشده' : 'پوزیشن بازی نیست'} hint={scope === 'steady' ? 'تحلیل کارنامه‌ها چند دقیقه طول می‌کشد؛ «همهٔ برترها» را ببینید.' : undefined} />
@@ -53,7 +53,7 @@ export function PositionsTab({ onCoin }: { onCoin: (coin: string) => void }) {
 }
 
 function CoinCard({ c, onOpen }: { c: CoinPositioning; onOpen: () => void }) {
-  const bias = c.longUsd + c.shortUsd > 0 ? c.netUsd / (c.longUsd + c.shortUsd) : 0;
+  const side = consensus(c);
   return (
     <Surface as="article" className="h-full p-4 transition-shadow hover:shadow-card">
       <button type="button" onClick={onOpen} className="block w-full text-start">
@@ -62,7 +62,7 @@ function CoinCard({ c, onOpen }: { c: CoinPositioning; onOpen: () => void }) {
             <p className="text-lg font-extrabold text-ink"><bdi dir="ltr">{c.coin}</bdi></p>
             <p className="text-xs text-muted">قیمت <bdi dir="ltr">{fmtPrice(c.markPx)}</bdi> · {toFaDigits(c.longCount + c.shortCount)} تریدر</p>
           </div>
-          {Math.abs(bias) >= 0.4 && <Badge tone={bias > 0 ? 'gain' : 'loss'}>{bias > 0 ? 'اکثراً لانگ' : 'اکثراً شورت'}</Badge>}
+          {side && <Badge tone={side === 'long' ? 'gain' : 'loss'}>{side === 'long' ? 'اکثراً لانگ' : 'اکثراً شورت'}</Badge>}
         </div>
         <SplitBar long={c.longUsd} short={c.shortUsd} />
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">

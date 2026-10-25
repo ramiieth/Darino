@@ -4,6 +4,7 @@
  *  GET /api/intel?op=token&chain=solana&address=…  ← GoPlus + RugCheck + DexScreener → حکم (کش ۳۰ دقیقه)
  *  GET /api/intel?op=memes&list=trending|new        ← استخرهای ترند/تازهٔ سولانا از GeckoTerminal
  *       + حکم سریع RugCheck برای هر توکن (کش ۳ دقیقه)
+ *  GET /api/intel?op=memeScreen                    ← غربال «محافظ سرمایه»: رژیم بازار + فیلترهای آزموده (ساخت تدریجی در تیک)
  *
  * منبعی که خطا بدهد فقط از حکم کنار می‌رود (sources نشان می‌دهد کدام‌ها پاسخ داده‌اند).
  * ============================================================ */
@@ -13,6 +14,7 @@ import { providerCacheKey, readProviderCache, writeProviderCache } from './_prov
 import { pool } from './_hyperliquid.js';
 import { assessToken, EVM_CHAIN_ID, isTokenAddress, listVerdict, type Chain, type TokenSafety } from '../src/features/intel/domain/tokenSafety.js';
 import { parsePools, type MemeToken } from '../src/features/intel/domain/memes.js';
+import { getMemeScreen } from './_memeScreen.js';
 
 const CHAINS: Chain[] = ['solana', 'ethereum', 'base', 'bsc', 'arbitrum'];
 const TOKEN_MS = 30 * 60_000;
@@ -99,6 +101,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         await writeProviderCache(key, payload, MEMES_MS);
       }
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=180');
+      json(res, 200, payload);
+      return;
+    }
+    if (op === 'memeScreen') {
+      const payload = await getMemeScreen();
+      if (!payload) throw new Error('coingecko unavailable');
+      res.setHeader('Cache-Control', 'public, max-age=120, s-maxage=600');
       json(res, 200, payload);
       return;
     }

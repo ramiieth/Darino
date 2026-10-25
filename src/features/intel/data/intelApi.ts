@@ -1,12 +1,14 @@
 /**
  * دادهٔ هاب اطلاعات
- *  - امنیت توکن و میم‌کوین‌ها: /api/intel (سرور سه منبع را ترکیب و کش می‌کند)
+ *  - امنیت توکن، میم‌کوین‌ها و غربال «محافظ سرمایه»: /api/intel (سرور منابع را ترکیب و کش می‌کند)
  *  - بازار مشتقات: مستقیم از API رسمی هایپرلیکوئید روی IP کاربر، از همان صف وزنی تریدرها
  */
 import { useQuery } from '@tanstack/react-query';
-import { hlFundingHistory, hlMetaAndCtxs } from '@/features/hyperliquid/data/hyperliquidService';
+import { hlCandles, hlFundingHistory, hlMetaAndCtxs } from '@/features/hyperliquid/data/hyperliquidService';
 import { weighted } from '@/features/traders/data/tradersApi';
 import { fundingStats, type FundingPoint } from '../domain/funding';
+import { parseCandles, type Candle } from '../domain/survival';
+import type { MemeScreenPayload } from '../domain/memeScreen';
 import type { Chain, TokenSafety } from '../domain/tokenSafety';
 import type { MemeToken } from '../domain/memes';
 
@@ -103,5 +105,26 @@ export function useFundingStats(coin: string | null, currentHourly: number | nul
     enabled: !!coin && enabled,
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000
+  });
+}
+
+/** ۵۰۰۰ کندل ۴ ساعته (~۲.۳ سال) برای چک قبل از ورود؛ وزن هایپرلیکوئید ≈ ۲۰ + ۱ به ازای هر ۶۰ کندل */
+export function useRiskCandles(coin: string | null) {
+  return useQuery({
+    queryKey: ['intel', 'candles4h', coin],
+    queryFn: async (): Promise<Candle[]> => parseCandles(await weighted(105, () => hlCandles(coin!, '4h', Date.now() - 5000 * 4 * 3_600_000), 0)),
+    enabled: !!coin,
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000
+  });
+}
+
+/** غربال «محافظ سرمایه» — روی سرور تدریجی ساخته می‌شود؛ اینجا فقط خوانده می‌شود */
+export function useMemeScreen() {
+  return useQuery({
+    queryKey: ['intel', 'meme-screen'],
+    queryFn: () => getPublic<MemeScreenPayload>('/api/intel?op=memeScreen', 'غربال میم‌کوین دریافت نشد'),
+    staleTime: 5 * 60_000,
+    refetchInterval: 10 * 60_000
   });
 }

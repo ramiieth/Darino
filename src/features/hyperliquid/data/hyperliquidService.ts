@@ -164,6 +164,11 @@ export async function hlFundingHistory(coin: string, startTime: number, endTime?
   return info({ type: 'fundingHistory', coin, startTime, ...(endTime ? { endTime } : {}) });
 }
 
+/** کندل‌های یک بازار (حداکثر ۵۰۰۰ ردیف، از startTime تا الان) */
+export async function hlCandles(coin: string, interval: '1h' | '4h' | '1d', startTime: number): Promise<unknown[]> {
+  return info({ type: 'candleSnapshot', req: { coin, interval, startTime, endTime: Date.now() } });
+}
+
 /** Funding پرداختی/دریافتی */
 export async function hlUserFunding(user: string): Promise<HlFundingPoint[]> {
   return infoCached<HlFundingPoint[]>(`funding:${user}`, { type: 'userFunding', user });
