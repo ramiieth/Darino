@@ -97,3 +97,8 @@ describe('عملیات عمومی QFEX برای ماشین‌حساب‌ها', (
   expect(f.mock.calls[0][0]).toBe('https://api.qfex.com/md/orderbook/NVDA-USD');
  });
 });
+
+describe('سری عمومی سود/زیان لایتر',()=>{
+ it('فقط شمارهٔ حساب عددی و دو op ثابت؛ پیش از هر درخواست رد می‌شود',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);const { getLighterPnl } = await import('../../api/_perpsRead');await expect(getLighterPnl('lighter-pnl','1&by=l1')).rejects.toMatchObject({status:400});await expect(getLighterPnl('evil','1')).rejects.toMatchObject({status:400});expect(f).not.toHaveBeenCalled();});
+ it('ساعتی و روزانه از میزبان درست؛ فقط [زمان، trade_pnl]',async()=>{const { getLighterPnl } = await import('../../api/_perpsRead');const f=vi.fn().mockImplementation(()=>Promise.resolve(ok({code:200,pnl:[{timestamp:10,trade_pnl:5.5,inflow:100},{timestamp:'x',trade_pnl:1}]})));vi.stubGlobal('fetch',f);const r=await getLighterPnl('lighter-mainnet-pnl','27160');expect(r.hourly).toEqual([[10,5.5]]);expect(r.daily).toEqual([[10,5.5]]);const urls=f.mock.calls.map(c=>new URL(c[0]));expect(urls.map(u=>u.origin)).toEqual(['https://mainnet.zklighter.elliot.ai','https://mainnet.zklighter.elliot.ai']);expect(urls.map(u=>u.searchParams.get('resolution')).sort()).toEqual(['1d','1h']);expect(urls.every(u=>u.searchParams.get('by')==='index'&&u.searchParams.get('value')==='27160')).toBe(true);});
+});
