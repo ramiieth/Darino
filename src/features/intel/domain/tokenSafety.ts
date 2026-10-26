@@ -7,6 +7,7 @@
  *  - حکم مثبت هرگز «امن» نیست: «خطر شناخته‌شده‌ای پیدا نشد».
  * Pure — ورودی پاسخ خام منابع، خروجی حکم قابل نمایش.
  */
+import { rugRiskFa } from './rugRisks.js';
 
 export type Chain = 'solana' | 'ethereum' | 'base' | 'bsc' | 'arbitrum';
 export const EVM_CHAIN_ID: Record<Exclude<Chain, 'solana'>, string> = { ethereum: '1', base: '8453', bsc: '56', arbitrum: '42161' };
@@ -156,7 +157,7 @@ export function assessToken(input: {
   if (rug && typeof rug === 'object') {
     sources.push('RugCheck');
     for (const r of (Array.isArray(rug.risks) ? rug.risks : []) as Raw[]) {
-      const label = String(r.name ?? '').slice(0, 80);
+      const label = rugRiskFa(String(r.name ?? '')).slice(0, 80);
       if (!label || flags.some((f) => f.label === label)) continue;
       flags.push({ level: r.level === 'danger' ? 'critical' : 'warn', label, detail: typeof r.description === 'string' ? r.description.slice(0, 160) : undefined });
     }
