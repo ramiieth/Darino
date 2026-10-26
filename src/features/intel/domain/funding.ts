@@ -33,7 +33,9 @@ export function fundingStats(history: FundingPoint[], currentHourly: number | nu
   const last7 = rates.filter((p) => p.t > now - 7 * 86_400_000).map((p) => p.r);
   const all = rates.map((p) => p.r);
   const current = currentHourly ?? (rates.length ? rates[rates.length - 1].r : null);
-  const percentile = current !== null && all.length >= MIN_SAMPLES ? (all.filter((r) => r <= current).length / all.length) * 100 : null;
+  // صدک میانه‌رتبه: نرخ برابر نیمه حساب می‌شود؛ وگرنه فاندینگی که بیشتر ماه روی نرخ پایه (~۱۱٪) ثابت بوده «صدک ۱۰۰ / داغ» می‌شد
+  const percentile =
+    current !== null && all.length >= MIN_SAMPLES ? ((all.filter((r) => r < current).length + all.filter((r) => r === current).length / 2) / all.length) * 100 : null;
 
   const byDay = new Map<string, number[]>();
   for (const p of rates) {

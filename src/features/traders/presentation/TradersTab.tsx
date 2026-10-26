@@ -1,32 +1,27 @@
 /**
- * تب «تریدرهای برتر» — برترین‌های هایپرلیکوئید با خلاصهٔ سرور + «آدرس‌های من» (همگام بین دستگاه‌ها)
+ * تب «تریدرهای برتر» — جواب «چه کسی ارزش دنبال کردن دارد و الان چه می‌کند؟»
+ *  - برترین‌ها: پیش‌فرض فقط «شایسته‌ها» (امتیاز ثبات ≥ ۶۵)، به ترتیب امتیاز، با پوزیشن فعلی هر نفر
+ *  - آدرس‌های من: همگام بین دستگاه‌ها
  */
 import { useMemo, useState, type FormEvent } from 'react';
 import { Cloud, CloudOff, Plus, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { ChipGroup, SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { EmptyState, ErrorState, ListSkeleton } from '@/shared/components/ui/StateViews';
 import { toast } from '@/shared/store/toastStore';
 import { toFaDigits } from '@/shared/utils/formatters';
-import { isHlAddress, type Candidate } from '../domain/candidates';
-import { isSteady, type TraderSummary } from '../domain/summary';
-import { useSummaries, useTradersList } from '../data/useTraders';
+import { isHlAddress } from '../domain/candidates';
+import { GOOD_SCORE, booksByAddress, qualityScore } from '../domain/quality';
+import { usePositions, useSummaries, useTradersList } from '../data/useTraders';
 import { MAX_SAVED, useSavedTraders } from '../data/savedTraders';
-import { LIST_MIN_TRADES, TraderRow } from './TraderRow';
+import { TraderRow } from './TraderRow';
 import { useFollow } from './useFollow';
 
 type View = 'top' | 'mine';
-type Sort = 'months' | 'allTime' | 'month' | 'winRate';
-const PAGE = 20;
-
-const BY: Record<Sort, (c: Candidate, s: TraderSummary | undefined) => number> = {
-  allTime: (c) => c.windows.allTime.pnl,
-  month: (c) => c.windows.month.pnl,
-  // ثبات: درصد ماه‌های سودده (حداقل ۶ ماه)، هم‌امتیازها با افت کمتر
-  months: (_c, s) => (s && s.months >= 6 ? (s.positiveMonths / s.months) * 1000 - (s.maxDrawdownPct ?? 100) : -Infinity),
-  winRate: (_c, s) => (s && s.closedCount >= LIST_MIN_TRADES && s.winRate !== null ? s.winRate * 1000 + Math.min(s.profitFactor ?? (s.allWins ? 999 : 0), 999) : -Infinity)
-};
+type Filter = 'good' | 'copy' | 'all';
+const PAGE = 12;
 
 export function TradersTab({ view, onView, onOpen }: { view: View; onView: (v: View) => void; onOpen: (address: string) => void }) {
   const saved = useSavedTraders((s) => s.saved);
@@ -49,62 +44,92 @@ export function TradersTab({ view, onView, onOpen }: { view: View; onView: (v: V
 
 function TopList({ onOpen }: { onOpen: (a: string) => void }) {
   const list = useTradersList();
-  const [sort, setSort] = useState<Sort>('months');
+  const positions = usePositions();
+  const [filter, setFilter] = useState<Filter>('good');
   const [shown, setShown] = useState(PAGE);
   const { isFollowing, toggle } = useFollow();
   const candidates = list.data?.candidates ?? [];
   const summaries = useSummaries(candidates.map((c) => c.address));
   const map = summaries.data?.summaries ?? {};
-  const analyzed = Object.keys(map).length;
-  const rows = useMemo(
-    () => [...candidates].sort((a, b) => BY[sort](b, map[b.address]) - BY[sort](a, map[a.address]) || b.windows.allTime.pnl - a.windows.allTime.pnl),
-    [candidates, map, sort]
+  const pending = summaries.isLoading || (summaries.data?.pending ?? 0) > 0;
+  const books = useMemo(() => booksByAddress(positions.data?.positions ?? []), [positions.data]);
+
+  const scored = useMemo(
+    () =>
+      candidates
+        .map((c) => ({ c, s: map[c.address], score: qualityScore(map[c.address]) }))
+        .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || b.c.windows.allTime.pnl - a.c.windows.allTime.pnl),
+    [candidates, map]
   );
-  const steady = candidates.filter((c) => isSteady(map[c.address])).length;
+  const good = scored.filter((x) => x.score !== null && x.score >= GOOD_SCORE);
+  const copy = good.filter((x) => x.s?.copyability === 'manual');
+  const rows = filter === 'good' ? good : filter === 'copy' ? copy : scored;
 
   if (list.isLoading) return <ListSkeleton rows={6} />;
   if (list.isError) return <ErrorState message="فهرست تریدرهای برتر دریافت نشد" hint="در «آدرس‌های من» هر آدرسی را دستی بررسی کنید." onRetry={() => void list.refetch()} />;
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <ChipGroup<Sort>
-          label="مرتب‌سازی"
-          value={sort}
-          onChange={setSort}
+        <ChipGroup<Filter>
+          label="فیلتر"
+          value={filter}
+          onChange={(v) => { setFilter(v); setShown(PAGE); }}
           options={[
-            { value: 'months', label: 'ثبات (ماه‌های سودده)' },
-            { value: 'winRate', label: 'نرخ برد معاملات' },
-            { value: 'allTime', label: 'سود کل' },
-            { value: 'month', label: 'سود ۳۰ روز' }
+            { value: 'good', label: 'شایستهٔ دنبال کردن', badge: good.length || undefined },
+            { value: 'copy', label: 'قابل کپی دستی', badge: copy.length || undefined },
+            { value: 'all', label: 'همه', badge: candidates.length || undefined }
           ]}
         />
-        <p className="flex items-center gap-1.5 text-xs text-muted">
-          {(summaries.data?.pending ?? 0) > 0 && <RefreshCw className="h-3.5 w-3.5 animate-spin text-subtle" aria-hidden />}
-          <span>تحلیل‌شده {toFaDigits(analyzed)} از {toFaDigits(candidates.length)}</span>
-          <span aria-hidden>·</span>
-          <span>{toFaDigits(steady)} ثابت‌قدم</span>
-        </p>
+        {pending && (
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-subtle" aria-hidden />
+            تحلیل کارنامه‌ها {toFaDigits(Object.keys(map).length)} از {toFaDigits(candidates.length)}
+          </p>
+        )}
       </div>
-      <p className="mb-4 text-xs leading-6 text-muted">
-        از {toFaDigits((list.data?.totalAccounts ?? 0).toLocaleString('en-US'))} حساب، فقط بالای ۱۰۰ هزار دلار و سودده در کل سابقه و ۳۰ روز اخیر؛ مارکت‌میکرها حذف شده‌اند.
-        «ثابت‌قدم» یعنی حداقل ۶ ماه سابقه، ۶۰٪ ماه‌ها سودده و افت کمتر از ۵۰٪. کارنامه‌ها روی سرور محاسبه و هر ۶ ساعت به‌روز می‌شوند.
-      </p>
-      <div className="grid gap-3 xl:grid-cols-2">
-        {rows.slice(0, shown).map((c, i) => (
-          <TraderRow
-            key={c.address}
-            rank={i + 1}
-            address={c.address}
-            name={c.displayName}
-            leader={c}
-            summary={map[c.address]}
-            loading={summaries.isLoading || (summaries.data?.pending ?? 0) > 0}
-            following={isFollowing(c.address)}
-            onToggleFollow={() => toggle(c.address, c.displayName)}
-            onOpen={() => onOpen(c.address)}
+      <Disclosure className="mb-4" summary="امتیاز ثبات چیست و این فهرست چطور ساخته می‌شود؟">
+        <div className="space-y-2 text-xs leading-6 text-muted">
+          <p>
+            سود دلاری کل فقط اندازهٔ حساب را نشان می‌دهد، نه مهارت را. امتیاز ثبات (۰ تا ۱۰۰) از چیزهایی ساخته می‌شود که یک ماه خوش‌شانس آن‌ها را نمی‌سازد:
+            ۴۰ امتیاز سهم ماه‌های سودده، ۳۰ امتیاز کم بودن بدترین افت ۱۲ ماه، ۱۵ امتیاز طول سابقه (تا ۱۲ ماه) و ۱۵ امتیاز نسبت سود به ضرر معاملات.
+            {' '}{toFaDigits(GOOD_SCORE)} و بالاتر «شایستهٔ دنبال کردن» است. مارکت‌میکرها و حساب‌های زیر ۳ ماه امتیاز نمی‌گیرند.
+          </p>
+          <p>
+            از {toFaDigits((list.data?.totalAccounts ?? 0).toLocaleString('en-US'))} حساب هایپرلیکوئید فقط حساب‌های بالای ۱۰۰ هزار دلار که هم در کل سابقه و هم در ۳۰ روز اخیر سودده‌اند بررسی می‌شوند.
+            «قابل کپی دستی» یعنی معامله‌ها چند ساعت یا بیشتر باز می‌مانند و با چند دقیقه تأخیر هم می‌شود دنبالشان کرد. کارنامه‌ها هر ۶ ساعت و پوزیشن‌ها هر ۵ دقیقه به‌روز می‌شوند.
+            عملکرد گذشته تضمین آینده نیست.
+          </p>
+        </div>
+      </Disclosure>
+      {rows.length === 0 ? (
+        pending ? (
+          <EmptyState
+            message="کارنامه‌ها هنوز در حال تحلیل‌اند"
+            hint="امتیاز هر تریدر بعد از تحلیل کامل سابقه‌اش محاسبه می‌شود (معمولاً چند دقیقه). تا آن موقع فهرست «همه» را ببینید."
+            action={<Button size="sm" variant="outline" onClick={() => setFilter('all')}>نمایش همه</Button>}
           />
-        ))}
-      </div>
+        ) : (
+          <EmptyState message="الان هیچ تریدری این شرط را ندارد" hint="فیلتر «همه» را ببینید؛ امتیازها با به‌روز شدن کارنامه‌ها تغییر می‌کنند." />
+        )
+      ) : (
+        <div className="grid gap-3 xl:grid-cols-2">
+          {rows.slice(0, shown).map(({ c, s }, i) => (
+            <TraderRow
+              key={c.address}
+              rank={i + 1}
+              address={c.address}
+              name={c.displayName}
+              leader={c}
+              summary={s}
+              book={positions.data ? books.get(c.address) ?? null : undefined}
+              loading={pending}
+              following={isFollowing(c.address)}
+              onToggleFollow={() => toggle(c.address, c.displayName)}
+              onOpen={() => onOpen(c.address)}
+            />
+          ))}
+        </div>
+      )}
       {shown < rows.length && (
         <Button variant="outline" className="mt-4 w-full" onClick={() => setShown((n) => n + PAGE)}>
           نمایش {toFaDigits(Math.min(PAGE, rows.length - shown))} تریدر دیگر
@@ -118,6 +143,8 @@ function MineList({ onOpen }: { onOpen: (a: string) => void }) {
   const { saved, add, remove, sync } = useSavedTraders();
   const { isFollowing, toggle } = useFollow();
   const summaries = useSummaries(saved.map((s) => s.address));
+  const positions = usePositions();
+  const books = useMemo(() => booksByAddress(positions.data?.positions ?? []), [positions.data]);
   const [address, setAddress] = useState('');
   const [label, setLabel] = useState('');
   const [error, setError] = useState('');
@@ -158,7 +185,7 @@ function MineList({ onOpen }: { onOpen: (a: string) => void }) {
         </div>
       </form>
       {saved.length === 0 ? (
-        <EmptyState message="هنوز آدرسی اضافه نکرده‌اید" hint="آدرس هر تریدری را که می‌شناسید وارد کنید، یا از «برترین‌ها» روی «افزودن به آدرس‌های من» یا زنگولهٔ اعلان بزنید." />
+        <EmptyState message="هنوز آدرسی اضافه نکرده‌اید" hint="آدرس هر تریدری را که می‌شناسید وارد کنید، یا در کارنامهٔ یکی از برترین‌ها «افزودن به آدرس‌های من» یا زنگولهٔ اعلان را بزنید." />
       ) : (
         <div className="grid gap-3 xl:grid-cols-2">
           {saved.map((s) => (
@@ -167,6 +194,7 @@ function MineList({ onOpen }: { onOpen: (a: string) => void }) {
               address={s.address}
               name={s.label}
               summary={summaries.data?.summaries[s.address]}
+              book={books.get(s.address)}
               loading={summaries.isLoading || (summaries.data?.pending ?? 0) > 0}
               following={isFollowing(s.address)}
               onToggleFollow={() => toggle(s.address, s.label)}

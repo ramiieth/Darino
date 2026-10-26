@@ -1,17 +1,18 @@
 /**
- * تب «چک قبل از ورود» — کاربر بازار، جهت و اهرم را می‌دهد و دو جواب جدا می‌گیرد:
- *   ۱) ریسک در شرایط عادی: احتمال لیکوئید ۲۴ ساعت و ۷ روز + اهرم پیشنهادی (ریسک ۷ روزه ≤ ۵٪)
- *   ۲) اگر آبشاری مثل بدترین روز تاریخچهٔ همین بازار تکرار شود — دستور، نه احتمال
+ * تب «چک قبل از ورود» — کاربر بازار، جهت و اهرم را می‌دهد و یک حکم می‌گیرد:
+ *   کارت حکم: احتمال لیکوئید ۷ روز در شرایط عادی + سرنوشت در تکرار بدترین روز + اهرم معقول (یک دکمه)
+ *   نوار اهرم: همین پوزیشن با اهرم‌های دیگر، یک نگاه
+ *   جزئیات و روش: پشت بازشو
  * جهت بازار را پیش‌بینی نمی‌کند. حالت در URL (?m= ، ?side= ، ?lev=) تا لینک قابل اشتراک باشد.
  */
 import { useMemo } from 'react';
-import { ShieldAlert, Zap } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { Badge } from '@/shared/components/ui/Badge';
+import { Badge, TONE_SOFT } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
+import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { Metric, MetricGrid, PercentValue } from '@/shared/components/ui/FinancialValue';
+import { KeyValueList, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits } from '@/shared/utils/formatters';
@@ -23,6 +24,21 @@ const MARKETS = 40;
 const pct = (v: number, digits = 1) => `${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: digits }))}٪`;
 const prob = (v: number | null, floored: boolean) => (v === null ? '—' : floored ? `کمتر از ${pct(v)}` : pct(v));
 const faDate = (t: number) => new Date(t).toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
+const SIDE_FA = { long: 'لانگ', short: 'شورت' } as const;
+
+type CardTone = 'loss' | 'warn' | 'gain' | 'neutral';
+const CARD: Record<CardTone, { border: string; label: string }> = {
+  loss: { border: 'border-negative/50', label: 'پرریسک' },
+  warn: { border: 'border-warn/50', label: 'کم‌حاشیه' },
+  gain: { border: 'border-gain/50', label: 'معقول' },
+  neutral: { border: 'border-divider', label: VERDICT_FA.unknown.label }
+};
+
+/** اهرم معقول: هم ریسک ۷ روزه ≤ ۵٪ و هم زنده ماندن در تکرار بدترین روز؛ null وقتی حتی ۱x ریسک ۷ روزه را رد می‌کند */
+function sensibleLeverage(r: Assessment): number | null {
+  if (r.safeLeverage === null) return null;
+  return Math.max(1, Math.min(r.safeLeverage, r.crashMaxLeverage ?? r.safeLeverage));
+}
 
 export function CheckTab({
   market,
@@ -58,7 +74,7 @@ export function CheckTab({
   if (markets.isError) return <ErrorState message="بازارهای هایپرلیکوئید دریافت نشد" onRetry={() => void markets.refetch()} />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <Surface className="grid gap-4 p-4 sm:grid-cols-3">
         <Field label="بازار">
           <Select value={m ? market : ''} onChange={(e) => onChange({ m: e.target.value })}>
@@ -102,100 +118,109 @@ export function CheckTab({
         <ErrorState message="کندل‌های این بازار دریافت نشد" onRetry={() => void candles.refetch()} />
       ) : (
         <>
-          <NormalRisk r={result} model={model} onLev={(l) => onChange({ lev: l })} />
-          <CrashScenario r={result} model={model} side={side} onLev={(l) => onChange({ lev: l })} />
+          <VerdictCard r={result} model={model} coin={market} side={side} onLev={(l) => onChange({ lev: l })} />
 
-          <Surface className="p-4">
-            <MetricGrid cols={4}>
-              <Metric label="فاصلهٔ لیکوئید" value={pct(result.liqPct)} sub={`تخمین ایزوله با ${toFaDigits(lev)}x`} />
-              <Metric label="احتمال لیکوئید ۲۴ ساعت" value={prob(result.p24, result.p24Floored)} sub="در شرایط عادی" />
-              <Metric label="احتمال لیکوئید ۷ روز" value={prob(result.p7d, result.p7dFloored)} sub="در شرایط عادی" />
-              <Metric
-                label="فاندینگ روزانه"
-                value={<PercentValue value={result.fundingDayMarginPct === null ? null : -result.fundingDayMarginPct} digits={2} />}
-                sub={result.fundingDayMarginPct === null ? undefined : result.fundingDayMarginPct > 0 ? 'از مارجین شما کم می‌شود' : 'به مارجین شما اضافه می‌شود'}
-              />
-            </MetricGrid>
-          </Surface>
-
-          <Surface className="p-4">
-            <p className="mb-3 text-sm font-bold text-ink">همین پوزیشن با اهرم‌های دیگر</p>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="mb-2 text-xs font-semibold text-muted">همین پوزیشن با اهرم‌های دیگر</p>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
               {ladder.map((r) => (
-                <li key={r.leverage}>
-                  <button
-                    type="button"
-                    onClick={() => onChange({ lev: r.leverage })}
-                    className={cn('w-full rounded-field border px-3 py-2 text-start text-sm', r.leverage === lev ? 'border-brand' : 'border-line hover:border-ink/30')}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-ink"><bdi dir="ltr">{toFaDigits(r.leverage)}x</bdi></span>
-                      <Badge tone={VERDICT_FA[r.verdict].tone}>{VERDICT_FA[r.verdict].short}</Badge>
-                    </span>
-                    <span className="mt-1 block text-xs text-muted">
-                      ۷ روز {prob(r.p7d, r.p7dFloored)} · آبشار {r.crashSurvives === null ? '—' : r.crashSurvives ? 'می‌ماند' : 'می‌سوزد'}
-                    </span>
-                  </button>
-                </li>
+                <button
+                  key={r.leverage}
+                  type="button"
+                  aria-pressed={r.leverage === lev}
+                  onClick={() => onChange({ lev: r.leverage })}
+                  className={cn('rounded-field px-2 py-2 text-center ring-offset-2 transition', TONE_SOFT[r.verdict === 'ok' && r.crashSurvives === false ? 'warn' : VERDICT_FA[r.verdict].tone], r.leverage === lev ? 'ring-2 ring-ink/70' : 'hover:ring-1 hover:ring-ink/20')}
+                >
+                  <span className="block text-sm font-extrabold"><bdi dir="ltr">{toFaDigits(r.leverage)}x</bdi></span>
+                  <span className="block text-[10px] font-semibold">{r.crashSurvives === false ? 'آبشار می‌سوزد' : VERDICT_FA[r.verdict].short}</span>
+                </button>
               ))}
-            </ul>
-          </Surface>
+            </div>
+          </div>
 
-          <p className="text-xs leading-6 text-subtle">
-            احتمال‌ها از «تاریخچهٔ مقیاس‌شده با نوسان» می‌آیند: حرکت‌های خلاف جهت {toFaDigits(model.days)} روز گذشتهٔ همین بازار، به نسبت نوسان آن روزها، با نوسان امروز دوباره مقیاس شده‌اند؛ بازار پرتلاطم‌تر یعنی احتمال بالاتر.
-            در آزمون عقب‌گرد روی ۱۰ بازار هایپرلیکوئید (ژوئیهٔ ۲۰۲۴ تا اکتبر ۲۰۲۶) وقتی این روش ۱ تا ۳٪ گفت، در واقعیت ۱.۶٪ (۲۴ ساعت) و ۲٪ (۷ روز) لیکوئید شدند، و «اهرم پیشنهادی» در عمل ۳.۱٪ لیکوئید شد.
-            زیر ۰.۲٪ و ۲٪ مدل کم‌برآورد بود، پس کمتر از این‌ها نشان داده نمی‌شود.
-            لیکوئید برای مارجین ایزوله تخمین زده شده؛ در مارجین کراس موجودی اضافه آن را دورتر می‌برد. کندل‌ها قیمت معامله‌اند و لیکوئید با قیمت مارک، پس اعداد کمی محافظه‌کارانه‌اند.
-            این چک جهت بازار را پیش‌بینی نمی‌کند و توصیهٔ مالی نیست.{' '}
-            <button type="button" onClick={() => onCoin(market)} className="font-semibold text-brand hover:underline">فاندینگ و پوزیشن برترها روی {market}</button>
-          </p>
+          <Disclosure summary="جزئیات و روش محاسبه">
+            <KeyValueList
+              dense
+              rows={[
+                { label: 'فاصلهٔ لیکوئید از ورود', value: pct(result.liqPct), hint: `تخمین مارجین ایزوله با ${toFaDigits(lev)}x` },
+                { label: 'احتمال لیکوئید ۲۴ ساعت', value: prob(result.p24, result.p24Floored), hint: 'در شرایط عادی' },
+                { label: 'احتمال لیکوئید ۷ روز', value: prob(result.p7d, result.p7dFloored), hint: 'در شرایط عادی' },
+                {
+                  label: 'فاندینگ روزانه نسبت به مارجین',
+                  value: <PercentValue value={result.fundingDayMarginPct === null ? null : -result.fundingDayMarginPct} digits={2} />,
+                  hint: result.fundingDayMarginPct === null ? undefined : result.fundingDayMarginPct > 0 ? 'از مارجین شما کم می‌شود' : 'به مارجین شما اضافه می‌شود'
+                },
+                ...(model.crashPct !== null && model.crashAt !== null
+                  ? [{ label: `بدترین ${side === 'long' ? 'ریزش' : 'جهش'} ۲۴ ساعته`, value: pct(model.crashPct), hint: faDate(model.crashAt) }]
+                  : [])
+              ]}
+            />
+            <p className="mt-3 text-xs leading-6 text-subtle">
+              احتمال‌ها از حرکت‌های خلاف جهت {toFaDigits(model.days)} روز گذشتهٔ همین بازار می‌آیند که با نوسان امروز دوباره مقیاس شده‌اند؛ بازار پرتلاطم‌تر یعنی احتمال بالاتر.
+              در آزمون عقب‌گرد روی ۱۰ بازار (ژوئیهٔ ۲۰۲۴ تا اکتبر ۲۰۲۶) وقتی این روش ۱ تا ۳٪ گفت، در واقعیت ۱.۶٪ (۲۴ ساعت) و ۲٪ (۷ روز) لیکوئید شدند. زیر ۰.۲٪ و ۲٪ مدل کم‌برآورد بود، پس کمتر از این‌ها نشان داده نمی‌شود.
+              صبح ریزش ۱۰ اکتبر ۲۰۲۵ همهٔ مدل‌ها ریسک ۳x آلت‌کوین‌ها را نزدیک صفر می‌دیدند و همه لیکوئید شدند؛ برای همین «اهرم معقول» آبشار را هم در نظر می‌گیرد.
+              در مارجین کراس موجودی اضافه لیکوئید را دورتر می‌برد. توصیهٔ مالی نیست.{' '}
+              <button type="button" onClick={() => onCoin(market)} className="font-semibold text-brand hover:underline">فاندینگ و پوزیشن برترها روی {market}</button>
+            </p>
+          </Disclosure>
         </>
       )}
     </div>
   );
 }
 
-function NormalRisk({ r, model, onLev }: { r: Assessment; model: RiskModel; onLev: (l: number) => void }) {
-  const v = VERDICT_FA[r.verdict];
-  const safe = r.safeLeverage;
-  const text =
-    r.verdict === 'unknown'
-      ? `فقط ${toFaDigits(model.days)} روز سابقه هست؛ برای تخمین احتمال دست‌کم ۱۸۰ روز لازم است.`
-      : `با ${toFaDigits(r.leverage)}x، اگر بازار مثل روزهای عادی‌اش ولی با نوسان امروز رفتار کند، احتمال لیکوئید طی ۷ روز ${prob(r.p7d, r.p7dFloored)} و طی ۲۴ ساعت ${prob(r.p24, r.p24Floored)} است.` +
-        (safe === null ? ' حتی بدون اهرم ریسک ۷ روزه از ۵٪ بیشتر است.' : r.verdict === 'ok' ? '' : ` برای ریسک ۷ روزهٔ حداکثر ${pct(SAFE_TARGET_7D, 0)}، اهرم را به ${toFaDigits(safe)}x یا کمتر برسانید.`) +
-        (model.shortHistory ? ` سابقهٔ این بازار کمتر از یک سال (${toFaDigits(model.days)} روز) است؛ احتمال ممکن است کم‌برآورد باشد.` : '');
-  return (
-    <Notice
-      tone={r.verdict === 'danger' ? 'error' : r.verdict === 'tight' ? 'warn' : r.verdict === 'ok' ? 'success' : 'neutral'}
-      icon={<ShieldAlert />}
-      title={
-        <span className="inline-flex flex-wrap items-center gap-2">
-          ۱. ریسک در شرایط عادی: {v.label}
-          {safe !== null && r.verdict !== 'unknown' && <Badge tone="brand">اهرم پیشنهادی تا {toFaDigits(safe)}x</Badge>}
-        </span>
-      }
-      action={safe !== null && r.verdict !== 'ok' && r.verdict !== 'unknown' && safe < r.leverage ? <Button size="sm" onClick={() => onLev(safe)}>{`اهرم ${toFaDigits(safe)}x`}</Button> : undefined}
-    >
-      {text}
-    </Notice>
-  );
-}
+function VerdictCard({ r, model, coin, side, onLev }: { r: Assessment; model: RiskModel; coin: string; side: Side; onLev: (l: number) => void }) {
+  const sensible = sensibleLeverage(r);
+  const lower = sensible !== null && sensible < r.leverage;
+  const crashBurns = r.crashSurvives === false;
+  const unknown = r.verdict === 'unknown';
+  const tone: CardTone = unknown ? 'neutral' : r.verdict === 'danger' ? 'loss' : r.verdict === 'tight' || lower || crashBurns ? 'warn' : 'gain';
+  const headline = unknown
+    ? `فقط ${toFaDigits(model.days)} روز سابقه هست؛ برای حکم دست‌کم ۱۸۰ روز لازم است.`
+    : r.safeLeverage === null
+      ? `حتی بدون اهرم احتمال لیکوئید ۷ روزه از ${pct(SAFE_TARGET_7D, 0)} بیشتر است؛ این بازار الان برای پوزیشن اهرمی مناسب نیست.`
+      : lower
+        ? `اهرم را به ${toFaDigits(sensible)}x یا کمتر برسانید.`
+        : crashBurns
+          ? 'در شرایط عادی مشکلی ندارد، اما یک آبشار مثل بدترین روز این بازار آن را می‌سوزاند.'
+          : 'با این اهرم هم در شرایط عادی و هم در تکرار بدترین روز این بازار جان به در می‌برد.';
 
-function CrashScenario({ r, model, side, onLev }: { r: Assessment; model: RiskModel; side: Side; onLev: (l: number) => void }) {
-  if (model.crashPct === null || model.crashAt === null) return null;
-  const dir = side === 'long' ? 'ریزش' : 'جهش';
-  const max = r.crashMaxLeverage;
   return (
-    <Notice
-      tone={r.crashSurvives ? 'neutral' : 'warn'}
-      icon={<Zap />}
-      title={`۲. اگر بدترین روز این بازار تکرار شود: ${r.crashSurvives ? 'این اهرم می‌ماند' : 'این اهرم می‌سوزد'}`}
-      action={!r.crashSurvives && max !== null && max < r.leverage ? <Button size="sm" variant="outline" onClick={() => onLev(max)}>{`اهرم ${toFaDigits(max)}x`}</Button> : undefined}
-    >
-      بدترین {dir} ۲۴ ساعتهٔ این بازار در {toFaDigits(model.days)} روز گذشته {pct(model.crashPct)} بود ({faDate(model.crashAt)}).
-      {max !== null && max >= 2 ? ` فقط تا ${toFaDigits(max)}x از آن جان به در می‌برد.` : ' هر اهرمی بالاتر از ۱x در آن روز لیکوئید می‌شد.'}
-      {' '}صبح ریزش ۱۰ اکتبر ۲۰۲۵ همهٔ مدل‌ها برای ۳x آلت‌کوین‌ها ریسک را نزدیک صفر می‌دیدند و همه لیکوئید شدند؛ آبشار پیش‌بینی‌پذیر نیست.
-      {' '}<b>فقط مارجینی بگذارید که حاضرید در یک آبشار کامل از دست بدهید، و از مارجین ایزوله استفاده کنید تا بقیهٔ حساب درگیر نشود.</b>
-    </Notice>
+    <Surface variant="focal" className={cn('border-2 p-5', CARD[tone].border)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-extrabold text-ink">
+          {SIDE_FA[side]} <bdi dir="ltr">{coin}</bdi> با <bdi dir="ltr">{toFaDigits(r.leverage)}x</bdi>
+        </h3>
+        <Badge tone={tone}>{CARD[tone].label}</Badge>
+      </div>
+      <p className="mt-1.5 text-sm leading-7 text-muted">{headline}</p>
+
+      {!unknown && (
+        <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-divider pt-4">
+          <div>
+            <dt className="text-2xs font-semibold text-muted">احتمال لیکوئید در ۷ روز</dt>
+            <dd className={cn('mt-1 text-xl font-extrabold', r.p7d !== null && r.p7d > SAFE_TARGET_7D ? 'text-negative' : 'text-ink')}>{prob(r.p7d, r.p7dFloored)}</dd>
+            <dd className="text-2xs text-subtle">شرایط عادی</dd>
+          </div>
+          <div>
+            <dt className="text-2xs font-semibold text-muted">اگر بدترین روز تکرار شود</dt>
+            <dd className={cn('mt-1 text-xl font-extrabold', crashBurns ? 'text-negative' : 'text-positive')}>{r.crashSurvives === null ? '—' : crashBurns ? 'می‌سوزد' : 'می‌ماند'}</dd>
+            {model.crashPct !== null && <dd className="text-2xs text-subtle">{side === 'long' ? 'ریزش' : 'جهش'} {pct(model.crashPct, 0)}</dd>}
+          </div>
+          <div>
+            <dt className="text-2xs font-semibold text-muted">اهرم معقول</dt>
+            <dd className="mt-1 text-xl font-extrabold text-ink">{sensible === null ? '—' : <>تا <bdi dir="ltr">{toFaDigits(sensible)}x</bdi></>}</dd>
+            <dd className="text-2xs text-subtle">۷ روز ≤ {pct(SAFE_TARGET_7D, 0)} و آبشار</dd>
+          </div>
+        </dl>
+      )}
+
+      {lower && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={() => onLev(sensible!)}>{`اعمال ${toFaDigits(sensible!)}x`}</Button>
+          <span className="text-xs text-muted">فقط مارجینی بگذارید که حاضرید در یک آبشار کامل از دست بدهید؛ مارجین ایزوله بقیهٔ حساب را درگیر نمی‌کند.</span>
+        </div>
+      )}
+    </Surface>
   );
 }

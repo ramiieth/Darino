@@ -33,12 +33,12 @@ describe('امنیت توکن', () => {
     const r = assessToken({
       chain: 'solana', address: 'So11111111111111111111111111111111111111112', now: NOW,
       goplus: { freezable: { status: '1' }, mintable: { status: '0' }, holders: [{ percent: '0.6' }] },
-      rug: { risks: [{ name: 'Mutable metadata', level: 'warn', description: 'x' }, { name: 'Top holder', level: 'danger' }], lpLockedPct: 10 },
+      rug: { risks: [{ name: 'مشخصات توکن قابل تغییر است', level: 'warn', description: 'x' }, { name: 'Top holder', level: 'danger' }], lpLockedPct: 10 },
       pairs: [{ liquidity: { usd: 8000 }, pairCreatedAt: NOW - 3_600_000 }]
     });
     expect(r.verdict).toBe('danger');
     const labels = r.flags.map((f) => f.label);
-    expect(labels).toEqual(expect.arrayContaining(['قابل فریز', 'Top holder', 'Mutable metadata', 'نقدینگی خیلی کم', 'کمتر از ۲۴ ساعت عمر', '۱۰ هولدر برتر 60٪ عرضه', 'فقط 10٪ نقدینگی قفل است']));
+    expect(labels).toEqual(expect.arrayContaining(['قابل فریز', 'Top holder', 'مشخصات توکن قابل تغییر است', 'نقدینگی خیلی کم', 'کمتر از ۲۴ ساعت عمر', '۱۰ هولدر برتر 60٪ عرضه', 'فقط 10٪ نقدینگی قفل است']));
     expect(r.sources).toEqual(['GoPlus', 'RugCheck', 'DexScreener']);
   });
 
@@ -78,6 +78,13 @@ describe('رژیم فاندینگ', () => {
   it('کمتر از ۷ روز داده → نامشخص؛ نرخ منفی → منفی', () => {
     expect(fundingStats(hist([0.00001, 0.00002]), 0.00001, NOW).regime).toBe('unknown');
     expect(fundingStats(hist(Array(24 * 8).fill(0.00001)), -0.00001, NOW).regime).toBe('negative');
+  });
+
+  it('فاندینگ ثابت روی نرخ پایه «عادی» است نه «داغ»', () => {
+    const pinned = [...Array(24 * 25).fill(0.0000125), ...Array(24 * 5).fill(0.00003)];
+    const s = fundingStats(hist(pinned), 0.0000125, NOW);
+    expect(s.percentile).toBeCloseTo(41.7, 0);
+    expect(s.regime).toBe('normal');
   });
 });
 

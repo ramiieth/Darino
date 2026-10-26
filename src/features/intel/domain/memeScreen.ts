@@ -11,6 +11,7 @@
  * رژیم بازار: «دست‌کم ۷۰٪ کوین‌های غربال بالای میانگین ۵۰ روزهٔ خودشان» — با شاخص آزموده ۸۵٪ هم‌خوان بود
  * (کمی خوش‌بین‌تر: ۳۲ روز روشن در برابر ۲۴). Pure — مشترک بین سرور و کلاینت.
  */
+import { HOLDER_CONCENTRATION, rugKey, rugRiskFa } from './rugRisks.js';
 
 export interface DailyBar {
   /** روز (ms) */
@@ -91,6 +92,8 @@ export const REGIME_BREADTH = 0.7;
 const REGIME_MIN_COINS = 10;
 export const EXIT_PLAN = { stopPct: 30, halfAtMultiple: 2, trendMa: 20 } as const;
 
+const faNum = (v: number) => String(v).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+
 export function sma(xs: number[], i: number, n: number): number {
   const w = xs.slice(Math.max(0, i - n + 1), i + 1);
   return w.reduce((a, b) => a + b, 0) / Math.max(1, w.length);
@@ -114,8 +117,14 @@ export function safetyVerdict(s: SafetyInfo | null): { ok: boolean | null; reaso
   if (!s.mintRevoked) reasons.push('مینت باز است');
   if (!s.freezeRevoked) reasons.push('فریز باز است');
   if (s.rugged) reasons.push('rug شده');
-  if (s.top10Pct !== null && s.top10Pct > SAFETY_MAX_TOP10) reasons.push(`۱۰ هولدر بزرگ ${Math.round(s.top10Pct)}٪`);
-  reasons.push(...s.dangers);
+  const concentrated = s.top10Pct !== null && s.top10Pct > SAFETY_MAX_TOP10;
+  if (concentrated) reasons.push(`۱۰ هولدر بزرگ ${faNum(Math.round(s.top10Pct!))}٪`);
+  // نام‌های RugCheck فارسی؛ تمرکز هولدرها وقتی عددش آمده تکرار نمی‌شود
+  for (const d of s.dangers) {
+    if (concentrated && HOLDER_CONCENTRATION.has(rugKey(d))) continue;
+    const fa = rugRiskFa(d);
+    if (!reasons.includes(fa)) reasons.push(fa);
+  }
   return { ok: reasons.length === 0, reasons };
 }
 
@@ -233,3 +242,50 @@ export const EXIT_LIQ_FA: Record<ExitLiqReason, string> = {
   distribution: 'حجم بالا با قیمت درجا (توزیع)',
   churn: 'حجم روزانه بیشتر از ارزش بازار'
 };
+
+export type ScreenGroup = 'ready' | 'watch' | 'rejected';
+export const groupOf = (c: Pick<CoinScreen, 'passes' | 'watchWorthy'>): ScreenGroup => (c.passes ? 'ready' : c.watchWorthy ? 'watch' : 'rejected');
+
+/** اولین فیلتر ردشده با دلیلش، به ترتیب اهمیت (امنیت اول: ریسک صفر شدن) */
+export function firstFailure(c: Pick<CoinScreen, 'gate' | 'trend' | 'exitLiq' | 'safety'>): { filter: string; why: string } | null {
+  if (c.safety.ok !== true) {
+    // دلیل‌ها از دادهٔ خام دوباره ساخته می‌شوند تا پاسخ کش‌شدهٔ قدیمی سرور هم فارسی و بدون تکرار باشد
+    const reasons = c.safety.info ? safetyVerdict(c.safety.info).reasons : c.safety.reasons;
+    return { filter: 'امنیت', why: reasons.slice(0, 2).join('، ') || 'گزارش امنیت در دسترس نیست' };
+  }
+  if (!c.gate) return { filter: 'بقا', why: 'ارزش بازار زیر ۵ میلیون، حجم کم یا کمتر از ۳۰ روز سابقه' };
+  if (!c.exitLiq.ok) return { filter: 'نقدینگی خروج', why: c.exitLiq.reasons.map((r) => EXIT_LIQ_FA[r]).join('، ') || 'دادهٔ کافی نیست' };
+  if (!c.trend) return { filter: 'روند', why: 'قیمت زیر میانگین ۲۰ روزه یا بازده ۳۰ روزهٔ منفی' };
+  return null;
+}
+
+/** حکم امروز غربال — یک جملهٔ اصلی برای کارت بالای صفحه */
+export type Verdict = 'buy' | 'wait' | 'avoid' | 'unknown';
+export function todayVerdict(regime: Regime, ready: number): Verdict {
+  if (regime.state === 'unknown') return 'unknown';
+  if (regime.state === 'off') return 'avoid';
+  return ready > 0 ? 'buy' : 'wait';
+}
+
+/** برچسب‌های هشدار بلیت و ترتیب: بدون خطر شناخته‌شده اول، بعد نقدینگی بیشتر (خروج ممکن‌تر) */
+export interface LotteryToken {
+  liquidityUsd: number | null;
+  change24h: number | null;
+  createdAt: number | null;
+  safety: { verdict: 'danger' | 'caution' | 'clear' | 'unknown' };
+}
+export type LotteryFlag = 'pumped' | 'thin' | 'fresh';
+export const LOTTERY_FLAG_FA: Record<LotteryFlag, string> = { pumped: 'پامپ ۲۴ ساعته', thin: 'نقدینگی کم', fresh: 'زیر ۲۴ ساعت' };
+
+export function lotteryFlags(t: LotteryToken, now = Date.now()): LotteryFlag[] {
+  const out: LotteryFlag[] = [];
+  if ((t.change24h ?? 0) > 100) out.push('pumped');
+  if (t.liquidityUsd !== null && t.liquidityUsd < 50_000) out.push('thin');
+  if (t.createdAt && now - t.createdAt < 86_400_000) out.push('fresh');
+  return out;
+}
+
+const VERDICT_RANK = { clear: 0, caution: 1, unknown: 2, danger: 3 } as const;
+export function rankLottery<T extends LotteryToken>(tokens: T[]): T[] {
+  return [...tokens].sort((a, b) => VERDICT_RANK[a.safety.verdict] - VERDICT_RANK[b.safety.verdict] || (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0));
+}

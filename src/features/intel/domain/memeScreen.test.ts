@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { exitLiquidity, exitPlan, lotteryPlan, parseMarketChart, parseRugReport, regimeOf, screenCoin, type CoinInput, type DailyBar, type SafetyInfo } from './memeScreen';
+import { exitLiquidity, exitPlan, firstFailure, groupOf, lotteryFlags, lotteryPlan, parseMarketChart, parseRugReport, rankLottery, regimeOf, screenCoin, todayVerdict, type CoinInput, type DailyBar, type SafetyInfo } from './memeScreen';
+import { rugRiskFa } from './rugRisks';
 import { sanitizeWatch, watchEvents, watchMessage } from './memeWatch';
 
 const DAY = 86_400_000;
@@ -41,7 +42,7 @@ describe('غربال محافظ سرمایه', () => {
   it('امنیت: مینت باز، تمرکز بالا و خطرهای RugCheck دلیل جدا دارند؛ بدون گزارش «نامشخص»', () => {
     const s = screenCoin(coin({ safety: { ...SAFE, mintRevoked: false, top10Pct: 82, dangers: ['Single holder ownership'] } }));
     expect(s.safety.ok).toBe(false);
-    expect(s.safety.reasons).toEqual(['مینت باز است', '۱۰ هولدر بزرگ 82٪', 'Single holder ownership']);
+    expect(s.safety.reasons).toEqual(['مینت باز است', '۱۰ هولدر بزرگ ۸۲٪']); // «Single holder ownership» با عدد تمرکز تکراری است
     const unknown = screenCoin(coin({ safety: null }));
     expect(unknown.safety.ok).toBeNull();
     expect(unknown.passes).toBe(false);
@@ -119,5 +120,37 @@ describe('فهرست انتظار', () => {
     expect(gone.next).toEqual({ zcat: true });
     expect(watchEvents(['zcat'], { regime: on, coins: [ready] }, gone.next).alerts).toEqual([]);
     expect(watchMessage(ready).title).toBe('ZCAT: همهٔ فیلترها رد شد');
+  });
+});
+
+describe('نمایش غربال و بلیت', () => {
+  it('اولین فیلتر ردشده: امنیت قبل از روند', () => {
+    const risky = screenCoin(coin({ bars: bars(series(90, -0.01)), safety: { ...SAFE, mintRevoked: false } }));
+    expect(firstFailure(risky)).toEqual({ filter: 'امنیت', why: 'مینت باز است' });
+    const falling = screenCoin(coin({ bars: bars(series(90, -0.01)) }));
+    expect(firstFailure(falling)?.filter).toBe('روند');
+    expect(groupOf(falling)).toBe('watch');
+    expect(firstFailure(screenCoin(coin()))).toBeNull();
+  });
+
+  it('حکم امروز از رژیم و تعداد آماده‌ها', () => {
+    expect(todayVerdict({ state: 'off', breadth: 0.3, counted: 20 }, 3)).toBe('avoid');
+    expect(todayVerdict({ state: 'on', breadth: 0.8, counted: 20 }, 0)).toBe('wait');
+    expect(todayVerdict({ state: 'on', breadth: 0.8, counted: 20 }, 2)).toBe('buy');
+    expect(todayVerdict({ state: 'unknown', breadth: null, counted: 3 }, 0)).toBe('unknown');
+  });
+
+  it('بلیت: برچسب‌ها و ترتیب امن‌تر و نقدشونده‌تر اول', () => {
+    const now = 10 * DAY;
+    const t = (verdict: 'clear' | 'caution' | 'danger' | 'unknown', liq: number, change = 5, age = 5 * DAY) => ({ liquidityUsd: liq, change24h: change, createdAt: now - age, safety: { verdict } });
+    expect(lotteryFlags(t('clear', 20_000, 150, 3_600_000), now)).toEqual(['pumped', 'thin', 'fresh']);
+    expect(lotteryFlags(t('clear', 900_000), now)).toEqual([]);
+    expect(rankLottery([t('caution', 9e6), t('clear', 1e5), t('clear', 2e6)]).map((x) => [x.safety.verdict, x.liquidityUsd])).toEqual([['clear', 2e6], ['clear', 1e5], ['caution', 9e6]]);
+  });
+
+  it('نام ریسک‌های RugCheck فارسی؛ ناشناخته دست‌نخورده', () => {
+    expect(rugRiskFa('Mutable metadata')).toBe('مشخصات توکن قابل تغییر است');
+    expect(rugRiskFa('  LOW LIQUIDITY ')).toBe('نقدینگی کم');
+    expect(rugRiskFa('Something new')).toBe('Something new');
   });
 });
