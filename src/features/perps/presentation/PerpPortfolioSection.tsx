@@ -17,7 +17,7 @@ import { Metric, MetricGrid, MoneyValue } from '@/shared/components/ui/Financial
 import { faNumber, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
-import { perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } from '../domain/perpPortfolio';
+import { keyedErrorHint, perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } from '../domain/perpPortfolio';
 import { usePerpVenues } from '../data/usePerpVenues';
 import { MarketAssetIdentity } from './MarketAssetIdentity';
 
@@ -72,6 +72,11 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
         </div>
         <StatusBadge a={a} />
       </div>
+      {a.status === 'error' && a.error && (
+        <p className="rounded-field bg-warn/8 px-3 py-2 text-xs leading-6 text-ink">
+          {keyedErrorHint(a.error)} <span className="text-2xs text-muted">(<bdi dir="ltr">{a.error}</bdi>)</span>
+        </p>
+      )}
       <Metric
         size="lg"
         label={`سود/زیان ${rangeTitle(range)}`}

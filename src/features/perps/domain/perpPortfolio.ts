@@ -54,6 +54,8 @@ export interface PerpVenueAccount {
   positions: PerpVenuePosition[];
   status: PerpStatus;
   stale: boolean;
+  /** پیام کوتاه خطای سرویس (فقط حساب‌های کلیددار؛ بدون کلید یا هدر) */
+  error?: string;
 }
 
 export interface PerpTotals {
@@ -304,7 +306,7 @@ export function fromHlLike(
 /** پاسخ op=keyed-perps → حساب؛ خطای یک پلتفرم کارت «دریافت نشد» می‌سازد، نه عدد */
 export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string }, label: string): PerpVenueAccount {
   if ('error' in r) {
-    return { id: `keyed:${r.venue}`, venue: r.venue, label, unit: 'USDC', equity: null, unrealizedPnl: null, allTimePnl: null, realizedPnl: null, periodPnl: NO_PERIODS, positions: [], status: 'error', stale: false };
+    return { id: `keyed:${r.venue}`, venue: r.venue, label, unit: 'USDC', equity: null, unrealizedPnl: null, allTimePnl: null, realizedPnl: null, periodPnl: NO_PERIODS, positions: [], status: 'error', stale: false, error: r.error };
   }
   return {
     id: `keyed:${r.venue}`,
@@ -320,6 +322,17 @@ export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string 
     status: 'ready',
     stale: false
   };
+}
+
+/** خطای سرویس کلیددار به زبان کاربر: چه چیزی را در پنل همان صرافی یا Vercel بررسی کند */
+export function keyedErrorHint(error: string | undefined): string {
+  const e = error ?? '';
+  if (/HTTP (401|403)/.test(e)) return 'کلید API رد شد: منقضی یا حذف شده، دسترسی خواندن ندارد، یا به IP خاصی محدود شده (سرور Vercel IP ثابت ندارد). در پنل همان صرافی کلید تازهٔ فقط‌خواندنی بدون محدودیت IP بسازید و در Vercel جایگزین کنید.';
+  if (/HTTP 429/.test(e)) return 'صرافی درخواست‌ها را محدود کرده؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌شود.';
+  if (/HTTP 5\d\d/.test(e)) return 'سرور صرافی خطا داد؛ معمولاً موقت است.';
+  if (/HTTP 4\d\d/.test(e)) return 'صرافی درخواست را نپذیرفت؛ معمولاً یعنی کلید یا امضای API (مثلاً کیف پول امضاکنندهٔ آستر) درست تنظیم نشده.';
+  if (/timeout|abort|fetch failed|reach/i.test(e)) return 'سرور صرافی جواب نداد؛ ممکن است به سرورهای خارج از کشورش دسترسی نداشته باشد یا موقتاً در دسترس نباشد.';
+  return 'دریافت حساب انجام نشد.';
 }
 
 /** نام پروتکل هر صرافی در دارایی‌های کیف پول Zerion (اگر Zerion همان حساب را به‌عنوان موقعیت دیفای نشان بدهد) */
@@ -357,10 +370,6 @@ export function perpInNetWorth(
   const { sum, partial } = sumKnown(counted.map((a) => (a.status === 'ready' ? a.equity : null)));
   return { equity: sum, accounts: counted, duplicates: accounts.filter((a) => a.venue !== 'arcus' && duplicate(a)), partial };
 }
-
-/** سرمایهٔ خالص واریزی یک حساب = ارزش − سود/زیان کل (وقتی هر دو معلوم‌اند) */
-export const netDeposit = (a: Pick<PerpVenueAccount, 'equity' | 'allTimePnl'>): number | null =>
-  a.equity === null || a.allTimePnl === null ? null : a.equity - a.allTimePnl;
 
 export function perpTotals(accounts: readonly PerpVenueAccount[]): PerpTotals {
   const equity = sumKnown(accounts.map((a) => a.equity));

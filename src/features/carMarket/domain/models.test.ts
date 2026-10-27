@@ -77,3 +77,16 @@ describe('خلاصه بازار و برند', () => {
     expect(ik).toMatchObject({ models: 2, stopped: 1, minToman: 0.5e9, maxToman: 1.1e9 });
   });
 });
+
+describe('دست‌دوم دیوار — در فیلتر پیش‌فرض «فعال» دیده می‌شود', () => {
+  it('پراید ۱۳۱ مدل ۱۳۹۹ دیوار «در حال عرضه» است، نه «توقف تولید»', () => {
+    const rows = [
+      row('dv:Pride 131 SE:1399', 1_070_000_000, { modelId: 'dv:Pride 131 SE', model: 'پراید 131 SE', brand: 'saipa', year: '1399', dealer: null, marketUpdatedAt: NOW, source: 'divar', n: 5 }),
+      // همان سال قدیمی از car.ir همچنان «توقف تولید»
+      row('old', 900_000_000, { modelId: 'old', model: 'مدل قدیمی', brand: 'saipa', year: '1399', dealer: null, marketUpdatedAt: NOW })
+    ];
+    const { models } = buildModelMarket([snap(0, 100_000, rows, NOW)], periodOf('1d'), {});
+    expect(models.find((x) => x.key === 'dv:Pride 131 SE')!.status).toBe('current');
+    expect(models.find((x) => x.key === 'old')!.status).toBe('stopped');
+  });
+});
