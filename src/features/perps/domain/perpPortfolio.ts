@@ -322,6 +322,46 @@ export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string 
   };
 }
 
+/** نام پروتکل هر صرافی در دارایی‌های کیف پول Zerion (اگر Zerion همان حساب را به‌عنوان موقعیت دیفای نشان بدهد) */
+const ZERION_PROTOCOL: Partial<Record<PerpVenue, RegExp>> = {
+  hyperliquid: /hyperliquid/i,
+  'lighter-mainnet': /lighter/i,
+  'lighter-robinhood': /lighter/i,
+  txflow: /txflow/i
+};
+
+export interface PerpInNetWorth {
+  /** جمع ارزش حساب‌هایی که به ارزش کل دارایی اضافه می‌شوند */
+  equity: number | null;
+  accounts: PerpVenueAccount[];
+  /** حساب‌هایی که چون کیف پول متصل همان موجودی را نشان می‌دهد، دوباره شمرده نشدند */
+  duplicates: PerpVenueAccount[];
+  /** حسابی هنوز دریافت نشده یا ارزشش نامعلوم است */
+  partial: boolean;
+}
+
+/**
+ * حساب‌های پرپ در ارزش کل دارایی (آرکوس جدا؛ ارزشش از قبل در جمع کیف پول‌ها و آرکوس هست).
+ * اگر آدرس حساب همان کیف پول متصل باشد و Zerion موقعیتی از همان پروتکل نشان بدهد، دوباره شمرده نمی‌شود.
+ */
+export function perpInNetWorth(
+  accounts: readonly PerpVenueAccount[],
+  wallets: readonly { address: string; protocols: readonly (string | null)[] }[]
+): PerpInNetWorth {
+  const duplicate = (a: PerpVenueAccount) => {
+    const re = ZERION_PROTOCOL[a.venue];
+    const w = a.address && re ? wallets.find((x) => x.address.toLowerCase() === a.address!.toLowerCase()) : undefined;
+    return !!w && w.protocols.some((p) => !!p && re!.test(p));
+  };
+  const counted = accounts.filter((a) => a.venue !== 'arcus' && !duplicate(a));
+  const { sum, partial } = sumKnown(counted.map((a) => (a.status === 'ready' ? a.equity : null)));
+  return { equity: sum, accounts: counted, duplicates: accounts.filter((a) => a.venue !== 'arcus' && duplicate(a)), partial };
+}
+
+/** سرمایهٔ خالص واریزی یک حساب = ارزش − سود/زیان کل (وقتی هر دو معلوم‌اند) */
+export const netDeposit = (a: Pick<PerpVenueAccount, 'equity' | 'allTimePnl'>): number | null =>
+  a.equity === null || a.allTimePnl === null ? null : a.equity - a.allTimePnl;
+
 export function perpTotals(accounts: readonly PerpVenueAccount[]): PerpTotals {
   const equity = sumKnown(accounts.map((a) => a.equity));
   const upnl = sumKnown(accounts.map((a) => a.unrealizedPnl));

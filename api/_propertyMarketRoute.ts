@@ -92,6 +92,7 @@ async function probeDivar(): Promise<{ ok: boolean; ms: number; listings: number
 
 /** حداکثر روزهای تاریخچه خودرو در پاسخ GET */
 const CAR_HISTORY_LIMIT = 400;
+const DAY_MS = 86_400_000;
 
 function queryOf(req: IncomingMessage): URLSearchParams {
   const raw = typeof req.url === 'string' ? req.url : '';
@@ -132,6 +133,19 @@ async function upsertCarSnapshot(snap: CarSnapshot): Promise<void> {
     ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, "dateTs" = EXCLUDED."dateTs"
     WHERE "carPriceSnapshots"."dateTs" < EXCLUDED."dateTs"
   `;
+}
+
+/**
+ * آخرین Snapshot بدون ردیف دیوار (Cron صبح قبل از جمع شدن آگهی‌ها نوشته شده) → همین الان اضافه و ذخیره؛
+ * برای Snapshot امروز پنجرهٔ آگهی‌ها تا همین لحظه است تا آگهی‌های بعد از Cron هم حساب شوند
+ */
+async function attachDivar(last: CarSnapshot | undefined): Promise<void> {
+  if (!last || last.rows.some((r) => r.source === 'divar')) return;
+  const now = Date.now();
+  const divar = await divarRowsAt(now - last.dateTs < DAY_MS ? now : last.dateTs);
+  if (!divar.length) return;
+  last.rows = [...last.rows, ...divar];
+  await db()`UPDATE "carPriceSnapshots" SET payload = ${JSON.stringify(last)}::jsonb WHERE id = ${last.id}`.catch(() => undefined);
 }
 
 /** بودجهٔ زمان Cron املاک — زیر سقف ۶۰ ثانیهٔ فانکشن، با حاشیه برای ذخیره */
@@ -215,7 +229,9 @@ async function handleCarGet(req: IncomingMessage, res: ServerResponse, q: URLSea
     const rows = (await db()`
       SELECT payload FROM "carPriceSnapshots" ORDER BY "dateTs" DESC LIMIT ${CAR_HISTORY_LIMIT}
     `) as unknown as { payload: CarSnapshot | string }[];
-    json(res, 200, { configured: true, snapshots: rows.map((r) => fromJsonb(r.payload)).reverse() });
+    const snapshots = rows.map((r) => fromJsonb(r.payload)).reverse();
+    await attachDivar(snapshots[snapshots.length - 1]);
+    json(res, 200, { configured: true, snapshots });
   } catch {
     json(res, 200, { configured: false, snapshots: [] });
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
 import type { ArcusPortfolio } from '@/features/arcus/api/types';
-import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries } from './perpPortfolio';
+import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries, netDeposit, perpInNetWorth, type PerpVenueAccount } from './perpPortfolio';
 
 const arcusPos = (o: Partial<ArcusPosition>): ArcusPosition =>
   ({ marketDisplayName: 'BTC-USD', side: 'LONG', size: '0.1', averageEntryPrice: '100000', unrealizedPnl: '25.5', markPx: '100255', ...o }) as ArcusPosition;
@@ -135,5 +135,37 @@ describe('هایپرلیکوئید و تی‌اکس‌فلو', () => {
     const a = fromHlLike('t2', 'x', 'txflow', A, null, 'error', false);
     expect(a).toMatchObject({ equity: null, unrealizedPnl: null, allTimePnl: null, positions: [] });
     expect(perpTotals([a, fromHlLike('h', 'y', 'hyperliquid', A, state, 'ready', false)]).partial).toBe(true);
+  });
+});
+
+describe('حساب‌های پرپ در ارزش کل دارایی', () => {
+  const acc = (id: string, venue: PerpVenueAccount['venue'], equity: number | null, extra: Partial<PerpVenueAccount> = {}): PerpVenueAccount => ({
+    id, venue, label: id, unit: 'USDC', equity, unrealizedPnl: null, allTimePnl: null, realizedPnl: null,
+    periodPnl: { day: null, week: null, month: null }, positions: [], status: 'ready', stale: false, ...extra
+  });
+
+  it('همهٔ صرافی‌ها جز آرکوس (آرکوس از قبل در جمع است)', () => {
+    const r = perpInNetWorth([acc('rh', 'lighter-robinhood', 1200), acc('hl', 'hyperliquid', 300), acc('ar', 'arcus', 999)], []);
+    expect(r.equity).toBe(1500);
+    expect(r.accounts.map((a) => a.id)).toEqual(['rh', 'hl']);
+    expect(r.partial).toBe(false);
+  });
+
+  it('حسابی که کیف پول متصل همان را به‌عنوان موقعیت همان پروتکل نشان می‌دهد دوباره شمرده نمی‌شود', () => {
+    const r = perpInNetWorth([acc('hl', 'hyperliquid', 300, { address: '0xAbC' })], [{ address: '0xabc', protocols: ['Hyperliquid', null] }]);
+    expect(r.equity).toBeNull();
+    expect(r.duplicates.map((a) => a.id)).toEqual(['hl']);
+    // همان آدرس بدون موقعیت هایپرلیکوئید در Zerion ← شمرده می‌شود
+    expect(perpInNetWorth([acc('hl', 'hyperliquid', 300, { address: '0xAbC' })], [{ address: '0xabc', protocols: ['Uniswap'] }]).equity).toBe(300);
+  });
+
+  it('حساب در حال دریافت: جمع ناقص علامت می‌خورد', () => {
+    const r = perpInNetWorth([acc('rh', 'lighter-robinhood', 1200), acc('q', 'qfex', null, { status: 'loading' })], []);
+    expect(r).toMatchObject({ equity: 1200, partial: true });
+  });
+
+  it('سرمایهٔ واریزی = ارزش − سود و زیان کل', () => {
+    expect(netDeposit({ equity: 1200, allTimePnl: 200 })).toBe(1000);
+    expect(netDeposit({ equity: 1200, allTimePnl: null })).toBeNull();
   });
 });
