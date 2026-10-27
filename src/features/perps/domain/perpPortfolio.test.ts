@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
 import type { ArcusPortfolio } from '@/features/arcus/api/types';
-import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries, perpInNetWorth, fromKeyed, keyedErrorHint, type PerpVenueAccount } from './perpPortfolio';
+import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries, perpInNetWorth, fromKeyed, type PerpVenueAccount } from './perpPortfolio';
 
 const arcusPos = (o: Partial<ArcusPosition>): ArcusPosition =>
   ({ marketDisplayName: 'BTC-USD', side: 'LONG', size: '0.1', averageEntryPrice: '100000', unrealizedPnl: '25.5', markPx: '100255', ...o }) as ArcusPosition;
@@ -166,10 +166,7 @@ describe('حساب‌های پرپ در ارزش کل دارایی', () => {
 });
 
 describe('خطای حساب‌های کلیددار', () => {
-  it('پیام خطای سرور به حساب می‌رسد و راهنمای ساده دارد', () => {
+  it('پیام خطای سرور به حساب می‌رسد (فقط در title برچسب «دریافت نشد»)', () => {
     expect(fromKeyed({ venue: 'qfex', error: 'HTTP 401 · invalid key' }, 'کیوفکس')).toMatchObject({ status: 'error', error: 'HTTP 401 · invalid key' });
-    expect(keyedErrorHint('HTTP 401 · invalid key')).toMatch(/کلید API رد شد/);
-    expect(keyedErrorHint('HTTP 503')).toMatch(/موقت/);
-    expect(keyedErrorHint('source unreachable')).toMatch(/جواب نداد/);
   });
 });

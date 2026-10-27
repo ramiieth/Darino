@@ -324,17 +324,6 @@ export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string 
   };
 }
 
-/** خطای سرویس کلیددار به زبان کاربر: چه چیزی را در پنل همان صرافی یا Vercel بررسی کند */
-export function keyedErrorHint(error: string | undefined): string {
-  const e = error ?? '';
-  if (/HTTP (401|403)/.test(e)) return 'کلید API رد شد: منقضی یا حذف شده، دسترسی خواندن ندارد، یا به IP خاصی محدود شده (سرور Vercel IP ثابت ندارد). در پنل همان صرافی کلید تازهٔ فقط‌خواندنی بدون محدودیت IP بسازید و در Vercel جایگزین کنید.';
-  if (/HTTP 429/.test(e)) return 'صرافی درخواست‌ها را محدود کرده؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌شود.';
-  if (/HTTP 5\d\d/.test(e)) return 'سرور صرافی خطا داد؛ معمولاً موقت است.';
-  if (/HTTP 4\d\d/.test(e)) return 'صرافی درخواست را نپذیرفت؛ معمولاً یعنی کلید یا امضای API (مثلاً کیف پول امضاکنندهٔ آستر) درست تنظیم نشده.';
-  if (/timeout|abort|fetch failed|reach/i.test(e)) return 'سرور صرافی جواب نداد؛ ممکن است به سرورهای خارج از کشورش دسترسی نداشته باشد یا موقتاً در دسترس نباشد.';
-  return 'دریافت حساب انجام نشد.';
-}
-
 /** نام پروتکل هر صرافی در دارایی‌های کیف پول Zerion (اگر Zerion همان حساب را به‌عنوان موقعیت دیفای نشان بدهد) */
 const ZERION_PROTOCOL: Partial<Record<PerpVenue, RegExp>> = {
   hyperliquid: /hyperliquid/i,

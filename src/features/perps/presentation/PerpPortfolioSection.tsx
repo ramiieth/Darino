@@ -17,7 +17,7 @@ import { Metric, MetricGrid, MoneyValue } from '@/shared/components/ui/Financial
 import { faNumber, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
-import { keyedErrorHint, perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } from '../domain/perpPortfolio';
+import { perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } from '../domain/perpPortfolio';
 import { usePerpVenues } from '../data/usePerpVenues';
 import { MarketAssetIdentity } from './MarketAssetIdentity';
 
@@ -45,7 +45,7 @@ const qty = (n: number | null) => (n === null ? '—' : faNumber(n, { maximumFra
 
 function StatusBadge({ a }: { a: PerpVenueAccount }) {
   if (a.status === 'loading') return <Badge>در حال دریافت</Badge>;
-  if (a.status === 'error') return <Badge tone="warn">دریافت نشد</Badge>;
+  if (a.status === 'error') return <span title={a.error}><Badge tone="warn">دریافت نشد</Badge></span>;
   if (a.stale) return <Badge tone="warn">قدیمی</Badge>;
   return null;
 }
@@ -72,11 +72,6 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
         </div>
         <StatusBadge a={a} />
       </div>
-      {a.status === 'error' && a.error && (
-        <p className="rounded-field bg-warn/8 px-3 py-2 text-xs leading-6 text-ink">
-          {keyedErrorHint(a.error)} <span className="text-2xs text-muted">(<bdi dir="ltr">{a.error}</bdi>)</span>
-        </p>
-      )}
       <Metric
         size="lg"
         label={`سود/زیان ${rangeTitle(range)}`}
