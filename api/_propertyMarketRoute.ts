@@ -42,6 +42,7 @@ import { buildCarSnapshot, isCarSnapshot } from '../src/features/carMarket/domai
 import type { CarSnapshot } from '../src/features/carMarket/domain/types.js';
 import { fetchUsdtDirect, type UsdtSource } from '../src/shared/fx/usdtRate.js';
 import { handleArvandAction, handleArvandGet } from './_arvand.js';
+import { divarRowsAt } from './_divarCars.js';
 
 /** سقف زمان هر تکه — زیر maxDuration=60 در vercel.json */
 const CHUNK_TIME_BUDGET_MS = 38_000;
@@ -121,7 +122,10 @@ async function serverUsdt(): Promise<{ rateToman: number; source: UsdtSource } |
 }
 
 /** درج/جایگزینی Snapshot روز — نسخه قدیمی‌تر روی جدیدتر نمی‌نشیند */
-async function upsertCarSnapshot(s: CarSnapshot): Promise<void> {
+async function upsertCarSnapshot(snap: CarSnapshot): Promise<void> {
+  // میانهٔ آگهی‌های دست‌دوم دیوار (مدل‌ها و سال‌هایی که car.ir ندارد) کنار ردیف‌های car.ir
+  const divar = await divarRowsAt(snap.dateTs);
+  const s: CarSnapshot = divar.length ? { ...snap, rows: [...snap.rows.filter((r) => r.source !== 'divar'), ...divar] } : snap;
   await db()`
     INSERT INTO "carPriceSnapshots" (id, "dateTs", payload, "createdAt")
     VALUES (${s.id}, ${s.dateTs}, ${JSON.stringify(s)}::jsonb, ${s.createdAt ?? Date.now()})

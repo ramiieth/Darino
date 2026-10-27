@@ -27,6 +27,8 @@ import { hlInfo, pool } from './_hyperliquid.js';
 import { warmSummaries } from './_tradersRoute.js';
 import { readMemeScreen, warmMemeScreen } from './_memeScreen.js';
 import { warmSwing } from './_swingScreen.js';
+import { recordGold } from './_gold.js';
+import { warmDivarCars } from './_divarCars.js';
 import { sanitizeWatch, watchEvents, watchMessage, type MemeWatchState } from '../src/features/intel/domain/memeWatch.js';
 import { followMessage, positionEvents, sanitizeSaved, shortAddr, type SavedTrader } from '../src/features/traders/domain/follow.js';
 import type { Fill } from '../src/features/traders/domain/types.js';
@@ -336,6 +338,10 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
   await warmMemeScreen().catch(() => { errors.push('meme-warm'); });
   // رژیم بازار سوینگ و ثبت روزانهٔ کاندید آزمایشی (حتی وقتی کسی صفحه را باز نکرده)
   await warmSwing().catch(() => { errors.push('swing-warm'); });
+  // حباب طلای ایران: ثبت روزانه برای آزمودن «ارزان/گران» در آینده
+  await recordGold().catch(() => { errors.push('gold-record'); });
+  // آگهی‌های خودروی داخلی دیوار تهران، چند صفحه در هر تیک (بازار خودرو)
+  await warmDivarCars().catch(() => { errors.push('divar-cars'); });
   const latest = (await store.get<TickInfo>(SYSTEM, 'tick')) ?? info;
   await store.put(SYSTEM, 'tick', { ...latest, lastAt: now, lastResult: { users: users.length, sent, errors: [...new Set(errors)] } });
   return { skipped: false, users: users.length, sent };

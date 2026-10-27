@@ -6,7 +6,7 @@ import { memo } from 'react';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits } from '@/shared/utils/formatters';
 import { CarBrandLogo } from '@/features/carMarket/presentation/CarBrandLogo';
-import { fmtCarPct, fmtCarToman, fmtCarUsd } from '@/features/carMarket/presentation/format';
+import { fmtCarPct, fmtCarToman, fmtCarTomanSigned, fmtCarUsd } from '@/features/carMarket/presentation/format';
 import { brandLabelOf, brandSlugOf } from '../domain/brandOf';
 import type { ModelGroup } from '../domain/compare';
 
@@ -57,6 +57,9 @@ export const GroupCard = memo(function GroupCard({ g, usdRate, onPick }: { g: Mo
             title="اختلاف میانه قیمت اروند با پلاک ملی"
           >
             <span className="num-ltr">{fmtCarPct(g.gapPct)}</span>
+            {g.arvand.median !== null && g.national.median !== null && fmtCarTomanSigned(g.arvand.median - g.national.median) && (
+              <span className="block text-2xs font-semibold">{fmtCarTomanSigned(g.arvand.median - g.national.median)}</span>
+            )}
           </span>
         ) : (
           <span className="shrink-0 rounded-full bg-surface-2 px-2 py-1 text-2xs text-muted">بدون مبنای ملی</span>

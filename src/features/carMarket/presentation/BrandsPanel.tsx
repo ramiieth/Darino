@@ -9,7 +9,7 @@ import { brandSummaries, type CarModelView } from '../domain/models';
 import { CarBrandLogo } from './CarBrandLogo';
 import { ChangePill } from './ChangeCell';
 import { CategoryBadge } from './StatusBadge';
-import { fmtCarToman } from './format';
+import { fmtCarToman, fmtCarTomanSigned } from './format';
 
 export function BrandsPanel({ models, periodLabel, onPick }: { models: CarModelView[]; periodLabel: string; onPick: (brand: string) => void }) {
   const brands = useMemo(
@@ -49,7 +49,7 @@ export function BrandsPanel({ models, periodLabel, onPick }: { models: CarModelV
             </span>
             <span className="flex flex-wrap items-center gap-1.5 border-t border-divider pt-3">
               <span className="text-2xs text-subtle">{periodLabel}</span>
-              <ChangePill pct={b.tomanPct} label="تومانی" />
+              <ChangePill pct={b.tomanPct} label="تومانی" amount={b.tomanAbs !== null && fmtCarTomanSigned(b.tomanAbs) ? `میانگین ${fmtCarTomanSigned(b.tomanAbs)}` : undefined} />
               <ChangePill pct={b.usdPct} label="دلاری" />
             </span>
           </button>

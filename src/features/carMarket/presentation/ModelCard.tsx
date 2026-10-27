@@ -12,7 +12,7 @@ import { CarBrandLogo } from './CarBrandLogo';
 import { ChangePill } from './ChangeCell';
 import { Sparkline } from './Sparkline';
 import { CategoryBadge, StatusBadge } from './StatusBadge';
-import { fmtCarPct, fmtCarToman, fmtCarUsd } from './format';
+import { fmtCarPct, fmtCarToman, fmtCarTomanSigned, fmtCarUsd, fmtCarUsdSigned } from './format';
 
 export const ModelCard = memo(function ModelCard({
   model: m,
@@ -44,6 +44,11 @@ export const ModelCard = memo(function ModelCard({
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
             <StatusBadge model={m} />
             <CategoryBadge category={m.category} />
+            {r.source === 'divar' && (
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-2xs font-semibold text-accent" title="میانهٔ قیمت آگهی‌های دست‌دوم دیوار تهران در ۱۴ روز اخیر">
+                دست‌دوم دیوار{r.n ? ` · ${toFaDigits(r.n)} آگهی` : ''}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -69,8 +74,8 @@ export const ModelCard = memo(function ModelCard({
           <span className="text-2xs text-muted">آخرین قیمت ثبت‌شده: {m.lastSeenTs ? formatJalali(m.lastSeenTs) : '—'}</span>
         ) : (
           <>
-            <ChangePill pct={m.change?.tomanPct} label="تومانی" estimated={m.change?.basis === 'source'} />
-            <ChangePill pct={m.change?.usdPct} label="دلاری" />
+            <ChangePill pct={m.change?.tomanPct} label="تومانی" amount={fmtCarTomanSigned(m.change?.tomanAbs) || undefined} estimated={m.change?.basis === 'source'} />
+            <ChangePill pct={m.change?.usdPct} label="دلاری" amount={m.change?.usdAbs != null ? fmtCarUsdSigned(m.change.usdAbs) : undefined} />
             {m.basis.gapPct !== null && (
               <span className="ms-auto text-2xs text-subtle" title="اختلاف قیمت بازار با کارخانه">
                 حباب {fmtCarPct(m.basis.gapPct)}

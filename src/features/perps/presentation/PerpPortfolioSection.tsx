@@ -21,12 +21,12 @@ import { perpTotals, type PnlPeriod, type PerpVenue, type PerpVenueAccount } fro
 import { usePerpVenues } from '../data/usePerpVenues';
 import { MarketAssetIdentity } from './MarketAssetIdentity';
 
-/** to: مسیر داخلی (کارنامهٔ هایپرلیکوئید در هاب اطلاعات) · href: پلتفرم بیرونی */
+/** to: مسیر داخلی (کارنامهٔ هایپرلیکوئید در میز معامله) · href: پلتفرم بیرونی */
 const VENUE: Record<PerpVenue, { name: string; logo: string; network?: string; to?: (a: PerpVenueAccount) => string; href?: string; cta?: string }> = {
   arcus: { name: 'آرکوس', logo: '/logos/platform-arcus.png', to: () => '/arcus' },
   'lighter-robinhood': { name: 'لایتر رابین‌هود', logo: '/logos/platform-lighter.png', network: '/logos/chain-4663.svg', to: () => '/lighter-robinhood' },
   'lighter-mainnet': { name: 'لایتر', logo: '/logos/platform-lighter.png', to: () => '/lighter' },
-  hyperliquid: { name: 'هایپرلیکوئید', logo: '/logos/token-hype.png', to: (a) => `/intel?a=${a.address ?? ''}`, cta: 'کارنامه و تاریخچهٔ معاملات' },
+  hyperliquid: { name: 'هایپرلیکوئید', logo: '/logos/token-hype.png', to: (a) => `/desk?a=${a.address ?? ''}`, cta: 'کارنامه و تاریخچهٔ معاملات' },
   txflow: { name: 'تی‌اکس‌فلو', logo: '/logos/platform-txflow.png', href: 'https://app.txflow.com/' },
   aster: { name: 'آستر', logo: '/logos/platform-aster.png', href: 'https://www.asterdex.com/en/trade/pro/futures/BTCUSDT' },
   qfex: { name: 'کیوفکس', logo: '/logos/platform-qfex.png', href: 'https://www.qfex.com/' },

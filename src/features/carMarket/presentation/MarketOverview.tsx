@@ -9,14 +9,14 @@ import { formatJalali } from '@/shared/utils/jalali';
 import type { CarModelView, MarketSummary } from '../domain/models';
 import { CarBrandLogo } from './CarBrandLogo';
 import { ChangePill, trendOf } from './ChangeCell';
-import { fmtCarPct } from './format';
+import { fmtCarPct, fmtCarTomanSigned } from './format';
 
 function Mover({ m, onPick }: { m: CarModelView; onPick: (m: CarModelView) => void }) {
   return (
     <button type="button" onClick={() => onPick(m)} className="flex w-full items-center gap-2 rounded-field px-2 py-1.5 text-start hover:bg-surface-2">
       <CarBrandLogo brand={m.brand} label={m.brandFa} size={24} />
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m.model}</span>
-      <ChangePill pct={m.change?.tomanPct} />
+      <ChangePill pct={m.change?.tomanPct} amount={fmtCarTomanSigned(m.change?.tomanAbs) || undefined} />
     </button>
   );
 }
