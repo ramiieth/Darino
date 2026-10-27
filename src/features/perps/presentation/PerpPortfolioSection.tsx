@@ -45,7 +45,7 @@ const qty = (n: number | null) => (n === null ? '—' : faNumber(n, { maximumFra
 
 function StatusBadge({ a }: { a: PerpVenueAccount }) {
   if (a.status === 'loading') return <Badge>در حال دریافت</Badge>;
-  if (a.status === 'error') return <Badge tone="warn">دریافت نشد</Badge>;
+  if (a.status === 'error') return <span title={a.error}><Badge tone="warn">دریافت نشد</Badge></span>;
   if (a.stale) return <Badge tone="warn">قدیمی</Badge>;
   return null;
 }

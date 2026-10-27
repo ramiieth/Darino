@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ArcusAccount, ArcusPosition } from '@/features/arcus/api/types';
 import type { ArcusPortfolio } from '@/features/arcus/api/types';
-import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries, netDeposit, perpInNetWorth, type PerpVenueAccount } from './perpPortfolio';
+import { arcusPeriodPnl, fromArcus, fromLighter, lighterSeriesPnl, perpTotals, positionsPnl, sumKnown, fromHlLike, hlPortfolioPnl, ledgerNetDeposits, type HlPortfolioSeries, perpInNetWorth, fromKeyed, type PerpVenueAccount } from './perpPortfolio';
 
 const arcusPos = (o: Partial<ArcusPosition>): ArcusPosition =>
   ({ marketDisplayName: 'BTC-USD', side: 'LONG', size: '0.1', averageEntryPrice: '100000', unrealizedPnl: '25.5', markPx: '100255', ...o }) as ArcusPosition;
@@ -163,9 +163,10 @@ describe('حساب‌های پرپ در ارزش کل دارایی', () => {
     const r = perpInNetWorth([acc('rh', 'lighter-robinhood', 1200), acc('q', 'qfex', null, { status: 'loading' })], []);
     expect(r).toMatchObject({ equity: 1200, partial: true });
   });
+});
 
-  it('سرمایهٔ واریزی = ارزش − سود و زیان کل', () => {
-    expect(netDeposit({ equity: 1200, allTimePnl: 200 })).toBe(1000);
-    expect(netDeposit({ equity: 1200, allTimePnl: null })).toBeNull();
+describe('خطای حساب‌های کلیددار', () => {
+  it('پیام خطای سرور به حساب می‌رسد (فقط در title برچسب «دریافت نشد»)', () => {
+    expect(fromKeyed({ venue: 'qfex', error: 'HTTP 401 · invalid key' }, 'کیوفکس')).toMatchObject({ status: 'error', error: 'HTTP 401 · invalid key' });
   });
 });

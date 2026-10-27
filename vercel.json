@@ -3,6 +3,7 @@
   "framework": "vite",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist",
+  "regions": ["sin1"],
   "functions": {
     "api/data.ts": {
       "includeFiles": "db/schema.sql"

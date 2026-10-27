@@ -102,7 +102,9 @@ function makeModel(trims: CarView[], refTs: number, delisted: boolean, lastSeenT
     basis,
     trims: sorted,
     latestYear: newestYear,
-    status: productionStatus(newest, basis, refTs, delisted, anyDealer),
+    // دست‌دوم دیوار: «الان خرید و فروش می‌شود» مهم است، نه «هنوز تولید می‌شود»؛ وگرنه پراید و ۴۰۵ و سمند
+    // «توقف تولید» می‌شدند و فیلتر پیش‌فرض «فعال» همه را پنهان می‌کرد
+    status: basis.row.source === 'divar' && !delisted ? 'current' : productionStatus(newest, basis, refTs, delisted, anyDealer),
     delisted,
     lastSeenTs,
     change: basis.change

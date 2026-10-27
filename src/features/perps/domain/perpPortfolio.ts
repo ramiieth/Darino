@@ -54,6 +54,8 @@ export interface PerpVenueAccount {
   positions: PerpVenuePosition[];
   status: PerpStatus;
   stale: boolean;
+  /** پیام کوتاه خطای سرویس (فقط حساب‌های کلیددار؛ بدون کلید یا هدر) */
+  error?: string;
 }
 
 export interface PerpTotals {
@@ -304,7 +306,7 @@ export function fromHlLike(
 /** پاسخ op=keyed-perps → حساب؛ خطای یک پلتفرم کارت «دریافت نشد» می‌سازد، نه عدد */
 export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string }, label: string): PerpVenueAccount {
   if ('error' in r) {
-    return { id: `keyed:${r.venue}`, venue: r.venue, label, unit: 'USDC', equity: null, unrealizedPnl: null, allTimePnl: null, realizedPnl: null, periodPnl: NO_PERIODS, positions: [], status: 'error', stale: false };
+    return { id: `keyed:${r.venue}`, venue: r.venue, label, unit: 'USDC', equity: null, unrealizedPnl: null, allTimePnl: null, realizedPnl: null, periodPnl: NO_PERIODS, positions: [], status: 'error', stale: false, error: r.error };
   }
   return {
     id: `keyed:${r.venue}`,
@@ -357,10 +359,6 @@ export function perpInNetWorth(
   const { sum, partial } = sumKnown(counted.map((a) => (a.status === 'ready' ? a.equity : null)));
   return { equity: sum, accounts: counted, duplicates: accounts.filter((a) => a.venue !== 'arcus' && duplicate(a)), partial };
 }
-
-/** سرمایهٔ خالص واریزی یک حساب = ارزش − سود/زیان کل (وقتی هر دو معلوم‌اند) */
-export const netDeposit = (a: Pick<PerpVenueAccount, 'equity' | 'allTimePnl'>): number | null =>
-  a.equity === null || a.allTimePnl === null ? null : a.equity - a.allTimePnl;
 
 export function perpTotals(accounts: readonly PerpVenueAccount[]): PerpTotals {
   const equity = sumKnown(accounts.map((a) => a.equity));
