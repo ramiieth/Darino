@@ -39,6 +39,8 @@ const LIGHTER = 'https://mainnet.zklighter.elliot.ai';
 const ARCUS = 'https://api.arcus.xyz';
 const ONDO = 'https://api.ondoperps.xyz';
 const MIN_TICK_GAP_MS = 60_000;
+/** سقف زمان کل تیک؛ زیر maxDuration=60 فانکشن services، با حاشیه برای ذخیرهٔ نتیجه */
+const TICK_BUDGET_MS = 52_000;
 const MAX_SUBSCRIPTIONS = 10;
 const LOG_SIZE = 20;
 /** اعلان تریدر دنبال‌شده در هر تیک برای هر کاربر */
@@ -332,16 +334,24 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
       errors.push('check-failed');
     }
   }
-  // خلاصهٔ کارنامهٔ چند تریدر برتر را هم گرم می‌کند تا فهرست بدون باز بودن صفحه آماده باشد
-  await warmSummaries().catch(() => { errors.push('traders-warm'); });
-  // غربال میم‌کوین را چند کوین در هر تیک تازه می‌کند (سقف درخواست CoinGecko)
-  await warmMemeScreen().catch(() => { errors.push('meme-warm'); });
-  // رژیم بازار سوینگ و ثبت روزانهٔ کاندید آزمایشی (حتی وقتی کسی صفحه را باز نکرده)
-  await warmSwing().catch(() => { errors.push('swing-warm'); });
-  // حباب طلای ایران: ثبت روزانه برای آزمودن «ارزان/گران» در آینده
-  await recordGold().catch(() => { errors.push('gold-record'); });
-  // آگهی‌های خودروی داخلی دیوار تهران، چند صفحه در هر تیک (بازار خودرو)
-  await warmDivarCars().catch(() => { errors.push('divar-cars'); });
+  // گرم‌کن‌های پس‌زمینه با بودجهٔ زمان: فانکشن ۶۰ ثانیه سقف دارد و قبلاً آخری‌ها (دیوار) هرگز نوبت نمی‌گرفتند.
+  // هر کدام فقط وقتی اجرا می‌شود که به‌اندازهٔ سقف زمان خودش وقت مانده باشد؛ نماندن وقت = «skip-…» در lastResult
+  const warmers: [string, number, () => Promise<unknown>][] = [
+    // آگهی‌های خودروی داخلی دیوار تهران، چند صفحه در هر تیک (بازار خودرو)
+    ['divar-cars', 11_000, () => warmDivarCars()],
+    // رژیم بازار سوینگ و ثبت روزانهٔ کاندید آزمایشی (حتی وقتی کسی صفحه را باز نکرده)
+    ['swing-warm', 14_000, () => warmSwing()],
+    // حباب طلای ایران: ثبت روزانه برای آزمودن «ارزان/گران» در آینده
+    ['gold-record', 16_000, () => recordGold()],
+    // غربال میم‌کوین را چند کوین در هر تیک تازه می‌کند (سقف درخواست CoinGecko)
+    ['meme-warm', 16_000, () => warmMemeScreen()],
+    // خلاصهٔ کارنامهٔ چند تریدر برتر را هم گرم می‌کند تا فهرست بدون باز بودن صفحه آماده باشد
+    ['traders-warm', 12_000, () => warmSummaries()]
+  ];
+  for (const [name, needMs, run] of warmers) {
+    if (Date.now() - now + needMs > TICK_BUDGET_MS) { errors.push(`skip-${name}`); continue; }
+    await run().catch(() => { errors.push(name); });
+  }
   const latest = (await store.get<TickInfo>(SYSTEM, 'tick')) ?? info;
   await store.put(SYSTEM, 'tick', { ...latest, lastAt: now, lastResult: { users: users.length, sent, errors: [...new Set(errors)] } });
   return { skipped: false, users: users.length, sent };
