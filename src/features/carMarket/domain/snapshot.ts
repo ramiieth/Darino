@@ -42,8 +42,16 @@ export function mergeCarSnapshots(...lists: CarSnapshot[][]): CarSnapshot[] {
     for (const s of list) {
       if (!isCarSnapshot(s)) continue;
       const prev = byDay.get(s.day);
-      if (!prev || s.dateTs > prev.dateTs) byDay.set(s.day, s);
+      if (!prev) byDay.set(s.day, s);
+      else byDay.set(s.day, s.dateTs > prev.dateTs ? carryDivar(s, prev) : carryDivar(prev, s));
     }
   }
   return [...byDay.values()].sort((a, b) => a.dateTs - b.dateTs);
+}
+
+/** نسخهٔ جدیدتر همان روز می‌ماند؛ اگر ردیف‌های دیوار ندارد (واکشی مستقیم car.ir در مرورگر) از نسخهٔ دیگر می‌آیند */
+export function carryDivar(newer: CarSnapshot, older: CarSnapshot): CarSnapshot {
+  if (newer.rows.some((r) => r.source === 'divar')) return newer;
+  const divar = older.rows.filter((r) => r.source === 'divar');
+  return divar.length ? { ...newer, rows: [...newer.rows, ...divar] } : newer;
 }

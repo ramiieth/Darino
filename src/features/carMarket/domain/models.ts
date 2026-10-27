@@ -162,6 +162,8 @@ export interface BrandSummary {
   models: number;
   /** میانگین ساده درصد تغییر مدل‌ها (فقط مدل‌های دارای تغییر) */
   tomanPct: number | null;
+  /** میانگین ساده مبلغ تغییر قیمت هر مدل (تومان) */
+  tomanAbs: number | null;
   usdPct: number | null;
   up: number;
   down: number;
@@ -189,6 +191,7 @@ export function brandSummaries(models: CarModelView[]): BrandSummary[] {
       brandFa: list[0].brandFa,
       models: list.length,
       tomanPct: avg(ch.map((c) => c.tomanPct)),
+      tomanAbs: avg(ch.map((c) => c.tomanAbs)),
       usdPct: avg(ch.map((c) => c.usdPct).filter((x): x is number => x !== null)),
       up: ch.filter((c) => c.tomanPct > 0.05).length,
       down: ch.filter((c) => c.tomanPct < -0.05).length,

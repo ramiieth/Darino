@@ -4,13 +4,14 @@
  * the top bar title and the command palette all read from here.
  *
  * Grouping follows user goals, not data providers:
- *   بازارها     what the market is doing (home route `/`)
- *   دارایی من   what I own and its record
- *   بازدهی     yield product (Boros)
- *   ابزارها    what-if tools
- *   دستیار و راهنمای خرید   Iranian shops, food, travel, doctors (read-only)
+ *   بازارها      what the global market is doing (home route `/`)
+ *   بازار ایران  Iranian gold, cars and real estate
+ *   معامله       decide before a trade (desk), then the venues: Boros, Arcus, Lighter, Ondo Perps
+ *   دارایی من    what I own, its record, alerts and security
+ *   ابزارها      what-if tools
+ *   خرید         Iranian shops, food, travel, doctors (read-only)
  */
-import { Activity, Bell, BookOpenText, Boxes, Calculator, CandlestickChart, Car, Home, Layers, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, Bell, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -50,95 +51,20 @@ export const NAV_GROUPS: NavGroup[] = [
         primary: true,
         match: ['/market']
       },
-      {
-        id: 'defi',
-        to: '/defi',
-        label: 'دیفای',
-        description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها',
-        icon: Boxes,
-        primary: true
-      },
-      {
-        id: 'intel',
-        to: '/intel',
-        label: 'هاب اطلاعات',
-        description: 'تریدرهای برتر، پوزیشن‌هایشان، بازار مشتقات، میم‌کوین و امنیت توکن',
-        icon: Telescope,
-        match: ['/traders']
-      }
+      { id: 'market-performance', to: '/market-performance', label: 'بازده بازار', description: 'بازده بازار در ۱، ۷، ۳۰، ۶۰ و ۹۰ روز گذشته', icon: Activity },
+      { id: 'defi', to: '/defi', label: 'دیفای', description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها', icon: Boxes }
     ]
   },
   {
-    id: 'mine',
-    label: 'دارایی من',
+    id: 'iran',
+    label: 'بازار ایران',
     items: [
       {
-        id: 'dashboard',
-        to: '/dashboard',
-        label: 'داشبورد',
-        description: 'ارزش خالص، تخصیص و تغییرات امروز',
-        icon: LayoutDashboard,
-        primary: true
-      },
-      { id: 'wallets', to: '/wallets', label: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
-      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
-      {
-        id: 'arcus',
-        to: '/arcus',
-        label: 'آرکوس',
-        title: 'آرکوس — پرپچوال و اسپات',
-        description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
-        icon: Activity
-      },
-      {
-        id: 'lighter', to: '/lighter', label: 'لایتر', description: 'پرپچوال، اسپات، دارایی‌ها و رابین‌هود', icon: Activity
-      },
-      { id: 'ondo-perps', to: '/ondo-perps', label: 'اوندو پرپس', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity },
-      {
-        id: 'security',
-        to: '/security',
-        label: 'امنیت',
-        title: 'امنیت و دستگاه‌ها',
-        description: 'کلید عبور، نشست‌های دستگاه‌ها و خروج',
-        icon: ShieldCheck
-      },
-      { id: 'alerts', to: '/alerts', label: 'اعلان‌ها', description: 'برعکس شدن اسپرد فاندینگ و نزدیک لیکویید، حتی وقتی اپ بسته است', icon: Bell }
-    ]
-  },
-  {
-    id: 'yield',
-    label: 'بازدهی',
-    items: [
-      {
-        id: 'boros',
-        to: '/boros',
-        label: 'بوروس',
-        title: 'تحلیل بوروس',
-        description: 'بازارهای نرخ تأمین مالی',
-        icon: Radar
-      }
-    ]
-  },
-  {
-    id: 'tools',
-    label: 'ابزارها',
-    items: [
-      { id: 'market-performance', to: '/market-performance', label: 'عملکرد بازار', description: 'بازده بازار در ۱، ۷، ۳۰، ۶۰ و ۹۰ روز گذشته', icon: Activity },
-      {
-        id: 'calculators',
-        to: '/calculators',
-        label: 'ماشین‌حساب',
-        title: 'ماشین‌حساب سرمایه‌گذاری',
-        description: 'سود و زیان، خرید دوره‌ای، رشد سالانه و بازده واقعی',
-        icon: Calculator
-      },
-      {
-        id: 'simulation',
-        to: '/simulation',
-        label: 'شبیه‌سازی',
-        title: 'شبیه‌سازی سرمایه‌گذاری',
-        description: 'سناریوهای «اگر سرمایه‌گذاری کرده بودم»',
-        icon: LineChart
+        id: 'gold',
+        to: '/gold',
+        label: 'طلای ایران',
+        description: 'طلای ۱۸ عیار و سکه در چهار پلتفرم و بازار، و حباب نسبت به انس و دلار آزاد',
+        icon: Coins
       },
       {
         id: 'vehicle',
@@ -160,8 +86,88 @@ export const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
+    id: 'trade',
+    label: 'معامله',
+    items: [
+      {
+        id: 'desk',
+        to: '/desk',
+        label: 'میز معامله',
+        description: 'چک قبل از ورود، سوینگ، تریدرهای برتر، پوزیشن‌ها، مشتقات، میم‌کوین و امنیت توکن',
+        icon: Telescope,
+        primary: true,
+        match: ['/intel', '/traders']
+      },
+      {
+        id: 'boros',
+        to: '/boros',
+        label: 'بوروس',
+        title: 'تحلیل بوروس',
+        description: 'بازارهای نرخ تأمین مالی',
+        icon: Radar
+      },
+      {
+        id: 'arcus',
+        to: '/arcus',
+        label: 'آرکوس',
+        title: 'آرکوس — پرپچوال و اسپات',
+        description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
+        icon: Activity
+      },
+      { id: 'lighter', to: '/lighter', label: 'لایتر', description: 'پرپچوال، اسپات، دارایی‌ها و رابین‌هود', icon: Activity },
+      { id: 'ondo-perps', to: '/ondo-perps', label: 'اوندو پرپس', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity }
+    ]
+  },
+  {
+    id: 'mine',
+    label: 'دارایی من',
+    items: [
+      {
+        id: 'dashboard',
+        to: '/dashboard',
+        label: 'داشبورد',
+        description: 'ارزش خالص، تخصیص و تغییرات امروز',
+        icon: LayoutDashboard,
+        primary: true
+      },
+      { id: 'wallets', to: '/wallets', label: 'کیف پول‌ها', title: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
+      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
+      { id: 'alerts', to: '/alerts', label: 'اعلان‌ها', description: 'برعکس شدن اسپرد فاندینگ و نزدیک لیکویید، حتی وقتی اپ بسته است', icon: Bell },
+      {
+        id: 'security',
+        to: '/security',
+        label: 'امنیت',
+        title: 'امنیت و دستگاه‌ها',
+        description: 'کلید عبور، نشست‌های دستگاه‌ها و خروج',
+        icon: ShieldCheck
+      }
+    ]
+  },
+  {
+    id: 'tools',
+    label: 'ابزارها',
+    items: [
+      {
+        id: 'calculators',
+        to: '/calculators',
+        label: 'ماشین‌حساب',
+        title: 'ماشین‌حساب سرمایه‌گذاری',
+        description: 'سود و زیان، خرید دوره‌ای، رشد سالانه و بازده واقعی',
+        icon: Calculator
+      },
+      {
+        id: 'simulation',
+        to: '/simulation',
+        label: 'شبیه‌سازی',
+        title: 'شبیه‌سازی سرمایه‌گذاری',
+        description: 'سناریوهای «اگر سرمایه‌گذاری کرده بودم»',
+        icon: LineChart
+      }
+    ]
+  },
+  {
     id: 'shopping',
-    label: 'دستیار و راهنمای خرید',
+    label: 'خرید',
     items: [
       {
         id: 'shopping',
@@ -187,8 +193,8 @@ export const DESIGN_SYSTEM_ITEM: NavItem = {
 
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), DESIGN_SYSTEM_ITEM];
 
-/** Bottom bar order — home first, then the portfolio */
-export const PRIMARY_MOBILE: NavItem[] = ['market', 'dashboard', 'defi', 'wallets']
+/** Bottom bar order — home first, then the portfolio, the trading desk and wallets */
+export const PRIMARY_MOBILE: NavItem[] = ['market', 'dashboard', 'desk', 'wallets']
   .map((id) => ALL_NAV_ITEMS.find((i) => i.id === id))
   .filter((i): i is NavItem => !!i);
 

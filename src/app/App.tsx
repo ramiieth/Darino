@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useState } from 'react';
 import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
@@ -25,8 +25,17 @@ const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboar
 const ShoppingPage = lazy(() => import('@/features/shopping/presentation/ShoppingPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
+const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
+/** /intel و /traders (نام قبلی میز معامله) ← /desk با همان پارامترها؛ تب طلای قبلی ← صفحهٔ مستقل /gold */
+function DeskRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  if (params.get('tab') === 'gold') return <Navigate to="/gold" replace />;
+  return <Navigate to={{ pathname: '/desk', search }} replace />;
+}
+
 function Private({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
     <AuthGate>
@@ -63,8 +72,11 @@ export function App() {
             }
           />
           <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
-          <Route path="/intel" element={<Lazy label="هاب اطلاعات"><IntelHubPage /></Lazy>} />
-          <Route path="/traders" element={<Navigate to="/intel" replace />} />
+          <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
+          <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
+          {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
+          <Route path="/intel" element={<DeskRedirect />} />
+          <Route path="/traders" element={<DeskRedirect />} />
           <Route
             path="/simulation"
             element={

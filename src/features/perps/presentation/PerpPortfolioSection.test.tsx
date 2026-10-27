@@ -48,7 +48,7 @@ it('Hyperliquid and TxFlow accounts get their own cards; Hyperliquid links to it
  client.setQueryData(['perp-account','txflow',ADDR],{state:{marginSummary:{accountValue:'1000'},assetPositions:[]},portfolio:null,ledger:[{time:1,delta:{type:'deposit',usdc:'900'}}]});
  const {container}=renderWith(client,[] as unknown as ConnectedPortfolio['arcus']);
  expect(screen.getByText('هایپر من')).toBeTruthy();expect(screen.getByText('تی‌اکس من')).toBeTruthy();
- expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/intel?a=${ADDR}`);
+ expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/desk?a=${ADDR}`);
  expect(screen.getByRole('link',{name:/باز کردن تی‌اکس‌فلو/}).getAttribute('href')).toBe('https://app.txflow.com/');
  const text=container.textContent!;
  expect(text).toContain('+۵۰۰');   // از ابتدا: ۴۰۰ + (۱۰۰۰ − ۹۰۰)
@@ -68,5 +68,5 @@ it('addresses from Vercel env (HYPERLIQUID_ADDRESS / LIGHTER_ADDRESS) get cards 
  expect(screen.getByText('حساب لایتر')).toBeTruthy();
  expect(screen.getByText('تی‌اکس من')).toBeTruthy();
  expect(screen.queryByText('حساب تی‌اکس‌فلو')).toBeNull();   // همان آدرس قبلاً ثبت شده
- expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/intel?a=${HL}`);
+ expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/desk?a=${HL}`);
 });

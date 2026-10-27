@@ -42,7 +42,7 @@ export interface PerpVenueAccount {
   id: string;
   venue: PerpVenue;
   label: string;
-  /** آدرس عمومی حساب (برای لینک کارنامه در هاب اطلاعات) */
+  /** آدرس عمومی حساب (برای لینک کارنامه در میز معامله) */
   address?: string;
   unit: 'USDC' | 'USDG' | 'USDT';
   equity: number | null;

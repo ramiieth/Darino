@@ -1,5 +1,5 @@
 /**
- * دادهٔ هاب اطلاعات
+ * دادهٔ میز معامله
  *  - امنیت توکن، میم‌کوین‌ها و غربال «محافظ سرمایه»: /api/intel (سرور منابع را ترکیب و کش می‌کند)
  *  - بازار مشتقات: مستقیم از API رسمی هایپرلیکوئید روی IP کاربر، از همان صف وزنی تریدرها
  */
@@ -10,6 +10,7 @@ import { fundingStats, type FundingPoint } from '../domain/funding';
 import { parseCandles, type Candle } from '../domain/survival';
 import type { MemeScreenPayload } from '../domain/memeScreen';
 import type { SwingPayload } from '../domain/swing';
+import type { GoldPayload } from '../domain/gold';
 import type { Chain, TokenSafety } from '../domain/tokenSafety';
 import type { MemeToken } from '../domain/memes';
 
@@ -117,6 +118,16 @@ export function useRiskCandles(coin: string | null) {
     enabled: !!coin,
     staleTime: 10 * 60_000,
     gcTime: 60 * 60_000
+  });
+}
+
+/** طلای ایران: ۴ پلتفرم و حباب نسبت به انس و تتر */
+export function useGold() {
+  return useQuery({
+    queryKey: ['intel', 'gold'],
+    queryFn: () => getPublic<GoldPayload>('/api/intel?op=gold', 'قیمت طلا دریافت نشد'),
+    staleTime: 60_000,
+    refetchInterval: 2 * 60_000
   });
 }
 

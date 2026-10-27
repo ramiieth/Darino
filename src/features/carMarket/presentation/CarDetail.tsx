@@ -106,6 +106,7 @@ export function CarDetail({ model: m, snapshots, daily }: { model: CarModelView;
                     <td className="!ps-4">
                       <span className="font-semibold text-ink">{toFaDigits(t.row.year)}</span>
                       {t.row.option && <span className="text-2xs text-muted"> · {t.row.option}</span>}
+                      {t.row.source === 'divar' && t.row.n ? <span className="text-2xs text-muted"> · {toFaDigits(t.row.n)} آگهی دیوار</span> : null}
                       {t.row.id === r.id && <span className="ms-1 text-2xs text-accent">مبنا</span>}
                       {t.stale && <span className="block text-2xs text-warn sm:hidden">قیمت {t.row.marketUpdatedAt ? formatJalali(t.row.marketUpdatedAt) : 'قدیمی'}</span>}
                     </td>

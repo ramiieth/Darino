@@ -33,6 +33,10 @@ export interface CarPriceRow {
   marketUpdatedAt: number | null;
   /** درصد تغییر قیمت بازار در آخرین به‌روزرسانی منبع */
   srcChangePct: number | null;
+  /** منبع ردیف؛ نبود = car.ir. «divar» = میانهٔ آگهی‌های دست‌دوم تهران (collector/divarMarket) */
+  source?: 'car.ir' | 'divar';
+  /** تعداد آگهی پشت میانه (فقط دیوار) */
+  n?: number;
 }
 
 /** Snapshot روزانه کل بازار */

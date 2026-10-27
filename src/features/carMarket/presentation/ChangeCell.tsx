@@ -46,15 +46,17 @@ export function ChangeCell({
   );
 }
 
-/** کپسول تغییر — label کوتاه کنار درصد (مثلاً «دلاری») */
+/** کپسول تغییر — label کوتاه کنار درصد (مثلاً «دلاری»)؛ amount = مبلغ تغییر کنار درصد (مثلاً «+۱۲۰ میلیون») */
 export function ChangePill({
   pct,
   label,
+  amount,
   size = 'sm',
   estimated = false
 }: {
   pct: number | null | undefined;
   label?: string;
+  amount?: string;
   size?: 'sm' | 'md';
   estimated?: boolean;
 }) {
@@ -75,6 +77,7 @@ export function ChangePill({
       {label && <span className="font-normal opacity-80">{label}</span>}
       <Icon aria-hidden className={size === 'md' ? 'h-4 w-4' : 'h-3 w-3'} />
       <span className="num-ltr">{fmtCarPct(pct)}</span>
+      {amount && <span className="font-normal opacity-80">({amount})</span>}
       {estimated && <span className="font-normal opacity-70">*</span>}
     </span>
   );

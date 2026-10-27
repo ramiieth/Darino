@@ -18,7 +18,7 @@ import { useUsdRate } from '@/shared/store/usdtStore';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 import { formatJalali } from '@/shared/utils/jalali';
 import { TrendChart } from '@/features/propertyMarket/presentation/MarketCharts';
-import { fmtCarPct, fmtCarToman, normalizeQuery } from '@/features/carMarket/presentation/format';
+import { fmtCarPct, fmtCarToman, fmtCarTomanSigned, normalizeQuery } from '@/features/carMarket/presentation/format';
 import { useArvand, useArvandStore, type RunState } from '../data/store';
 import { ARVAND_KINDS } from '../domain/ads';
 import { buildGroups, marketIndex, median, type ModelGroup } from '../domain/compare';
@@ -336,7 +336,11 @@ function GroupDetail({ g, usdRate }: { g: ModelGroup; usdRate: number | null }) 
       </div>
       {g.gapPct !== null && (
         <p className="text-sm text-ink">
-          قیمت پلاک اروند <span className="num-ltr font-extrabold text-accent">{fmtCarPct(g.gapPct)}</span> نسبت به پلاک ملی
+          قیمت پلاک اروند <span className="num-ltr font-extrabold text-accent">{fmtCarPct(g.gapPct)}</span>
+          {g.arvand.median !== null && g.national.median !== null && fmtCarTomanSigned(g.arvand.median - g.national.median) && (
+            <span className="font-bold text-accent"> ({fmtCarTomanSigned(g.arvand.median - g.national.median)} تومان)</span>
+          )}{' '}
+          نسبت به پلاک ملی
           {g.lowSample && <span className="ms-1 text-2xs text-warn">(نمونه کم)</span>}
         </p>
       )}

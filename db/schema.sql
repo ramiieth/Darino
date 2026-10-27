@@ -147,6 +147,21 @@ CREATE TABLE IF NOT EXISTS "carPriceSnapshots" (
 CREATE INDEX IF NOT EXISTS idx_carPriceSnapshots_date ON "carPriceSnapshots" ("dateTs");
 
 -- ------------------------------------------------------------
+-- بازار دست‌دوم خودروی داخلی (دیوار تهران) — هر آگهی یک ردیف؛ میانهٔ «مدل + سال» ۱۴ روز اخیر
+-- هنگام ذخیرهٔ Snapshot روزانهٔ خودرو به آن اضافه می‌شود (api/_divarCars.ts). داده عمومی بازار.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "divarCarAds" (
+  token        TEXT PRIMARY KEY,
+  model        TEXT NOT NULL,              -- مقدار دقیق مدل دیوار (Peugeot 206 5)
+  year         INTEGER NOT NULL,           -- سال شمسی
+  km           INTEGER,
+  price        BIGINT NOT NULL,            -- تومان
+  "firstSeen"  BIGINT NOT NULL,
+  "lastSeen"   BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_divarCarAds_seen ON "divarCarAds" ("lastSeen");
+
+-- ------------------------------------------------------------
 -- خودروهای وارداتی پلاک اروند (دیوار: اهواز، آبادان، خرمشهر + مبنای ملی تهران)
 --   * آگهی‌ها با توکن دیوار؛ آگهی حذف‌شده/قدیمی از اپ حذف می‌شود
 --   * Snapshot روزانه میانه قیمت هر مدل/سال برای روند

@@ -8,7 +8,7 @@ import { cn } from '@/shared/lib/cn';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 import { CarBrandLogo } from '@/features/carMarket/presentation/CarBrandLogo';
 import { ChangePill } from '@/features/carMarket/presentation/ChangeCell';
-import { fmtCarToman, fmtCarUsd } from '@/features/carMarket/presentation/format';
+import { fmtCarToman, fmtCarTomanSigned, fmtCarUsd } from '@/features/carMarket/presentation/format';
 import { brandLabelOf, brandSlugOf } from '../domain/brandOf';
 import type { CarAd } from '../domain/types';
 import { PlateBadge } from './PlateBadge';
@@ -67,7 +67,7 @@ export const AdCard = memo(function AdCard({ ad, usdRate }: { ad: CarAd; usdRate
             </p>
             {ad.price && usdRate ? <p className="text-2xs text-muted">≈ {fmtCarUsd(ad.price / usdRate)}</p> : null}
           </div>
-          {pct !== null && <ChangePill pct={pct} label="قیمت" />}
+          {pct !== null && <ChangePill pct={pct} label="قیمت" amount={fmtCarTomanSigned(ad.price! - first!) || undefined} />}
         </div>
 
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-divider pt-2.5 text-2xs text-muted">
