@@ -6,7 +6,7 @@
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Flame, Gauge, Layers, ShieldCheck, Trophy } from 'lucide-react';
+import { Activity, Compass, Flame, Gauge, Layers, ShieldCheck, Trophy } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useAuth } from '@/features/auth/authClient';
@@ -16,6 +16,7 @@ import { useTradersList } from '@/features/traders/data/useTraders';
 import { TradersTab } from '@/features/traders/presentation/TradersTab';
 import { TraderReportSheet } from '@/features/traders/presentation/TraderReportSheet';
 import { CheckTab } from './CheckTab';
+import { SwingTab } from './SwingTab';
 import { PositionsTab } from './PositionsTab';
 import { DerivativesTab } from './DerivativesTab';
 import { MemesTab } from './MemesTab';
@@ -23,11 +24,12 @@ import { SafetyTab } from './SafetyTab';
 import { CoinSheet } from './CoinSheet';
 import { TokenSheet } from './TokenSheet';
 
-type Tab = 'check' | 'traders' | 'positions' | 'derivs' | 'memes' | 'safety';
-const TABS: Tab[] = ['check', 'traders', 'positions', 'derivs', 'memes', 'safety'];
+type Tab = 'check' | 'swing' | 'traders' | 'positions' | 'derivs' | 'memes' | 'safety';
+const TABS: Tab[] = ['check', 'swing', 'traders', 'positions', 'derivs', 'memes', 'safety'];
 
 const INTRO: Record<Tab, string> = {
   check: 'بازار، جهت و اهرم را بدهید تا بدانید در شرایط عادی و در یک آبشار مثل بدترین روز همین بازار چه می‌شود، و چه اهرمی معقول است. جهت قیمت را پیش‌بینی نمی‌کند.',
+  swing: 'برای معاملهٔ چندروزه تا یک‌ماهه: بازار الان صعودی است یا نه، و با سرمایه و ریسک شما هر پوزیشن چقدر باید باشد. از آزمون سه سال پرپ‌های هایپرلیکوئید و ۱۶ سال سهام و کامودیتی؛ سیگنال خرید نمی‌دهد.',
   traders: 'تریدرهای هایپرلیکوئید که در ماه‌های متوالی سود کرده‌اند و افتشان کنترل‌شده است، همراه با پوزیشن‌هایی که الان دارند. هر کدام را دنبال کنید تا باز و بسته شدن پوزیشن‌هایش را اعلان بگیرید.',
   positions: 'برترها روی کدام بازار هم‌نظرند، ثابت‌قدم‌ها هم همین را می‌گویند یا نه، و طرف غالب الان در سود است یا زیان.',
   derivs: 'کجا لانگ‌ها یا شورت‌ها شلوغ‌اند و برای پوزیشن جهت‌دار یا درآمد دلتا نوترال شما چه معنایی دارد.',
@@ -78,6 +80,7 @@ export default function IntelHubPage() {
         onChange={(v) => update({ tab: v === 'check' ? null : v, view: null })}
         options={[
           { value: 'check', label: 'چک قبل از ورود', icon: <Gauge /> },
+          { value: 'swing', label: 'سوینگ', icon: <Compass /> },
           { value: 'traders', label: 'تریدرهای برتر', icon: <Trophy /> },
           { value: 'positions', label: 'پوزیشن برترها', icon: <Layers /> },
           { value: 'derivs', label: 'بازار مشتقات', icon: <Activity /> },
@@ -95,6 +98,7 @@ export default function IntelHubPage() {
             onCoin={(c) => update({ coin: c })}
           />
         )}
+        {tab === 'swing' && <SwingTab onCheck={(c) => update({ tab: null, view: null, m: c })} />}
         {tab === 'traders' && (
           <TradersTab view={params.get('view') === 'mine' ? 'mine' : 'top'} onView={(v) => update({ view: v === 'top' ? null : v })} onOpen={(a) => update({ a })} />
         )}

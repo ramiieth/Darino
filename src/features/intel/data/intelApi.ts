@@ -9,6 +9,7 @@ import { weighted } from '@/features/traders/data/tradersApi';
 import { fundingStats, type FundingPoint } from '../domain/funding';
 import { parseCandles, type Candle } from '../domain/survival';
 import type { MemeScreenPayload } from '../domain/memeScreen';
+import type { SwingPayload } from '../domain/swing';
 import type { Chain, TokenSafety } from '../domain/tokenSafety';
 import type { MemeToken } from '../domain/memes';
 
@@ -116,6 +117,16 @@ export function useRiskCandles(coin: string | null) {
     enabled: !!coin,
     staleTime: 10 * 60_000,
     gcTime: 60 * 60_000
+  });
+}
+
+/** سوینگ: رژیم بازار پرپ‌ها و کاندید آزمایشی — روی سرور تدریجی ساخته می‌شود */
+export function useSwing() {
+  return useQuery({
+    queryKey: ['intel', 'swing'],
+    queryFn: () => getPublic<SwingPayload>('/api/intel?op=swing', 'وضعیت بازار دریافت نشد'),
+    staleTime: 5 * 60_000,
+    refetchInterval: 10 * 60_000
   });
 }
 
