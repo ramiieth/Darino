@@ -203,6 +203,92 @@ export async function getLighterPnl(op: string, index: string): Promise<{ hourly
   const [hourly, daily] = await Promise.all([series('1h', 7 * 86400 + 3600, 170), series('1d', 31 * 86400, 33)]);
   return { hourly, daily, fetchedAt: Date.now() };
 }
+/** خلاصهٔ هر معاملهٔ لایتر از دید یک حساب — همان شکل LighterTradeLite در src/features/journal/domain/fills.ts */
+export interface LighterTradeLite {
+  id: string; t: number; sym: string; side: 'buy' | 'sell'; px: number; sz: number; usd: number;
+  fee: number | null; pnl: number | null; before: number | null; maker: boolean; liq: boolean;
+}
+
+/**
+ * یک معاملهٔ خام لایتر → دید همین حساب. سمت از bid/ask، نقش از is_maker_ask، پوزیشن قبل از maker/taker_position_size_before،
+ * سود بسته‌شده از {bid|ask}_account_pnl (فقط وقتی پوزیشن کم شده). کارمزد لایتر به میلیونیم (ppm) است.
+ * لایتر فیلد کارمزد صفر را حذف می‌کند (حساب‌های استاندارد بدون کارمزدند؛ در فید عمومی کارمزد غیرصفر دیده می‌شود)، پس نبودِ فیلد = صفر.
+ */
+export function trimLighterTrade(raw: unknown, index: string): LighterTradeLite | null {
+  const t = asRow(raw);
+  const bid = String(t.bid_account_id ?? '') === index;
+  const ask = String(t.ask_account_id ?? '') === index;
+  if (bid === ask) return null; // خودمعامله یا نامربوط
+  const px = fin(t.price), sz = fin(t.size), time = fin(t.timestamp);
+  const sym = typeof t.market_symbol === 'string' ? t.market_symbol : '';
+  if (px === null || sz === null || time === null || !sym || (t.market_kind !== undefined && t.market_kind !== 'perps')) return null;
+  const makerIsAsk = t.is_maker_ask === true;
+  const maker = ask ? makerIsAsk : !makerIsAsk;
+  const role = maker ? 'maker' : 'taker';
+  const before = fin(t[`${role}_position_size_before`]);
+  const rate = fin(t[`${role}_fee`]);
+  const usd = fin(t.usd_amount) ?? px * sz;
+  const pnl = fin(t[bid ? 'bid_account_pnl' : 'ask_account_pnl']);
+  return {
+    id: String(t.trade_id_str ?? t.trade_id ?? `${time}:${px}:${sz}`),
+    t: time, sym, side: bid ? 'buy' : 'sell', px, sz, usd,
+    fee: ((rate ?? 0) * usd) / 1e6,
+    pnl, before, maker,
+    liq: t.type === 'liquidation' || t.type === 'deleverage'
+  };
+}
+
+/**
+ * تاریخچهٔ معاملات یک زیرحساب لایتر (عمومی، بدون امضا) — جدیدترین اول، با cursor.
+ * هر درخواست حداکثر ۲۰ صفحهٔ ۱۰۰تایی؛ وقتی به `since` (ms) برسد یا صفحه‌ها تمام شود complete=true.
+ * کلاینت با next ادامه می‌دهد تا سهمیهٔ درخواست کاربر رعایت شود.
+ */
+export async function getLighterTrades(op: string, index: string, sinceMs: number, cursor: string): Promise<{ trades: LighterTradeLite[]; next: string | null; complete: boolean; fetchedAt: number }> {
+  if (!['lighter-trades', 'lighter-mainnet-trades'].includes(op)) throw new ProviderError(400, 'درخواست ناشناخته');
+  if (!/^\d{1,18}$/.test(index)) throw new ProviderError(400, 'شمارهٔ حساب معتبر نیست');
+  if (cursor && !/^[A-Za-z0-9+/=_-]{1,400}$/.test(cursor)) throw new ProviderError(400, 'ادامهٔ صفحه معتبر نیست');
+  const host = op === 'lighter-mainnet-trades' ? MAINNET : LIGHTER;
+  const out: LighterTradeLite[] = [];
+  let next = cursor;
+  const started = Date.now();
+  // سقف زمانی هر درخواست تا فانکشن سرور به مهلت نخورد؛ بقیه با next در درخواست بعدی
+  for (let page = 0; page < 20 && Date.now() - started < 7_000; page++) {
+    const q = new URLSearchParams({ sort_by: 'timestamp', limit: '100', account_index: index });
+    if (next) q.set('cursor', next);
+    const data = await read(`${host}/api/v1/trades?${q}`, 10_000);
+    const rows = Array.isArray(data.trades) ? data.trades : [];
+    let reachedSince = false;
+    for (const r of rows) {
+      const lite = trimLighterTrade(r, index);
+      if (!lite) continue;
+      if (lite.t < sinceMs) { reachedSince = true; continue; }
+      out.push(lite);
+    }
+    const c = typeof data.next_cursor === 'string' && data.next_cursor ? data.next_cursor : null;
+    if (reachedSince || !c || rows.length < 100) return { trades: out, next: null, complete: true, fetchedAt: Date.now() };
+    if (c === next) break;
+    next = c;
+  }
+  return { trades: out, next: next || null, complete: false, fetchedAt: Date.now() };
+}
+
+/** سری روزانهٔ حساب لایتر تا ۱۸۰ روز: [ثانیه، trade_pnl تجمعی، حجم روز] — برای دفتر دلتا نوترال */
+export async function getLighterDaily(op: string, index: string, days: number): Promise<{ daily: [number, number, number][]; fetchedAt: number }> {
+  if (!['lighter-daily', 'lighter-mainnet-daily'].includes(op)) throw new ProviderError(400, 'درخواست ناشناخته');
+  if (!/^\d{1,18}$/.test(index)) throw new ProviderError(400, 'شمارهٔ حساب معتبر نیست');
+  const span = Math.min(Math.max(Math.floor(days) || 90, 1), 180);
+  const host = op === 'lighter-mainnet-daily' ? MAINNET : LIGHTER;
+  const now = Math.floor(Date.now() / 1000);
+  const q = new URLSearchParams({ by: 'index', value: index, resolution: '1d', start_timestamp: String(now - span * 86400), end_timestamp: String(now), count_back: String(span + 2) });
+  const data = await read(`${host}/api/v1/pnl?${q}`);
+  if (!Array.isArray(data.pnl)) throw new ProviderError(502, 'پاسخ سود و زیان معتبر نیست');
+  const daily = data.pnl.map(asRow).flatMap((p): [number, number, number][] => {
+    const t = fin(p.timestamp), v = fin(p.trade_pnl), vol = fin(p.volume);
+    return t === null || v === null ? [] : [[t, v, vol ?? 0]];
+  });
+  return { daily, fetchedAt: Date.now() };
+}
+
 export async function getPerpsRead(op: string, address: string): Promise<unknown> {
   if (op === 'lighter-mainnet-markets'||op === 'lighter-markets') {
     const host=op==='lighter-mainnet-markets'?MAINNET:LIGHTER;

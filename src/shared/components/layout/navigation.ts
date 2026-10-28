@@ -11,7 +11,7 @@
  *   ابزارها      what-if tools
  *   خرید         Iranian shops, food, travel, doctors (read-only)
  */
-import { Activity, Bell, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -99,6 +99,13 @@ export const NAV_GROUPS: NavGroup[] = [
         match: ['/intel', '/traders']
       },
       {
+        id: 'journal',
+        to: '/journal',
+        label: 'ژورنال معاملاتی',
+        description: 'برنامهٔ قبل از معامله، حسابرسی خودکار، تگ «چرا»، مرور هفتگی و دفتر دلتا نوترال',
+        icon: BookOpenCheck
+      },
+      {
         id: 'boros',
         to: '/boros',
         label: 'بوروس',
@@ -115,6 +122,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Activity
       },
       { id: 'lighter', to: '/lighter', label: 'لایتر', description: 'پرپچوال، اسپات، دارایی‌ها و رابین‌هود', icon: Activity },
+      { id: 'txflow', to: '/txflow', label: 'تی‌اکس‌فلو', description: 'موجودی، سود/زیان، پوزیشن‌ها و بازارهای تی‌اکس‌فلو', icon: Activity },
       { id: 'ondo-perps', to: '/ondo-perps', label: 'اوندو پرپس', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity }
     ]
   },

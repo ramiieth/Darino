@@ -6,14 +6,14 @@ describe('منو پس از بازچینی گروه‌ها', () => {
     const ids = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id));
     for (const id of [
       'market', 'defi', 'desk', 'dashboard', 'wallets', 'assistant', 'arcus', 'lighter', 'ondo-perps', 'security', 'alerts',
-      'boros', 'market-performance', 'calculators', 'simulation', 'vehicle', 'realestate', 'shopping', 'gold'
+      'boros', 'market-performance', 'calculators', 'simulation', 'vehicle', 'realestate', 'shopping', 'gold', 'journal', 'txflow'
     ]) expect(ids).toContain(id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('گروه‌ها: بازارها، بازار ایران، معامله، دارایی من، ابزارها، خرید', () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual(['بازارها', 'بازار ایران', 'معامله', 'دارایی من', 'ابزارها', 'خرید']);
-    expect(NAV_GROUPS.find((g) => g.id === 'trade')!.items.map((i) => i.id)).toEqual(['desk', 'boros', 'arcus', 'lighter', 'ondo-perps']);
+    expect(NAV_GROUPS.find((g) => g.id === 'trade')!.items.map((i) => i.id)).toEqual(['desk', 'journal', 'boros', 'arcus', 'lighter', 'txflow', 'ondo-perps']);
   });
 
   it('نشانی‌های قبلی میز معامله همان بخش را فعال می‌کنند', () => {
