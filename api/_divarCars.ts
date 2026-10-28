@@ -16,7 +16,8 @@ import { DIVAR_BRANDS, buildDivarSearchBody, divarRows, parseDivarCars, type Div
 import type { CarPriceRow } from '../src/features/carMarket/domain/types.js';
 
 const DAY_MS = 86_400_000;
-const PAGES_PER_BRAND = 15;
+// صفحه‌های اول هر برند بیشترِ آگهی‌های تازه‌اند؛ دور کامل همهٔ برندها باید خیلی کوتاه‌تر از پنجرهٔ ۱۴ روزه باشد
+const PAGES_PER_BRAND = 8;
 const WINDOW_MS = 14 * DAY_MS;
 const KEEP_MS = 60 * DAY_MS;
 const PAUSE_MS = 1_000;

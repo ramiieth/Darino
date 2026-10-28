@@ -39,10 +39,10 @@ import type {
 } from '../src/features/propertyMarket/domain/types.js';
 import { fetchCarIrPrices } from '../src/features/carMarket/collector/carIr.js';
 import { buildCarSnapshot, isCarSnapshot } from '../src/features/carMarket/domain/snapshot.js';
-import type { CarSnapshot } from '../src/features/carMarket/domain/types.js';
+import type { CarPriceRow, CarSnapshot } from '../src/features/carMarket/domain/types.js';
 import { fetchUsdtDirect, type UsdtSource } from '../src/shared/fx/usdtRate.js';
 import { handleArvandAction, handleArvandGet } from './_arvand.js';
-import { divarRowsAt } from './_divarCars.js';
+import { divarRowsAt, warmDivarCars } from './_divarCars.js';
 
 /** سقف زمان هر تکه — زیر maxDuration=60 در vercel.json */
 const CHUNK_TIME_BUDGET_MS = 38_000;
@@ -122,8 +122,8 @@ async function serverUsdt(): Promise<{ rateToman: number; source: UsdtSource } |
   return null;
 }
 
-/** درج/جایگزینی Snapshot روز — نسخه قدیمی‌تر روی جدیدتر نمی‌نشیند */
-async function upsertCarSnapshot(snap: CarSnapshot): Promise<void> {
+/** درج/جایگزینی Snapshot روز — نسخه قدیمی‌تر روی جدیدتر نمی‌نشیند؛ ردیف‌های دیوار افزوده‌شده برگردانده می‌شوند */
+async function upsertCarSnapshot(snap: CarSnapshot): Promise<CarPriceRow[]> {
   // میانهٔ آگهی‌های دست‌دوم دیوار (مدل‌ها و سال‌هایی که car.ir ندارد) کنار ردیف‌های car.ir
   const divar = await divarRowsAt(snap.dateTs);
   const s: CarSnapshot = divar.length ? { ...snap, rows: [...snap.rows.filter((r) => r.source !== 'divar'), ...divar] } : snap;
@@ -133,6 +133,7 @@ async function upsertCarSnapshot(snap: CarSnapshot): Promise<void> {
     ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, "dateTs" = EXCLUDED."dateTs"
     WHERE "carPriceSnapshots"."dateTs" < EXCLUDED."dateTs"
   `;
+  return divar;
 }
 
 /**
@@ -211,6 +212,8 @@ async function handleCarGet(req: IncomingMessage, res: ServerResponse, q: URLSea
       return;
     }
     try {
+      // تیک GitHub Actions عملاً چند بار در روز اجرا می‌شود؛ Cron روزانه هم یک نوبت بزرگ آگهی دیوار جمع می‌کند
+      await warmDivarCars(20, 28_000).catch(() => -1);
       const snap = buildCarSnapshot(await fetchCarIrPrices(), await serverUsdt());
       await upsertCarSnapshot(snap);
       json(res, 200, { ok: true, persisted: true, day: snap.day, rows: snap.rows.length, usdt: snap.usdtRate });
@@ -399,8 +402,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         json(res, 400, { ok: false, error: 'invalid snapshot' });
         return;
       }
-      await upsertCarSnapshot(snap);
-      json(res, 200, { ok: true, persisted: true });
+      // ردیف‌های دیوار به اپ برمی‌گردند تا Snapshot امروزِ مرورگر (فقط car.ir) کامل شود
+      json(res, 200, { ok: true, persisted: true, divar: await upsertCarSnapshot(snap) });
       return;
     }
 

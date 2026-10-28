@@ -18,6 +18,7 @@ import { allSourceCostSummary } from '../domain/allSources';
 import { useCostSources } from '../data';
 import { PlatformPositions } from './PlatformPositions';
 import { COST_PREF, type CostBook } from '../domain/book';
+import { usePerpVenues } from '@/features/perps/data/usePerpVenues';
 function CostQuantity({value,unit}:{value:Decimal;unit?:string}) {
  const small=value.gt(0)&&value.lt('.01');
  return <span title={value.toString()}>{small&&<span className="text-xs text-muted">کمتر از </span>}<QuantityValue digits={2} value={small ? 0.01 : value.toDecimalPlaces(2,Decimal.ROUND_DOWN).toNumber()} unit={unit}/></span>;
@@ -27,8 +28,9 @@ export function CostSummaryPanel({ portfolio, links }: { portfolio: ConnectedPor
  const [selected,setSelected]=useState<string|null>(null);
  const book=getPref<CostBook>(COST_PREF)?.value;
  const {boros,extraWallets}=useCostSources(portfolio);
- const { rows,result,walletCovered } = allSourceCostSummary(portfolio,book,links,boros,extraWallets);
- const identity = (row: typeof rows[number]) => <div className="flex min-w-0 items-center gap-3"><TokenLogo logo={row.asset.icon} symbol={row.asset.symbol} name={tokenName(row.asset.symbol, row.asset.name)} size={34} networkLogo={row.chains.size === 1 ? chainIdentity(row.asset.chain).logo : undefined} networkName={row.chains.size === 1 ? chainIdentity(row.asset.chain).name : undefined} /><div className="min-w-0"><span className="block text-sm font-semibold">{tokenName(row.asset.symbol, row.asset.name)}</span><span className="mt-1 block text-[11px] text-muted">{row.sourceLabel} · {[...row.chains].map(c => chainIdentity(c).name).join(' · ')}</span></div></div>;
+ const perps=usePerpVenues(portfolio.arcus);
+ const { rows,result,walletCovered } = allSourceCostSummary(portfolio,book,links,boros,extraWallets,perps);
+ const identity = (row: typeof rows[number]) => <div className="flex min-w-0 items-center gap-3"><TokenLogo logo={row.asset.icon} symbol={row.asset.symbol} name={tokenName(row.asset.symbol, row.asset.name)} size={34} networkLogo={row.chains.size === 1 ? chainIdentity(row.asset.chain).logo : undefined} networkName={row.chains.size === 1 ? chainIdentity(row.asset.chain).name : undefined} /><div className="min-w-0"><span className="block text-sm font-semibold">{row.provider==='perp'?row.asset.name:tokenName(row.asset.symbol, row.asset.name)}</span><span className="mt-1 block text-[11px] text-muted">{row.sourceLabel} · {[...row.chains].map(c => chainIdentity(c).name).join(' · ')}</span></div></div>;
  const state = (row: typeof rows[number]) => row.status === 'confirmation' ? <div className="space-y-1"><Badge tone="neutral">بهای ذخیره‌شده</Badge><button type="button" className="block min-h-11 text-xs text-brand-500" onClick={()=>setSelected(row.asset.key)}>{row.stale?'بررسی هزینه و موجودی':'تأیید همین هزینه'}</button></div> : row.status !== 'ready' ? <span title={row.issues[0]?.reason}><Badge tone="warn">{COST_STATUS[row.status as keyof typeof COST_STATUS]}</Badge></span> : null;
  const gain = (row: typeof rows[number]) => {
   const value=row.pnl??row.estimatedPnl;
@@ -40,7 +42,7 @@ export function CostSummaryPanel({ portfolio, links }: { portfolio: ConnectedPor
   return <div className="flex flex-col gap-1" title={estimate&&at?`برآورد بر پایهٔ آخرین دریافت: ${new Date(at).toLocaleString('fa-IR')}`:undefined}><MoneyValue digits={2} value={value} signed tone="auto" state={row.stale?'stale':'ready'}/><PercentValue value={row.basis!==null&&row.basis>0?value/row.basis*100:null} className="text-xs"/>{estimate&&<span className="text-[10px] text-muted">{row.stale?'برآورد ذخیره‌شده':'برآورد موجودی فعلی'}</span>}{row.valuation.unknown !== '0' && <span className="text-[10px] text-muted">فقط بخش دارای بهای خرید</span>}</div>;
  };
  return <Surface as="section" aria-labelledby="dashboard-cost-title" className="cost-summary min-w-0 p-4 md:p-5">
-  <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="dashboard-cost-title" className="text-base font-bold">بهای خرید و سود و زیان</h2><span className="text-xs text-muted">کیف پول · آرکوس · بوروس</span></div>
+  <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="dashboard-cost-title" className="text-base font-bold">بهای خرید و سود و زیان</h2><span className="text-xs text-muted">کیف پول · پرپچوال · بوروس</span></div>
   {boros.error&&<Notice tone="warn">بوروس: {boros.error}</Notice>}
   {boros.loading&&!boros.data&&<p className="text-xs text-muted mb-3">در حال دریافت موجودی بوروس…</p>}
   {!rows.length ? <p className="text-sm text-muted">دارایی قابل محاسبه‌ای موجود نیست.</p> : <>

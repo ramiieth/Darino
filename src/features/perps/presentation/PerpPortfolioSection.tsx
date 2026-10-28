@@ -1,7 +1,7 @@
 /**
  * داشبورد — بخش پرپچوال: سود/زیان همهٔ پلتفرم‌ها در بازهٔ انتخابی (۲۴ ساعت/۷ روز/۳۰ روز/از ابتدا)
  * + سود/زیان بسته‌شده، باز و ارزش حساب؛ یک کارت برای هر حساب (آرکوس، لایتر رابین‌هود، لایتر، هایپرلیکوئید،
- * تی‌اکس‌فلو، و با کلید فقط‌خواندنی env: آستر، کیوفکس، اوندو پرپس).
+ * تی‌اکس‌فلو، و با کلید فقط‌خواندنی env: اوندو پرپس).
  * محاسبات در domain/perpPortfolio؛ داده در data/usePerpVenues.
  */
 import { useState } from 'react';
@@ -28,8 +28,6 @@ const VENUE: Record<PerpVenue, { name: string; logo: string; network?: string; t
   'lighter-mainnet': { name: 'لایتر', logo: '/logos/platform-lighter.png', to: () => '/lighter' },
   hyperliquid: { name: 'هایپرلیکوئید', logo: '/logos/token-hype.png', to: (a) => `/desk?a=${a.address ?? ''}`, cta: 'کارنامه و تاریخچهٔ معاملات' },
   txflow: { name: 'تی‌اکس‌فلو', logo: '/logos/platform-txflow.png', href: 'https://app.txflow.com/' },
-  aster: { name: 'آستر', logo: '/logos/platform-aster.png', href: 'https://www.asterdex.com/en/trade/pro/futures/BTCUSDT' },
-  qfex: { name: 'کیوفکس', logo: '/logos/platform-qfex.png', href: 'https://www.qfex.com/' },
   ondo: { name: 'اوندو پرپس', logo: '/logos/platform-ondo.png', href: 'https://app.ondoperps.xyz/' }
 };
 type Range = PnlPeriod | 'all';

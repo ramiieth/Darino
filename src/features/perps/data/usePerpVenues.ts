@@ -4,7 +4,7 @@
  *   لایتر: همان کش صفحهٔ لایتر + سری سود/زیان هر زیرحساب
  *   هایپرلیکوئید: info/clearinghouseState + info/portfolio (عمومی، فقط آدرس)
  *   تی‌اکس‌فلو: rpc.txflow.com/info clearinghouseState + دفتر واریز/برداشت (API سازگار با هایپرلیکوئید)
- *   آستر، کیوفکس، اوندو پرپس: /api/integrations?op=keyed-perps با کلید فقط‌خواندنی در env ورسل (فقط کاربر واردشده)
+ *   اوندو پرپس: /api/integrations?op=keyed-perps با کلید فقط‌خواندنی در env ورسل (فقط کاربر واردشده)
  *   آدرس‌های env (HYPERLIQUID_ADDRESS، LIGHTER_ADDRESS، …) از همان پاسخ؛ مثل حساب ثبت‌شده خوانده می‌شوند
  * هر حساب «پلتفرم» با آدرس عمومی در مدیریت کیف پول‌ها ثبت می‌شود؛ بدون کلید یا امضا.
  */
@@ -28,6 +28,8 @@ const keyedPerpsQuery = {
   refetchInterval: 60_000,
   retry: 0
 } as const;
+
+const EVM = /^0x[0-9a-fA-F]{40}$/;
 
 const ENV_LABEL = { hyperliquid: 'حساب هایپرلیکوئید', 'lighter-mainnet': 'حساب لایتر', 'lighter-robinhood': 'حساب لایتر رابین‌هود', txflow: 'حساب تی‌اکس‌فلو' } as const;
 
@@ -96,15 +98,29 @@ export function useHlLikeVenues(): PerpVenueAccount[] {
   const envHl = useEnvAddresses('hyperliquid', fromHoldings.filter((l) => l.venue === 'hyperliquid').map((l) => l.address));
   const envTx = useEnvAddresses('txflow', fromHoldings.filter((l) => l.venue === 'txflow').map((l) => l.address));
   const linked = [...fromHoldings, ...envHl.map((e) => ({ ...e, venue: 'hyperliquid' as const })), ...envTx.map((e) => ({ ...e, venue: 'txflow' as const }))];
-  const queries = useQueries({ queries: linked.map((l) => hlLikeAccountQuery(l.venue, l.address)) });
-  return linked.map((l, i) => {
-    const q = queries[i];
+  // کیف پول‌های EVM متصل که روی تی‌اکس‌فلو حساب فعال دارند ولی جداگانه ثبت نشده‌اند (بدون نیاز به «افزودن حساب»)
+  const seenTx = new Set(linked.filter((l) => l.venue === 'txflow').map((l) => l.address.toLowerCase()));
+  const walletTx = [
+    ...new Map(
+      custody.holdings
+        .filter((h) => h.kind === 'wallet' && !h.archivedAt && h.address && EVM.test(h.address) && !seenTx.has(h.address.toLowerCase()))
+        .map((h) => [h.address!.toLowerCase(), { id: `wallet:txflow:${h.address!.toLowerCase()}`, label: `${h.label} · تی‌اکس‌فلو`, address: h.address!, venue: 'txflow' as const }])
+    ).values()
+  ];
+  const queries = useQueries({ queries: [...linked, ...walletTx].map((l) => hlLikeAccountQuery(l.venue, l.address)) });
+  const toAccount = (l: (typeof linked)[number], q: (typeof queries)[number]) => {
     const status = q.isPending ? 'loading' : q.isError && !q.data ? 'error' : 'ready';
     return fromHlLike(l.id, l.label, l.venue, l.address, q.data?.state ?? null, status, q.isError && !!q.data, { portfolio: q.data?.portfolio, ledger: q.data?.ledger });
+  };
+  const active = walletTx.flatMap((l, i) => {
+    const state = queries[linked.length + i].data?.state;
+    const open = (state?.assetPositions ?? []).some((p) => Number(p.position?.szi));
+    return Number(state?.marginSummary?.accountValue ?? 0) > 0 || open ? [toAccount(l, queries[linked.length + i])] : [];
   });
+  return [...linked.map((l, i) => toAccount(l, queries[i])), ...active];
 }
 
-const KEYED_LABEL = { aster: 'حساب آستر', qfex: 'حساب کیوفکس', ondo: 'حساب اوندو پرپس' } as const;
+const KEYED_LABEL = { ondo: 'حساب اوندو پرپس' } as const;
 
 /**
  * پلتفرم‌هایی که کلیدشان در env ورسل تنظیم شده؛ بدون کلید یا بدون ورود → هیچ کارتی (خطا نشان داده نمی‌شود)
@@ -114,7 +130,7 @@ export function useKeyedVenues(): PerpVenueAccount[] {
   return (q.data?.venues ?? []).map((r) => ({ ...fromKeyed(r, KEYED_LABEL[r.venue]), stale: q.isError && !!q.data }));
 }
 
-/** پوزیشن‌های پلتفرمی (لایتر، هایپرلیکوئید، تی‌اکس‌فلو، آستر، کیوفکس، اوندو) برای «پوزیشن‌های واقعی» */
+/** پوزیشن‌های پلتفرمی (لایتر، هایپرلیکوئید، تی‌اکس‌فلو، اوندو) برای «پوزیشن‌های واقعی» */
 export function usePlatformPerpVenues(): PerpVenueAccount[] {
   return [...useLighterVenues(), ...useHlLikeVenues(), ...useKeyedVenues()];
 }

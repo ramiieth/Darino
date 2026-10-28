@@ -81,7 +81,7 @@ export function CarMarketPage() {
     const q = normalizeQuery(query);
     return market.models.filter((m) => {
       if (cat !== 'all' && m.category !== cat) return false;
-      if (status === 'active' && m.status === 'stopped') return false;
+      if (status === 'active' && !m.onMarket) return false;
       if (status !== 'active' && status !== 'all' && m.status !== status) return false;
       if (!q) return true;
       const years = m.trims.map((t) => t.row.year).join(' ');
@@ -107,7 +107,7 @@ export function CarMarketPage() {
       c.cat[m.category] += 1;
       c.status.all += 1;
       c.status[m.status] += 1;
-      if (m.status !== 'stopped') c.status.active += 1;
+      if (m.onMarket) c.status.active += 1;
     }
     return c;
   }, [market.models]);
@@ -292,9 +292,10 @@ export function CarMarketPage() {
           {tab === 'brands' && <BrandsPanel models={filtered} periodLabel={period.label} onPick={pickBrand} />}
 
           <p className="text-2xs leading-5 text-muted">
-            منبع: car.ir — قیمت بازار و کارخانه (تومان)، هر روز خودکار ذخیره می‌شود؛ معادل دلاری با نرخ تتر همان روز. مبنای قیمت هر خودرو آخرین سال
+            منبع: car.ir — قیمت بازار و کارخانه (تومان) + میانهٔ آگهی‌های دست‌دوم دیوار، هر روز خودکار ذخیره می‌شود؛ معادل دلاری با نرخ تتر همان روز. مبنای قیمت هر خودرو آخرین سال
             ساخت آن است. سال مدل شمسی = تولید داخل (داخلی یا مونتاژی)، میلادی = وارداتی. «توقف تولید»: آخرین مدل دو سال یا قدیمی‌تر، قیمت بیش از
-            ۹۰ روز به‌روز نشده، یا حذف از فهرست car.ir (با آخرین قیمت ثبت‌شده). قیمت‌ها پیشنهادی بازارند و لزوماً قیمت معامله نیستند.
+            ۹۰ روز به‌روز نشده، یا حذف از فهرست car.ir (با آخرین قیمت ثبت‌شده). «در بازار»: هر خودرویی که هنوز قیمت روز دارد، حتی اگر تولیدش
+            متوقف شده باشد. قیمت‌ها پیشنهادی بازارند و لزوماً قیمت معامله نیستند.
           </p>
         </div>
       )}

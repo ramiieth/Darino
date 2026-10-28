@@ -18,7 +18,6 @@
     "@fontsource/vazirmatn": "^5.1.1",
     "@hookform/resolvers": "^3.10.0",
     "@neondatabase/serverless": "^1.1.0",
-    "@noble/curves": "1.9.7",
     "@noble/hashes": "1.8.0",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",

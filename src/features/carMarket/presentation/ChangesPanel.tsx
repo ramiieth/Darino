@@ -69,7 +69,7 @@ export function ChangesPanel({
   const sorted = useMemo(
     () =>
       models
-        .filter((m) => m.status !== 'stopped' && m.change && (basis === 'toman' || m.change.usdPct !== null))
+        .filter((m) => m.onMarket && m.change && (basis === 'toman' || m.change.usdPct !== null))
         .sort((a, b) => metric(b) - metric(a)),
     [models, basis] // eslint-disable-line react-hooks/exhaustive-deps
   );

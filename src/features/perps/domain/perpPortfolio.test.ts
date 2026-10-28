@@ -160,13 +160,13 @@ describe('حساب‌های پرپ در ارزش کل دارایی', () => {
   });
 
   it('حساب در حال دریافت: جمع ناقص علامت می‌خورد', () => {
-    const r = perpInNetWorth([acc('rh', 'lighter-robinhood', 1200), acc('q', 'qfex', null, { status: 'loading' })], []);
+    const r = perpInNetWorth([acc('rh', 'lighter-robinhood', 1200), acc('o', 'ondo', null, { status: 'loading' })], []);
     expect(r).toMatchObject({ equity: 1200, partial: true });
   });
 });
 
 describe('خطای حساب‌های کلیددار', () => {
   it('پیام خطای سرور به حساب می‌رسد (فقط در title برچسب «دریافت نشد»)', () => {
-    expect(fromKeyed({ venue: 'qfex', error: 'HTTP 401 · invalid key' }, 'کیوفکس')).toMatchObject({ status: 'error', error: 'HTTP 401 · invalid key' });
+    expect(fromKeyed({ venue: 'ondo', error: 'HTTP 401 · invalid key' }, 'اوندو')).toMatchObject({ status: 'error', error: 'HTTP 401 · invalid key' });
   });
 });

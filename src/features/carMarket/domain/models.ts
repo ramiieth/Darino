@@ -10,6 +10,9 @@
  *   stopped   — آخرین مدل دو سال یا قدیمی‌تر، یا قیمت بازار بیش از ۹۰ روز
  *               به‌روز نشده، یا از فهرست car.ir حذف شده (آخرین قیمت ثبت‌شده)
  *  وارداتی (سال میلادی): مدل سال جاری یا قبل = جاری؛ ۲ سال قبل = no-new
+ *
+ *  «در بازار» (onMarket) جدا از وضعیت تولید: هنوز خرید و فروش می‌شود — در فهرست امروز هست و قیمتش
+ *  رها نشده (یا قیمت کارخانه دارد). تارا ۱۴۰۳ یا پراید دست‌دوم دیوار «توقف تولید»اند ولی در بازارند.
  * ============================================================ */
 import { toJalaali } from '../../../shared/utils/jalaliCore.js';
 import type { DailyRates } from '../../../shared/fx/usdtHistory.js';
@@ -36,6 +39,8 @@ export interface CarModelView {
   trims: CarView[];
   latestYear: string;
   status: ProductionStatus;
+  /** هنوز معامله می‌شود (فیلتر پیش‌فرض «در بازار» و میانگین بازار) */
+  onMarket: boolean;
   /** از فهرست امروز car.ir حذف شده */
   delisted: boolean;
   /** آخرین روزی که در منبع دیده شد (برای حذف‌شده‌ها) */
@@ -62,17 +67,18 @@ function trimOrder(a: CarView, b: CarView): number {
  */
 export function productionStatus(newest: CarView, priced: CarView, refTs: number, delisted: boolean, anyDealer = newest.row.dealer !== null): ProductionStatus {
   if (delisted) return 'stopped';
+  if (abandonedPrice(priced, refTs) && !anyDealer) return 'stopped';
   const y = yearNum(newest.row.year);
   const jalali = y < 1500;
   const d = new Date(refTs);
   const cur = jalali ? toJalaali(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()).year : d.getUTCFullYear();
   const age = cur - y;
-  const abandoned = priced.row.marketUpdatedAt !== null && refTs - priced.row.marketUpdatedAt > ABANDONED_MS;
-  if (abandoned && !anyDealer) return 'stopped';
   if (anyDealer) return 'current';
   if (jalali) return age <= 0 ? 'current' : age === 1 ? 'no-new' : 'stopped';
   return age <= 1 ? 'current' : age === 2 ? 'no-new' : 'stopped';
 }
+
+const abandonedPrice = (priced: CarView, refTs: number) => priced.row.marketUpdatedAt !== null && refTs - priced.row.marketUpdatedAt > ABANDONED_MS;
 
 export const STATUS_FA: Record<ProductionStatus, string> = {
   current: 'در حال عرضه',
@@ -102,12 +108,12 @@ function makeModel(trims: CarView[], refTs: number, delisted: boolean, lastSeenT
     basis,
     trims: sorted,
     latestYear: newestYear,
-    // دست‌دوم دیوار: «الان خرید و فروش می‌شود» مهم است، نه «هنوز تولید می‌شود»؛ وگرنه پراید و ۴۰۵ و سمند
-    // «توقف تولید» می‌شدند و فیلتر پیش‌فرض «فعال» همه را پنهان می‌کرد
-    status: basis.row.source === 'divar' && !delisted ? 'current' : productionStatus(newest, basis, refTs, delisted, anyDealer),
+    status: productionStatus(newest, basis, refTs, delisted, anyDealer),
+    onMarket: !delisted && (anyDealer || (basis.row.market !== null && !abandonedPrice(basis, refTs))),
     delisted,
     lastSeenTs,
-    change: basis.change
+    // ردیف مبنا (مثلاً مدل ۱۴۰۵ تازه) ماه پیش نبود ← تغییر جدیدترین تیپ همین مدل که در دوره قیمت داشته
+    change: basis.change ?? sorted.find((t) => t.change)?.change ?? null
   };
 }
 
@@ -215,9 +221,9 @@ export interface MarketSummary {
   flat: number;
 }
 
-/** خلاصه بازار (فقط مدل‌های در حال عرضه/بدون مدل جدید — توقف تولید جدا) */
+/** خلاصه بازار (فقط مدل‌های در بازار — حذف‌شده یا با قیمت رهاشده جدا) */
 export function marketSummary(models: CarModelView[]): MarketSummary {
-  const live = models.filter((m) => m.status !== 'stopped');
+  const live = models.filter((m) => m.onMarket);
   const ch = live.map((m) => m.change).filter((c): c is PriceChange => c !== null);
   const up = ch.filter((c) => c.tomanPct > 0.05).length;
   const down = ch.filter((c) => c.tomanPct < -0.05).length;

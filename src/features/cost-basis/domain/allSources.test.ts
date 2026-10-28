@@ -78,3 +78,21 @@ it('separates cached numeric estimates from live PnL and updates the estimate wi
  p.wallets[0].state!.data!.positions[0].quantity='1';
  expect(allSourceCostSummary(p,book,[],{data:null,stale:false}).rows[0].estimatedPnl).toBeNull();
 });
+
+describe('حساب‌های پرپچوال در بهای خرید', () => {
+ const perp=(id:string,venue:string,unit:string,equity:number|null,allTimePnl:number|null,extra={})=>({id,venue,label:'حساب ۱',unit,equity,allTimePnl,unrealizedPnl:null,realizedPnl:null,periodPnl:{day:null,week:null,month:null},positions:[],status:'ready',stale:false,...extra}) as never;
+ it('موجودی = ارزش حساب، بها = خالص واریز؛ «اعتبار آرکوس» جایش را به ارزش حساب آرکوس می‌دهد', () => {
+  const rows=allSourceCostSummary(portfolio(),undefined,[],{data:null,stale:false},[],[perp('arcus-1','arcus','USDG',150,50),perp('rh','lighter-robinhood','USDG',1200,-80),perp('l','lighter-mainnet','USDC',null,null,{status:'loading'})]).rows.filter(r=>r.provider!=='wallet');
+  expect(rows.map(r=>[r.asset.name,r.sourceLabel,r.quantity.toNumber(),r.basis,r.pnl,r.status])).toEqual([
+   ['یو اس دی جی - پرپچوال','آرکوس · حساب ۱',150,100,50,'ready'],
+   ['یو اس دی جی - پرپچوال','لایتر رابین‌هود · حساب ۱',1200,1280,-80,'ready']
+  ]);
+ });
+ it('سود/زیان کل نامعلوم → بهای ثبت‌شدهٔ کاربر بدون تطبیق مقدار', () => {
+  const accounts=[perp('rh','lighter-robinhood','USDG',1100,null)];
+  const asset=allSourceCostSummary(portfolio(),undefined,[],{data:null,stale:false},[],accounts).rows.find(r=>r.provider==='perp')!.asset;
+  const book=reconcileBasis(undefined,asset,'1000','1000',now);
+  const [r]=allSourceCostSummary(portfolio(),book,[],{data:null,stale:false},[],accounts).rows.filter(r=>r.provider==='perp');
+  expect(r).toMatchObject({basis:1000,pnl:100});
+ });
+});

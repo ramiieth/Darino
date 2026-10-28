@@ -37,6 +37,12 @@ describe('نمای مدل — مبنای قیمت آخرین سال ساخت', (
     expect(statusLabel(m('bmw'))).toBe('توقف واردات');
     expect(statusLabel(m('quick'))).toBe('توقف تولید');
   });
+
+  it('«در بازار»: هر مدلی که قیمت روز دارد، حتی با توقف تولید', () => {
+    expect(m('bmw').onMarket).toBe(true); // ۲۰۱۸ ولی قیمت امروز
+    expect(m('quick').onMarket).toBe(false); // ۲۰۰ روز به‌روز نشده
+    expect(m('dena').onMarket).toBe(true);
+  });
 });
 
 describe('سال جدید فقط با قیمت کارخانه', () => {
@@ -59,16 +65,17 @@ describe('مدل حذف‌شده از car.ir', () => {
     const today = snap(0, 100_000, [row('a', 1.1e9)], NOW);
     const { models } = buildModelMarket([old, today], periodOf('1d'), {});
     const gone = models.find((x) => x.key === 'gone')!;
-    expect(gone).toMatchObject({ delisted: true, status: 'stopped', lastSeenTs: old.dateTs, change: null });
+    expect(gone).toMatchObject({ delisted: true, status: 'stopped', onMarket: false, lastSeenTs: old.dateTs, change: null });
     expect(gone.basis.row.market).toBe(900_000_000);
     expect(models).toHaveLength(2);
   });
 });
 
 describe('خلاصه بازار و برند', () => {
-  it('توقف تولید از میانگین بازار کنار گذاشته می‌شود', () => {
-    const s0 = snap(-1, 100_000, [row('a', 1e9, { modelId: 'A' }), row('b', 1e9, { modelId: 'B', year: '1401', dealer: null })], NOW);
-    const s1 = snap(0, 100_000, [row('a', 1.1e9, { modelId: 'A' }), row('b', 0.5e9, { modelId: 'B', year: '1401', dealer: null })], NOW);
+  it('قیمت رهاشده از میانگین بازار کنار گذاشته می‌شود', () => {
+    const stale = { modelId: 'B', year: '1401', dealer: null, marketUpdatedAt: NOW - 200 * DAY };
+    const s0 = snap(-1, 100_000, [row('a', 1e9, { modelId: 'A' }), row('b', 1e9, stale)], NOW);
+    const s1 = snap(0, 100_000, [row('a', 1.1e9, { modelId: 'A' }), row('b', 0.5e9, stale)], NOW);
     const { models } = buildModelMarket([s0, s1], periodOf('1d'), {});
     const sum = marketSummary(models);
     expect(sum).toMatchObject({ models: 1, withChange: 1, up: 1, down: 0 });
@@ -78,15 +85,25 @@ describe('خلاصه بازار و برند', () => {
   });
 });
 
-describe('دست‌دوم دیوار — در فیلتر پیش‌فرض «فعال» دیده می‌شود', () => {
-  it('پراید ۱۳۱ مدل ۱۳۹۹ دیوار «در حال عرضه» است، نه «توقف تولید»', () => {
+describe('دست‌دوم دیوار — در فیلتر پیش‌فرض «در بازار» دیده می‌شود', () => {
+  it('پراید ۱۳۱ مدل ۱۳۹۹ دیوار توقف تولید است ولی در بازار', () => {
     const rows = [
       row('dv:Pride 131 SE:1399', 1_070_000_000, { modelId: 'dv:Pride 131 SE', model: 'پراید 131 SE', brand: 'saipa', year: '1399', dealer: null, marketUpdatedAt: NOW, source: 'divar', n: 5 }),
       // همان سال قدیمی از car.ir همچنان «توقف تولید»
       row('old', 900_000_000, { modelId: 'old', model: 'مدل قدیمی', brand: 'saipa', year: '1399', dealer: null, marketUpdatedAt: NOW })
     ];
     const { models } = buildModelMarket([snap(0, 100_000, rows, NOW)], periodOf('1d'), {});
-    expect(models.find((x) => x.key === 'dv:Pride 131 SE')!.status).toBe('current');
-    expect(models.find((x) => x.key === 'old')!.status).toBe('stopped');
+    expect(models.find((x) => x.key === 'dv:Pride 131 SE')).toMatchObject({ status: 'stopped', onMarket: true });
+    expect(models.find((x) => x.key === 'old')).toMatchObject({ status: 'stopped', onMarket: true });
+  });
+});
+
+describe('تغییر دوره برای مدلی که ردیف مبنایش تازه است', () => {
+  it('مدل ۱۴۰۵ ماه پیش نبود ← تغییر تیپ ۱۴۰۴ همان مدل', () => {
+    const old = snap(-30, 100_000, [row('q04', 1e9, { modelId: 'quick', year: '1404', dealer: null })], NOW);
+    const today = snap(0, 100_000, [row('q05', 1.5e9, { modelId: 'quick', year: '1405', dealer: null, marketUpdatedAt: NOW }), row('q04', 1.2e9, { modelId: 'quick', year: '1404', dealer: null, marketUpdatedAt: NOW })], NOW);
+    const [m] = buildModelMarket([old, today], periodOf('1m'), {}).models;
+    expect(m.basis.row.id).toBe('q05');
+    expect(m.change?.tomanPct).toBeCloseTo(20);
   });
 });
