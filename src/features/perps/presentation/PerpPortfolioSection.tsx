@@ -27,8 +27,8 @@ const VENUE: Record<PerpVenue, { name: string; logo: string; network?: string; t
   'lighter-robinhood': { name: 'لایتر رابین‌هود', logo: '/logos/platform-lighter.png', network: '/logos/chain-4663.svg', to: () => '/lighter-robinhood' },
   'lighter-mainnet': { name: 'لایتر', logo: '/logos/platform-lighter.png', to: () => '/lighter' },
   hyperliquid: { name: 'هایپرلیکوئید', logo: '/logos/token-hype.png', to: (a) => `/desk?a=${a.address ?? ''}`, cta: 'کارنامه و تاریخچهٔ معاملات' },
-  txflow: { name: 'تی‌اکس‌فلو', logo: '/logos/platform-txflow.png', href: 'https://app.txflow.com/' },
-  ondo: { name: 'اوندو پرپس', logo: '/logos/platform-ondo.png', href: 'https://app.ondoperps.xyz/' }
+  txflow: { name: 'تی‌اکس‌فلو', logo: '/logos/platform-txflow.png', to: () => '/txflow' },
+  ondo: { name: 'اوندو پرپس', logo: '/logos/platform-ondo.png', to: () => '/ondo-perps' }
 };
 type Range = PnlPeriod | 'all';
 const RANGES: { value: Range; label: string; title: string }[] = [

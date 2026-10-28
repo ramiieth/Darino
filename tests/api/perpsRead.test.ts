@@ -102,3 +102,38 @@ describe('سری عمومی سود/زیان لایتر',()=>{
  it('فقط شمارهٔ حساب عددی و دو op ثابت؛ پیش از هر درخواست رد می‌شود',async()=>{const f=vi.fn();vi.stubGlobal('fetch',f);const { getLighterPnl } = await import('../../api/_perpsRead');await expect(getLighterPnl('lighter-pnl','1&by=l1')).rejects.toMatchObject({status:400});await expect(getLighterPnl('evil','1')).rejects.toMatchObject({status:400});expect(f).not.toHaveBeenCalled();});
  it('ساعتی و روزانه از میزبان درست؛ فقط [زمان، trade_pnl]',async()=>{const { getLighterPnl } = await import('../../api/_perpsRead');const f=vi.fn().mockImplementation(()=>Promise.resolve(ok({code:200,pnl:[{timestamp:10,trade_pnl:5.5,inflow:100},{timestamp:'x',trade_pnl:1}]})));vi.stubGlobal('fetch',f);const r=await getLighterPnl('lighter-mainnet-pnl','27160');expect(r.hourly).toEqual([[10,5.5]]);expect(r.daily).toEqual([[10,5.5]]);const urls=f.mock.calls.map(c=>new URL(c[0]));expect(urls.map(u=>u.origin)).toEqual(['https://mainnet.zklighter.elliot.ai','https://mainnet.zklighter.elliot.ai']);expect(urls.map(u=>u.searchParams.get('resolution')).sort()).toEqual(['1d','1h']);expect(urls.every(u=>u.searchParams.get('by')==='index'&&u.searchParams.get('value')==='27160')).toBe(true);});
 });
+
+describe('تاریخچهٔ معاملات لایتر برای ژورنال', () => {
+ const raw = (over: Record<string, unknown> = {}) => ({ trade_id_str: '9', type: 'trade', market_symbol: 'ETH', market_kind: 'perps', size: '1.5', price: '2000', usd_amount: '3000', ask_account_id: 5, bid_account_id: 77, is_maker_ask: true, timestamp: 1793181624847, taker_position_size_before: '-3', maker_position_size_before: '0', taker_fee: 200, bid_account_pnl: '-4.5', ...over });
+ it('دید همان حساب: سمت، نقش، پوزیشن قبل، کارمزد ppm و سود بسته‌شده', async () => {
+  const { trimLighterTrade } = await import('../../api/_perpsRead');
+  expect(trimLighterTrade(raw(), '77')).toEqual({ id: '9', t: 1793181624847, sym: 'ETH', side: 'buy', px: 2000, sz: 1.5, usd: 3000, fee: 0.6, pnl: -4.5, before: -3, maker: false, liq: false });
+  expect(trimLighterTrade(raw(), '5')).toMatchObject({ side: 'sell', maker: true, before: 0, fee: 0, pnl: null });
+  expect(trimLighterTrade(raw(), '1')).toBeNull();
+  expect(trimLighterTrade(raw({ market_kind: 'spot' }), '77')).toBeNull();
+ });
+ it('فقط میزبان ثابت؛ با رسیدن به since متوقف می‌شود و ورودی نامعتبر را قبل از fetch رد می‌کند', async () => {
+  const { getLighterTrades } = await import('../../api/_perpsRead');
+  const f = vi.fn().mockResolvedValueOnce(ok({ code: 200, next_cursor: 'abc', trades: Array.from({ length: 100 }, (_, i) => raw({ trade_id_str: String(i), timestamp: 2_000 - i })) }))
+   .mockResolvedValueOnce(ok({ code: 200, next_cursor: 'def', trades: [raw({ trade_id_str: 'x', timestamp: 1_850 }), raw({ trade_id_str: 'y', timestamp: 100 })] }));
+  vi.stubGlobal('fetch', f);
+  const r = await getLighterTrades('lighter-mainnet-trades', '77', 1_000, '');
+  expect(r.complete).toBe(true);
+  expect(r.trades.map((t) => t.id)).toContain('x');
+  expect(r.trades.map((t) => t.id)).not.toContain('y');
+  expect(f.mock.calls[1][0]).toContain('cursor=abc');
+  for (const [url] of f.mock.calls) expect(new URL(url).origin).toBe('https://mainnet.zklighter.elliot.ai');
+  const g = vi.fn(); vi.stubGlobal('fetch', g);
+  await expect(getLighterTrades('lighter-trades', 'https://evil', 0, '')).rejects.toMatchObject({ status: 400 });
+  await expect(getLighterTrades('evil', '1', 0, '')).rejects.toMatchObject({ status: 400 });
+  await expect(getLighterTrades('lighter-trades', '1', 0, '../x?y')).rejects.toMatchObject({ status: 400 });
+  expect(g).not.toHaveBeenCalled();
+ });
+ it('سری روزانه: [ثانیه، trade_pnl، حجم] با سقف ۱۸۰ روز', async () => {
+  const { getLighterDaily } = await import('../../api/_perpsRead');
+  const f = vi.fn().mockResolvedValue(ok({ code: 200, pnl: [{ timestamp: 10, trade_pnl: 5, volume: 1000 }, { timestamp: 'x' }] }));
+  vi.stubGlobal('fetch', f);
+  expect((await getLighterDaily('lighter-daily', '3', 9999)).daily).toEqual([[10, 5, 1000]]);
+  expect(f.mock.calls[0][0]).toContain('count_back=182');
+ });
+});

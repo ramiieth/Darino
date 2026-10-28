@@ -21,7 +21,7 @@ import { LIGHTER_PLATFORM, lighterAccountQuery, lighterPnlQuery, type LighterNet
 type KeyedResponse = { venues: Parameters<typeof fromKeyed>[0][]; addresses?: Partial<Record<'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow', string[]>> };
 
 /** یک درخواست برای حساب‌های کلیددار و آدرس‌های env؛ بدون ورود یا بدون env → خالی */
-const keyedPerpsQuery = {
+export const keyedPerpsQuery = {
   queryKey: ['perp-keyed'],
   queryFn: () => fetchJson<KeyedResponse>('/api/integrations?op=keyed-perps', { timeoutMs: 20_000 }),
   staleTime: 30_000,

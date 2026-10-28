@@ -1,7 +1,7 @@
 import { z } from 'zod';
 const finite = z.number().finite().nullable();
 const time = z.number().finite().nonnegative().nullable();
-export const sectionKeys = ['dashboard', 'wallets', 'transactions', 'arcus', 'costBasis', 'markets', 'performance', 'boros', 'defi', 'simulation', 'calculators', 'vehicles', 'property', 'watchlist', 'preferences', 'security', 'designSystem'] as const;
+export const sectionKeys = ['dashboard', 'wallets', 'transactions', 'arcus', 'costBasis', 'markets', 'performance', 'boros', 'defi', 'simulation', 'calculators', 'vehicles', 'property', 'watchlist', 'preferences', 'security', 'designSystem', 'journal'] as const;
 export const statusSchema = z.enum(['ready', 'partial', 'stale', 'loading', 'unavailable', 'reference', 'empty', 'interface']);
 export const metricsSchema = z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9]{0,39}$/), finite).refine(v => Object.keys(v).length <= 40);
 export const insightRowSchema = z.object({
@@ -20,7 +20,7 @@ const ranked = z.object({ name: z.string().max(160), symbol: z.string().max(40),
 export const appContextSchema = z.object({
     version: z.literal(1), generatedAt: z.number().finite().nonnegative(),
     cash: z.object({ walletStableUsd: finite, walletPartial: z.boolean(), arcusFreeCollateralUsd: finite, arcusPartial: z.boolean() }),
-    sections: z.array(sectionSchema).max(17).refine(s => new Set(s.map(x => x.key)).size === s.length),
+    sections: z.array(sectionSchema).max(18).refine(s => new Set(s.map(x => x.key)).size === s.length),
     rankings: z.array(z.object({
         period: z.enum(['1d', '7d', '30d', '60d', '90d']), universe: z.enum(['all', 'crypto', 'tokenized', 'tradfi']),
         available: z.number().int().nonnegative(), total: z.number().int().nonnegative(),

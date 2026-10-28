@@ -49,7 +49,7 @@ it('Hyperliquid and TxFlow accounts get their own cards; Hyperliquid links to it
  const {container}=renderWith(client,[] as unknown as ConnectedPortfolio['arcus']);
  expect(screen.getByText('هایپر من')).toBeTruthy();expect(screen.getByText('تی‌اکس من')).toBeTruthy();
  expect(screen.getByRole('link',{name:/کارنامه و تاریخچهٔ معاملات/}).getAttribute('href')).toBe(`/desk?a=${ADDR}`);
- expect(screen.getByRole('link',{name:/باز کردن تی‌اکس‌فلو/}).getAttribute('href')).toBe('https://app.txflow.com/');
+ expect(screen.getByRole('link',{name:/تاریخچه و جزئیات تی‌اکس‌فلو/}).getAttribute('href')).toBe('/txflow');
  const text=container.textContent!;
  expect(text).toContain('+۵۰۰');   // از ابتدا: ۴۰۰ + (۱۰۰۰ − ۹۰۰)
  expect(text).toContain('۴,۰۰۰');  // ارزش کل: ۳۰۰۰ + ۱۰۰۰

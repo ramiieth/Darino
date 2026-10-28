@@ -6,6 +6,7 @@
  * جهت بازار را پیش‌بینی نمی‌کند. حالت در URL (?m= ، ?side= ، ?lev=) تا لینک قابل اشتراک باشد.
  */
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge, TONE_SOFT } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
@@ -110,6 +111,13 @@ export function CheckTab({
         </Field>
       </Surface>
 
+      {m && (
+        <p className="text-xs text-muted">
+          تصمیم به ورود گرفتید؟{' '}
+          <Link className="font-semibold text-accent underline" to={`/journal?tab=plan&m=${encodeURIComponent(market)}&side=${side}&lev=${lev}`}>برنامهٔ معامله را ثبت کنید</Link>
+          {' '}تا R، ریسک و نظم استاپ در ژورنال سنجیده شود.
+        </p>
+      )}
       {!m ? (
         <Notice tone="neutral">این بازار در هایپرلیکوئید پیدا نشد؛ از فهرست انتخاب کنید.</Notice>
       ) : candles.isLoading ? (

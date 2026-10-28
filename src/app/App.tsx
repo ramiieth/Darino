@@ -16,6 +16,7 @@ const PropertyMarketPage = lazy(() => import('@/features/propertyMarket/presenta
 const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/CalculatorsPage').then((m) => ({ default: m.CalculatorsPage })));
 const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
 const PerpsPage = lazy(() => import('@/features/perps/presentation/PerpsPage'));
+const TxflowPage = lazy(() => import('@/features/perps/presentation/TxflowPage'));
 const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
 const ConnectedPage = lazy(() => import('@/features/connected/presentation/ConnectedPage'));
 const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
@@ -25,6 +26,7 @@ const BorosPage = lazy(() => import('@/features/boros/presentation/BorosDashboar
 const ShoppingPage = lazy(() => import('@/features/shopping/presentation/ShoppingPage'));
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
+const JournalPage = lazy(() => import('@/features/journal/presentation/JournalPage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
@@ -74,6 +76,7 @@ export function App() {
           <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
           <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
+          <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
           <Route path="/intel" element={<DeskRedirect />} />
           <Route path="/traders" element={<DeskRedirect />} />
@@ -188,6 +191,7 @@ export function App() {
           />
           <Route path="/lighter" element={<Private label="لایتر"><PerpsPage provider="lighter" initialTab="perp" /></Private>} />
           <Route path="/lighter-robinhood" element={<Private label="لایتر رابین‌هود"><PerpsPage provider="lighter" /></Private>} />
+          <Route path="/txflow" element={<Private label="تی‌اکس‌فلو"><TxflowPage /></Private>} />
           <Route path="/ondo-perps" element={<Private label="اوندو پرپس"><PerpsPage provider="ondo" /></Private>} />
           <Route path="/wallets" element={<Private label="مدیریت کیف پول‌ها"><ConnectedPage /></Private>} />
           <Route path="/assistant" element={<Private label="دستیار پرتفولیو"><AssistantPage /></Private>} />
