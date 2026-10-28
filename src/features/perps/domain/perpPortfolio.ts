@@ -14,14 +14,14 @@
  *                         هایپرلیکوئید: آخرین نقطهٔ perpDay/perpWeek/perpMonth (مثل آرکوس)
  *                         تی‌اکس‌فلو: نامعلوم (سری دوره‌ای عمومی ندارد) — حدس زده نمی‌شود
  *   جمع کل               = جمع مقادیر معلوم + پرچم partial
- *   آستر/کیوفکس/اوندو (کلید فقط‌خواندنی env): نرمال‌سازی در domain/keyedVenues؛ اینجا فقط به مدل مشترک
+ *   اوندو (کلید فقط‌خواندنی env): نرمال‌سازی در domain/keyedVenues؛ اینجا فقط به مدل مشترک
  * واحد حساب‌ها USDC/USDG/USDT است و ≈ ۱ دلار در نظر گرفته می‌شود.
  */
 import type { ArcusAccount, ArcusPortfolio, ArcusPosition } from '@/features/arcus/api/types';
 import type { LighterAccount } from './model';
 import type { KeyedSnapshot, KeyedVenue } from './keyedVenues';
 
-export type PerpVenue = 'arcus' | 'lighter-robinhood' | 'lighter-mainnet' | 'hyperliquid' | 'txflow' | 'aster' | 'qfex' | 'ondo';
+export type PerpVenue = 'arcus' | 'lighter-robinhood' | 'lighter-mainnet' | 'hyperliquid' | 'txflow' | 'ondo';
 export type PerpStatus = 'loading' | 'ready' | 'error';
 export type PnlPeriod = 'day' | 'week' | 'month';
 export const PNL_PERIODS: readonly PnlPeriod[] = ['day', 'week', 'month'];
@@ -37,6 +37,15 @@ export interface PerpVenuePosition {
   pnl: number | null;
   liquidation: number | null;
 }
+
+export const PERP_VENUE_NAME: Record<PerpVenue, string> = {
+  arcus: 'آرکوس',
+  'lighter-robinhood': 'لایتر رابین‌هود',
+  'lighter-mainnet': 'لایتر',
+  hyperliquid: 'هایپرلیکوئید',
+  txflow: 'تی‌اکس‌فلو',
+  ondo: 'اوندو پرپس'
+};
 
 export interface PerpVenueAccount {
   id: string;
@@ -312,7 +321,7 @@ export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string 
     id: `keyed:${r.venue}`,
     venue: r.venue,
     label,
-    unit: r.venue === 'aster' ? 'USDT' : 'USDC',
+    unit: 'USDC',
     equity: r.equity,
     unrealizedPnl: r.unrealizedPnl,
     allTimePnl: r.allTimePnl,

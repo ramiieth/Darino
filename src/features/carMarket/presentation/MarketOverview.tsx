@@ -1,6 +1,6 @@
 /** ============================================================
  * خلاصه بازار خودرو در دوره انتخابی: شاخص میانگین تومانی/دلاری،
- * گران/ارزان‌شده‌ها، و سه مدل با بیشترین رشد و کاهش
+ * گران/ارزان‌شده‌ها، و تا ۱۵ مدل با بیشترین رشد و کاهش (فهرست اسکرول‌شونده)
  * ============================================================ */
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
@@ -10,6 +10,9 @@ import type { CarModelView, MarketSummary } from '../domain/models';
 import { CarBrandLogo } from './CarBrandLogo';
 import { ChangePill, trendOf } from './ChangeCell';
 import { fmtCarPct, fmtCarTomanSigned } from './format';
+
+/** حداقل ۱۵ خودرو برای هر برند/فیلتر */
+const MOVERS = 15;
 
 function Mover({ m, onPick }: { m: CarModelView; onPick: (m: CarModelView) => void }) {
   return (
@@ -36,9 +39,9 @@ export function MarketOverview({
   models: CarModelView[];
   onPick: (m: CarModelView) => void;
 }) {
-  const ranked = models.filter((m) => m.status !== 'stopped' && m.change).sort((a, b) => b.change!.tomanPct - a.change!.tomanPct);
-  const gainers = ranked.filter((m) => m.change!.tomanPct > 0.05).slice(0, 3);
-  const losers = ranked.filter((m) => m.change!.tomanPct < -0.05).reverse().slice(0, 3);
+  const ranked = models.filter((m) => m.onMarket && m.change).sort((a, b) => b.change!.tomanPct - a.change!.tomanPct);
+  const gainers = ranked.filter((m) => m.change!.tomanPct > 0.05).slice(0, MOVERS);
+  const losers = ranked.filter((m) => m.change!.tomanPct < -0.05).reverse().slice(0, MOVERS);
   const t = trendOf(summary.tomanPct);
   const hasData = summary.withChange > 0;
 
@@ -87,11 +90,11 @@ export function MarketOverview({
 
         <div>
           <p className="mb-1.5 text-xs font-bold text-positive">بیشترین رشد</p>
-          {gainers.length ? gainers.map((m) => <Mover key={m.key} m={m} onPick={onPick} />) : <p className="px-2 text-xs text-subtle">—</p>}
+          {gainers.length ? <div className="max-h-80 overflow-y-auto">{gainers.map((m) => <Mover key={m.key} m={m} onPick={onPick} />)}</div> : <p className="px-2 text-xs text-subtle">—</p>}
         </div>
         <div>
           <p className="mb-1.5 text-xs font-bold text-negative">بیشترین کاهش</p>
-          {losers.length ? losers.map((m) => <Mover key={m.key} m={m} onPick={onPick} />) : <p className="px-2 text-xs text-subtle">—</p>}
+          {losers.length ? <div className="max-h-80 overflow-y-auto">{losers.map((m) => <Mover key={m.key} m={m} onPick={onPick} />)}</div> : <p className="px-2 text-xs text-subtle">—</p>}
         </div>
       </div>
     </section>

@@ -23,11 +23,12 @@ export const DIVAR_BRANDS = Object.keys(DIVAR_DOMESTIC);
 
 const BRAND_FA: Record<string, string> = {
   Peugeot: 'پژو', Samand: 'سمند', Dena: 'دنا', Runna: 'رانا', Paykan: 'پیکان', Tara: 'تارا', Haima: 'هایما',
-  Pride: 'پراید', Saipa: 'سایپا', Tiba: 'تیبا', Quick: 'کوییک', Saina: 'ساینا', Shahin: 'شاهین', Zamyad: 'زامیاد', Soren: 'سورن', Padra: 'پادرا'
+  Pride: 'پراید', Saipa: 'سایپا', Tiba: 'تیبا', Quick: 'کوییک', Saina: 'ساینا', Shahin: 'شاهین', Zamyad: 'زامیاد', Soren: 'سورن', Padra: 'پادرا',
+  Atlas: 'اطلس', Sahand: 'سهند', Pars: 'پارس', Saba: 'صبا', Karoon: 'کارون'
 };
 const WORD_FA: Record<string, string> = {
   sedan: 'صندوق‌دار', hatchback: 'هاچ‌بک', manual: 'دنده‌ای', automatic: 'اتوماتیک', petrol: 'بنزینی', cng: 'دوگانه‌سوز',
-  'bi-fuel': 'دوگانه‌سوز', pickup: 'وانت', basic: 'ساده', plus: 'پلاس', latest: 'جدید', optional: 'آپشنال', turbo: 'توربو'
+  'bi-fuel': 'دوگانه‌سوز', pickup: 'وانت', basic: 'ساده', plus: 'پلاس', latest: 'جدید', optional: 'آپشنال', turbo: 'توربو', pro: 'پرو', 'full-plus': 'فول پلاس'
 };
 
 /** «Peugeot 206 SD V9» → «پژو 206 SD V9» ؛ «Tiba Sedan SX-normal» → «تیبا صندوق‌دار SX» */

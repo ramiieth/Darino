@@ -18,6 +18,8 @@ vi.mock('../../src/shared/fx/usdtRate.js', async (orig) => {
   return { ...actual, fetchUsdtDirect: async () => ({ source: 'wallex', priceToman: 100_000, tradedAt: null, fetchedAt: 0 }) };
 });
 vi.mock('../../api/_schema.js', () => ({ ensureSchema: async () => true }));
+// جمع‌آوری آگهی دیوار تست خودش را دارد (divarMarket)؛ اینجا شبکه نمی‌زند
+vi.mock('../../api/_divarCars.js', () => ({ warmDivarCars: async () => 0, divarRowsAt: async () => [] }));
 vi.mock('../../api/_authCore.js', () => ({ requireSession: async () => ({ userId: 'u1' }) }));
 vi.mock('../../api/_neon.js', async (orig) => {
   const actual = await orig<typeof import('../../api/_neon.js')>();

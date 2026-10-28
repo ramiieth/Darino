@@ -64,7 +64,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const [status, body] = await handleAlertsOp(neonAlertsStore(db()), op, req.method ?? 'GET', auth.userId, () => readBody(req));
       json(res,status,body); return;
     }
-    // حساب‌های آستر/کیوفکس/اوندو با کلید فقط‌خواندنی env؛ فقط کاربر واردشده، بدون کش عمومی
+    // حساب‌های اوندو با کلید فقط‌خواندنی env؛ فقط کاربر واردشده، بدون کش عمومی
     if (op === 'keyed-perps' && req.method === 'GET') { res.setHeader('Cache-Control','private, no-store'); json(res,200,{ venues: await getKeyedPerps(), addresses: envAddresses() }); return; }
     if (req.method === 'POST' && op === 'analyze') {
       const parsed = analysisSchema.safeParse(await readBody(req));

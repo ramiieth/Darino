@@ -155,9 +155,15 @@ export const useCarMarketStore = create<CarMarketState>((set, get) => ({
       await localPut(snap);
       set({ snapshots: mergeCarSnapshots(get().snapshots, [snap]), status: 'done', via, message: null });
       if (isRemoteAllowed()) {
-        void fetchJson('/api/propertyMarket', { method: 'POST', body: { action: 'carPersist', snapshot: snap }, timeoutMs: 30_000 }).catch(
-          () => undefined
-        );
+        void fetchJson<{ divar?: CarSnapshot['rows'] }>('/api/propertyMarket', { method: 'POST', body: { action: 'carPersist', snapshot: snap }, timeoutMs: 30_000 })
+          .then(async (r) => {
+            const divar = Array.isArray(r?.divar) ? r.divar.filter((x) => x?.source === 'divar') : [];
+            if (!divar.length) return;
+            const full = { ...snap, rows: [...snap.rows.filter((x) => x.source !== 'divar'), ...divar] };
+            await localPut(full);
+            set({ snapshots: mergeCarSnapshots(get().snapshots.filter((s) => s.day !== full.day), [full]) });
+          })
+          .catch(() => undefined);
       }
     } catch {
       set({

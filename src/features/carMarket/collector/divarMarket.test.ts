@@ -65,4 +65,13 @@ describe('ادغام Snapshot همان روز', () => {
     expect(mergeCarSnapshots([server], [browser])[0].rows.map((r) => r.id)).toEqual(['a', 'dv:x']);
     expect(carryDivar(server, browser)).toBe(server);
   });
+
+  it('روز تازهٔ مرورگر (هنوز بدون دیوار) ردیف‌های دیوار دیروز را می‌گیرد؛ قدیمی‌تر از ۱۴ روز نه', () => {
+    const DAY = 86_400_000;
+    const at = (d: number, rows: CarPriceRow[]): CarSnapshot => ({ ...snap(d * DAY, rows), id: `car-${d}`, day: `d${d}` });
+    const merged = mergeCarSnapshots([at(1, [row('a'), row('dv:x', 'divar')]), at(2, [row('a')])]);
+    expect(merged[1].rows.map((r) => r.id)).toEqual(['a', 'dv:x']);
+    expect(merged[0].rows.map((r) => r.id)).toEqual(['a', 'dv:x']);
+    expect(mergeCarSnapshots([at(1, [row('dv:x', 'divar')]), at(20, [row('a')])])[1].rows.map((r) => r.id)).toEqual(['a']);
+  });
 });

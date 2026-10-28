@@ -46,8 +46,19 @@ export function mergeCarSnapshots(...lists: CarSnapshot[][]): CarSnapshot[] {
       else byDay.set(s.day, s.dateTs > prev.dateTs ? carryDivar(s, prev) : carryDivar(prev, s));
     }
   }
-  return [...byDay.values()].sort((a, b) => a.dateTs - b.dateTs);
+  const sorted = [...byDay.values()].sort((a, b) => a.dateTs - b.dateTs);
+  // روز تازه با واکشی مستقیم car.ir (هنوز بدون دیوار) ← ردیف‌های دیوارِ آخرین روزِ دارای دیوار؛
+  // وگرنه همهٔ خودروهای دست‌دوم دیوار «حذف‌شده» و «توقف تولید» به نظر می‌رسیدند
+  const last = sorted.length - 1;
+  if (last > 0 && !sorted[last].rows.some((r) => r.source === 'divar')) {
+    const prev = [...sorted].reverse().find((s) => s.rows.some((r) => r.source === 'divar') && sorted[last].dateTs - s.dateTs <= DIVAR_CARRY_MS);
+    if (prev) sorted[last] = carryDivar(sorted[last], prev);
+  }
+  return sorted;
 }
+
+/** ردیف‌های دیوار میانهٔ ۱۴ روز آگهی‌اند؛ تا همین بازه برای روز تازه معتبرند */
+const DIVAR_CARRY_MS = 14 * 86_400_000;
 
 /** نسخهٔ جدیدتر همان روز می‌ماند؛ اگر ردیف‌های دیوار ندارد (واکشی مستقیم car.ir در مرورگر) از نسخهٔ دیگر می‌آیند */
 export function carryDivar(newer: CarSnapshot, older: CarSnapshot): CarSnapshot {
