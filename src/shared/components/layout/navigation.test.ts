@@ -6,7 +6,7 @@ describe('منو پس از بازچینی گروه‌ها', () => {
     const ids = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id));
     for (const id of [
       'market', 'defi', 'desk', 'dashboard', 'wallets', 'assistant', 'arcus', 'lighter', 'ondo-perps', 'security', 'alerts',
-      'boros', 'market-performance', 'calculators', 'simulation', 'vehicle', 'realestate', 'shopping', 'gold', 'journal', 'txflow'
+      'boros', 'market-performance', 'calculators', 'simulation', 'vehicle', 'realestate', 'shopping', 'gold', 'exchanges', 'journal', 'txflow'
     ]) expect(ids).toContain(id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -21,6 +21,7 @@ describe('منو پس از بازچینی گروه‌ها', () => {
     expect(navItemForPath('/traders')?.id).toBe('desk');
     expect(navItemForPath('/desk')?.label).toBe('میز معامله');
     expect(navItemForPath('/gold')?.id).toBe('gold');
+    expect(navItemForPath('/exchanges')?.id).toBe('exchanges');
   });
 
   it('نوار پایین موبایل: بازار، داشبورد، میز معامله، کیف پول‌ها', () => {

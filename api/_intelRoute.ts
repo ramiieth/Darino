@@ -7,6 +7,7 @@
  *  GET /api/intel?op=memeScreen                    ← غربال «محافظ سرمایه»: رژیم بازار + فیلترهای آزموده (ساخت تدریجی در تیک)
  *  GET /api/intel?op=swing                         ← سوینگ: رژیم بازار پرپ‌ها + کاندید آزمایشی و عملکرد زنده‌اش (ساخت تدریجی در تیک)
  *  GET /api/intel?op=gold                          ← طلای ایران: ۴ پلتفرم + حباب نسبت به انس و تتر (کش ۶۰ ثانیه)
+ *  GET /api/intel?op=irx&coin=USDT|BTC|…           ← صرافی‌های ایران: بهترین خرید/فروش و اسپرد در ۱۱ صرافی (کش ۳۰ ثانیه)
  *
  * منبعی که خطا بدهد فقط از حکم کنار می‌رود (sources نشان می‌دهد کدام‌ها پاسخ داده‌اند).
  * ============================================================ */
@@ -19,6 +20,8 @@ import { parsePools, type MemeToken } from '../src/features/intel/domain/memes.j
 import { getMemeScreen } from './_memeScreen.js';
 import { getSwing } from './_swingScreen.js';
 import { getGold } from './_gold.js';
+import { getIrExchanges } from './_irExchanges.js';
+import { IRX_COINS, type IrxCoin } from '../src/features/intel/domain/irExchanges.js';
 
 const CHAINS: Chain[] = ['solana', 'ethereum', 'base', 'bsc', 'arbitrum'];
 const TOKEN_MS = 30 * 60_000;
@@ -119,6 +122,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const payload = await getGold();
       if (!payload.rows.length) throw new Error('gold platforms unavailable');
       res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60');
+      json(res, 200, payload);
+      return;
+    }
+    if (op === 'irx') {
+      const coin = (params.get('coin') ?? 'USDT').toUpperCase() as IrxCoin;
+      if (!IRX_COINS.includes(coin)) {
+        json(res, 400, { error: 'ارز پشتیبانی نمی‌شود' });
+        return;
+      }
+      const payload = await getIrExchanges(coin);
+      if (!payload.rows.length) throw new Error('exchanges unavailable');
+      res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=30');
       json(res, 200, payload);
       return;
     }

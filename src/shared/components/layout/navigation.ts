@@ -5,13 +5,13 @@
  *
  * Grouping follows user goals, not data providers:
  *   بازارها      what the global market is doing (home route `/`)
- *   بازار ایران  Iranian gold, cars and real estate
+ *   بازار ایران  Iranian gold, crypto exchanges, cars and real estate
  *   معامله       decide before a trade (desk), then the venues: Boros, Arcus, Lighter, Ondo Perps
  *   دارایی من    what I own, its record, alerts and security
  *   ابزارها      what-if tools
  *   خرید         Iranian shops, food, travel, doctors (read-only)
  */
-import { Activity, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -65,6 +65,13 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'طلای ایران',
         description: 'طلای ۱۸ عیار و سکه در چهار پلتفرم و بازار، و حباب نسبت به انس و دلار آزاد',
         icon: Coins
+      },
+      {
+        id: 'exchanges',
+        to: '/exchanges',
+        label: 'صرافی‌های ایران',
+        description: 'تتر و بیت‌کوین کجا ارزان‌تر است: بهترین خرید و فروش و اسپرد در ۱۱ صرافی',
+        icon: ArrowLeftRight
       },
       {
         id: 'vehicle',
