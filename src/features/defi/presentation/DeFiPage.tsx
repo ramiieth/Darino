@@ -1,7 +1,7 @@
 /**
  * DeFi — capital flow, market overview, stablecoins.
  * Only the selected panel mounts, avoiding hidden provider requests.
- * Boros is the active yield module.
+ * Boros is the active yield module; «درآمد استیبل» compares leveraged dollar carry.
  */
 import { useEffect, useState } from 'react';
 import { Radar } from 'lucide-react';
@@ -12,10 +12,11 @@ import { ListRow } from '@/shared/components/ui/ListRow';
 import { OverviewPanel } from './OverviewPanel';
 import { StablecoinsCG } from './StablecoinsCG';
 import { TvlFlowDashboard } from './TvlFlowDashboard';
+import { StableCarryPanel } from '@/features/defi-loop/presentation/StableCarryPanel';
 import { useUiStore } from '@/shared/store/uiStore';
 
 
-type DeFiTab = 'flow' | 'overview' | 'stablecoins';
+type DeFiTab = 'flow' | 'overview' | 'stablecoins' | 'carry';
 
 const YIELD_LINKS = [
   { to: '/boros', title: 'بوروس', desc: 'بازارهای نرخ تأمین مالی', icon: Radar },
@@ -48,12 +49,14 @@ export function DeFiPage() {
           options={[
             { value: 'flow', label: 'شبکه‌ها و پروتکل‌ها' },
             { value: 'overview', label: 'نمای کلی بازار' },
-            { value: 'stablecoins', label: 'استیبل‌کوین‌ها' }
+            { value: 'stablecoins', label: 'استیبل‌کوین‌ها' },
+            { value: 'carry', label: 'درآمد استیبل' }
           ]}
         />
         {tab==='flow'&&<TvlFlowDashboard />}
         {tab==='overview'&&<OverviewPanel />}
         {tab==='stablecoins'&&<StablecoinsCG />}
+        {tab==='carry'&&<StableCarryPanel />}
       </div>
 
       <Section id="yield-products" title="محصولات بازدهی">

@@ -68,3 +68,15 @@ export function referenceLoopsByLiquidity(
   }
   return n;
 }
+
+/**
+ * Leverage حالت Multiply (فلش‌لون — Kamino Multiply و مشابه):
+ *   یک تراکنش مستقیم به LTV هدف می‌رسد؛ معادل بی‌نهایت گام Reference:
+ *   Leverage = Σ LTV^i (i=0..∞) = 1 / (1 − LTV)
+ *   multiplyLeverage(0.76) ≈ 4.1667 — در برابر calculateLoopLeverage(0.76, 5) ≈ 3.3638
+ * LTV نامعتبر یا ≥ ۱ → null (اهرم بی‌نهایت تعریف نمی‌شود)
+ */
+export function multiplyLeverage(ltv: number): number | null {
+  if (!Number.isFinite(ltv) || ltv < 0 || ltv >= 1) return null;
+  return 1 / (1 - ltv);
+}
