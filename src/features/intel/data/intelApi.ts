@@ -11,6 +11,7 @@ import { parseCandles, type Candle } from '../domain/survival';
 import type { MemeScreenPayload } from '../domain/memeScreen';
 import type { SwingPayload } from '../domain/swing';
 import type { GoldPayload } from '../domain/gold';
+import type { IrxCoin, IrxPayload } from '../domain/irExchanges';
 import type { Chain, TokenSafety } from '../domain/tokenSafety';
 import type { MemeToken } from '../domain/memes';
 
@@ -128,6 +129,16 @@ export function useGold() {
     queryFn: () => getPublic<GoldPayload>('/api/intel?op=gold', 'قیمت طلا دریافت نشد'),
     staleTime: 60_000,
     refetchInterval: 2 * 60_000
+  });
+}
+
+/** صرافی‌های ایران: بهترین خرید و فروش یک ارز */
+export function useIrExchanges(coin: IrxCoin) {
+  return useQuery({
+    queryKey: ['intel', 'irx', coin],
+    queryFn: () => getPublic<IrxPayload>(`/api/intel?op=irx&coin=${coin}`, 'قیمت صرافی‌ها دریافت نشد'),
+    staleTime: 30_000,
+    refetchInterval: 60_000
   });
 }
 

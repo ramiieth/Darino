@@ -28,6 +28,7 @@ const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSyste
 const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
 const JournalPage = lazy(() => import('@/features/journal/presentation/JournalPage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
+const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
 /** /intel و /traders (نام قبلی میز معامله) ← /desk با همان پارامترها؛ تب طلای قبلی ← صفحهٔ مستقل /gold */
@@ -76,6 +77,7 @@ export function App() {
           <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
           <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
+          <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
           <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
           <Route path="/intel" element={<DeskRedirect />} />
