@@ -2,10 +2,12 @@
  * DeFiLlama Yields Provider — فقط API رسمی (Data-Driven، بدون Hardcode)
  *  - GET https://yields.llama.fi/pools : همه پول‌ها (کش ۵ دقیقه)
  *  - GET https://yields.llama.fi/chart/{pool} : تاریخچه روزانه APY/TVL (کش ۶ ساعت)
+ *  - GET https://yields.llama.fi/lendBorrow : نرخ وام، LTV و نقدینگی بازارهای وام (کش ۵ دقیقه)
  *  - Retry + Timeout + 429 → Exponential Backoff + Cache Fallback
  * ============================================================ */
 import { fetchWithRetry } from '@/shared/lib/fetchWithRetry';
 import { cacheBulkGetPrice, cachePutPrice } from '@/shared/lib/db';
+import type { LendBorrowRow } from '@/features/defi-loop/domain/carry';
 
 export const YIELDS_BASE = 'https://yields.llama.fi';
 
@@ -45,6 +47,7 @@ export interface YieldChartPoint {
 const POOLS_CACHE_MS = 5 * 60_000;
 const CHART_CACHE_MS = 6 * 60 * 60 * 1000;
 const POOLS_KEY = 'yields:pools';
+const LEND_BORROW_KEY = 'yields:lendBorrow';
 
 /** همه پول‌ها (کش ۵ دقیقه) */
 export async function fetchAllYieldPools(): Promise<YieldPool[]> {
@@ -99,6 +102,35 @@ export async function fetchPoolChart(poolId: string): Promise<YieldChartPoint[]>
     }
     return pts;
   } catch {
+    return [];
+  }
+}
+
+/** بازارهای وام (کش ۵ دقیقه) — خطا → کش کهنه → [] */
+export async function fetchLendBorrow(): Promise<LendBorrowRow[]> {
+  try {
+    const rec = await cacheBulkGetPrice([LEND_BORROW_KEY]);
+    const r = rec.get(LEND_BORROW_KEY);
+    if (r && Date.now() - r.fetchedAt < POOLS_CACHE_MS) {
+      return r.price as unknown as LendBorrowRow[];
+    }
+  } catch { /* ادامه */ }
+
+  try {
+    const res = await fetchWithRetry(`${YIELDS_BASE}/lendBorrow`, { retries: 2, timeoutMs: 25_000 });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as LendBorrowRow[];
+    if (!Array.isArray(data)) throw new Error('bad payload');
+    try {
+      await cachePutPrice(LEND_BORROW_KEY, { price: data as unknown as number, source: 'live', fetchedAt: Date.now() });
+    } catch { /* خاموش */ }
+    return data;
+  } catch {
+    try {
+      const rec = await cacheBulkGetPrice([LEND_BORROW_KEY]);
+      const r = rec.get(LEND_BORROW_KEY);
+      if (r) return r.price as unknown as LendBorrowRow[];
+    } catch { /* خاموش */ }
     return [];
   }
 }
