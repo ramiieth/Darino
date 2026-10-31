@@ -23,3 +23,4 @@ export * from './exitAdvice';
 export * from './fundingStrategies';
 export * from './orderTicket';
 export * from './fundingPlanner';
+export * from './shopBreakEven';

@@ -3,7 +3,7 @@
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { BadgeDollarSign, Bot, Layers, ListChecks, Radar, Scale, ShieldHalf } from 'lucide-react';
+import { BadgeDollarSign, Bot, Layers, ListChecks, Radar, Scale, ShieldHalf, Store } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { toFaDigits } from '@/shared/utils/formatters';
@@ -21,12 +21,13 @@ import { FundingScanner } from './delta/FundingScanner';
 import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
 import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
+import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
 import { FundingStrategiesCalculator } from './strategies/FundingStrategiesCalculator';
 import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'strategies' | 'cagr' | 'xirr' | 'compare';
-type Group = 'invest' | 'income' | 'risk';
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'strategies' | 'cagr' | 'xirr' | 'compare' | 'shop';
+type Group = 'invest' | 'income' | 'risk' | 'business';
 /** قدم‌های تب «درآمد دلتا نوترال»: پیدا کن ← تصمیم بگیر ← اجرا و پایش */
 type HubStep = 'find' | 'decide' | 'run';
 type FindView = 'scanner' | 'arb';
@@ -62,14 +63,21 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     icon: <ShieldHalf aria-hidden />
   },
   { value: 'options', label: 'آپشن (Derive)', description: 'قدم به قدم: با توجه به سرمایه و نظرتان دربارهٔ بازار، یک معاملهٔ آپشن در صرافی Derive پیشنهاد می‌شود؛ همراه با بیشترین سود و زیان، سود یا زیان در هر حرکت قیمت و زمان مناسب خروج' },
+  {
+    value: 'shop',
+    label: 'سربه‌سر دلاری مغازه',
+    description: 'چقدر بفروشید تا با تورم دلار، هم قفسه پر بماند و هم ارزش دلاری پول پیش حفظ شود — با اثر خرید چکی و تست بحران فروش ضعیف',
+    icon: <Store aria-hidden />
+  },
   { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' }
 ];
 
-/** سه گروه به‌جای سیزده تب کنار هم */
+/** چهار گروه به‌جای چهارده تب کنار هم */
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
   { value: 'invest', label: 'سرمایه‌گذاری', tabs: ['pnl', 'dca', 'cagr', 'xirr', 'compare', 'plan'] },
-  { value: 'income', label: 'درآمد دلتا نوترال', tabs: ['delta', 'strategies'] },
-  { value: 'risk', label: 'پوشش ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] }
+  { value: 'income', label: 'دلتا نوترال', tabs: ['delta', 'strategies'] },
+  { value: 'risk', label: 'ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] },
+  { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
 const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.value;
 
@@ -202,6 +210,9 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('compare')}>
           <CompareCalculator />
+        </div>
+        <div {...panel('shop')}>
+          <ShopBreakEvenCalculator />
         </div>
       </div>
     </Page>
