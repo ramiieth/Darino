@@ -22,6 +22,7 @@ const VENUE_CODE: Record<Venue, string> = {
   'lighter-mainnet': 'lm',
   'lighter-robinhood': 'lr',
   arcus: 'ar',
+  metatrader: 'mt',
   manual: 'mn'
 };
 

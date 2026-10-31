@@ -5,7 +5,7 @@
  *   فیلتر «بدون تگ» برای کارِ عقب‌افتاده. معاملهٔ دستی برای پلتفرمی که اتصال ندارد.
  */
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { FileUp, Plus } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
@@ -17,6 +17,8 @@ import { cn } from '@/shared/lib/cn';
 import type { ClassifiedTrade, JournalSettings, TradeNote, TradePlan } from '../domain/types';
 import { VENUE_FA } from '../domain/types';
 import { saveManual, saveNote, type ManualTrade } from '../data/journalStore';
+import type { MtTrade } from '../domain/metatrader';
+import { MetaTraderImport } from './MetaTraderImport';
 import { duration, fa, faDateTime, parseNum, pnlTone, TagPicker, usd } from './parts';
 
 type Filter = 'all' | 'open' | 'untagged' | 'directional' | 'neutral';
@@ -109,10 +111,11 @@ function ManualDialog({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-export function TradesTab({ trades, notes, links, settings, manual }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; settings: JournalSettings; manual: ManualTrade[] }) {
+export function TradesTab({ trades, notes, links, settings, manual, mt = [] }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; settings: JournalSettings; manual: ManualTrade[]; mt?: MtTrade[] }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit] = useState(30);
   const [manualOpen, setManualOpen] = useState(false);
+  const [mtOpen, setMtOpen] = useState(false);
   const list = useMemo(() => {
     const base = [...trades].sort((a, b) => Number(b.open) - Number(a.open) || (b.closeTime ?? b.openTime) - (a.closeTime ?? a.openTime));
     return base.filter((t) => filter === 'all' || (filter === 'open' ? t.open : filter === 'untagged' ? !(notes.get(t.id)?.whyTags.length) : t.book === filter));
@@ -128,13 +131,15 @@ export function TradesTab({ trades, notes, links, settings, manual }: { trades: 
           { value: 'directional', label: 'جهت‌دار' },
           { value: 'neutral', label: 'دلتا نوترال' }
         ]} />
-        <Button size="sm" variant="outline" icon={<Plus />} className="ms-auto" onClick={() => setManualOpen(true)}>معاملهٔ دستی</Button>
+        <Button size="sm" variant="outline" icon={<FileUp />} className="ms-auto" onClick={() => setMtOpen(true)}>استیتمنت متاتریدر</Button>
+        <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setManualOpen(true)}>معاملهٔ دستی</Button>
       </div>
       {untagged > 0 && <Notice tone="info">{fa(untagged)} معاملهٔ جهت‌دار هنوز تگ «چرا» ندارد. بدون تگ، ستاپ سودده از دل داده بیرون نمی‌آید. برای معامله‌های باز همین حالا بزنید — قبل از دیدن نتیجه.</Notice>}
       {manual.length > 0 && <p className="text-xs text-muted">{fa(manual.length)} معاملهٔ دستی ثبت شده (پلتفرم: {[...new Set(manual.map((m) => m.venueLabel || 'نامشخص'))].join('، ')}).</p>}
       {!list.length ? <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p> : list.slice(0, limit).map((t) => <TradeCard key={t.id} t={t} note={notes.get(t.id)} plan={links.get(t.id)} settings={settings} />)}
       {list.length > limit && <Button variant="outline" onClick={() => setLimit((l) => l + 30)}>نمایش ۳۰ معاملهٔ بیشتر ({fa(list.length - limit)} باقی‌مانده)</Button>}
       <ManualDialog open={manualOpen} onClose={() => setManualOpen(false)} />
+      <MetaTraderImport open={mtOpen} onClose={() => setMtOpen(false)} existing={mt} />
     </div>
   );
 }

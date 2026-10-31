@@ -19,6 +19,7 @@ import { VENUE_FA } from '../domain/types';
 import { dayKey } from '../domain/time';
 import { ChartBlock, ClassBadge, duration, fa, faDate, faDateTime, pct, pnlTone, ScoreRowView, Term, usd, VerdictBadge } from './parts';
 import { Bars, EquityChart } from './charts';
+import { ExcursionPanel } from './ExcursionPanel';
 
 const BAND_STYLE = { pass: 'border-gain/50 bg-gain/5', conditions: 'border-warn/50 bg-warn/5', fail: 'border-negative/50 bg-negative/5', insufficient: 'border-divider bg-surface-2/60' } as const;
 
@@ -193,6 +194,8 @@ export function AuditTab({ a, empty, tz }: { a: BookAudit; empty: React.ReactNod
           </Surface>
         </div>
       </section>
+
+      <ExcursionPanel trades={a.trades} />
 
       {/* لایهٔ ۳ — تحلیل */}
       {m.n > 0 && (

@@ -6,6 +6,7 @@
  *           R، ریسک دلار و درصد، اندازهٔ پیشنهادی از سقف ریسک، داخل سقف؟، همگرایی‌ها، دلایل نگرفتن معامله
  *   اتصال خودکار به معاملهٔ واقعی در بازهٔ اعتبار؛ بعد از بسته‌شدن: R برنامه در برابر R واقعی.
  *   ورود از «چک قبل از ورود»: ?tab=plan&m=BTC&side=long&lev=5
+ *   دو حالت: کریپتو (اندازه به واحد دارایی، اهرم) و متاتریدر (پیشنهاد از تاریخچه + لات، پیپ، مارجین — MtPlanPanel)
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
@@ -18,6 +19,9 @@ import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { Bias, ClassifiedTrade, JournalAccount, JournalSettings, NewsItem, TradePlan, YesNo } from '../domain/types';
+import type { MtTrade } from '../domain/metatrader';
+import { calcForex, contractSizeFor } from '../domain/forex';
+import { defaultMtParams, MtPlanPanel } from './MtPlanPanel';
 import { calcPlan, newPlan } from '../domain/plan';
 import { isoWeekKey } from '../domain/time';
 import { savePlan } from '../data/journalStore';
@@ -47,7 +51,7 @@ function ListEditor({ items, onChange, ph, tone }: { items: string[]; onChange: 
   );
 }
 
-function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { initial: TradePlan; settings: JournalSettings; accounts: JournalAccount[]; accountSize: number | null; onDone: () => void }) {
+function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, onDone }: { initial: TradePlan; settings: JournalSettings; accounts: JournalAccount[]; accountSize: number | null; mt: MtTrade[]; trades: ClassifiedTrade[]; tz: string; onDone: () => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(initial));
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
@@ -55,12 +59,23 @@ function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { init
   const setO = (patch: Partial<Draft['outlook']>) => setD((x) => ({ ...x, outlook: { ...x.outlook, ...patch } }));
   const plan = fromDraft(d);
   const c = calcPlan(plan, accountSize, settings.maxRiskPct);
+  const kind = d.kind ?? 'crypto';
+  const mtParams = d.mt ?? defaultMtParams(d.symbol, mt, accountSize, settings.maxRiskPct);
+  function switchKind(k: 'crypto' | 'mt') {
+    setD((x) => {
+      const symbol = k === 'mt' && (!x.symbol || x.symbol === 'BTC') ? 'XAUUSD' : x.symbol;
+      return { ...x, kind: k, symbol, mt: k === 'mt' ? x.mt ?? defaultMtParams(symbol, mt, accountSize, settings.maxRiskPct) : x.mt };
+    });
+  }
   const checked = settings.checklist.filter((i) => o.checklist[i.id] && o.checklist[i.id] !== '-').length;
   const checklistDone = checked === settings.checklist.length;
   async function save() {
     setBusy(true);
     try {
-      await savePlan({ ...plan, symbol: plan.symbol.trim().toUpperCase() || 'BTC', confluences: plan.confluences.filter(Boolean), reasonsAgainst: plan.reasonsAgainst.filter(Boolean) });
+      // متاتریدر: اندازه = لات × قرارداد تا R حسابرسی با پوزیشن واقعی هم‌واحد باشد
+      const fx = kind === 'mt' ? calcForex({ symbol: plan.symbol.trim().toUpperCase(), direction: plan.direction, entry: plan.entry, stop: plan.stop, target: plan.target, ...mtParams }) : null;
+      const sized = fx ? { kind, mt: mtParams, size: fx.units, leverage: mtParams.leverage } : {};
+      await savePlan({ ...plan, ...sized, symbol: plan.symbol.trim().toUpperCase() || 'BTC', confluences: plan.confluences.filter(Boolean), reasonsAgainst: plan.reasonsAgainst.filter(Boolean) });
       onDone();
     } finally {
       setBusy(false);
@@ -125,8 +140,13 @@ function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { init
       </Disclosure>
 
       {/* برنامه */}
+      <Field label="نوع حساب"><SegmentedControl label="نوع حساب" options={[{ value: 'crypto', label: 'کریپتو' }, { value: 'mt', label: 'متاتریدر (فارکس، طلا، نفت)' }]} value={kind} onChange={switchKind} /></Field>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="نماد"><Input dir="ltr" value={d.symbol} onChange={(e) => set('symbol', e.target.value.slice(0, 20))} /></Field>
+        <Field label="نماد"><Input dir="ltr" value={d.symbol} placeholder={kind === 'mt' ? 'XAUUSD' : 'BTC'} onChange={(e) => {
+          const symbol = e.target.value.slice(0, 20);
+          // متاتریدر: اندازهٔ قرارداد نماد تازه از استیتمنت یا پیش‌فرض
+          setD((x) => ({ ...x, symbol, mt: kind === 'mt' ? { ...mtParams, contractSize: contractSizeFor(symbol.trim().toUpperCase(), mt).size } : x.mt }));
+        }} /></Field>
         <Field label="جهت"><SegmentedControl label="جهت" fill options={[{ value: 'long', label: 'لانگ' }, { value: 'short', label: 'شورت' }]} value={d.direction} onChange={(v) => set('direction', v)} /></Field>
         <Field label="حساب (اختیاری)">
           <Select value={d.account ?? ''} onChange={(e) => set('account', e.target.value || null)}>
@@ -149,6 +169,17 @@ function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { init
         <Field label="چرا استاپ اینجاست"><textarea className="min-h-16 w-full rounded-control border border-divider bg-card p-2 text-sm" value={d.stopWhy} onChange={(e) => set('stopWhy', e.target.value.slice(0, 1000))} /></Field>
         <Field label="چرا هدف اینجاست"><textarea className="min-h-16 w-full rounded-control border border-divider bg-card p-2 text-sm" value={d.targetWhy} onChange={(e) => set('targetWhy', e.target.value.slice(0, 1000))} /></Field>
       </div>
+      {kind === 'mt' ? (
+        <>
+          <MtPlanPanel
+            symbol={d.symbol} direction={d.direction} entry={d.entry} stop={d.stop} target={d.target}
+            params={mtParams} onParams={(p) => set('mt', p)}
+            onLevels={(l) => setD((x) => ({ ...x, ...l }))}
+            mt={mt} trades={trades} tz={tz}
+          />
+          <Field label="اعتبار برای اتصال خودکار (ساعت)"><Input inputMode="numeric" dir="ltr" value={String(d.validHours)} onChange={(e) => set('validHours', Math.min(240, Math.max(1, Number(e.target.value) || 24)))} /></Field>
+        </>
+      ) : (<>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="اندازه (واحد دارایی)"><Input inputMode="decimal" dir="ltr" value={d.size} placeholder={c.suggestedSize ? c.suggestedSize.toPrecision(4) : ''} onChange={(e) => set('size', e.target.value)} /></Field>
         <Field label="اهرم"><Input inputMode="decimal" dir="ltr" value={d.leverage} onChange={(e) => set('leverage', e.target.value)} /></Field>
@@ -163,6 +194,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { init
       </Surface>
       {c.withinLimit !== null && <p className={cn('text-xs font-semibold', c.withinLimit ? 'text-positive' : 'text-negative')}>{c.withinLimit ? '✓ داخل سقف ریسک کلی' : '✕ خارج از سقف ریسک کلی'}</p>}
       {c.problems.map((p, i) => <Notice key={i} tone="warn">{p}</Notice>)}
+      </>)}
       {!checklistDone && <p className="text-xs text-warn">چک‌لیست چشم‌انداز کامل نشده.</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -179,7 +211,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, onDone }: { init
   );
 }
 
-export function PlanTab({ plans, trades, links, settings, accounts, accountSize, prefill, onPrefillUsed }: {
+export function PlanTab({ plans, trades, links, settings, accounts, accountSize, prefill, onPrefillUsed, mt = [], tz = 'UTC' }: {
   plans: TradePlan[];
   trades: ClassifiedTrade[];
   links: Map<string, TradePlan>;
@@ -188,6 +220,8 @@ export function PlanTab({ plans, trades, links, settings, accounts, accountSize,
   accountSize: number | null;
   prefill: { symbol: string; direction: 'long' | 'short'; leverage: number | null } | null;
   onPrefillUsed: () => void;
+  mt?: MtTrade[];
+  tz?: string;
 }) {
   const [editing, setEditing] = useState<TradePlan | null>(null);
   useEffect(() => {
@@ -202,12 +236,13 @@ export function PlanTab({ plans, trades, links, settings, accounts, accountSize,
     return m;
   }, [trades, links]);
 
-  if (editing) return <PlanEditor initial={editing} settings={settings} accounts={accounts} accountSize={accountSize} onDone={() => setEditing(null)} />;
+  if (editing) return <PlanEditor initial={editing} settings={settings} accounts={accounts} accountSize={accountSize} mt={mt} trades={trades} tz={tz} onDone={() => setEditing(null)} />;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm text-muted">قبل از هر ورود ۶۰ ثانیه. برنامه به‌طور خودکار به معاملهٔ واقعی وصل می‌شود و R، ریسک هر معامله و نظم استاپ را در حسابرسی فعال می‌کند.</p>
         <Button icon={<Plus />} className="ms-auto" onClick={() => setEditing(newPlan(Date.now()))}>برنامهٔ تازه</Button>
+        <Button variant="outline" icon={<Plus />} onClick={() => setEditing(newPlan(Date.now(), { kind: 'mt', symbol: 'XAUUSD', mt: defaultMtParams('XAUUSD', mt, accountSize, settings.maxRiskPct) }))}>برنامهٔ متاتریدر</Button>
       </div>
       {!plans.length && <Notice tone="info">هنوز برنامه‌ای ثبت نشده. از «میز معامله ← چک قبل از ورود» هم می‌توانید مستقیم برنامه بسازید.</Notice>}
       {plans.map((p) => {
@@ -223,7 +258,7 @@ export function PlanTab({ plans, trades, links, settings, accounts, accountSize,
               {t ? <Badge tone="brand">متصل به معامله</Badge> : p.status === 'planned' && <span className="text-xs text-subtle">در انتظار معامله تا {faDateTime(p.createdAt + p.validHours * 3_600_000)}</span>}
               <span className="ms-auto text-xs text-muted">{faDateTime(p.createdAt)}</span>
             </div>
-            <p className="mt-1 text-xs text-muted">ورود {fa(p.entry, 4)} · استاپ {fa(p.stop, 4)} · هدف {fa(p.target, 4)} · R هدف {c.rTarget === null ? '—' : fa(c.rTarget, 2)}{p.setupTags.length ? ` · ${p.setupTags.join('، ')}` : ''}</p>
+            <p className="mt-1 text-xs text-muted">{p.kind === 'mt' && <>متاتریدر · {p.size && p.mt?.contractSize ? `${fa(p.size / p.mt.contractSize, 2)} لات · ` : ''}</>}ورود {fa(p.entry, 5)} · استاپ {fa(p.stop, 5)} · هدف {fa(p.target, 5)} · R هدف {c.rTarget === null ? '—' : fa(c.rTarget, 2)}{p.setupTags.length ? ` · ${p.setupTags.join('، ')}` : ''}</p>
             {t && !t.open && <p className="mt-1 text-xs">نتیجه: <b className={pnlTone(t.netPnl)}>{usd(t.netPnl, true)}</b>{actualR !== null && <> · R واقعی <b className={pnlTone(actualR)}>{fa(actualR, 2)}R</b> در برابر R هدف {c.rTarget === null ? '—' : fa(c.rTarget, 2)}</>}{actualR !== null && actualR < -1.1 && <span className="text-negative"> — زیان از استاپ برنامه بیشتر شد</span>}</p>}
             <Button size="sm" variant="ghost" className="mt-1" onClick={() => setEditing(p)}>ویرایش</Button>
           </Surface>

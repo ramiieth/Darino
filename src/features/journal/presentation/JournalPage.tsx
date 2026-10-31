@@ -77,11 +77,11 @@ export default function JournalPage() {
   const clearPrefill = useCallback(() => update({ m: null, side: null, lev: null }), [update]);
 
   const directionalTrades = a ? a.all : [];
-  const noAccounts = !j.accounts.length && !j.data.manual.length;
+  const noAccounts = !j.accounts.length && !j.data.manual.length && !j.data.mt.length;
   const empty = (
     <EmptyState
       message={noAccounts ? 'هنوز حساب پرپچوالی متصل نیست' : 'هنوز معاملهٔ بسته‌شدهٔ جهت‌داری در این بازه نیست'}
-      hint={noAccounts ? 'حساب هایپرلیکوئید، لایتر یا آرکوس را با آدرس عمومی اضافه کنید؛ یا برای پلتفرم دیگر معامله را دستی ثبت کنید.' : 'بازه را بزرگ‌تر کنید یا نقش حساب‌ها را در تنظیمات ببینید (لایتر رابین‌هود و آرکوس پیش‌فرض نوترال‌اند).'}
+      hint={noAccounts ? 'حساب هایپرلیکوئید، لایتر یا آرکوس را با آدرس عمومی اضافه کنید؛ یا در تب «معاملات» استیتمنت متاتریدر را وارد کنید یا معامله را دستی ثبت کنید.' : 'بازه را بزرگ‌تر کنید یا نقش حساب‌ها را در تنظیمات ببینید (لایتر رابین‌هود و آرکوس پیش‌فرض نوترال‌اند).'}
       action={noAccounts ? <Link to="/wallets"><Button>مدیریت کیف پول‌ها</Button></Link> : <Button variant="outline" onClick={() => update({ tab: 'settings' })}>تنظیمات حساب‌ها</Button>}
     />
   );
@@ -115,8 +115,8 @@ export default function JournalPage() {
           <>
             {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
             {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} />}
-            {tab === 'trades' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} settings={j.data.settings} manual={j.data.manual} />}
-            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
+            {tab === 'trades' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} settings={j.data.settings} manual={j.data.manual} mt={j.data.mt} />}
+            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} mt={j.data.mt} tz={j.tz} />}
             {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
             {tab === 'neutral' && <NeutralTab nb={a.neutral} fillDays={j.data.settings.neutralFillDays} accounts={j.accounts} settings={j.data.settings} />}
             {tab === 'settings' && <SettingsTab settings={j.data.settings} accounts={j.accounts} histories={j.histories} liveEquity={liveEquity} onRefetch={j.refetch} />}
