@@ -10,7 +10,7 @@
  * مقدار نامعلوم null است؛ هرگز با صفر جایگزین نمی‌شود.
  */
 
-export type Venue = 'hyperliquid' | 'txflow' | 'lighter-mainnet' | 'lighter-robinhood' | 'arcus' | 'manual';
+export type Venue = 'hyperliquid' | 'txflow' | 'lighter-mainnet' | 'lighter-robinhood' | 'arcus' | 'metatrader' | 'manual';
 
 export const VENUE_FA: Record<Venue, string> = {
   hyperliquid: 'هایپرلیکوئید',
@@ -18,6 +18,7 @@ export const VENUE_FA: Record<Venue, string> = {
   'lighter-mainnet': 'لایتر',
   'lighter-robinhood': 'لایتر رابین‌هود',
   arcus: 'آرکوس',
+  metatrader: 'متاتریدر',
   manual: 'ثبت دستی'
 };
 
@@ -30,6 +31,8 @@ export const VENUE_COVERAGE: Record<Venue, { fees: boolean; funding: boolean; po
   'lighter-mainnet': { fees: true, funding: false, positionBefore: true },
   'lighter-robinhood': { fees: true, funding: false, positionBefore: true },
   arcus: { fees: true, funding: true, positionBefore: false },
+  // از استیتمنت: کمیسیون و سواپ (هم‌ارز فاندینگ) برای هر پوزیشن
+  metatrader: { fees: true, funding: true, positionBefore: true },
   manual: { fees: true, funding: false, positionBefore: false }
 };
 
@@ -187,7 +190,20 @@ export interface TradePlan {
   /** ساعت اعتبار برای تطبیق خودکار با معاملهٔ واقعی */
   validHours: number;
   notes: string;
+  /** نوع برنامه؛ نبودن = کریپتو (برنامه‌های قدیمی) */
+  kind?: 'crypto' | 'mt';
+  /** تنظیمات حجم متاتریدر (فقط kind = mt)؛ size برنامه = لات × اندازهٔ قرارداد تا R حسابرسی درست بماند */
+  mt?: MtPlanParams;
   deleted?: boolean;
+}
+
+export interface MtPlanParams {
+  capital: number | null;
+  riskPct: number;
+  leverage: number | null;
+  contractSize: number | null;
+  spreadPips: number;
+  commissionPerLot: number;
 }
 
 export type CommitmentRule =

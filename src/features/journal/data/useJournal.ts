@@ -14,6 +14,7 @@ import { lighterAccounts } from '@/features/perps/domain/model';
 import type { Fill, JournalAccount, Venue } from '../domain/types';
 import { accountKey } from '../domain/fills';
 import { buildTrades } from '../domain/roundTrips';
+import { mtToTrade } from '../domain/metatrader';
 import { roleOf } from '../domain/classify';
 import { fundingAccounts, runJournal, type JournalAudit } from '../domain/audit';
 import type { DailyAccountPoint } from '../domain/neutral';
@@ -119,7 +120,8 @@ export function useJournal(range: RangeKey, liveEquity: number | null): JournalS
     const fills = [...ready.flatMap((h) => h.fills), ...data.manual.flatMap(manualFills)];
     const funding = ready.flatMap((h) => h.funding);
     const fAcc = fundingAccounts(accounts, new Set(ready.filter((h) => h.fundingFetched).map((h) => h.key)));
-    const trades = buildTrades(fills, funding, fAcc);
+    // پوزیشن‌های متاتریدر خودشان معاملهٔ کامل‌اند و از بازسازی اجراها نمی‌گذرند
+    const trades = [...buildTrades(fills, funding, fAcc), ...data.mt.map(mtToTrade)];
     // فاندینگ و کارمزد دستی کاربر برای معاملهٔ دستی
     for (const m of data.manual) {
       const t = trades.find((x) => x.account === accountKey('manual', 'manual') && x.openTime === m.openTime && x.symbol === m.symbol);

@@ -4,6 +4,7 @@
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Fill, JournalAccount } from '../domain/types';
 import { accountKey } from '../domain/fills';
@@ -20,6 +21,9 @@ import { ReviewTab } from './ReviewTab';
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
 vi.mock('@/features/custody/data/repository', () => ({ savePref: vi.fn(() => Promise.resolve()), useCustodyStore: () => ({ prefs: [], loaded: true }) }));
 afterEach(cleanup);
+// پنل MAE/MFE کندل می‌خواهد؛ در آزمون شبکه نداریم
+vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
+const withQuery = (ui: React.ReactNode) => <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>;
 
 const H = 3_600_000;
 const T0 = Date.UTC(2026, 8, 1, 9);
@@ -45,7 +49,7 @@ function journal() {
 describe('تب‌های ژورنال', () => {
   it('حسابرسی: حکم، اعتماد داده، کارنامه، «اول این را درست کن» و پیوست', () => {
     const j = journal();
-    render(<MemoryRouter><AuditTab a={j.directional} tz="UTC" empty={<p>خالی</p>} /></MemoryRouter>);
+    render(withQuery(<MemoryRouter><AuditTab a={j.directional} tz="UTC" empty={<p>خالی</p>} /></MemoryRouter>));
     expect(screen.getByText('این حسابرسی چه چیزی را می‌تواند بگوید و چه چیزی را نه')).toBeTruthy();
     expect(screen.getByText('آنچه معامله‌گری شما تولید کرد')).toBeTruthy();
     expect(screen.getByText('چطور اجرا کردید')).toBeTruthy();
@@ -58,7 +62,7 @@ describe('تب‌های ژورنال', () => {
 
   it('حسابرسی خالی → حالت خالی', () => {
     const j = runJournal({ trades: [], fills: [], funding: [], accounts: [], notes: new Map(), plans: [], settings: DEFAULT_SETTINGS, accountSize: null, platformDaily: new Map(), from: 0, tz: 'UTC', sourceNotes: [] });
-    render(<MemoryRouter><AuditTab a={j.directional} tz="UTC" empty={<p>خالی</p>} /></MemoryRouter>);
+    render(withQuery(<MemoryRouter><AuditTab a={j.directional} tz="UTC" empty={<p>خالی</p>} /></MemoryRouter>));
     expect(screen.getByText('خالی')).toBeTruthy();
   });
 
@@ -79,5 +83,20 @@ describe('تب‌های ژورنال', () => {
     expect(screen.getByText('هفتهٔ بعد چطور بهتر شوم؟')).toBeTruthy();
     fireEvent.click(screen.getByText('مقایسهٔ هفته‌ها'));
     expect(screen.getByText('الگوهای شناسایی‌شده')).toBeTruthy();
+  });
+  it('برنامهٔ متاتریدر: حالت کریپتو می‌ماند و حالت متاتریدر لات و پیپ می‌دهد', () => {
+    const j = journal();
+    render(withQuery(<MemoryRouter><PlanTab plans={[]} trades={j.all} links={j.links} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} mt={[]} tz="UTC" /></MemoryRouter>));
+    fireEvent.click(screen.getByText('برنامهٔ متاتریدر'));
+    expect(screen.getByText('پیشنهاد از تاریخچهٔ خودتان')).toBeTruthy();
+    expect(screen.getByText('کریپتو')).toBeTruthy();
+    const inputs = screen.getAllByRole('textbox');
+    const byLabel = (l: string) => screen.getByLabelText(l) as HTMLInputElement;
+    fireEvent.change(byLabel('قیمت ورود'), { target: { value: '3880' } });
+    fireEvent.change(byLabel('استاپ'), { target: { value: '3865' } });
+    fireEvent.change(byLabel('هدف (FTA)'), { target: { value: '3910' } });
+    // ۱٪ از ۵۰۰۰ = ۵۰ دلار ÷ (۱۵ × ۱۰۰) → ۰٫۰۳ لات
+    expect(screen.getByText(/۰٫۰۳ لات|0.03 لات|۰.۰۳ لات/)).toBeTruthy();
+    expect(inputs.length).toBeGreaterThan(5);
   });
 });
