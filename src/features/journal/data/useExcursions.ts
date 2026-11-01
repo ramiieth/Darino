@@ -58,6 +58,18 @@ export function useExcursions(trades: readonly Trade[]) {
   }, [stamp, trades, needs, now]);
 }
 
+/** کندل‌های یک (کوین، بازه) — هم‌کلید با MAE/MFE تا کش مشترک باشد؛ null = غیرفعال */
+export function useCandles(coin: string | null, key: string, ms: number) {
+  return useQuery({
+    queryKey: ['journal-candles', coin ?? '', key],
+    queryFn: () => fetchCandles(coin!, key, ms),
+    enabled: !!coin,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    retry: 1
+  });
+}
+
 /** قیمت میانهٔ لحظه‌ای پرپ هم‌نام (پیش‌فرض قیمت ورود؛ با قیمت بروکر فرق دارد) */
 export function useLiveMid(coin: string | null) {
   const dex = coin?.includes(':') ? coin.split(':')[0] : null;

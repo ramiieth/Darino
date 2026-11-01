@@ -17,6 +17,7 @@ import { NeutralTab } from './NeutralTab';
 import { TradesTab } from './TradesTab';
 import { PlanTab } from './PlanTab';
 import { ReviewTab } from './ReviewTab';
+import { BaseRatePanel } from './BaseRatePanel';
 
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
 vi.mock('@/features/custody/data/repository', () => ({ savePref: vi.fn(() => Promise.resolve()), useCustodyStore: () => ({ prefs: [], loaded: true }) }));
@@ -75,7 +76,7 @@ describe('تب‌های ژورنال', () => {
     const t = render(<MemoryRouter><TradesTab trades={j.all} notes={j.notes} links={j.links} settings={DEFAULT_SETTINGS} manual={[]} /></MemoryRouter>);
     expect(screen.getAllByText('چرا وارد شدم؟', { exact: false }).length).toBeGreaterThan(0);
     t.unmount();
-    const p = render(<MemoryRouter><PlanTab plans={[newPlan(T0, { symbol: 'SOL', entry: 100, stop: 95, target: 110 })]} trades={j.all} links={j.links} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} /></MemoryRouter>);
+    const p = render(withQuery(<MemoryRouter><PlanTab plans={[newPlan(T0, { symbol: 'SOL', entry: 100, stop: 95, target: 110 })]} trades={j.all} links={j.links} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} /></MemoryRouter>));
     fireEvent.click(screen.getByText('برنامهٔ تازه'));
     expect(screen.getByText('ذخیرهٔ برنامه')).toBeTruthy();
     p.unmount();
@@ -98,5 +99,28 @@ describe('تب‌های ژورنال', () => {
     // ۱٪ از ۵۰۰۰ = ۵۰ دلار ÷ (۱۵ × ۱۰۰) → ۰٫۰۳ لات
     expect(screen.getByText(/۰٫۰۳ لات|0.03 لات|۰.۰۳ لات/)).toBeTruthy();
     expect(inputs.length).toBeGreaterThan(5);
+  });
+
+  it('نرخ پایهٔ استاپ و هدف از کندل‌ها محاسبه و نشان داده می‌شود', async () => {
+    // ۳۰۰۰ کندل ۱۵ دقیقه‌ای رفت‌وبرگشتی (بدون روند)
+    const raw = Array.from({ length: 3000 }, (_, i) => {
+      const c = 100 + Math.sin(i / 9) * 2;
+      return { t: i * 900_000, o: String(c), h: String(c * 1.002), l: String(c * 0.998), c: String(c) };
+    });
+    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(raw))));
+    render(withQuery(<BaseRatePanel symbol="BTC" kind="crypto" direction="long" entry={100} stop={98} target={104} />));
+    expect(await screen.findByText('اول هدف')).toBeTruthy();
+    expect(screen.getByText('اول استاپ')).toBeTruthy();
+    expect(screen.getByText(/نمونهٔ مؤثر/)).toBeTruthy();
+    expect(screen.getByText(/ساختار و کارمزد/)).toBeTruthy();
+    expect(screen.getByText(/روند اخیر بازار/)).toBeTruthy();
+  });
+
+  it('نرخ پایه: نماد متاتریدر بدون کندل → توضیح، و برنامهٔ نامعتبر → هیچ', () => {
+    const a = render(withQuery(<BaseRatePanel symbol="GBPJPY" kind="mt" direction="long" entry={190} stop={189} target={192} />));
+    expect(screen.getByText(/کندل هم‌نامی در هایپرلیکوئید نداریم/)).toBeTruthy();
+    a.unmount();
+    const b = render(withQuery(<BaseRatePanel symbol="BTC" kind="crypto" direction="long" entry={100} stop={101} target={104} />));
+    expect(b.container.textContent).toBe('');
   });
 });
