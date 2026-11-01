@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exitFromPnl, kindOf, priceAt, recentSymbols, roundPx, stopFractions, stopFrom, targetFrom, unitsFrom } from './quick';
+import { crossOf, exitFromPnl, pipFractions, toPips, kindOf, priceAt, recentSymbols, roundPx, stopFractions, stopFrom, targetFrom, unitsFrom } from './quick';
 import { loginFromFileName } from './metatrader';
 
 const H = 3_600_000;
@@ -55,5 +55,16 @@ describe('ورود سریع ژورنال', () => {
     expect(roundPx(3412.3456)).toBe(3412.35);
     expect(loginFromFileName('ReportHistory-51234567.html')).toBe('51234567');
     expect(loginFromFileName('Statement.htm')).toBeNull();
+  });
+
+  it('فارکس: استاپ رایج به پیپ و جفت‌ارز متقاطع از دو قیمت', () => {
+    const f = pipFractions('EURUSD', 1.1)!;
+    expect(toPips('EURUSD', f.normal, 1.1)).toBeCloseTo(25);
+    const g = pipFractions('XAUUSD', 3900)!;
+    expect(g.normal * 3900).toBeCloseTo(10); // ۱۰۰ پیپ طلا = ۱۰ دلار
+    expect(toPips('USDJPY', pipFractions('USDJPY', 157)!.tight, 157)).toBeCloseTo(15);
+    expect(crossOf('gbpjpy')).toEqual({ a: 'xyz:GBP', b: 'xyz:JPY', op: 'mul' });
+    expect(crossOf('EURGBP')?.op).toBe('div');
+    expect(crossOf('EURUSD')).toBeNull();
   });
 });

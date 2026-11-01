@@ -18,9 +18,9 @@ import type { ClassifiedTrade, Direction, MtPlanParams } from '../domain/types';
 import type { MtTrade } from '../domain/metatrader';
 import { calcForex, contractSizeFor, suggest, type EdgeStat } from '../domain/forex';
 import { useExcursions } from '../data/useExcursions';
-import { digitsFor } from '../domain/quick';
+import { CAPITALS, digitsFor } from '../domain/quick';
 import { fa, parseNum, pct, usd } from './parts';
-import { Chip } from './quickInputs';
+import { Chip, PresetNum, usdShort } from './quickInputs';
 
 export function defaultMtParams(symbol: string, mt: readonly MtTrade[], accountSize: number | null, maxRiskPct: number): MtPlanParams {
   return { capital: accountSize, riskPct: maxRiskPct, leverage: 100, contractSize: contractSizeFor(symbol, mt).size, spreadPips: 0, commissionPerLot: 0 };
@@ -31,7 +31,7 @@ function Edge({ label, s }: { label: string; s: EdgeStat | null }) {
   return <p className="text-xs text-muted">{label}: {fa(s.n)} معامله · برد {pct(s.winRate * 100, 0)} · میانگین <span className={s.expectancy >= 0 ? 'text-positive' : 'text-negative'}>{usd(s.expectancy, true)}</span></p>;
 }
 
-export function MtPlanPanel({ symbol, direction, entry, stop, target, params, onParams, onLevels, mt, trades, tz }: {
+export function MtPlanPanel({ symbol, direction, entry, stop, target, params, onParams, onLevels, mt, trades, tz, quoteUsd = null }: {
   symbol: string;
   direction: Direction;
   entry: string;
@@ -43,13 +43,15 @@ export function MtPlanPanel({ symbol, direction, entry, stop, target, params, on
   mt: readonly MtTrade[];
   trades: readonly ClassifiedTrade[];
   tz: string;
+  /** ارزش دلاری ارز دوم (useQuoteUsd) */
+  quoteUsd?: number | null;
 }) {
   const sym = symbol.trim().toUpperCase();
   const symTrades = useMemo(() => trades.filter((t) => t.venue === 'metatrader' && t.symbol === sym), [trades, sym]);
   const ex = useExcursions(symTrades);
   const e = parseNum(entry);
   const sg = suggest({ symbol: sym, direction, entry: e, now: Date.now(), tz }, ex.symbols.find((s) => s.symbol === sym), trades);
-  const c = calcForex({ symbol: sym, direction, entry: e, stop: parseNum(stop), target: parseNum(target), ...params });
+  const c = calcForex({ symbol: sym, direction, entry: e, stop: parseNum(stop), target: parseNum(target), ...params, quoteUsd });
   const cs = contractSizeFor(sym, mt);
   const set = <K extends keyof MtPlanParams>(k: K, v: MtPlanParams[K]) => onParams({ ...params, [k]: v });
   const digits = digitsFor(e ?? 1);
@@ -71,7 +73,7 @@ export function MtPlanPanel({ symbol, direction, entry, stop, target, params, on
       <Disclosure summary={`سرمایه، ریسک و لات — ${params.capital ? usd(params.capital) : 'سرمایه نامعلوم'} · ${fa(params.riskPct, 2)}٪ · ۱:${fa(params.leverage)}`} defaultOpen={!params.capital}>
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="سرمایهٔ حساب (دلار)"><Input inputMode="decimal" dir="ltr" value={params.capital?.toString() ?? ''} placeholder="موجودی حساب متاتریدر" onChange={(ev) => set('capital', parseNum(ev.target.value))} /></Field>
+            <PresetNum label="سرمایهٔ حساب متاتریدر" values={CAPITALS} value={params.capital?.toString() ?? ''} onChange={(v) => set('capital', parseNum(v))} format={usdShort} suffix="$" />
             <div>
               <p className="mb-1.5 text-xs font-semibold text-muted">ریسک هر معامله</p>
               <div className="flex flex-wrap gap-1.5">

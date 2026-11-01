@@ -28,10 +28,10 @@ import { defaultMtParams, MtPlanPanel } from './MtPlanPanel';
 import { BaseRatePanel } from './BaseRatePanel';
 import { calcPlan, newPlan } from '../domain/plan';
 import { baseOf } from '../domain/roundTrips';
-import { digitsFor, kindOf, R_PRESETS, recentSymbols, roundPx, STOP_PRESETS, stopFrom, targetFrom, type PlanKind, type StopPreset } from '../domain/quick';
+import { CAPITALS, digitsFor, kindOf, R_PRESETS, recentSymbols, roundPx, STOP_PRESETS, stopFrom, targetFrom, toPips, type PlanKind, type StopPreset } from '../domain/quick';
 import { savePlan, saveSettings } from '../data/journalStore';
 import { fa, faDateTime, parseNum, pct, pnlTone, TagPicker, usd } from './parts';
-import { Chip, DirectionPicker, Label, NumInput, SymbolPicker, useMarket } from './quickInputs';
+import { Chip, DirectionPicker, Label, NumInput, PresetNum, SymbolPicker, useMarket, useQuoteUsd, usdShort } from './quickInputs';
 
 const BIAS: { value: Bias; label: string }[] = [{ value: 'neutral', label: 'خنثی' }, { value: 'bullish', label: 'صعودی' }, { value: 'bearish', label: 'نزولی' }];
 const YN: { value: YesNo; label: string }[] = [{ value: '-', label: '—' }, { value: 'y', label: 'بله' }, { value: 'n', label: 'خیر' }];
@@ -70,7 +70,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
   const kind = d.kind ?? 'crypto';
   const mtParams = d.mt ?? defaultMtParams(d.symbol, mt, accountSize, settings.maxRiskPct);
   const market = useMarket(d.symbol, kind);
-  const symbols = useMemo(() => recentSymbols(trades.map((t) => t.symbol), kind), [trades, kind]);
+  const symbols = useMemo(() => recentSymbols(trades.map((t) => t.symbol), null, 20), [trades]);
   const isNew = initial.createdAt === initial.updatedAt;
 
   function setKind(k: PlanKind, symbol?: string) {
@@ -100,9 +100,11 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
   }, [market.live, d.symbol, d.entry]);
 
   const e = plan.entry;
+  const stops = market.stops(e);
+  const quoteUsd = useQuoteUsd(d.symbol, e, kind === 'mt');
   function applyStop(k: StopPreset) {
-    if (!e || !market.stops) return;
-    const st = roundPx(stopFrom(e, market.stops[k], d.direction));
+    if (!e || !stops) return;
+    const st = roundPx(stopFrom(e, stops.fracs[k], d.direction));
     const r = rPick ?? 2;
     setPreset(k);
     setRPick(r);
@@ -115,9 +117,9 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
   }
   // استاپ و هدف خالی → پیشنهاد «معمولی» و ۲R از نوسان بازار (با لمس عوض می‌شود)
   useEffect(() => {
-    if (isNew && e && market.stops && d.stop === '' && d.target === '') applyStop('normal');
+    if (isNew && e && stops && d.stop === '' && d.target === '') applyStop('normal');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [e, market.stops, d.stop, d.target]);
+  }, [e, !!stops, d.stop, d.target]);
   function flip(dir: Direction) {
     if (dir === d.direction) return;
     // جهت عوض شد: استاپ و هدف به طرف دیگر ورود منعکس می‌شوند
@@ -133,7 +135,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
     setBusy(true);
     try {
       // متاتریدر: اندازه = لات × قرارداد تا R حسابرسی با پوزیشن واقعی هم‌واحد باشد
-      const fx = kind === 'mt' ? calcForex({ symbol: plan.symbol.trim().toUpperCase(), direction: plan.direction, entry: plan.entry, stop: plan.stop, target: plan.target, ...mtParams }) : null;
+      const fx = kind === 'mt' ? calcForex({ symbol: plan.symbol.trim().toUpperCase(), direction: plan.direction, entry: plan.entry, stop: plan.stop, target: plan.target, ...mtParams, quoteUsd }) : null;
       const sized = fx ? { kind, mt: mtParams, size: fx.units, leverage: mtParams.leverage } : {};
       await savePlan({ ...plan, ...sized, symbol: plan.symbol.trim().toUpperCase() || 'BTC', confluences: plan.confluences.filter(Boolean), reasonsAgainst: plan.reasonsAgainst.filter(Boolean) });
       onDone();
@@ -149,23 +151,22 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
     <Surface variant="focal" className="max-w-3xl space-y-5 p-4 md:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-bold text-ink">{isNew ? 'برنامهٔ تازه' : 'ویرایش برنامه'} <span className="font-normal text-muted">· {faDateTime(d.createdAt)}</span></p>
-        <SegmentedControl size="sm" label="نوع حساب" options={[{ value: 'crypto', label: 'کریپتو' }, { value: 'mt', label: 'متاتریدر' }]} value={kind} onChange={(k) => setKind(k)} />
       </div>
 
-      <SymbolPicker value={d.symbol} onChange={pickSymbol} options={symbols} />
+      <SymbolPicker value={d.symbol} onChange={pickSymbol} options={symbols} kind={kind} onKind={(k) => setKind(k)} />
       <DirectionPicker value={d.direction} onChange={flip} />
 
       {/* قیمت‌ها */}
       <div className="space-y-4">
-        <NumInput label="قیمت ورود" value={d.entry} onChange={(v) => set('entry', v)} placeholder={market.coin ? 'در حال دریافت قیمت…' : 'قیمت را بنویسید'} fill={market.live ? () => set('entry', String(roundPx(market.live!))) : null} fillLabel={market.live ? `قیمت فعلی ${fa(market.live, digitsFor(market.live))}` : undefined} />
+        <NumInput label="قیمت ورود" value={d.entry} onChange={(v) => set('entry', v)} placeholder={market.covered ? 'در حال دریافت قیمت…' : 'قیمت بازار این نماد را نداریم؛ بنویسید'} fill={market.live ? () => set('entry', String(roundPx(market.live!))) : null} fillLabel={market.live ? `قیمت فعلی ${fa(market.live, digitsFor(market.live))}` : undefined} />
         <div>
           <NumInput label="استاپ" value={d.stop} onChange={(v) => { setPreset(null); set('stop', v); }} suffix={stopPct !== null ? pct(stopPct, 2) : undefined} />
-          {market.stops && e ? (
+          {stops && e ? (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-subtle">از نوسان بازار:</span>
-              {STOP_PRESETS.map((p) => <Chip key={p.key} on={preset === p.key} onClick={() => applyStop(p.key)} className="h-8 px-2.5 text-xs">{p.label} {pct(market.stops![p.key] * 100, 1)}</Chip>)}
+              <span className="text-[11px] text-subtle">{stops.source === 'vol' ? 'از نوسان بازار:' : 'فاصلهٔ رایج:'}</span>
+              {STOP_PRESETS.map((p) => <Chip key={p.key} on={preset === p.key} onClick={() => applyStop(p.key)} className="h-8 px-2.5 text-xs">{p.label} {kind === 'mt' ? `${fa(toPips(d.symbol, stops.fracs[p.key], e), 0)} پیپ` : pct(stops.fracs[p.key] * 100, 1)}</Chip>)}
             </div>
-          ) : kind === 'mt' && !market.coin ? <p className="mt-1 text-[11px] text-subtle">برای این نماد دادهٔ بازار نداریم؛ استاپ را بنویسید یا از «پیشنهاد از تاریخچهٔ خودتان» پایین استفاده کنید.</p> : null}
+          ) : !e ? <p className="mt-1 text-[11px] text-subtle">با قیمت ورود، استاپ پیشنهادی این‌جا می‌آید.</p> : null}
         </div>
         <div>
           <NumInput label="هدف" value={d.target} onChange={(v) => { setRPick(null); set('target', v); }} suffix={c.rTarget !== null ? `${fa(c.rTarget, 1)}R` : undefined} />
@@ -176,7 +177,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
             </div>
           )}
         </div>
-        {isNew && preset && <p className="text-[11px] text-subtle">استاپ «{STOP_PRESETS.find((p) => p.key === preset)!.label}» = {fa(STOP_PRESETS.find((p) => p.key === preset)!.mult)} برابر نوسان معمول یک ساعت همین بازار. با لمس عوض کنید یا عدد خودتان را بنویسید.</p>}
+        {preset && stops && <p className="text-[11px] text-subtle">{stops.source === 'vol' ? `استاپ «${STOP_PRESETS.find((p) => p.key === preset)!.label}» = ${fa(STOP_PRESETS.find((p) => p.key === preset)!.mult)} برابر نوسان معمول یک ساعت همین بازار.` : 'فاصلهٔ رایج معامله‌گرهای این نماد (دادهٔ نوسان این جفت‌ارز را نداریم).'} با لمس عوض کنید یا عدد خودتان را بنویسید.</p>}
       </div>
 
       {kind === 'mt' ? (
@@ -184,7 +185,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
           symbol={d.symbol} direction={d.direction} entry={d.entry} stop={d.stop} target={d.target}
           params={mtParams} onParams={(p) => set('mt', p)}
           onLevels={(l) => { setPreset(null); setD((x) => ({ ...x, ...l })); }}
-          mt={mt} trades={trades} tz={tz}
+          mt={mt} trades={trades} tz={tz} quoteUsd={quoteUsd}
         />
       ) : (
         <>
@@ -304,7 +305,12 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
         </Disclosure>
       </div>
 
-      <div className="sticky bottom-[var(--bottomnav-h)] z-10 -mx-4 flex flex-wrap gap-2 border-t border-divider bg-card/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+      <div className="sticky bottom-[var(--bottomnav-h)] z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-divider bg-card/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+        <p className="w-full text-xs leading-5 text-muted">
+          <b className={d.direction === 'long' ? 'text-positive' : 'text-negative'}>{d.direction === 'long' ? 'لانگ' : 'شورت'}</b> <b className="text-ink" dir="ltr">{d.symbol.toUpperCase() || '—'}</b>
+          {' · '}ورود <span className="num-ltr">{fa(plan.entry, 5)}</span> · استاپ <span className="num-ltr text-negative">{fa(plan.stop, 5)}</span> · هدف <span className="num-ltr text-positive">{fa(plan.target, 5)}</span>
+          {c.rTarget !== null && <> · {fa(c.rTarget, 1)}R</>}
+        </p>
         <Button loading={busy} icon={<Save />} className="flex-1 md:flex-none" onClick={() => void save()}>ذخیرهٔ برنامه</Button>
         <Button variant="ghost" onClick={onDone}>انصراف</Button>
         {!isNew && <Button variant="destructive" className="ms-auto" onClick={() => void savePlan({ ...plan, deleted: true }).then(onDone)}>حذف</Button>}
@@ -318,9 +324,9 @@ function AccountSizeAsk({ settings }: { settings: JournalSettings }) {
   const [v, setV] = useState('');
   const n = parseNum(v);
   return (
-    <div className="flex items-end gap-2 rounded-card border border-dashed border-divider-strong p-3">
-      <div className="min-w-0 flex-1"><NumInput label="سرمایهٔ حسابتان چقدر است؟ (یک‌بار؛ برای حساب حجم مجاز)" value={v} onChange={setV} suffix="$" /></div>
-      <Button disabled={!n || n <= 0} onClick={() => void saveSettings({ ...settings, accountSize: n })}>ذخیره</Button>
+    <div className="space-y-2 rounded-card border border-dashed border-divider-strong p-3">
+      <PresetNum label="سرمایهٔ حسابتان حدوداً چقدر است؟ (یک‌بار؛ برای حساب حجم مجاز)" values={CAPITALS} value={v} onChange={setV} format={usdShort} suffix="$" />
+      <Button size="sm" disabled={!n || n <= 0} onClick={() => void saveSettings({ ...settings, accountSize: n })}>ذخیره</Button>
     </div>
   );
 }

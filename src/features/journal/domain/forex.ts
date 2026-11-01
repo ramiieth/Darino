@@ -23,6 +23,21 @@ export function isForexSymbol(symbol: string): boolean {
 
 export const quotesUsd = (symbol: string) => /USD$/.test(symbol.toUpperCase()) || /^(UKOIL|USOIL)$/.test(symbol.toUpperCase());
 
+/**
+ * ارزش دلاری یک واحد ارز دوم نماد (برای ارزش پیپ و ریسک دلاری درست)
+ *   …USD → ۱ ؛ USD… (USDJPY، USDCAD، USDCHF) → ۱ ÷ قیمت خود نماد ؛ …JPY → ۱ ÷ USDJPY ؛ …GBP → GBPUSD ؛ …EUR → EURUSD
+ *   null = نرخ تبدیل را نداریم (ریسک دلاری تقریبی می‌ماند)
+ */
+export function quoteToUsd(symbol: string, price: number | null, rates: { USDJPY?: number | null; GBPUSD?: number | null; EURUSD?: number | null }): number | null {
+  const s = symbol.toUpperCase();
+  if (quotesUsd(s)) return 1;
+  if (/^USD[A-Z]{3}$/.test(s)) return price && price > 0 ? 1 / price : null;
+  if (s.endsWith('JPY')) return rates.USDJPY ? 1 / rates.USDJPY : null;
+  if (s.endsWith('GBP')) return rates.GBPUSD ?? null;
+  if (s.endsWith('EUR')) return rates.EURUSD ?? null;
+  return null;
+}
+
 /** اندازهٔ پیپ رایج: ارز ۴ رقمی 0.0001، ین 0.01، طلا 0.1، نقره 0.01، نفت 0.01 */
 export function pipSize(symbol: string): number {
   const s = symbol.toUpperCase();
@@ -58,6 +73,8 @@ export interface ForexInput {
   commissionPerLot: number;
   lotStep?: number;
   minLot?: number;
+  /** ارزش دلاری یک واحد ارز دوم (quoteToUsd)؛ نبودن = فرض دلار */
+  quoteUsd?: number | null;
 }
 
 export interface ForexCalc {
@@ -87,11 +104,14 @@ export function calcForex(i: ForexInput): ForexCalc {
   const tDist = entry !== null && target !== null ? Math.abs(target - entry) : null;
   if (entry !== null && stop !== null && (i.direction === 'long' ? stop >= entry : stop <= entry)) problems.push(i.direction === 'long' ? 'در لانگ، استاپ باید زیر ورود باشد.' : 'در شورت، استاپ باید بالای ورود باشد.');
   if (entry !== null && target !== null && (i.direction === 'long' ? target <= entry : target >= entry)) problems.push(i.direction === 'long' ? 'در لانگ، هدف باید بالای ورود باشد.' : 'در شورت، هدف باید زیر ورود باشد.');
-  if (!quotesUsd(i.symbol)) problems.push('ارز دوم این نماد دلار نیست؛ ارزش پیپ و ریسک دلاری با نرخ تبدیل لحظه‌ای فرق می‌کند و این‌جا تقریبی است.');
+  const q = quotesUsd(i.symbol) ? 1 : i.quoteUsd ?? null;
+  if (q === null) problems.push('ارز دوم این نماد دلار نیست و نرخ تبدیلش را نداریم؛ ارزش پیپ و ریسک دلاری تقریبی است.');
+  const fx = q ?? 1;
   if (cs === null) problems.push('اندازهٔ قرارداد هر لات معلوم نیست؛ از مشخصات نماد در متاتریدر (Contract size) وارد کنید.');
-  const pipValuePerLot = cs !== null ? pip * cs : null;
+  // همهٔ مبالغ به دلار: حرکت قیمت × قرارداد به ارز دوم است، × fx
+  const pipValuePerLot = cs !== null ? pip * cs * fx : null;
   const costPerLot = pipValuePerLot !== null ? i.spreadPips * pipValuePerLot + i.commissionPerLot : 0;
-  const riskPerLot = dist !== null && cs !== null ? dist * cs + costPerLot : null;
+  const riskPerLot = dist !== null && cs !== null ? dist * cs * fx + costPerLot : null;
   const budget = i.capital ? (i.capital * i.riskPct) / 100 : null;
   let lots = budget !== null && riskPerLot ? floorStep(budget / riskPerLot, step) : null;
   if (lots !== null && lots < minLot) {
@@ -100,10 +120,10 @@ export function calcForex(i: ForexInput): ForexCalc {
   }
   if (!i.capital) problems.push('سرمایه را وارد کنید تا حجم حساب شود.');
   const riskUsd = lots !== null && riskPerLot !== null ? lots * riskPerLot : null;
-  const rewardUsd = lots !== null && tDist !== null && cs !== null ? lots * (tDist * cs - costPerLot) : null;
+  const rewardUsd = lots !== null && tDist !== null && cs !== null ? lots * (tDist * cs * fx - costPerLot) : null;
   const rr = riskUsd && rewardUsd !== null ? rewardUsd / riskUsd : null;
   if (rr !== null && rr < 1.5 && !problems.length) problems.push(`نسبت سود به ریسک پس از هزینه ${rr.toFixed(2)} است؛ زیر ۱٫۵.`);
-  const margin = lots !== null && cs !== null && entry !== null && i.leverage ? (lots * cs * entry) / i.leverage : null;
+  const margin = lots !== null && cs !== null && entry !== null && i.leverage ? (lots * cs * entry * fx) / i.leverage : null;
   if (margin !== null && i.capital && margin > i.capital * 0.5) problems.push('مارجین این پوزیشن بیش از نصف سرمایه است.');
   return {
     pip,

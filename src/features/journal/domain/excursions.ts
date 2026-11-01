@@ -32,7 +32,10 @@ export function candleCoin(t: Pick<Trade, 'venue' | 'symbol'>): string | null {
   if (t.venue !== 'metatrader') return null;
   const s = t.symbol.toUpperCase();
   if (/^(XAUUSD|GOLD)$/.test(s)) return 'xyz:GOLD';
+  if (/^(XAGUSD|SILVER)$/.test(s)) return 'xyz:SILVER';
   if (s === 'EURUSD') return 'xyz:EUR';
+  if (s === 'GBPUSD') return 'xyz:GBP';
+  if (s === 'USDJPY') return 'xyz:JPY';
   if (/^(UKOUSD|UKOIL|XBRUSD|BRENT|BRN)$/.test(s)) return 'xyz:BRENTOIL';
   if (/^(USOUSD|USOIL|XTIUSD|WTI|CL)$/.test(s)) return 'xyz:CL';
   return null;

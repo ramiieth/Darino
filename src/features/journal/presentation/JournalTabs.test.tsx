@@ -129,22 +129,23 @@ describe('تب‌های ژورنال', () => {
 });
 
 describe('ورود سریع: معاملهٔ دستی و استیتمنت', () => {
-  it('معاملهٔ دستی با چند لمس: نماد، قیمت و اندازهٔ دلاری؛ بسته‌شده با سود/زیان', async () => {
+  it('معاملهٔ دستی با چند لمس: نماد، اندازهٔ آماده، بسته‌شده با «ضرر کردم»', async () => {
     const { savePref } = await import('@/features/custody/data/repository');
     vi.mocked(savePref).mockClear();
     render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={['SOL', 'SOL', 'BTC']} /></MemoryRouter>));
     fireEvent.click(screen.getByRole('button', { name: 'SOL' }));
     fireEvent.click(screen.getByRole('radio', { name: /شورت/ }));
     fireEvent.change(screen.getByLabelText('قیمت ورود'), { target: { value: '200' } });
-    fireEvent.change(screen.getByLabelText('اندازه'), { target: { value: '1000' } });
+    fireEvent.click(screen.getByRole('button', { name: '$۱K' }));
     fireEvent.click(screen.getByRole('button', { name: 'بسته شد' }));
     fireEvent.click(screen.getByRole('button', { name: 'فقط سود/زیان را می‌دانم' }));
-    fireEvent.change(screen.getByLabelText('سود یا زیان (دلار، زیان با منفی)'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'ضرر کردم' }));
+    fireEvent.change(screen.getByLabelText('چند دلار؟'), { target: { value: '50' } });
     fireEvent.click(screen.getByText('ثبت معامله'));
     await vi.waitFor(() => expect(savePref).toHaveBeenCalled());
     const m = vi.mocked(savePref).mock.calls[0][1] as ManualTrade;
-    // ۱۰۰۰ دلار ÷ ۲۰۰ = ۵ واحد؛ شورت با ۵۰ دلار سود → خروج ۱۹۰
-    expect(m).toMatchObject({ symbol: 'SOL', direction: 'short', entryPx: 200, size: 5, exitPx: 190, fees: null });
+    // ۱۰۰۰ دلار ÷ ۲۰۰ = ۵ واحد؛ شورت با ۵۰ دلار ضرر → خروج ۲۱۰
+    expect(m).toMatchObject({ symbol: 'SOL', direction: 'short', entryPx: 200, size: 5, exitPx: 210, fees: null });
     expect(m.closeTime).not.toBeNull();
   });
 
@@ -165,5 +166,21 @@ describe('ورود سریع: معاملهٔ دستی و استیتمنت', () =>
     fireEvent.change(screen.getByLabelText('فایل استیتمنت'), { target: { files: [file] } });
     expect(await screen.findByText(/حساب ۵۱۲۳۴۵۶۷|حساب 51234567/)).toBeTruthy();
     expect(screen.getByText(/افزودن .* پوزیشن تازه/)).toBeTruthy();
+  });
+
+  it('فارکس بدون تایپ نماد: بازار «فارکس» و فهرست کامل، لات آماده', async () => {
+    const { savePref } = await import('@/features/custody/data/repository');
+    vi.mocked(savePref).mockClear();
+    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={[]} /></MemoryRouter>));
+    fireEvent.click(screen.getByRole('radio', { name: 'فارکس، طلا، نفت' }));
+    fireEvent.click(screen.getByRole('button', { name: 'همه…' }));
+    fireEvent.click(screen.getByText('GBPJPY'));
+    expect(screen.getByText(/پوند\/ین/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('قیمت ورود'), { target: { value: '210.5' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'دلار' }));
+    fireEvent.click(screen.getByRole('button', { name: '$۵۰۰' }));
+    fireEvent.click(screen.getByText('ثبت معامله'));
+    await vi.waitFor(() => expect(savePref).toHaveBeenCalled());
+    expect(vi.mocked(savePref).mock.calls[0][1]).toMatchObject({ symbol: 'GBPJPY', entryPx: 210.5, closeTime: null });
   });
 });

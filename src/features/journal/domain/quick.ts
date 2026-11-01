@@ -5,15 +5,54 @@
  *   قیمت در یک لحظهٔ گذشته: کندلی که آن لحظه را در بر دارد (باز اگر اول کندل، وگرنه بسته)
  *   استاپ پیشنهادی: مضربی از میانهٔ دامنهٔ یک ساعت همین بازار (تنگ ۱×، معمولی ۲×، باز ۴×)
  *   هدف: مضرب R از همان استاپ
+ *   فارکس: استاپ به پیپ (۱۵/۲۵/۴۰ ارز، ۵۰/۱۰۰/۲۰۰ طلا) وقتی کندل نداریم؛ جفت‌ارزهای متقاطع از دو قیمت لحظه‌ای
  *   اندازه از ارزش دلاری یا لات → واحد دارایی؛ قیمت خروج از سود/زیان دلاری
+ *   عددهای آماده (اندازه، سرمایه) تا تایپ آخرین راه باشد
  */
 import type { Direction } from './types';
 import type { Candle } from './excursions';
 import { medianHourRange } from './baseRate';
-import { isForexSymbol } from './forex';
+import { isForexSymbol, pipSize } from './forex';
 
 export const COMMON_CRYPTO = ['BTC', 'ETH', 'SOL', 'HYPE'];
-export const COMMON_MT = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USOIL'];
+export const COMMON_MT = ['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY'];
+
+/** فهرست کامل انتخابی (بدون تایپ) */
+export const ALL_CRYPTO = ['BTC', 'ETH', 'SOL', 'HYPE', 'XRP', 'BNB', 'DOGE', 'SUI', 'ADA', 'AVAX', 'LINK', 'LTC', 'TON', 'TRX', 'DOT', 'NEAR', 'APT', 'ARB', 'OP', 'PEPE', 'WIF', 'ENA', 'AAVE', 'TAO'];
+export const ALL_MT = ['XAUUSD', 'XAGUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURJPY', 'GBPJPY', 'EURGBP', 'USOIL', 'UKOIL'];
+export const SYMBOL_FA: Record<string, string> = {
+  XAUUSD: 'طلا', XAGUSD: 'نقره', EURUSD: 'یورو/دلار', GBPUSD: 'پوند/دلار', USDJPY: 'دلار/ین', AUDUSD: 'دلار استرالیا', USDCAD: 'دلار/کانادا',
+  USDCHF: 'دلار/فرانک', NZDUSD: 'دلار نیوزیلند', EURJPY: 'یورو/ین', GBPJPY: 'پوند/ین', EURGBP: 'یورو/پوند', USOIL: 'نفت آمریکا', UKOIL: 'نفت برنت',
+  BTC: 'بیت‌کوین', ETH: 'اتریوم', SOL: 'سولانا', HYPE: 'هایپرلیکوئید', XRP: 'ریپل', BNB: 'بی‌ان‌بی', DOGE: 'دوج'
+};
+
+/** جفت‌ارز متقاطع → دو قیمت هایپرلیکوئید (ضرب یا تقسیم) برای قیمت لحظه‌ای؛ کندل ندارد */
+export function crossOf(symbol: string): { a: string; b: string; op: 'mul' | 'div' } | null {
+  const s = symbol.trim().toUpperCase();
+  if (s === 'EURJPY') return { a: 'xyz:EUR', b: 'xyz:JPY', op: 'mul' };
+  if (s === 'GBPJPY') return { a: 'xyz:GBP', b: 'xyz:JPY', op: 'mul' };
+  if (s === 'EURGBP') return { a: 'xyz:EUR', b: 'xyz:GBP', op: 'div' };
+  return null;
+}
+
+/** استاپ به پیپ برای فارکس وقتی کندل نداریم (یا برای نمایش به پیپ) */
+export function pipPresets(symbol: string): Record<StopPreset, number> {
+  const s = symbol.toUpperCase();
+  const gold = s.startsWith('XAU') || s === 'GOLD';
+  const oil = /OIL|UKO|USO|XBR|XTI|BRENT|WTI/.test(s);
+  return gold ? { tight: 50, normal: 100, wide: 200 } : oil ? { tight: 30, normal: 60, wide: 120 } : { tight: 15, normal: 25, wide: 40 };
+}
+export const pipFractions = (symbol: string, entry: number): Record<StopPreset, number> | null => {
+  if (!(entry > 0)) return null;
+  const p = pipPresets(symbol), pip = pipSize(symbol);
+  return { tight: (p.tight * pip) / entry, normal: (p.normal * pip) / entry, wide: (p.wide * pip) / entry };
+};
+/** فاصله به پیپ (برای برچسب) */
+export const toPips = (symbol: string, frac: number, entry: number) => (frac * entry) / pipSize(symbol);
+
+export const USD_SIZES = [100, 500, 1000, 5000];
+export const LOT_SIZES = [0.01, 0.05, 0.1, 0.5, 1];
+export const CAPITALS = [500, 1000, 5000, 10_000, 25_000];
 
 export type PlanKind = 'crypto' | 'mt';
 
