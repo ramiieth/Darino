@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * ژورنال: دستگاه خود کاربر (پرچم یا دادهٔ محلی) بدون رمز؛ دستگاه تازه فقط صفحهٔ ورود؛ قفل با تأیید و برگشت‌پذیر
+ * همهٔ صفحه‌های شخصی: دستگاه خود کاربر (پرچم یا دادهٔ محلی) بدون رمز؛ دستگاه تازه فقط صفحهٔ ورود؛ قفل با تأیید و برگشت‌پذیر
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -10,11 +10,11 @@ const store = vi.hoisted(() => ({ value: { loaded: true, prefs: [] as { id: stri
 vi.mock('@/features/custody/data/repository', () => ({ loadCustody: vi.fn(() => Promise.resolve()), useCustodyStore: () => store.value }));
 vi.mock('qrcode', () => ({ toDataURL: vi.fn(async () => 'data:image/png;base64,AAAA') }));
 
-import { JournalGate } from './JournalGate';
+import { AuthGate } from './AuthGate';
 
 const KEY = 'darino-journal-open-device';
-const CONTENT = 'محتوای ژورنال';
-const ui = () => render(<JournalGate><p>{CONTENT}</p></JournalGate>);
+const CONTENT = 'محتوای داشبورد';
+const ui = (strict = false) => render(<AuthGate strict={strict}><p>{CONTENT}</p></AuthGate>);
 
 beforeEach(() => {
   store.value = { loaded: true, prefs: [], holdings: [], operations: [] };
@@ -26,7 +26,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('JournalGate', () => {
+describe('AuthGate روی دستگاه خود کاربر', () => {
   it('دستگاه تازه (بدون پرچم و بدون داده): صفحهٔ ورود بدون هیچ گزینهٔ بدون رمز', () => {
     ui();
     expect(screen.queryByText(CONTENT)).toBeNull();
@@ -61,7 +61,14 @@ describe('JournalGate', () => {
     expect(screen.queryByText(CONTENT)).toBeNull();
   });
 
-  it('با ورود: ژورنال بدون پیام', () => {
+  it('صفحهٔ امنیت (strict) حتی روی دستگاه مجاز ورود می‌خواهد', () => {
+    localStorage.setItem(KEY, '1');
+    ui(true);
+    expect(screen.queryByText(CONTENT)).toBeNull();
+    expect(screen.getByText('ورود به دارینو')).toBeTruthy();
+  });
+
+  it('با ورود: صفحه بدون پیام', () => {
     useAuth.setState({ status: 'authenticated' });
     ui();
     expect(screen.getByText(CONTENT)).toBeTruthy();

@@ -5,7 +5,7 @@
  *  • سرور بدون پایگاه داده (توسعهٔ محلی): حالت فقط‌محلی با هشدار.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { Fingerprint, KeyRound, Link2, ShieldCheck } from 'lucide-react';
+import { Fingerprint, KeyRound, Link2, LockKeyhole, LockKeyholeOpen, ShieldCheck } from 'lucide-react';
 import { Page } from '@/shared/components/layout/Page';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
@@ -15,10 +15,16 @@ import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { authErrorText, loginWithPasskey, registerPasskey, useAuth, webAuthnSupported } from './authClient';
 import { PasswordLoginForm, PasswordSetupWizard } from './PasswordParts';
+import { lockDevice, unlockDevice, useDeviceAccess } from './deviceTrust';
 
-/** extra: فقط ژورنال، فقط روی دستگاهی که کاربر خودش قفل کرده («باز کردن دوباره») */
-export function AuthGate({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
+const LOCK_CONFIRM = 'این دستگاه قفل شود؟ بعد از آن برای باز کردن صفحه‌های شخصی رمز لازم است (یا «باز کردن دوباره» روی همین دستگاه).';
+
+/**
+ * strict: فقط با ورود واقعی (مثل «امنیت و دستگاه‌ها»)؛ بقیهٔ صفحه‌ها روی دستگاه خود کاربر (deviceTrust.ts) بدون رمز باز می‌شوند
+ */
+export function AuthGate({ children, strict = false }: { children: ReactNode; strict?: boolean }) {
   const status = useAuth((s) => s.status);
+  const access = useDeviceAccess();
   if (status === 'unknown') return <PageSkeleton label="بررسی ورود" />;
   if (status === 'authenticated') return <>{children}</>;
   if (status === 'offline')
@@ -39,9 +45,32 @@ export function AuthGate({ children, extra }: { children: ReactNode; extra?: Rea
         {children}
       </>
     );
-  return <LoginScreen extra={extra} />;
+  if (strict || access === 'new') return <LoginScreen />;
+  if (access === 'checking') return <PageSkeleton label="بررسی ورود" />;
+  if (access === 'locked') return <LoginScreen extra={<Reopen />} />;
+  return (
+    <>
+      <div className="px-gutter pt-3 md:px-8">
+        <Notice tone="info">
+          <span className="block">این دستگاه شما بدون رمز باز است و دادهٔ همین دستگاه را نشان می‌دهد. برای همگام‌سازی با دستگاه‌های دیگر یک‌بار وارد شوید.</span>
+          <Button size="sm" variant="ghost" className="mt-1" icon={<LockKeyhole />} onClick={() => window.confirm(LOCK_CONFIRM) && lockDevice()}>قفل این دستگاه</Button>
+        </Notice>
+      </div>
+      {children}
+    </>
+  );
 }
 
+function Reopen() {
+  return (
+    <div className="space-y-2 border-t border-divider pt-4">
+      <p className="text-xs leading-5 text-muted">این دستگاه را خودتان قفل کرده بودید.</p>
+      <Button className="w-full" variant="outline" icon={<LockKeyholeOpen />} onClick={unlockDevice}>باز کردن دوباره روی این دستگاه</Button>
+    </div>
+  );
+}
+
+/** extra: فقط روی دستگاهی که کاربر خودش قفل کرده («باز کردن دوباره») */
 export function LoginScreen({ extra }: { extra?: ReactNode } = {}) {
   const { hasPasskeys, hasPassword, setupAvailable } = useAuth();
   const [busy, setBusy] = useState<null | 'login' | 'pair' | 'setup'>(null);
