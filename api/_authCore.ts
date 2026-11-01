@@ -14,8 +14,10 @@ import { db, isDbConfigured, json } from './_neon.js';
 import { ensureSchema } from './_schema.js';
 import { neonAuthStore, type AuthStore, type StoredSession } from './_authStore.js';
 
-export const SESSION_TTL_MS = 30 * 24 * 3600_000;
-export const SESSION_MAX_AGE_MS = 180 * 24 * 3600_000;
+/** دستگاهی که یک‌بار با رمز + کد ۶ رقمی وارد شده، تا وقتی استفاده می‌شود دوباره رمز نمی‌خواهد:
+ *  نشست و کوکی با هر استفاده تمدید می‌شوند (لغزان، بدون سقف مطلق). فقط با خروج، لغو از «امنیت و دستگاه‌ها»
+ *  یا یک سال استفاده‌نکردن پایان می‌یابد. دستگاه جدید همیشه رمز عبور + کد ۶ رقمی لازم دارد. */
+export const SESSION_TTL_MS = 365 * 24 * 3600_000;
 export const STEP_UP_WINDOW_MS = 10 * 60_000;
 export const CHALLENGE_TTL_MS = 5 * 60_000;
 export const PAIR_CODE_TTL_MS = 10 * 60_000;
@@ -186,16 +188,20 @@ export interface ActiveSession {
   userId: string;
 }
 
-export async function readSession(req: IncomingMessage, store: AuthStore, now = Date.now()): Promise<ActiveSession | null> {
+/** res داده شود تا کوکی هم همراه نشست تمدید شود (وگرنه کوکی سر موعدِ اولیه منقضی می‌شد و رمز دوباره خواسته می‌شد) */
+export async function readSession(req: IncomingMessage, store: AuthStore, now = Date.now(), res?: CookieRes): Promise<ActiveSession | null> {
   const cookies = parseCookies(req);
   const token = cookies['__Host-darino_sid'] ?? cookies['darino_sid'];
   if (!token || token.length < 32 || token.length > 128) return null;
   const s = await store.getSessionByTokenHash(sha256(token));
-  if (!s || s.revokedAt || s.expiresAt <= now || now - s.createdAt > SESSION_MAX_AGE_MS) return null;
+  if (!s || s.revokedAt || s.expiresAt <= now) return null;
   if (now - s.lastSeenAt > TOUCH_THROTTLE_MS) {
-    // تمدید لغزان (حداکثر تا سقف مطلق)
-    const exp = Math.min(now + SESSION_TTL_MS, s.createdAt + SESSION_MAX_AGE_MS);
-    await store.touchSession(s.id, now, exp);
+    // تمدید لغزان
+    await store.touchSession(s.id, now, now + SESSION_TTL_MS);
+    if (res) {
+      const secure = isHttps(req);
+      appendCookie(res, buildCookie(sessionCookieName(secure), token, SESSION_TTL_MS / 1000, secure));
+    }
   }
   return { session: s, userId: s.userId };
 }
@@ -250,7 +256,7 @@ export async function requireSession(req: IncomingMessage, res: ServerResponse):
     json(res, 503, { ok: false, error: 'auth_unavailable' });
     return null;
   }
-  const s = await readSession(req, store);
+  const s = await readSession(req, store, Date.now(), res);
   if (!s) {
     json(res, 401, { ok: false, error: 'unauthenticated' });
     return null;

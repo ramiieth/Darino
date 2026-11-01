@@ -266,6 +266,27 @@ describe('مدیریت نشست‌ها و Passkeyها', () => {
     expect((await b.auth('GET', 'status')).body.authenticated).toBe(false);
   });
 
+  it('دستگاه واردشده تا وقتی استفاده می‌شود رمز نمی‌خواهد: نشست و کوکی با استفاده تمدید می‌شوند', async () => {
+    const b = new Browser();
+    await setup(b);
+    const t0 = Date.now();
+    const spy = vi.spyOn(Date, 'now');
+    try {
+      // هر ۲۰ روز یک‌بار باز شدن، جمعاً بیش از ۲۰۰ روز (فراتر از کوکی ۳۰ روزه و سقف ۱۸۰ روزهٔ قبلی)
+      for (let day = 20; day <= 220; day += 20) {
+        spy.mockReturnValue(t0 + day * 24 * 3600_000);
+        const r = await b.auth('GET', 'status');
+        expect(r.body.authenticated).toBe(true);
+        const sid = r.cookies.find((c) => c.startsWith('__Host-darino_sid='))!;
+        expect(sid).toMatch(new RegExp(`Max-Age=${365 * 24 * 3600}`));
+      }
+      // دستگاه جدید بدون ورود همچنان احراز نشده است
+      expect((await new Browser().auth('GET', 'status')).body.authenticated).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('خروج: نشست لغو و کوکی پاک می‌شود', async () => {
     const a = new Browser();
     await setup(a);
