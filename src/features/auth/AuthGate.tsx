@@ -16,7 +16,8 @@ import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { authErrorText, loginWithPasskey, registerPasskey, useAuth, webAuthnSupported } from './authClient';
 import { PasswordLoginForm, PasswordSetupWizard } from './PasswordParts';
 
-export function AuthGate({ children }: { children: ReactNode }) {
+/** extra: فقط ژورنال، فقط روی دستگاهی که کاربر خودش قفل کرده («باز کردن دوباره») */
+export function AuthGate({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
   const status = useAuth((s) => s.status);
   if (status === 'unknown') return <PageSkeleton label="بررسی ورود" />;
   if (status === 'authenticated') return <>{children}</>;
@@ -38,10 +39,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
         {children}
       </>
     );
-  return <LoginScreen />;
+  return <LoginScreen extra={extra} />;
 }
 
-export function LoginScreen() {
+export function LoginScreen({ extra }: { extra?: ReactNode } = {}) {
   const { hasPasskeys, hasPassword, setupAvailable } = useAuth();
   const [busy, setBusy] = useState<null | 'login' | 'pair' | 'setup'>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +136,7 @@ export function LoginScreen() {
           <p className="text-xs leading-5 text-muted">
             اپ نصب‌شده روی آیفون نشست جدا از Safari دارد؛ یک‌بار داخل خود اپ وارد شوید.
           </p>
+          {extra}
         </Surface>
       </div>
     </Page>

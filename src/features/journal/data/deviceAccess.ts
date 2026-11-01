@@ -1,31 +1,41 @@
 /**
- * دستگاه‌های قبلاً مجاز ژورنال — فقط پرچم محلی موجود خوانده می‌شود؛ دستگاه تازه هیچ راهی برای گرفتن آن ندارد
+ * دسترسی ژورنال بدون رمز روی دستگاه‌های خود کاربر — دستگاه تازه همیشه رمز و کد ۶ رقمی لازم دارد
  *
- *   مک‌بوک و آیفونی که قبلاً «ژورنال بدون رمز» را روشن کرده بودند همان پرچم را در مرورگر دارند و ژورنال را بدون رمز باز می‌کنند.
- *   فقط رابط باز می‌شود؛ سرور قفل می‌ماند (requireSession): بدون ورود فقط دادهٔ IndexedDB همین مرورگر دیده می‌شود
- *   و همگام‌سازی و تاریخچهٔ سروری (لایتر/رابین‌هود) نیست. هیچ دکمه‌ای پرچم را روشن نمی‌کند؛ فقط «قفل این دستگاه» آن را پاک می‌کند.
+ *   پرچم محلی: '1' = مجاز، '0' = قفل‌شده با دست کاربر، نبودن = تصمیم از دادهٔ همین دستگاه:
+ *   دستگاهی که دادهٔ ژورنال یا دارایی خودش را دارد (یعنی قبلاً استفاده شده و «خروج» آن را پاک نکرده) مجاز است و پرچم '1' می‌گیرد؛
+ *   دستگاه تازه داده‌ای ندارد → صفحهٔ ورود. خروج (signOut) دادهٔ محلی را پاک می‌کند، پس دستگاه خارج‌شده هم رمز می‌خواهد.
+ *   فقط رابط باز می‌شود؛ سرور قفل می‌ماند (requireSession): بدون ورود فقط دادهٔ همین دستگاه دیده می‌شود.
  */
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
+import { loadCustody, useCustodyStore } from '@/features/custody/data/repository';
 
 const KEY = 'darino-journal-open-device';
 const listeners = new Set<() => void>();
 
-function read(): boolean {
+type Flag = '1' | '0' | null;
+
+function read(): Flag {
   try {
-    return localStorage.getItem(KEY) === '1';
+    const v = localStorage.getItem(KEY);
+    return v === '1' || v === '0' ? v : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function lockJournalOnDevice(): void {
+function write(v: '1' | '0'): void {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.setItem(KEY, v);
   } catch {
     /* ذخیره‌سازی مسدود */
   }
   listeners.forEach((l) => l());
 }
+
+/** «قفل این دستگاه»: از این به بعد ژورنال این دستگاه رمز می‌خواهد (برگشت‌پذیر روی همین دستگاه) */
+export const lockJournalOnDevice = () => write('0');
+/** برگرداندن دسترسی بدون رمز روی دستگاهی که خود کاربر قفل کرده بود */
+export const unlockJournalOnDevice = () => write('1');
 
 function subscribe(l: () => void): () => void {
   listeners.add(l);
@@ -37,6 +47,21 @@ function subscribe(l: () => void): () => void {
   };
 }
 
-export function useJournalOpenOnDevice(): boolean {
-  return useSyncExternalStore(subscribe, read, () => false);
+export type DeviceAccess = 'checking' | 'open' | 'locked' | 'new';
+
+export function useJournalDeviceAccess(): DeviceAccess {
+  const flag = useSyncExternalStore(subscribe, read, () => null);
+  const store = useCustodyStore();
+  useEffect(() => {
+    if (flag === null) void loadCustody();
+  }, [flag]);
+  const used = store.prefs.some((p) => p.id === 'journal-settings' || /^j[nprmt]:/.test(p.id)) || store.holdings.length > 0 || store.operations.length > 0;
+  // دستگاه استفاده‌شده بدون پرچم (مثلاً پرچم پاک شده بود) → دوباره مجاز و ماندگار
+  useEffect(() => {
+    if (flag === null && store.loaded && used) write('1');
+  }, [flag, store.loaded, used]);
+  if (flag === '1') return 'open';
+  if (flag === '0') return 'locked';
+  if (!store.loaded) return 'checking';
+  return used ? 'open' : 'new';
 }
