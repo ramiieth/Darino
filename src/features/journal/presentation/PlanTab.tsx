@@ -7,6 +7,7 @@
  *   اتصال خودکار به معاملهٔ واقعی در بازهٔ اعتبار؛ بعد از بسته‌شدن: R برنامه در برابر R واقعی.
  *   ورود از «چک قبل از ورود»: ?tab=plan&m=BTC&side=long&lev=5
  *   دو حالت: کریپتو (اندازه به واحد دارایی، اهرم) و متاتریدر (پیشنهاد از تاریخچه + لات، پیپ، مارجین — MtPlanPanel)
+ *   در هر دو: نرخ پایهٔ همین استاپ و هدف روی کندل‌های اخیر بازار (BaseRatePanel)
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
@@ -22,6 +23,7 @@ import type { Bias, ClassifiedTrade, JournalAccount, JournalSettings, NewsItem, 
 import type { MtTrade } from '../domain/metatrader';
 import { calcForex, contractSizeFor } from '../domain/forex';
 import { defaultMtParams, MtPlanPanel } from './MtPlanPanel';
+import { BaseRatePanel } from './BaseRatePanel';
 import { calcPlan, newPlan } from '../domain/plan';
 import { isoWeekKey } from '../domain/time';
 import { savePlan } from '../data/journalStore';
@@ -195,6 +197,7 @@ function PlanEditor({ initial, settings, accounts, accountSize, mt, trades, tz, 
       {c.withinLimit !== null && <p className={cn('text-xs font-semibold', c.withinLimit ? 'text-positive' : 'text-negative')}>{c.withinLimit ? '✓ داخل سقف ریسک کلی' : '✕ خارج از سقف ریسک کلی'}</p>}
       {c.problems.map((p, i) => <Notice key={i} tone="warn">{p}</Notice>)}
       </>)}
+      <BaseRatePanel symbol={plan.symbol} kind={kind} direction={plan.direction} entry={plan.entry} stop={plan.stop} target={plan.target} />
       {!checklistDone && <p className="text-xs text-warn">چک‌لیست چشم‌انداز کامل نشده.</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
