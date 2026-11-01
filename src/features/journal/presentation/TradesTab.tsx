@@ -10,16 +10,16 @@ import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
-import { Field, Input, Select } from '@/shared/components/ui/Input';
-import { Dialog } from '@/shared/components/ui/Sheet';
+import { Field, Select } from '@/shared/components/ui/Input';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { ClassifiedTrade, JournalSettings, TradeNote, TradePlan } from '../domain/types';
 import { VENUE_FA } from '../domain/types';
-import { saveManual, saveNote, type ManualTrade } from '../data/journalStore';
+import { saveNote, type ManualTrade } from '../data/journalStore';
 import type { MtTrade } from '../domain/metatrader';
 import { MetaTraderImport } from './MetaTraderImport';
-import { duration, fa, faDateTime, parseNum, pnlTone, TagPicker, usd } from './parts';
+import { ManualTradeSheet } from './ManualTradeSheet';
+import { duration, fa, faDateTime, pnlTone, TagPicker, usd } from './parts';
 
 type Filter = 'all' | 'open' | 'untagged' | 'directional' | 'neutral';
 
@@ -79,35 +79,12 @@ function TradeCard({ t, note, plan, settings }: { t: ClassifiedTrade; note: Trad
   );
 }
 
-function ManualDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [f, setF] = useState({ venue: '', symbol: '', direction: 'long', open: '', close: '', entry: '', exit: '', size: '', fees: '', funding: '' });
-  const [err, setErr] = useState<string | null>(null);
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
-  async function submit() {
-    const openT = Date.parse(f.open), closeT = f.close ? Date.parse(f.close) : null;
-    const entry = parseNum(f.entry), exit = parseNum(f.exit), size = parseNum(f.size);
-    if (!f.symbol.trim() || !Number.isFinite(openT) || !entry || !size || size <= 0) return setErr('نماد، زمان ورود، قیمت ورود و اندازه لازم است.');
-    if (closeT !== null && (!Number.isFinite(closeT) || closeT < openT || !exit)) return setErr('زمان خروج باید بعد از ورود باشد و قیمت خروج لازم است.');
-    const m: ManualTrade = { id: `m${Date.now().toString(36)}`, venueLabel: f.venue.trim().slice(0, 40), symbol: f.symbol.trim().toUpperCase().slice(0, 20), direction: f.direction as 'long' | 'short', openTime: openT, closeTime: closeT, entryPx: entry, exitPx: closeT ? exit : null, size, fees: parseNum(f.fees), funding: parseNum(f.funding) };
-    await saveManual(m);
-    onClose();
-  }
+function AddButton({ icon, title, sub, onClick }: { icon: React.ReactNode; title: string; sub: string; onClick: () => void }) {
   return (
-    <Dialog open={open} onClose={onClose} title="ثبت دستی معامله" description="برای پلتفرمی که اتصال ندارد. همان حسابرسی روی آن اجرا می‌شود." footer={<Button onClick={() => void submit()}>ثبت</Button>}>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="پلتفرم"><Input value={f.venue} onChange={set('venue')} placeholder="مثلاً بایننس" /></Field>
-        <Field label="نماد"><Input value={f.symbol} onChange={set('symbol')} placeholder="BTC" dir="ltr" /></Field>
-        <Field label="جهت"><Select value={f.direction} onChange={set('direction')}><option value="long">لانگ</option><option value="short">شورت</option></Select></Field>
-        <Field label="اندازه (واحد دارایی)"><Input inputMode="decimal" value={f.size} onChange={set('size')} dir="ltr" /></Field>
-        <Field label="زمان ورود"><Input type="datetime-local" value={f.open} onChange={set('open')} dir="ltr" /></Field>
-        <Field label="قیمت ورود"><Input inputMode="decimal" value={f.entry} onChange={set('entry')} dir="ltr" /></Field>
-        <Field label="زمان خروج (خالی = باز)"><Input type="datetime-local" value={f.close} onChange={set('close')} dir="ltr" /></Field>
-        <Field label="قیمت خروج"><Input inputMode="decimal" value={f.exit} onChange={set('exit')} dir="ltr" /></Field>
-        <Field label="کارمزد کل (دلار)"><Input inputMode="decimal" value={f.fees} onChange={set('fees')} dir="ltr" /></Field>
-        <Field label="فاندینگ (دلار، دریافت مثبت)"><Input inputMode="decimal" value={f.funding} onChange={set('funding')} dir="ltr" /></Field>
-      </div>
-      {err && <p className="mt-3 text-xs text-negative">{err}</p>}
-    </Dialog>
+    <button type="button" onClick={onClick} className="flex items-center gap-2.5 rounded-card border border-divider bg-card p-3 text-start transition-colors hover:border-accent [&_svg]:h-5 [&_svg]:w-5">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field bg-accent-soft text-accent">{icon}</span>
+      <span className="min-w-0"><span className="block text-sm font-bold text-ink">{title}</span><span className="block truncate text-[11px] text-muted">{sub}</span></span>
+    </button>
   );
 }
 
@@ -123,22 +100,22 @@ export function TradesTab({ trades, notes, links, settings, manual, mt = [] }: {
   const untagged = trades.filter((t) => t.book === 'directional' && !notes.get(t.id)?.whyTags.length).length;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <ChipGroup label="فیلتر معاملات" value={filter} onChange={setFilter} options={[
-          { value: 'all', label: 'همه', badge: trades.length },
-          { value: 'open', label: 'باز', badge: trades.filter((t) => t.open).length },
-          { value: 'untagged', label: 'بدون تگ «چرا»', badge: trades.filter((t) => !notes.get(t.id)?.whyTags.length).length },
-          { value: 'directional', label: 'جهت‌دار' },
-          { value: 'neutral', label: 'دلتا نوترال' }
-        ]} />
-        <Button size="sm" variant="outline" icon={<FileUp />} className="ms-auto" onClick={() => setMtOpen(true)}>استیتمنت متاتریدر</Button>
-        <Button size="sm" variant="outline" icon={<Plus />} onClick={() => setManualOpen(true)}>معاملهٔ دستی</Button>
+      <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+        <AddButton icon={<FileUp />} title="استیتمنت متاتریدر" sub="یک فایل، همهٔ معامله‌ها" onClick={() => setMtOpen(true)} />
+        <AddButton icon={<Plus />} title="معاملهٔ دستی" sub="چند لمس، بدون جزئیات" onClick={() => setManualOpen(true)} />
       </div>
+      <ChipGroup label="فیلتر معاملات" bleed value={filter} onChange={setFilter} options={[
+        { value: 'all', label: 'همه', badge: trades.length },
+        { value: 'open', label: 'باز', badge: trades.filter((t) => t.open).length },
+        { value: 'untagged', label: 'بدون تگ «چرا»', badge: trades.filter((t) => !notes.get(t.id)?.whyTags.length).length },
+        { value: 'directional', label: 'جهت‌دار' },
+        { value: 'neutral', label: 'دلتا نوترال' }
+      ]} />
       {untagged > 0 && <Notice tone="info">{fa(untagged)} معاملهٔ جهت‌دار هنوز تگ «چرا» ندارد. بدون تگ، ستاپ سودده از دل داده بیرون نمی‌آید. برای معامله‌های باز همین حالا بزنید — قبل از دیدن نتیجه.</Notice>}
       {manual.length > 0 && <p className="text-xs text-muted">{fa(manual.length)} معاملهٔ دستی ثبت شده (پلتفرم: {[...new Set(manual.map((m) => m.venueLabel || 'نامشخص'))].join('، ')}).</p>}
       {!list.length ? <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p> : list.slice(0, limit).map((t) => <TradeCard key={t.id} t={t} note={notes.get(t.id)} plan={links.get(t.id)} settings={settings} />)}
       {list.length > limit && <Button variant="outline" onClick={() => setLimit((l) => l + 30)}>نمایش ۳۰ معاملهٔ بیشتر ({fa(list.length - limit)} باقی‌مانده)</Button>}
-      <ManualDialog open={manualOpen} onClose={() => setManualOpen(false)} />
+      <ManualTradeSheet open={manualOpen} onClose={() => setManualOpen(false)} manual={manual} mt={mt} usedSymbols={trades.map((t) => t.symbol)} />
       <MetaTraderImport open={mtOpen} onClose={() => setMtOpen(false)} existing={mt} />
     </div>
   );

@@ -151,7 +151,7 @@ export default async function handler(req: IncomingMessage, res: Res): Promise<v
   }
 
   try {
-    const active = await readSession(req, store);
+    const active = await readSession(req, store, Date.now(), res);
 
     if (op === 'status' && method === 'GET') {
       const creds = await store.listCredentials(cfg.ownerId);

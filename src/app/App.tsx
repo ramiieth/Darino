@@ -4,7 +4,6 @@ import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { AuthBootstrap, AuthGate } from '@/features/auth/AuthGate';
-import { JournalGate } from '@/features/journal/presentation/JournalGate';
 
 // ⚠️ فقط صفحه اصلی (بازار) مستقیم import می‌شود — بقیه lazy تا باندل
 // اولیه سبک بماند و اپ زود بالا بیاید (تغییر اساسی برای روان‌سازی)
@@ -79,7 +78,7 @@ export function App() {
           <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
           <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
-          <Route path="/journal" element={<JournalGate><Lazy label="ژورنال معاملاتی"><JournalPage /></Lazy></JournalGate>} />
+          <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
           <Route path="/intel" element={<DeskRedirect />} />
           <Route path="/traders" element={<DeskRedirect />} />

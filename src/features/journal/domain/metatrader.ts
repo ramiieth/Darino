@@ -271,6 +271,9 @@ export function inferContractSizes(drafts: readonly Draft[]): Record<string, num
   return out;
 }
 
+/** شمارهٔ حساب از نام فایل (MT5: ReportHistory-12345678.html) */
+export const loginFromFileName = (name: string) => /(\d{5,})/.exec(name)?.[1] ?? null;
+
 export function parseStatement(text: string, opts: { serverTime: ServerTime; login?: string | null }): MtParseResult {
   const isHtml = /<t[dr]\b/i.test(text);
   const rows = isHtml ? htmlRows(text) : csvRows(text);

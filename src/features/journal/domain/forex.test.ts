@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ClassifiedTrade } from './types';
 import type { MtTrade } from './metatrader';
 import type { SymbolExcursions } from './excursions';
-import { calcForex, contractSizeFor, isForexSymbol, pipSize, suggest } from './forex';
+import { calcForex, contractSizeFor, isForexSymbol, pipSize, quoteToUsd, suggest } from './forex';
 
 const base = { spreadPips: 0, commissionPerLot: 0, leverage: 100 };
 
@@ -81,5 +81,22 @@ describe('suggestion from own history', () => {
     expect(s.notes.join(' ')).toContain('جهت مخالف');
     expect(s.hour!.n).toBe(44);
     expect(suggest({ symbol: 'XAUUSD', direction: 'long', entry: null, now: 0, tz: 'UTC' }, undefined, []).notes.join()).toContain('مسیر قیمت');
+  });
+});
+
+describe('ارزش دلاری ارز دوم', () => {
+  it('ین، دلارِ اول، پوند؛ ریسک و ارزش پیپ GBPJPY به دلار', () => {
+    expect(quoteToUsd('EURUSD', 1.1, {})).toBe(1);
+    expect(quoteToUsd('USDJPY', 160, {})).toBeCloseTo(1 / 160);
+    expect(quoteToUsd('GBPJPY', 210, { USDJPY: 160 })).toBeCloseTo(1 / 160);
+    expect(quoteToUsd('EURGBP', 0.83, { GBPUSD: 1.3 })).toBe(1.3);
+    expect(quoteToUsd('GBPJPY', 210, {})).toBeNull();
+    const base = { symbol: 'GBPJPY', direction: 'long' as const, entry: 210, stop: 209.75, target: 210.5, contractSize: 100_000, capital: 10_000, riskPct: 1, leverage: 100, spreadPips: 0, commissionPerLot: 0 };
+    const c = calcForex({ ...base, quoteUsd: 1 / 160 });
+    // ارزش هر پیپ ≈ ۱۰۰۰ ین ÷ ۱۶۰ = ۶٫۲۵ دلار؛ ۲۵ پیپ استاپ؛ ۱۰۰ دلار ریسک → ۰٫۶۴ لات
+    expect(c.pipValuePerLot).toBeCloseTo(6.25);
+    expect(c.lots).toBeCloseTo(0.64);
+    expect(c.problems.some((p) => p.includes('نرخ تبدیلش را نداریم'))).toBe(false);
+    expect(calcForex(base).problems.some((p) => p.includes('نرخ تبدیلش را نداریم'))).toBe(true);
   });
 });

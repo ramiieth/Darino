@@ -24,6 +24,9 @@ describe('excursions', () => {
     expect(candleCoin({ venue: 'metatrader', symbol: 'XAUUSD' })).toBe('xyz:GOLD');
     expect(candleCoin({ venue: 'metatrader', symbol: 'EURUSD' })).toBe('xyz:EUR');
     expect(candleCoin({ venue: 'metatrader', symbol: 'UKOUSD' })).toBe('xyz:BRENTOIL');
+    expect(candleCoin({ venue: 'metatrader', symbol: 'GBPUSD' })).toBe('xyz:GBP');
+    expect(candleCoin({ venue: 'metatrader', symbol: 'USDJPY' })).toBe('xyz:JPY');
+    expect(candleCoin({ venue: 'metatrader', symbol: 'XAGUSD' })).toBe('xyz:SILVER');
     expect(candleCoin({ venue: 'metatrader', symbol: 'GBPJPY' })).toBeNull();
     expect(candleCoin({ venue: 'hyperliquid', symbol: 'BTC' })).toBe('BTC');
     expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'BTC' })).toBeNull();
