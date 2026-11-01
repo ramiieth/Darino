@@ -1,5 +1,5 @@
 /**
- * دسترسی ژورنال بدون رمز روی دستگاه‌های خود کاربر — دستگاه تازه همیشه رمز و کد ۶ رقمی لازم دارد
+ * دسترسی بدون رمز روی دستگاه‌های خود کاربر (همهٔ صفحه‌های شخصی) — دستگاه تازه همیشه رمز و کد ۶ رقمی لازم دارد
  *
  *   پرچم محلی: '1' = مجاز، '0' = قفل‌شده با دست کاربر، نبودن = تصمیم از دادهٔ همین دستگاه:
  *   دستگاهی که دادهٔ ژورنال یا دارایی خودش را دارد (یعنی قبلاً استفاده شده و «خروج» آن را پاک نکرده) مجاز است و پرچم '1' می‌گیرد؛
@@ -9,6 +9,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { loadCustody, useCustodyStore } from '@/features/custody/data/repository';
 
+// نام کلید از زمانی مانده که فقط ژورنال بود؛ عوض نشود تا دستگاه‌های مجاز فعلی مجاز بمانند
 const KEY = 'darino-journal-open-device';
 const listeners = new Set<() => void>();
 
@@ -32,10 +33,10 @@ function write(v: '1' | '0'): void {
   listeners.forEach((l) => l());
 }
 
-/** «قفل این دستگاه»: از این به بعد ژورنال این دستگاه رمز می‌خواهد (برگشت‌پذیر روی همین دستگاه) */
-export const lockJournalOnDevice = () => write('0');
+/** «قفل این دستگاه»: از این به بعد این دستگاه رمز می‌خواهد (برگشت‌پذیر روی همین دستگاه) */
+export const lockDevice = () => write('0');
 /** برگرداندن دسترسی بدون رمز روی دستگاهی که خود کاربر قفل کرده بود */
-export const unlockJournalOnDevice = () => write('1');
+export const unlockDevice = () => write('1');
 
 function subscribe(l: () => void): () => void {
   listeners.add(l);
@@ -49,7 +50,7 @@ function subscribe(l: () => void): () => void {
 
 export type DeviceAccess = 'checking' | 'open' | 'locked' | 'new';
 
-export function useJournalDeviceAccess(): DeviceAccess {
+export function useDeviceAccess(): DeviceAccess {
   const flag = useSyncExternalStore(subscribe, read, () => null);
   const store = useCustodyStore();
   useEffect(() => {
