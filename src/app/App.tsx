@@ -39,9 +39,9 @@ function DeskRedirect() {
   return <Navigate to={{ pathname: '/desk', search }} replace />;
 }
 
-function Private({ children, label, strict }: { children: React.ReactNode; label?: string; strict?: boolean }) {
+function Private({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
-    <AuthGate strict={strict}>
+    <AuthGate>
       <Lazy label={label}>{children}</Lazy>
     </AuthGate>
   );
@@ -129,7 +129,7 @@ export function App() {
           <Route
             path="/security"
             element={
-              <Private label="امنیت و دستگاه‌ها" strict>
+              <Private label="امنیت و دستگاه‌ها">
                 <SecurityPage />
               </Private>
             }

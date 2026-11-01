@@ -1,5 +1,5 @@
 /**
- * AuthGate — صفحه‌های شخصی بدون رمز باز می‌شوند؛ فقط «امنیت و دستگاه‌ها» ورود (رمز عبور + کد ۶ رقمی، یا کلید عبور) می‌خواهد
+ * AuthGate — صفحه‌های «دارایی من» فقط پس از ورود (رمز عبور + کد ۶ رقمی، یا کلید عبور)
  *  • این گارد فقط رابط است؛ کنترل دسترسی واقعی روی سرور (requireSession) انجام می‌شود.
  *  • آفلاین: اگر آخرین بار وارد بوده‌اید، دادهٔ محلی با برچسب «آفلاین» نمایش داده می‌شود.
  *  • سرور بدون پایگاه داده (توسعهٔ محلی): حالت فقط‌محلی با هشدار.
@@ -16,13 +16,9 @@ import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { authErrorText, loginWithPasskey, registerPasskey, useAuth, webAuthnSupported } from './authClient';
 import { PasswordLoginForm, PasswordSetupWizard } from './PasswordParts';
 
-
-/**
- * strict: فقط با ورود واقعی (فقط «امنیت و دستگاه‌ها»)؛ بقیهٔ صفحه‌ها بدون رمز و بدون پیام باز می‌شوند
- *   سرور همچنان قفل است (requireSession): بدون ورود فقط دادهٔ همین دستگاه دیده می‌شود.
- */
-export function AuthGate({ children, strict = false }: { children: ReactNode; strict?: boolean }) {
+export function AuthGate({ children }: { children: ReactNode }) {
   const status = useAuth((s) => s.status);
+  if (status === 'unknown') return <PageSkeleton label="بررسی ورود" />;
   if (status === 'authenticated') return <>{children}</>;
   if (status === 'offline')
     return (
@@ -42,8 +38,6 @@ export function AuthGate({ children, strict = false }: { children: ReactNode; st
         {children}
       </>
     );
-  if (!strict) return <>{children}</>;
-  if (status === 'unknown') return <PageSkeleton label="بررسی ورود" />;
   return <LoginScreen />;
 }
 
