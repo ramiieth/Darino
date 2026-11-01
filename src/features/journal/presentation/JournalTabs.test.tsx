@@ -18,6 +18,9 @@ import { TradesTab } from './TradesTab';
 import { PlanTab } from './PlanTab';
 import { ReviewTab } from './ReviewTab';
 import { BaseRatePanel } from './BaseRatePanel';
+import { ManualTradeSheet } from './ManualTradeSheet';
+import { MetaTraderImport } from './MetaTraderImport';
+import type { ManualTrade } from '../data/journalStore';
 
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
 vi.mock('@/features/custody/data/repository', () => ({ savePref: vi.fn(() => Promise.resolve()), useCustodyStore: () => ({ prefs: [], loaded: true }) }));
@@ -95,7 +98,7 @@ describe('تب‌های ژورنال', () => {
     const byLabel = (l: string) => screen.getByLabelText(l) as HTMLInputElement;
     fireEvent.change(byLabel('قیمت ورود'), { target: { value: '3880' } });
     fireEvent.change(byLabel('استاپ'), { target: { value: '3865' } });
-    fireEvent.change(byLabel('هدف (FTA)'), { target: { value: '3910' } });
+    fireEvent.change(byLabel('هدف'), { target: { value: '3910' } });
     // ۱٪ از ۵۰۰۰ = ۵۰ دلار ÷ (۱۵ × ۱۰۰) → ۰٫۰۳ لات
     expect(screen.getByText(/۰٫۰۳ لات|0.03 لات|۰.۰۳ لات/)).toBeTruthy();
     expect(inputs.length).toBeGreaterThan(5);
@@ -122,5 +125,45 @@ describe('تب‌های ژورنال', () => {
     a.unmount();
     const b = render(withQuery(<BaseRatePanel symbol="BTC" kind="crypto" direction="long" entry={100} stop={101} target={104} />));
     expect(b.container.textContent).toBe('');
+  });
+});
+
+describe('ورود سریع: معاملهٔ دستی و استیتمنت', () => {
+  it('معاملهٔ دستی با چند لمس: نماد، قیمت و اندازهٔ دلاری؛ بسته‌شده با سود/زیان', async () => {
+    const { savePref } = await import('@/features/custody/data/repository');
+    vi.mocked(savePref).mockClear();
+    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={['SOL', 'SOL', 'BTC']} /></MemoryRouter>));
+    fireEvent.click(screen.getByRole('button', { name: 'SOL' }));
+    fireEvent.click(screen.getByRole('radio', { name: /شورت/ }));
+    fireEvent.change(screen.getByLabelText('قیمت ورود'), { target: { value: '200' } });
+    fireEvent.change(screen.getByLabelText('اندازه'), { target: { value: '1000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'بسته شد' }));
+    fireEvent.click(screen.getByRole('button', { name: 'فقط سود/زیان را می‌دانم' }));
+    fireEvent.change(screen.getByLabelText('سود یا زیان (دلار، زیان با منفی)'), { target: { value: '50' } });
+    fireEvent.click(screen.getByText('ثبت معامله'));
+    await vi.waitFor(() => expect(savePref).toHaveBeenCalled());
+    const m = vi.mocked(savePref).mock.calls[0][1] as ManualTrade;
+    // ۱۰۰۰ دلار ÷ ۲۰۰ = ۵ واحد؛ شورت با ۵۰ دلار سود → خروج ۱۹۰
+    expect(m).toMatchObject({ symbol: 'SOL', direction: 'short', entryPx: 200, size: 5, exitPx: 190, fees: null });
+    expect(m.closeTime).not.toBeNull();
+  });
+
+  it('معاملهٔ دستی بدون قیمت → پیام روشن، ذخیره نمی‌شود', async () => {
+    const { savePref } = await import('@/features/custody/data/repository');
+    vi.mocked(savePref).mockClear();
+    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={[]} /></MemoryRouter>));
+    fireEvent.click(screen.getByText('ثبت معامله'));
+    expect(screen.getByText(/قیمت ورود معلوم نیست/)).toBeTruthy();
+    expect(savePref).not.toHaveBeenCalled();
+  });
+
+  it('استیتمنت: شمارهٔ حساب از نام فایل، بدون تایپ', async () => {
+    const html = `<table><tr><td>Time</td><td>Position</td><td>Symbol</td><td>Type</td><td>Volume</td><td>Price</td><td>S / L</td><td>T / P</td><td>Time</td><td>Price</td><td>Commission</td><td>Swap</td><td>Profit</td></tr>
+      <tr><td>2026.09.01 10:00:00</td><td>111</td><td>XAUUSD</td><td>buy</td><td>0.10</td><td>2500.00</td><td></td><td></td><td>2026.09.01 12:00:00</td><td>2510.00</td><td>-0.70</td><td>0</td><td>100.00</td></tr></table>`;
+    render(<MetaTraderImport open onClose={() => {}} existing={[]} />);
+    const file = new File([html], 'ReportHistory-51234567.html', { type: 'text/html' });
+    fireEvent.change(screen.getByLabelText('فایل استیتمنت'), { target: { files: [file] } });
+    expect(await screen.findByText(/حساب ۵۱۲۳۴۵۶۷|حساب 51234567/)).toBeTruthy();
+    expect(screen.getByText(/افزودن .* پوزیشن تازه/)).toBeTruthy();
   });
 });
