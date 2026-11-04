@@ -11,16 +11,16 @@ import { useCustody } from '@/features/custody/data/useCustody';
 import { keyedPerpsQuery } from '@/features/perps/data/usePerpVenues';
 import { lighterAccountQuery, LIGHTER_PLATFORM, type LighterNetwork } from '@/features/perps/data/lighterAccount';
 import { lighterAccounts } from '@/features/perps/domain/model';
-import type { Fill, JournalAccount, Venue } from '../domain/types';
+import type { JournalAccount, Venue } from '../domain/types';
 import { accountKey } from '../domain/fills';
 import { buildTrades } from '../domain/roundTrips';
-import { mtToTrade } from '../domain/metatrader';
 import { roleOf } from '../domain/classify';
 import { fundingAccounts, runJournal, type JournalAudit } from '../domain/audit';
 import type { DailyAccountPoint } from '../domain/neutral';
 import { localTimeZone } from '../domain/time';
 import { loadAccountHistory, loadLighterDaily, type AccountHistory } from './fetchHistory';
-import { useJournalData, type JournalData, type ManualTrade } from './journalStore';
+import { useJournalData, type JournalData } from './journalStore';
+import type { OrderCoverage } from '../domain/autoPlan';
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const HL_PLATFORMS: Record<string, Venue> = { hyperliquid: 'hyperliquid', txflow: 'txflow' };
@@ -66,14 +66,6 @@ export function useJournalAccounts(): { accounts: JournalAccount[]; loading: boo
   return { accounts, loading: env.isPending || lq.some((q) => q.isPending) };
 }
 
-/** معاملهٔ دستی → دو اجرا (ورود، خروج) تا همان موتور بازسازی را بگذرد */
-export function manualFills(m: ManualTrade): Fill[] {
-  const key = accountKey('manual', 'manual');
-  const open: Fill = { id: `${key}|${m.id}:o`, account: key, venue: 'manual', symbol: m.symbol, side: m.direction === 'long' ? 'buy' : 'sell', px: m.entryPx, sz: m.size, time: m.openTime, fee: m.fees === null ? null : m.fees / 2, realized: null, posBefore: 0 };
-  if (m.closeTime === null || m.exitPx === null) return [open];
-  return [open, { ...open, id: `${key}|${m.id}:c`, side: m.direction === 'long' ? 'sell' : 'buy', px: m.exitPx, time: m.closeTime }];
-}
-
 export type RangeKey = '30' | '90' | '180' | 'all';
 export const RANGE_FA: Record<RangeKey, string> = { '30': '۳۰ روز', '90': '۹۰ روز', '180': '۱۸۰ روز', all: 'همه' };
 
@@ -117,22 +109,18 @@ export function useJournal(range: RangeKey, liveEquity: number | null): JournalS
   const audit = useMemo(() => {
     if (!data.loaded) return null;
     const ready = hq.map((q) => q.data).filter((x): x is AccountHistory => !!x);
-    const fills = [...ready.flatMap((h) => h.fills), ...data.manual.flatMap(manualFills)];
+    const fills = ready.flatMap((h) => h.fills);
     const funding = ready.flatMap((h) => h.funding);
     const fAcc = fundingAccounts(accounts, new Set(ready.filter((h) => h.fundingFetched).map((h) => h.key)));
-    // پوزیشن‌های متاتریدر خودشان معاملهٔ کامل‌اند و از بازسازی اجراها نمی‌گذرند
-    const trades = [...buildTrades(fills, funding, fAcc), ...data.mt.map(mtToTrade)];
-    // فاندینگ و کارمزد دستی کاربر برای معاملهٔ دستی
-    for (const m of data.manual) {
-      const t = trades.find((x) => x.account === accountKey('manual', 'manual') && x.openTime === m.openTime && x.symbol === m.symbol);
-      if (t && m.funding !== null) { t.funding = m.funding; t.netPnl = t.grossPnl - (t.fees ?? 0) + m.funding; }
-    }
+    const trades = buildTrades(fills, funding, fAcc);
+    const orders = ready.flatMap((h) => h.orders);
+    const orderCoverage = new Map<string, OrderCoverage>(ready.map((h) => [h.key, h.orderCoverage]));
     const daily = new Map<string, DailyAccountPoint[]>();
     lighter.forEach((a, i) => dq[i].data && daily.set(a.key, dq[i].data!));
     const from = range === 'all' ? 0 : now - Number(range) * 86_400_000;
     const sourceNotes = ready.filter((h) => h.limitation).map((h) => `${accounts.find((a) => a.key === h.key)?.label ?? h.key}: ${h.limitation}`);
     hq.forEach((q, i) => q.isError && !q.data && sourceNotes.push(`${accounts[i].label}: دریافت تاریخچه انجام نشد.`));
-    return runJournal({ trades, fills, funding, accounts, notes: data.notes, plans: data.plans, settings: data.settings, accountSize, platformDaily: daily, from, tz, sourceNotes, now });
+    return runJournal({ trades, fills, funding, accounts, notes: data.notes, plans: data.plans, settings: data.settings, accountSize, platformDaily: daily, from, tz, sourceNotes, orders, orderCoverage, now });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, data, range, accountSize, accounts]);
 

@@ -29,15 +29,19 @@ export const MIN_PATH = 3;
 /** نماد متاتریدر/پلتفرم → کوین کندل هایپرلیکوئید؛ null = منبع مسیر نداریم */
 export function candleCoin(t: Pick<Trade, 'venue' | 'symbol'>): string | null {
   if (t.venue === 'hyperliquid') return t.symbol;
-  if (t.venue !== 'metatrader') return null;
-  const s = t.symbol.toUpperCase();
-  if (/^(XAUUSD|GOLD)$/.test(s)) return 'xyz:GOLD';
-  if (/^(XAGUSD|SILVER)$/.test(s)) return 'xyz:SILVER';
+  return tradfiCoin(t.symbol);
+}
+
+/** طلا، نقره، نفت و ارز (لایتر XAU، XAG، WTI، BRENTOIL، EURUSD) → بازار هم‌نام xyz هایپرلیکوئید */
+export function tradfiCoin(symbol: string): string | null {
+  const s = symbol.toUpperCase().replace(/^[A-Z0-9]+:/, '');
+  if (/^(XAU|XAUUSD|GOLD)$/.test(s)) return 'xyz:GOLD';
+  if (/^(XAG|XAGUSD|SILVER)$/.test(s)) return 'xyz:SILVER';
   if (s === 'EURUSD') return 'xyz:EUR';
   if (s === 'GBPUSD') return 'xyz:GBP';
   if (s === 'USDJPY') return 'xyz:JPY';
-  if (/^(UKOUSD|UKOIL|XBRUSD|BRENT|BRN)$/.test(s)) return 'xyz:BRENTOIL';
-  if (/^(USOUSD|USOIL|XTIUSD|WTI|CL)$/.test(s)) return 'xyz:CL';
+  if (/^(BRENTOIL|BRENT|UKOIL)$/.test(s)) return 'xyz:BRENTOIL';
+  if (/^(WTI|USOIL|CL)$/.test(s)) return 'xyz:CL';
   return null;
 }
 
@@ -88,8 +92,7 @@ export function measure(t: Trade, set: CandleSet | undefined, now: number): Excu
   const iv = set.intervalMs;
   const first = set.candles[0].t;
   if (t.openTime < first) return { ...base, reason: 'too-old' };
-  const skipWeekend = t.venue === 'metatrader';
-  const path = set.candles.filter((k) => k.t + iv > t.openTime && k.t < t.closeTime! && !(skipWeekend && inWeekendGap(k.t)));
+  const path = set.candles.filter((k) => k.t + iv > t.openTime && k.t < t.closeTime!);
   if (path.length < MIN_PATH) return { ...base, reason: 'too-short' };
   const ref = path[0].o;
   if (!(ref > 0)) return { ...base, reason: 'no-data' };

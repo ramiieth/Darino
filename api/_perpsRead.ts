@@ -1,4 +1,4 @@
-/** Fixed public GET destinations. No SDK, signing, cookies or upstream credentials. */
+/** Fixed GET destinations. No SDK, signing or cookies; the only credential is an optional Lighter read-only (ro:) token for SL/TP orders. */
 import { ProviderError } from './_zerion.js';
 const MAINNET='https://mainnet.zklighter.elliot.ai';
 const LIGHTER = 'https://api.rh.lighter.xyz';
@@ -320,4 +320,117 @@ export async function getPerpsRead(op: string, address: string): Promise<unknown
     cursors.add(cursor);
   }
   throw new ProviderError(502, 'فهرست حساب‌ها کامل دریافت نشد');
+}
+
+/* ---------------- سفارش‌های استاپ/هدف لایتر با توکن فقط‌خواندنی (ژورنال: برنامهٔ خودکار) ---------------- */
+
+/** خلاصهٔ سفارش SL/TP لایتر — همان شکل LighterOrderLite در src/features/journal/domain/autoPlan.ts */
+export interface LighterOrderLite { id: string; sym: string; kind: 'sl' | 'tp'; side: 'buy' | 'sell'; trigger: number; placed: number; ended: number | null; status: string }
+
+/**
+ * توکن فقط‌خواندنی (ro:{account}:{single|all}:{expiry}:{hex}) از app.lighter.xyz/read-only-tokens — نه کلید API و نه امضا.
+ *   LIGHTER_READ_TOKEN            لایتر اصلی (چند توکن با کاما برای چند حساب)
+ *   LIGHTER_ROBINHOOD_READ_TOKEN  لایتر رابین‌هود (صرافی جدا؛ توکن خودش را می‌خواهد)
+ * توکن فقط در هدر Authorization به همان میزبان لایتر می‌رود؛ هرگز در پاسخ، لاگ یا خطا نمی‌آید.
+ */
+function lighterTokens(mainnet: boolean, index: string): string[] {
+  const names = mainnet ? ['LIGHTER_READ_TOKEN', 'LIGHTER_RO_TOKEN'] : ['LIGHTER_ROBINHOOD_READ_TOKEN', 'LIGHTER_RH_READ_TOKEN'];
+  const all = names.flatMap((n) => (process.env[n] ?? '').split(',')).map((t) => t.trim()).filter((t) => /^ro:\d{1,18}:(single|all):\d+:[0-9a-fA-F]+$/.test(t));
+  // اول توکن همین حساب، بعد توکن‌های «all» (حساب اصلی با زیرحساب‌ها)
+  const own = all.filter((t) => t.split(':')[1] === index);
+  return [...own, ...all.filter((t) => !own.includes(t) && t.split(':')[2] === 'all')];
+}
+
+export const lighterOrdersConfigured = (mainnet: boolean) => ['LIGHTER_READ_TOKEN', 'LIGHTER_RO_TOKEN', 'LIGHTER_ROBINHOOD_READ_TOKEN', 'LIGHTER_RH_READ_TOKEN']
+  .slice(mainnet ? 0 : 2, mainnet ? 2 : 4).some((n) => (process.env[n] ?? '').trim().startsWith('ro:'));
+
+async function readAuth(url: string, token: string): Promise<Record<string, unknown> | null> {
+  const r = await fetch(url, { method: 'GET', headers: { accept: 'application/json', authorization: token }, redirect: 'error', signal: AbortSignal.timeout(10_000) });
+  if (r.status === 401 || r.status === 403 || r.status === 400) return null; // توکن مال حساب دیگری یا منقضی
+  if (!r.ok) throw new ProviderError(r.status === 429 ? 429 : 502, 'دریافت سفارش‌های لایتر انجام نشد');
+  const d = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!d || (d.code !== undefined && d.code !== 200 && d.code !== 0)) return null;
+  return d;
+}
+
+const marketCache = new Map<string, { at: number; map: Map<number, string> }>();
+async function lighterMarkets(host: string): Promise<Map<number, string>> {
+  const hit = marketCache.get(host);
+  if (hit && Date.now() - hit.at < 3_600_000) return hit.map;
+  const data = await read(`${host}/api/v1/orderBookDetails`, 10_000);
+  const map = new Map<number, string>();
+  for (const m of Array.isArray(data.order_book_details) ? data.order_book_details.map(asRow) : []) {
+    const id = fin(m.market_id);
+    if (id !== null && typeof m.symbol === 'string') map.set(id, m.symbol);
+  }
+  marketCache.set(host, { at: Date.now(), map });
+  return map;
+}
+
+/** زمان لایتر (ثانیه، میلی‌ثانیه یا میکروثانیه) → میلی‌ثانیه */
+const lighterMs = (v: unknown): number | null => {
+  const n = fin(v);
+  if (n === null || n <= 0) return null;
+  return n > 1e15 ? Math.floor(n / 1000) : n > 1e12 ? n : n * 1000;
+};
+
+export function trimLighterOrder(raw: unknown, markets: ReadonlyMap<number, string>): LighterOrderLite | null {
+  const o = asRow(raw);
+  const type = String(o.type ?? '');
+  const kind = type.startsWith('stop-loss') ? 'sl' : type.startsWith('take-profit') ? 'tp' : null;
+  const trigger = fin(o.trigger_price);
+  const placed = lighterMs(o.created_at) ?? lighterMs(o.timestamp);
+  const sym = markets.get(fin(o.market_index) ?? -1);
+  if (!kind || !trigger || placed === null || !sym) return null;
+  const status = String(o.status ?? '');
+  const live = ['open', 'pending', 'in-progress'].includes(status);
+  return {
+    id: String(o.order_id ?? o.order_index ?? `${placed}:${trigger}`),
+    sym, kind, side: o.is_ask === true ? 'sell' : 'buy', trigger, placed,
+    ended: live ? null : lighterMs(o.updated_at) ?? lighterMs(o.transaction_time) ?? placed,
+    status
+  };
+}
+
+/**
+ * سفارش‌های SL/TP یک زیرحساب: فعال + غیرفعال (جدیدترین اول، تا `since` یا سقف زمانی). بدون توکن → configured=false.
+ */
+export async function getLighterOrders(op: string, index: string, sinceMs: number): Promise<{ configured: boolean; orders: LighterOrderLite[]; complete: boolean; from: number | null; fetchedAt: number }> {
+  if (!['lighter-orders', 'lighter-mainnet-orders'].includes(op)) throw new ProviderError(400, 'درخواست ناشناخته');
+  if (!/^\d{1,18}$/.test(index)) throw new ProviderError(400, 'شمارهٔ حساب معتبر نیست');
+  const mainnet = op === 'lighter-mainnet-orders';
+  const tokens = lighterTokens(mainnet, index);
+  if (!tokens.length) return { configured: lighterOrdersConfigured(mainnet), orders: [], complete: false, from: null, fetchedAt: Date.now() };
+  const host = mainnet ? MAINNET : LIGHTER;
+  const markets = await lighterMarkets(host);
+  for (const token of tokens) {
+    const active = await readAuth(`${host}/api/v1/accountActiveOrders?${new URLSearchParams({ account_index: index, market_type: 'perp' })}`, token);
+    if (!active) continue; // این توکن به این حساب دسترسی ندارد
+    const out: LighterOrderLite[] = [];
+    for (const r of Array.isArray(active.orders) ? active.orders : []) { const x = trimLighterOrder(r, markets); if (x) out.push(x); }
+    let cursor = '';
+    let oldest = Date.now();
+    let complete = false;
+    const started = Date.now();
+    for (let page = 0; page < 15 && Date.now() - started < 7_000; page++) {
+      const q = new URLSearchParams({ account_index: index, limit: '100', market_type: 'perp' });
+      if (cursor) q.set('cursor', cursor);
+      const data = await readAuth(`${host}/api/v1/accountInactiveOrders?${q}`, token);
+      if (!data) break;
+      const rows = Array.isArray(data.orders) ? data.orders : [];
+      let reached = false;
+      for (const r of rows) {
+        const t = lighterMs(asRow(r).timestamp) ?? lighterMs(asRow(r).created_at);
+        if (t !== null) { oldest = Math.min(oldest, t); if (t < sinceMs) reached = true; }
+        const x = trimLighterOrder(r, markets);
+        if (x) out.push(x);
+      }
+      const next = typeof data.next_cursor === 'string' && data.next_cursor ? data.next_cursor : '';
+      if (reached || !next || rows.length < 100) { complete = true; break; }
+      if (next === cursor) break;
+      cursor = next;
+    }
+    return { configured: true, orders: out, complete, from: complete ? sinceMs : oldest, fetchedAt: Date.now() };
+  }
+  return { configured: true, orders: [], complete: false, from: null, fetchedAt: Date.now() };
 }

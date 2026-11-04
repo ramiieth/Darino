@@ -60,13 +60,14 @@ async function cachedGet(path: string, deadline: number,force:boolean): Promise<
   tail = run;
   return run;
 }
-export function checkedNext(next: string, address: string, resource: 'positions' | 'transactions'): string {
+export function checkedNext(next: string, address: string, resource: 'positions' | 'transactions', tradesOnly = false): string {
   const u = new URL(next, BASE);
   if (u.origin !== BASE || ![ `/v1/wallets/${address}/${resource}`, `/v1/wallets/${address}/${resource}/` ].includes(u.pathname) || u.username || u.password || next.length > 6000) throw new ProviderError(400, 'صفحهٔ بعد معتبر نیست');
   // Keep provider cursor, enforce read-only filtering and USD values.
   u.searchParams.set('currency', 'usd'); u.searchParams.set('page[size]', '100');
   u.searchParams.set('filter[trash]', 'only_non_trash');
   if (resource === 'positions') u.searchParams.set('filter[positions]', 'no_filter');
+  if (tradesOnly) u.searchParams.set('filter[operation_types]', 'trade');
   return u.pathname + u.search;
 }
 export async function getChains(): Promise<ChainInfo[]> {
@@ -107,10 +108,11 @@ export async function getWallet(address: string, userId: string, force = false):
   })();
   running.set(key, work); try { return await work; } catch(e) {if(previous?.complete)return {...previous,stale:true,detailsError:e instanceof ProviderError?e.message:'ارتباط با زریون برقرار نشد',retryAt:e instanceof ProviderError&&e.retryAfter?Date.now()+e.retryAfter*1000:undefined};throw e;} finally { running.delete(key); }
 }
-export async function getTransactions(address: string, next?: string): Promise<TransactionPage> {
-  const path = next ? checkedNext(next, address, 'transactions') : `/v1/wallets/${address}/transactions/?currency=usd&filter[trash]=only_non_trash&page[size]=100`;
+/** `tradesOnly`: فقط سواپ‌ها (filter[operation_types]=trade) برای ژورنال اسپات — کم‌مصرف‌تر از کل تاریخچه */
+export async function getTransactions(address: string, next?: string, tradesOnly = false): Promise<TransactionPage> {
+  const path = next ? checkedNext(next, address, 'transactions', tradesOnly) : `/v1/wallets/${address}/transactions/?currency=usd&filter[trash]=only_non_trash&page[size]=100${tradesOnly ? '&filter[operation_types]=trade' : ''}`;
   const r = await get(path); const link = str(obj(r.links).next);
-  return { rows: arr(r.data).map(normalizeTransaction), next: link ? checkedNext(link, address, 'transactions') : null, fetchedAt: responseAt.get(r)??Date.now() };
+  return { rows: arr(r.data).map(normalizeTransaction), next: link ? checkedNext(link, address, 'transactions', tradesOnly) : null, fetchedAt: responseAt.get(r)??Date.now() };
 }
 export async function getPnl(address: string): Promise<unknown> { return await get(`/v1/wallets/${address}/pnl?currency=usd`); }
 

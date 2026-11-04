@@ -14,7 +14,7 @@
  *   این «ورود تصادفی با همین هندسه» است، نه پیش‌بینی ستاپ شما: اگر امید ریاضی‌اش ≈ ۰ باشد، مزیت باید از ستاپ بیاید.
  */
 import type { Direction } from './types';
-import { candleCoin, type Candle } from './excursions';
+import { tradfiCoin, type Candle } from './excursions';
 import { baseOf } from './roundTrips';
 
 export const HORIZONS = [
@@ -185,10 +185,9 @@ export function splitEdge(evR: number, oppositeEvR: number): { structureR: numbe
   return { structureR: (evR + oppositeEvR) / 2, trendR: (evR - oppositeEvR) / 2 };
 }
 
-/** نماد برنامه → کوین کندل هایپرلیکوئید (متاتریدر: همان نگاشت MAE/MFE؛ کریپتو: دارایی پایه) */
-export function planCoin(symbol: string, kind: 'crypto' | 'mt'): string | null {
+/** نماد برنامه → کوین کندل هایپرلیکوئید (طلا، نقره، نفت: بازار xyz؛ کریپتو: دارایی پایه) */
+export function planCoin(symbol: string): string | null {
   const s = symbol.trim();
   if (!s) return null;
-  if (kind === 'mt') return candleCoin({ venue: 'metatrader', symbol: s });
-  return s.includes(':') ? s : baseOf(s);
+  return tradfiCoin(s) ?? (s.includes(':') ? s : baseOf(s));
 }

@@ -13,9 +13,7 @@ import type { AccountRole, BookKind, ClassifiedTrade, JournalSettings, Trade, Tr
 
 export const DEFAULT_ROLE_BY_VENUE: Partial<Record<Trade['venue'], AccountRole>> = {
   'lighter-robinhood': 'neutral',
-  arcus: 'neutral',
-  // حساب فارکس با پرپ هم‌نام (XAU) پوشش حساب نشود
-  metatrader: 'directional'
+  arcus: 'neutral'
 };
 
 export function roleOf(account: string, venue: Trade['venue'], roles: JournalSettings['roles']): AccountRole {
@@ -53,7 +51,7 @@ export function findHedgePairs(trades: readonly Trade[], hedge: JournalSettings[
       const end = trades[idx[x]].closeTime ?? now;
       for (let y = x + 1; y < idx.length && trades[idx[y]].openTime <= end; y++) {
         const a = trades[idx[x]], b = trades[idx[y]];
-        if (a.account === b.account || a.direction === b.direction || a.venue === 'metatrader' || b.venue === 'metatrader') continue;
+        if (a.account === b.account || a.direction === b.direction) continue;
         if (overlapRatio(a, b, now) < hedge.minOverlap) continue;
         if (sizeRatio(a, b) > hedge.maxSizeRatio) continue;
         pairs.push([idx[x], idx[y]]);

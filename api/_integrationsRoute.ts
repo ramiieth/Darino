@@ -12,7 +12,7 @@ import { ALERT_OPS, handleAlertsOp, neonAlertsStore, runTick, verifyTickKey } fr
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
-import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
+import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getLighterOrders, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
 import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
@@ -95,17 +95,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if(['lighter-pnl','lighter-mainnet-pnl'].includes(op) && req.method==='GET'){json(res,200,await getLighterPnl(op,u.searchParams.get('index')?.trim()??''));return;}
     // ژورنال معاملاتی: تاریخچهٔ معاملات و سری روزانهٔ یک زیرحساب لایتر (عمومی؛ فقط کاربر واردشده)
     if(['lighter-trades','lighter-mainnet-trades'].includes(op) && req.method==='GET'){res.setHeader('Cache-Control','private, no-store');json(res,200,await getLighterTrades(op,u.searchParams.get('index')?.trim()??'',Number(u.searchParams.get('since'))||0,u.searchParams.get('cursor')?.trim()??''));return;}
+    // برنامهٔ خودکار ژورنال: سفارش‌های استاپ/هدف لایتر با توکن فقط‌خواندنی سرور (توکن هرگز به مرورگر نمی‌رسد)
+    if(['lighter-orders','lighter-mainnet-orders'].includes(op) && req.method==='GET'){res.setHeader('Cache-Control','private, no-store');json(res,200,await getLighterOrders(op,u.searchParams.get('index')?.trim()??'',Number(u.searchParams.get('since'))||0));return;}
     if(['lighter-daily','lighter-mainnet-daily'].includes(op) && req.method==='GET'){res.setHeader('Cache-Control','private, no-store');json(res,200,await getLighterDaily(op,u.searchParams.get('index')?.trim()??'',Number(u.searchParams.get('days'))||90));return;}
     if(op==='arcus-spot' && req.method==='GET') {json(res,200,await getSpotTokens());return;}
     if(op==='shop-img' && req.method==='GET'){const img=await fetchImage(u.searchParams.get('u')??'');res.statusCode=200;res.setHeader('Content-Type',img.type);res.setHeader('Cache-Control','private, max-age=86400');res.setHeader('X-Content-Type-Options','nosniff');res.end(img.body);return;}
     if(op==='shop-ask' && req.method==='GET'){const q=(u.searchParams.get('q')??'').trim();const home=u.searchParams.get('home')??'';if(q.length<3||q.length>300||(home&&!/^[a-z-]{2,30}$/.test(home))){json(res,400,{error:'درخواست را در ۳ تا ۳۰۰ حرف بنویسید'});return;}json(res,200,await shopAsk(q,home||null));return;}
     if(op==='dk-search' && req.method==='GET'){const q=(u.searchParams.get('q')??'').trim().slice(0,80);const page=Math.min(Math.max(Number(u.searchParams.get('page'))||1,1),20);const sort=u.searchParams.get('sort')??'relevant';if(q.length<2||!Object.hasOwn(DK_SORT_IDS,sort)){json(res,400,{error:'عبارت جستجو یا مرتب‌سازی معتبر نیست'});return;}json(res,200,await searchDigikala(q,page,sort as DkSort));return;}
     if(op==='dk-product' && req.method==='GET'){const id=Number(u.searchParams.get('id'));if(!Number.isSafeInteger(id)||id<1){json(res,400,{error:'شناسهٔ کالا معتبر نیست'});return;}json(res,200,await digikalaProduct(id));return;}
-    if (req.method !== 'GET' || !['wallet','transactions','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
+    if (req.method !== 'GET' || !['wallet','transactions','swaps','pnl','chart'].includes(op)) { json(res,400,{ error:'درخواست ناشناخته' }); return; }
     const address = u.searchParams.get('address')?.trim() ?? '';
     if (!await validPublicAddress(address)) { json(res,400,{ error:'آدرس عمومی معتبر نیست' }); return; }
-    if(isBitcoinAddress(address)){if(op==='wallet')json(res,200,await getBitcoinWallet(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,auth.userId,u.searchParams.get('refresh')==='1'));else if(op==='transactions')json(res,200,await getBitcoinTransactions(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,u.searchParams.get('next')??undefined));else json(res,400,{error:'این داده برای بیت‌کوین در دسترس نیست'});return;}
-    const data = op === 'chart' ? await getBalanceChart(address,auth.userId,u.searchParams.get('period')??'day',(u.searchParams.get('ids')??'').split(',').filter(Boolean),u.searchParams.get('chain')??'') : op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined);
+    if(isBitcoinAddress(address)){if(op==='wallet')json(res,200,await getBitcoinWallet(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,auth.userId,u.searchParams.get('refresh')==='1'));else if(op==='swaps')json(res,200,{rows:[],next:null,fetchedAt:Date.now()});else if(op==='transactions')json(res,200,await getBitcoinTransactions(address.toLowerCase().startsWith('bc1')?address.toLowerCase():address,u.searchParams.get('next')??undefined));else json(res,400,{error:'این داده برای بیت‌کوین در دسترس نیست'});return;}
+    const data = op === 'chart' ? await getBalanceChart(address,auth.userId,u.searchParams.get('period')??'day',(u.searchParams.get('ids')??'').split(',').filter(Boolean),u.searchParams.get('chain')??'') : op === 'wallet' ? await getWallet(address, auth.userId, u.searchParams.get('refresh') === '1') : op === 'pnl' ? await getPnl(address) : await getTransactions(address, u.searchParams.get('next') ?? undefined, op === 'swaps');
     json(res,200,data);
   } catch (e) {
     const status = e instanceof ProviderError ? e.status : 502;

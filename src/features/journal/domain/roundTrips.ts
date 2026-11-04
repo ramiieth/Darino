@@ -19,8 +19,12 @@ export function baseOf(symbol: string): string {
   s = s.replace(/[-_/ ]?(USDC|USDT|USDE|USDG|USD|PERP|P)$/, '');
   s = s.replace(/[-_/.]?P$/, '');
   s = s.replace(/^(1000000|100000|10000|1000|K)(?=[A-Z]{2,})/, '');
+  // طلا و نقره در هر پلتفرم یک دارایی‌اند: لایتر XAU/XAG، هایپرلیکوئید xyz:GOLD / xyz:SILVER
+  s = METAL_ALIAS[s] ?? s;
   return s || symbol.toUpperCase();
 }
+
+const METAL_ALIAS: Record<string, string> = { XAU: 'GOLD', XAG: 'SILVER' };
 
 /** نماد امن برای شناسهٔ همگام‌سازی (فقط [\w.-]) */
 export function safeSymbol(symbol: string): string {

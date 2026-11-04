@@ -9,7 +9,6 @@ import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { Direction } from '../domain/types';
-import { inWeekendGap } from '../domain/excursions';
 import { baseRate, HORIZONS, MIN_EFFECTIVE, planCoin, splitEdge, type HorizonKey } from '../domain/baseRate';
 import { useCandles } from '../data/useExcursions';
 import { duration, fa, faDate, pct } from './parts';
@@ -29,9 +28,8 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
   );
 }
 
-export function BaseRatePanel({ symbol, kind, direction, entry, stop, target }: {
+export function BaseRatePanel({ symbol, direction, entry, stop, target }: {
   symbol: string;
-  kind: 'crypto' | 'mt';
   direction: Direction;
   entry: number | null;
   stop: number | null;
@@ -39,13 +37,13 @@ export function BaseRatePanel({ symbol, kind, direction, entry, stop, target }: 
 }) {
   const [hk, setHk] = useState<HorizonKey>('24h');
   const h = HORIZONS.find((x) => x.key === hk)!;
-  const coin = planCoin(symbol, kind);
+  const coin = planCoin(symbol);
   const valid = entry !== null && stop !== null && target !== null && entry > 0
     && (direction === 'long' ? stop < entry && target > entry : stop > entry && target < entry);
   const q = useCandles(valid ? coin : null, h.interval, h.ms);
   const { r, edge } = useMemo(() => {
     if (!valid || !q.data) return { r: null, edge: null };
-    const candles = kind === 'mt' ? q.data.candles.filter((c) => !inWeekendGap(c.t)) : q.data.candles;
+    const candles = q.data.candles;
     const args = {
       stopFrac: Math.abs(entry! - stop!) / entry!,
       targetFrac: Math.abs(target! - entry!) / entry!,
@@ -55,7 +53,7 @@ export function BaseRatePanel({ symbol, kind, direction, entry, stop, target }: 
     const mine = baseRate(candles, { ...args, direction });
     const opp = baseRate(candles, { ...args, direction: direction === 'long' ? 'short' : 'long' });
     return { r: mine, edge: mine && opp ? splitEdge(mine.evR, opp.evR) : null };
-  }, [valid, q.data, kind, direction, entry, stop, target, h]);
+  }, [valid, q.data, direction, entry, stop, target, h]);
 
   if (!valid) return null;
   return (
@@ -65,7 +63,7 @@ export function BaseRatePanel({ symbol, kind, direction, entry, stop, target }: 
         {r && <Badge tone={r.enough ? 'info' : 'neutral'} className="ms-auto">{r.enough ? 'نمونهٔ کافی' : 'فرضیه — نمونهٔ کم'}</Badge>}
       </div>
       <SegmentedControl size="sm" label="افق نگه‌داری" options={HORIZONS.map((x) => ({ value: x.key, label: `تا ${x.label}` }))} value={hk} onChange={setHk} />
-      {!coin && <Notice tone="info">برای نماد {symbol || '—'} کندل هم‌نامی در هایپرلیکوئید نداریم{kind === 'mt' ? ' (فعلاً طلا، یورو، برنت و WTI)' : ''}.</Notice>}
+      {!coin && <Notice tone="info">برای نماد {symbol || '—'} کندل هم‌نامی در هایپرلیکوئید نداریم.</Notice>}
       {coin && q.isPending && <p className="text-xs text-muted">در حال دریافت کندل‌های {coin}…</p>}
       {coin && q.isError && <Notice tone="warn">کندل {coin} دریافت نشد.</Notice>}
       {coin && q.data && !r && <Notice tone="info">کندل کافی برای این افق نیست.</Notice>}

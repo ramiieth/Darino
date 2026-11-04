@@ -93,8 +93,8 @@ export function neutralBook(input: {
     const volume = fs.reduce((s, f) => s + f.px * f.sz, 0);
     const feesKnown = fs.every((f) => f.fee !== null);
     const fees = feesKnown ? fs.reduce((s, f) => s + (f.fee ?? 0), 0) : null;
-    const venue = acc?.venue ?? ts[0]?.venue ?? 'manual';
-    const fundingKnown = VENUE_COVERAGE[venue].funding;
+    const venue = acc?.venue ?? ts[0]?.venue ?? null;
+    const fundingKnown = venue ? VENUE_COVERAGE[venue].funding : false;
     const fund = fundingKnown ? funding.filter((e) => e.account === key).reduce((s, e) => s + e.amount, 0) : null;
     const realized = ts.filter((t) => !t.open).reduce((s, t) => s + t.grossPnl, 0);
     const net = realized - (fees ?? 0) + (fund ?? 0);

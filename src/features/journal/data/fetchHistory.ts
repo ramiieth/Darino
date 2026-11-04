@@ -5,14 +5,17 @@
  *   تی‌اکس‌فلو     rpc.txflow.com فقط userFills (اجراهای اخیر) را مجاز می‌داند؛ userFillsByTime و userFunding «not allowed» است
  *   لایتر          /api/integrations?op=lighter-trades (سرور؛ صفحه‌بندی cursor)
  *   آرکوس          /v1/fills و /v1/funding (مستقیم؛ صفحه‌بندی موجود ماژول آرکوس)
+ * سفارش‌های SL/TP (برای برنامهٔ خودکار): هایپرلیکوئید historicalOrders (۲۰۰۰ اخیر)، تی‌اکس‌فلو همان اگر مجاز باشد، آرکوس /v1/orders؛
+ *   لایتر: سرور با توکن فقط‌خواندنی (LIGHTER_READ_TOKEN) می‌خواند؛ بدون توکن → «خوانده نمی‌شود» با راهنمای ساخت توکن.
  * هم‌پوشانی ۲ روزه با آخرین دریافت تا اجرای دیر ثبت‌شده جا نیفتد؛ تکراری‌ها با شناسه حذف می‌شوند.
  */
 import { fetchJson } from '@/repositories/remoteClient';
 import { txflowInfo } from '@/features/calculators/data/perpMarkets';
 import { fetchHistory } from '@/features/arcus/api/paginate';
-import type { Fill, FundingEvent, JournalAccount } from '../domain/types';
+import type { Fill, FundingEvent, JournalAccount, TriggerOrder } from '../domain/types';
+import { fromArcusOrders, fromHlOrders, fromLighterOrders, type LighterOrderLite, type OrderCoverage } from '../domain/autoPlan';
 import { dedupeById, fromArcusFills, fromArcusFunding, fromHlFills, fromHlFunding, fromLighterTrades, type LighterTradeLite } from '../domain/fills';
-import { readAccount, writeAccount } from './historyCache';
+import { readAccount, writeAccount, type SyncMark } from './historyCache';
 import type { DailyAccountPoint } from '../domain/neutral';
 
 const HL_INFO = 'https://api.hyperliquid.xyz/info';
@@ -26,6 +29,39 @@ export interface AccountHistory {
   complete: boolean;
   limitation: string | null;
   syncedAt: number;
+  orders: TriggerOrder[];
+  orderCoverage: OrderCoverage;
+}
+
+const ORDER_CAP = 2000;
+const LIGHTER_NO_TOKEN = 'برای خواندن استاپ و هدف لایتر، یک توکن فقط‌خواندنی (ro:) از app.lighter.xyz/read-only-tokens بسازید و در ورسل با نام LIGHTER_READ_TOKEN (رابین‌هود: LIGHTER_ROBINHOOD_READ_TOKEN) بگذارید.';
+const LIGHTER_BAD_TOKEN = 'توکن فقط‌خواندنی لایتر برای این حساب کار نکرد (منقضی شده یا مال حساب دیگری است).';
+
+/** سفارش‌های SL/TP تازه + اینکه از کی کامل‌اند (null = پلتفرم نمی‌دهد) */
+async function loadOrders(acc: JournalAccount, since: number): Promise<{ orders: TriggerOrder[]; from: number | null; why: string | null }> {
+  try {
+    if (acc.venue === 'hyperliquid' || acc.venue === 'txflow') {
+      const body = { type: 'historicalOrders', user: acc.address };
+      const raw = acc.venue === 'hyperliquid' ? await hlInfo<unknown[]>(body) : await txflowInfo<unknown[]>(body);
+      const list = Array.isArray(raw) ? raw : [];
+      const orders = fromHlOrders(acc, list);
+      const times = list.map((r) => Number(((r as { order?: { timestamp?: unknown } }).order ?? {}).timestamp)).filter(Number.isFinite);
+      return { orders, from: list.length < ORDER_CAP ? 0 : times.length ? Math.min(...times) : Date.now(), why: null };
+    }
+    if (acc.venue === 'arcus') {
+      const r = await fetchHistory('orders', { env: 'mainnet', address: acc.address, accountIndex: acc.sub ?? 0, limit: 1000, fromUs: since > 0 ? String(BigInt(since) * 1000n) : null });
+      return { orders: fromArcusOrders(acc, r.rows), from: r.complete ? since : null, why: r.complete ? null : 'تاریخچهٔ سفارش‌های آرکوس کامل خوانده نشد.' };
+    }
+    if (acc.venue === 'lighter-mainnet' || acc.venue === 'lighter-robinhood') {
+      const op = acc.venue === 'lighter-mainnet' ? 'lighter-mainnet-orders' : 'lighter-orders';
+      const r = await fetchJson<{ configured: boolean; orders: LighterOrderLite[]; complete: boolean; from: number | null }>(`/api/integrations?${new URLSearchParams({ op, index: String(acc.sub ?? ''), since: String(since) })}`, { timeoutMs: 20_000 });
+      if (r.from === null) return { orders: [], from: null, why: r.configured ? LIGHTER_BAD_TOKEN : LIGHTER_NO_TOKEN };
+      return { orders: fromLighterOrders(acc, r.orders), from: r.from, why: null };
+    }
+    return { orders: [], from: null, why: 'سفارش‌های این پلتفرم خوانده نمی‌شود.' };
+  } catch {
+    return { orders: [], from: null, why: acc.venue === 'txflow' ? 'تی‌اکس‌فلو تاریخچهٔ سفارش‌ها را عمومی نمی‌دهد.' : 'دریافت سفارش‌های استاپ انجام نشد؛ دفعهٔ بعد دوباره تلاش می‌شود.' };
+  }
 }
 
 async function hlInfo<T>(body: Record<string, unknown>): Promise<T> {
@@ -128,9 +164,15 @@ export async function loadAccountHistory(acc: JournalAccount, windowFrom: number
   // ناقص‌بودن چسبنده است: اگر دریافت اول به کل تاریخچه نرسید، دریافت‌های افزایشی بعدی آن را «کامل» نمی‌کنند
   const complete = coversWindow ? cached.mark!.complete && fresh.complete : fresh.complete;
   const limitation = fresh.limitation ?? (coversWindow && !cached.mark!.complete ? cached.mark!.limitation : null);
-  const mark = { key: acc.key, lastTime, from: coversWindow ? Math.min(cached.mark!.from, windowFrom) : windowFrom, complete, limitation, syncedAt: now };
-  await writeAccount(acc.key, fresh.fills, fresh.funding ?? [], mark);
-  return { key: acc.key, fills, funding, fundingFetched: fresh.fundingFetched ?? acc.venue === 'arcus', complete, limitation, syncedAt: now };
+  const mark: SyncMark = { key: acc.key, lastTime, from: coversWindow ? Math.min(cached.mark!.from, windowFrom) : windowFrom, complete, limitation, syncedAt: now };
+  // سفارش‌ها: کش + تازه؛ پوشش فقط بزرگ‌تر می‌شود (پنجرهٔ ۲۰۰۰ تایی هایپرلیکوئید جلو می‌رود ولی کش قدیمی‌ها را نگه می‌دارد)
+  const fo = await loadOrders(acc, coversWindow && cached.mark?.ordersFrom != null ? Math.max(0, cached.mark.lastTime - OVERLAP) : 0);
+  const prevFrom = cached.mark?.ordersFrom ?? null;
+  const ordersFrom = fo.from === null ? prevFrom : prevFrom === null ? fo.from : Math.min(prevFrom, fo.from);
+  const orders = dedupeById([...cached.orders, ...fo.orders]);
+  mark.ordersFrom = ordersFrom;
+  await writeAccount(acc.key, fresh.fills, fresh.funding ?? [], mark, fo.orders);
+  return { key: acc.key, fills, funding, fundingFetched: fresh.fundingFetched ?? acc.venue === 'arcus', complete, limitation, syncedAt: now, orders, orderCoverage: { from: ordersFrom, why: ordersFrom === null ? fo.why : null } };
 }
 
 /** سری روزانهٔ لایتر (۱۸۰ روز) برای دفتر نوترال */

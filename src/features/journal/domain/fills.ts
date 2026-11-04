@@ -21,9 +21,7 @@ const VENUE_CODE: Record<Venue, string> = {
   txflow: 'tx',
   'lighter-mainnet': 'lm',
   'lighter-robinhood': 'lr',
-  arcus: 'ar',
-  metatrader: 'mt',
-  manual: 'mn'
+  arcus: 'ar'
 };
 
 /** کلید کوتاه و پایدار حساب (در شناسهٔ همگام‌سازی جا شود) */
@@ -120,7 +118,7 @@ export function fromLighterTrades(acc: JournalAccount, raw: readonly LighterTrad
 
 /* ---------------- آرکوس ---------------- */
 
-const usToMs = (v: unknown): number | null => {
+export const usToMs = (v: unknown): number | null => {
   if (typeof v === 'string' && /^\d{13,19}$/.test(v)) return Number(BigInt(v) / 1000n);
   const n = num(v);
   return n === null ? null : n > 1e14 ? Math.floor(n / 1000) : n;
