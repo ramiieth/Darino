@@ -57,9 +57,17 @@ export interface PerpMarket {
   makerFeePct: number | null;
   volume24hUsd: number | null;
   change24hPct: number | null;
+  /** گام اندازهٔ سفارش (واحد دارایی)؛ null = نامعلوم */
+  sizeStep?: number | null;
+  /** حداقل اندازه (واحد) و حداقل ارزش سفارش (دلار) */
+  minSize?: number | null;
+  minNotional?: number | null;
 }
 
 const LIGHTER_BASE = 'https://mainnet.zklighter.elliot.ai';
+
+/** تعداد اعشار مجاز → گام (۴ → ۰٫۰۰۰۱) */
+const decimalsStep = (d: unknown): number | null => (typeof d === 'number' && Number.isInteger(d) && d >= 0 && d <= 12 ? 10 ** -d : null);
 
 const num = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
@@ -94,6 +102,10 @@ interface LighterBook {
   daily_quote_token_volume?: number;
   daily_price_change?: number;
   market_config?: { hidden?: boolean };
+  size_decimals?: number;
+  supported_size_decimals?: number;
+  min_base_amount?: string;
+  min_quote_amount?: string;
 }
 
 export function normalizeLighter(books: LighterBook[], rates: { market_id: number; exchange: string; rate: number }[]): PerpMarket[] {
@@ -118,7 +130,10 @@ export function normalizeLighter(books: LighterBook[], rates: { market_id: numbe
         takerFeePct: num(b.taker_fee),
         makerFeePct: num(b.maker_fee),
         volume24hUsd: num(b.daily_quote_token_volume),
-        change24hPct: num(b.daily_price_change)
+        change24hPct: num(b.daily_price_change),
+        sizeStep: decimalsStep(b.supported_size_decimals ?? b.size_decimals),
+        minSize: num(b.min_base_amount),
+        minNotional: num(b.min_quote_amount)
       };
     });
 }
@@ -166,6 +181,9 @@ interface ArcusMarketFull {
   /** کارمزد پایهٔ حساب عمومی به واحد ppm (۲۲۵ = ۰٫۰۲۲۵٪) */
   effectiveTakerFeePpm?: number | null;
   effectiveMakerFeePpm?: number | null;
+  stepSize?: string | null;
+  minOrderSize?: string | null;
+  minOrderNotional?: string | null;
 }
 
 /** ppm → ٪ (۱٬۰۰۰٬۰۰۰ ppm = ۱۰۰٪) */
@@ -202,7 +220,10 @@ export function normalizeArcus(markets: ArcusMarketFull[]): PerpMarket[] {
         takerFeePct: ppmPct(m.effectiveTakerFeePpm),
         makerFeePct: ppmPct(m.effectiveMakerFeePpm),
         volume24hUsd: num(m.volume24hNotional),
-        change24hPct: change === null ? null : change * 100
+        change24hPct: change === null ? null : change * 100,
+        sizeStep: num(m.stepSize),
+        minSize: num(m.minOrderSize),
+        minNotional: num(m.minOrderNotional)
       };
     });
 }
@@ -295,6 +316,8 @@ interface TxflowInstrument {
   maxLeverage?: number;
   delisted?: boolean;
   haltTrading?: boolean;
+  basePrecision?: string;
+  szDecimals?: number;
 }
 interface TxflowDayCtx {
   instrumentId: number;
@@ -395,7 +418,10 @@ export function normalizeTxflow(
         takerFeePct: TXFLOW_TAKER_PCT,
         makerFeePct: TXFLOW_MAKER_PCT,
         volume24hUsd: num(d?.dayNtlVlm),
-        change24hPct: last !== null && prev ? (last / prev - 1) * 100 : null
+        change24hPct: last !== null && prev ? (last / prev - 1) * 100 : null,
+        sizeStep: num(u.basePrecision) ?? decimalsStep(u.szDecimals),
+        minSize: null,
+        minNotional: null
       };
     });
 }

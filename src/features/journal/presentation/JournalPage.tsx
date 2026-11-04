@@ -26,6 +26,7 @@ import { ReviewTab } from './ReviewTab';
 import { NeutralTab } from './NeutralTab';
 import { SettingsTab } from './SettingsTab';
 import { SpotTab } from './SpotTab';
+import { HedgeAssistant } from './HedgeAssistant';
 import { fa } from './parts';
 
 type Tab = 'audit' | 'trades' | 'plan' | 'spot' | 'review' | 'neutral' | 'settings';
@@ -38,7 +39,7 @@ const INTRO: Record<Tab, string> = {
   plan: 'برنامهٔ هر معامله خودکار از استاپ و هدفی که روی صرافی گذاشتید ساخته می‌شود: ریسک، R، جابه‌جایی استاپ و روند بازار لحظهٔ ورود.',
   spot: 'سواپ‌های همهٔ کیف پول‌ها در DEXها خودکار ثبت می‌شوند: سود محقق و باز هر توکن، میانگین بها، گاز و لغزش.',
   review: 'هر هفته: پایبندی، اشتباه‌ها، کار درست و حداکثر سه تعهد قابل‌سنجش که هفتهٔ بعد خودکار بررسی می‌شوند.',
-  neutral: 'دفتر دلتا نوترال و فارم پوینت: حجم ساخته‌شده، فاندینگ، کارمزد، هزینه به‌ازای هر ۱ میلیون دلار حجم و تعادل پوشش‌ها.',
+  neutral: 'باز کردن جفت لانگ و شورت با عدد دقیق هر پا و یک لمس تا صفحهٔ صرافی، یادآور جفت‌های نامتعادل؛ و دفتر دلتا نوترال و فارم پوینت: حجم ساخته‌شده، فاندینگ، کارمزد، هزینه به‌ازای هر ۱ میلیون دلار حجم و تعادل پوشش‌ها.',
   settings: 'نقش هر حساب (جهت‌دار یا نوترال)، اندازهٔ حساب، سقف ریسک، تگ‌ها، چک‌لیست و سؤال‌های مرور.'
 };
 
@@ -128,6 +129,7 @@ export default function JournalPage() {
             {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
             {tab === 'spot' && <SpotTab from={range === 'all' ? 0 : spotFrom} />}
             {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
+            {tab === 'neutral' && <HedgeAssistant />}
             {tab === 'neutral' && <NeutralTab nb={a.neutral} fillDays={j.data.settings.neutralFillDays} accounts={j.accounts} settings={j.data.settings} />}
             {tab === 'settings' && <SettingsTab settings={j.data.settings} accounts={j.accounts} histories={j.histories} liveEquity={liveEquity} onRefetch={j.refetch} />}
           </>

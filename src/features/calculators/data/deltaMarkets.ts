@@ -46,6 +46,10 @@ export interface VenueQuote {
   maxLeverage: number | null;
   maintenanceMarginFraction: number | null;
   volume24hUsd: number | null;
+  /** گام اندازه و حداقل سفارش (از API همان صرافی؛ null = نامعلوم) */
+  sizeStep?: number | null;
+  minSize?: number | null;
+  minNotional?: number | null;
   /** بازار HIP-3 هایپرلیکوئید: نام DEX سازندهٔ شخص ثالث (اوراکل و قواعد دست اوست) */
   builderDex?: string | null;
 }
@@ -73,7 +77,10 @@ export function fromPerpMarket(m: PerpMarket): VenueQuote {
     takerFeePct: m.takerFeePct,
     maxLeverage: m.maxLeverage,
     maintenanceMarginFraction: m.maintenanceMarginFraction,
-    volume24hUsd: m.volume24hUsd
+    volume24hUsd: m.volume24hUsd,
+    sizeStep: m.sizeStep ?? null,
+    minSize: m.minSize ?? null,
+    minNotional: m.minNotional ?? null
   };
 }
 
