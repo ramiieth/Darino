@@ -27,6 +27,7 @@ import { NeutralTab } from './NeutralTab';
 import { SettingsTab } from './SettingsTab';
 import { SpotTab } from './SpotTab';
 import { HedgeAssistant } from './HedgeAssistant';
+import { FLOW_ROLE, TradeFlow, type FlowStep } from '@/shared/components/layout/TradeFlow';
 import { fa } from './parts';
 
 type Tab = 'audit' | 'trades' | 'plan' | 'spot' | 'review' | 'neutral' | 'settings';
@@ -34,7 +35,7 @@ const TABS: Tab[] = ['audit', 'trades', 'plan', 'spot', 'review', 'neutral', 'se
 const RANGES: RangeKey[] = ['30', '90', '180', 'all'];
 
 const INTRO: Record<Tab, string> = {
-  audit: 'حسابرسی خودکار معاملات جهت‌دار شما از حساب‌های واقعی، به سبک ارزیابی شرکت‌های Prop: کجا با یک حرفه‌ای فرق دارید، با عدد، و اول چه چیزی را درست کنید.',
+  audit: 'حسابرسی = نگاه به گذشته: همهٔ معاملات بستهٔ جهت‌دار شما از حساب‌های واقعی، به سبک ارزیابی شرکت‌های Prop — کجا با یک حرفه‌ای فرق دارید، با عدد، و اول چه چیزی را درست کنید. برای سنجش یک پوزیشن قبل از باز کردن، «چک قبل از ورود» در میز معامله است.',
   trades: 'همهٔ معاملات خودکار از هایپرلیکوئید، لایتر، تی‌اکس‌فلو و آرکوس می‌آیند؛ چیزی تایپ نمی‌شود. اختیاری: با یک لمس بگویید چرا وارد شدید.',
   plan: 'برنامهٔ هر معامله خودکار از استاپ و هدفی که روی صرافی گذاشتید ساخته می‌شود: ریسک، R، جابه‌جایی استاپ و روند بازار لحظهٔ ورود.',
   spot: 'سواپ‌های همهٔ کیف پول‌ها در DEXها خودکار ثبت می‌شوند: سود محقق و باز هر توکن، میانگین بها، گاز و لغزش.',
@@ -98,6 +99,7 @@ export default function JournalPage() {
     <Page>
       <PageHeader eyebrow="معامله · خودکار · فقط‌خواندنی" title="ژورنال معاملاتی" meta={<p className="max-w-3xl text-sm leading-7 text-muted">{INTRO[tab]}</p>} />
       <Sources histories={j.histories} />
+      {(tab === 'audit' || tab === 'plan' || tab === 'trades' || tab === 'review') && <TradeFlow current={tab as FlowStep} className="mb-3" />}
       <Tabs
         label="بخش‌های ژورنال"
         value={tab}
@@ -124,11 +126,12 @@ export default function JournalPage() {
         ) : (
           <>
             {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
+            {tab === 'audit' && <p className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-xs leading-6 text-muted">{FLOW_ROLE.audit} <Link to="/desk" className="font-semibold text-accent underline">چک قبل از ورود ←</Link></p>}
             {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} />}
             {tab === 'trades' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} auto={a.auto} settings={j.data.settings} />}
             {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
             {tab === 'spot' && <SpotTab from={range === 'all' ? 0 : spotFrom} />}
-            {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
+            {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} auto={a.auto} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
             {tab === 'neutral' && <HedgeAssistant />}
             {tab === 'neutral' && <NeutralTab nb={a.neutral} fillDays={j.data.settings.neutralFillDays} accounts={j.accounts} settings={j.data.settings} />}
             {tab === 'settings' && <SettingsTab settings={j.data.settings} accounts={j.accounts} histories={j.histories} liveEquity={liveEquity} onRefetch={j.refetch} />}

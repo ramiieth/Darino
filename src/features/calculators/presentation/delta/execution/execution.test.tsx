@@ -3,7 +3,11 @@
  * تب اجرا و پایش دلتا — اعداد نمایش‌داده‌شده = domain؛ انتقال از دلتا نوترال؛ پایش با دادهٔ mock (بدون شبکه)
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+// ماشین‌حساب لینک ژورنال دارد؛ در اپ همیشه داخل روتر است (wrapper در rerender هم می‌ماند)
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 import { calcExecution } from '@/features/calculators/domain';
 import { toFaDigits } from '@/shared/utils/formatters';
 import type { VenueQuote } from '@/features/calculators/data/deltaMarkets';

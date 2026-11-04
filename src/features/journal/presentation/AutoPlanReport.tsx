@@ -24,7 +24,9 @@ type Filter = 'all' | 'nostop' | 'counter' | 'moved' | 'open';
 const BIAS_FA: Record<Bias, string> = { bullish: 'صعودی', bearish: 'نزولی', neutral: 'خنثی' };
 
 export function AutoPlanReport({ trades, auto, settings, accountSize }: { trades: ClassifiedTrade[]; auto: Map<string, TradePlan>; settings: JournalSettings; accountSize: number | null }) {
-  const directional = useMemo(() => trades.filter((t) => t.book === 'directional' && !t.truncated && auto.has(t.id)), [trades, auto]);
+  // جهت‌دار با شروع معلوم + هر پوزیشن باز (حتی پای نوترال یا شروع خارج از تاریخچه) — پوزیشن زنده هیچ‌وقت جا نمی‌ماند
+  const directional = useMemo(() => trades.filter((t) => auto.has(t.id) && (t.open || (t.book === 'directional' && !t.truncated))), [trades, auto]);
+  const neutralClosed = useMemo(() => trades.filter((t) => t.book === 'neutral' && !t.open).length, [trades]);
   const { plans, loading } = useAutoOutlook(directional, auto);
   const rep = useMemo(() => autoReport(directional, plans, accountSize, settings.maxRiskPct), [directional, plans, accountSize, settings.maxRiskPct]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -44,7 +46,7 @@ export function AutoPlanReport({ trades, auto, settings, accountSize }: { trades
   }, [directional, plans, filter]);
 
   if (!directional.length) {
-    return <Notice tone="info">هنوز معاملهٔ جهت‌داری از حساب‌های متصل نیامده. هر معامله‌ای که در هایپرلیکوئید، لایتر، تی‌اکس‌فلو یا آرکوس بگیرید، خودش این‌جا با برنامه‌اش ثبت می‌شود.</Notice>;
+    return <Notice tone="info">پوزیشن باز یا معاملهٔ جهت‌داری از حساب‌های متصل نیامده. هر پوزیشنی که در هایپرلیکوئید، لایتر، تی‌اکس‌فلو یا آرکوس باز کنید، خودش این‌جا با استاپ و هدفش ثبت می‌شود.{neutralClosed > 0 && <> {fa(neutralClosed)} معاملهٔ بسته در دفتر «دلتا نوترال» است (نقش حساب در تنظیمات).</>}</Notice>;
   }
 
   return (
@@ -162,10 +164,11 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
         <span className={cn('flex h-8 w-8 items-center justify-center rounded-field [&_svg]:h-4 [&_svg]:w-4', long ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative')}>{long ? <TrendingUp /> : <TrendingDown />}</span>
         <div className="min-w-0">
           <p className="text-sm font-bold text-ink"><span dir="ltr">{t.symbol}</span> <span className={cn('text-xs font-semibold', long ? 'text-positive' : 'text-negative')}>{long ? 'لانگ' : 'شورت'}</span></p>
-          <p className="text-[11px] text-muted">{VENUE_FA[t.venue]} · {faDateTime(t.openTime)}</p>
+          <p className="text-[11px] text-muted">{VENUE_FA[t.venue]} · {t.fills === 0 ? 'از پوزیشن زندهٔ صرافی' : faDateTime(t.openTime)}{t.book === 'neutral' ? ' · پای دلتا نوترال' : ''}</p>
         </div>
         <div className="ms-auto text-end">
           <p className={cn('num-ltr text-base font-extrabold', t.open ? 'text-warn' : pnlTone(t.netPnl))}>{t.open ? 'باز' : usd(t.netPnl, true)}</p>
+          {t.open && t.fills === 0 && t.netPnl !== 0 && <p className={cn('num-ltr text-[11px] font-semibold', pnlTone(t.netPnl))}>{usd(t.netPnl, true)}</p>}
           {R !== null && <p className={cn('num-ltr text-[11px] font-semibold', pnlTone(R))}>{fa(R, 2)}R</p>}
         </div>
       </div>

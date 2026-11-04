@@ -62,4 +62,39 @@ describe('ژورنال اسپات', () => {
     expect(b.totals.swaps).toBe(1);
     expect(b.totals.unrealized).toBeCloseTo(20);
   });
+
+  it('موجودی واقعی کیف پول: خروج غیر سواپی بها را کم می‌کند، ورود غیر سواپی بهای نامعلوم است، خرد و تسویه‌شده جدا', () => {
+    const swaps = toSwaps('0xw', [
+      // ۱۰ اتر به میانگین ۳۴۰۰ خریده شد
+      tx(1, [leg('out', 'USDC', 34000, 34000), leg('in', 'WETH', 10, 34000)]),
+      // DRV کامل خرید و فروش شد
+      tx(2, [leg('out', 'USDC', 100, 100), leg('in', 'DRV', 50, 100)]),
+      tx(3, [leg('out', 'DRV', 50, 80), leg('in', 'USDC', 80, 80)]),
+      // ARB خریده شد ولی الان فقط خرد مانده
+      tx(4, [leg('out', 'USDC', 50, 50), leg('in', 'ARB', 50, 50)])
+    ]);
+    // در کیف پول: فقط ۲ اتر (۸ اتر به صرافی رفت)، ۰٫۰۱ بیت‌کوین از پل (بدون سواپ)، ۰٫۰۶ ARB
+    const price = new Map([['ETH', 2400], ['BTC', 80000], ['ARB', 0.5]]);
+    const held = new Map([['ETH', 2], ['BTC', 0.01], ['ARB', 0.06]]);
+    const b = spotBook(swaps, price, Date.UTC(2026, 0, 2), held);
+    const eth = b.open.find((a) => a.asset === 'ETH')!;
+    expect(eth.qty).toBe(2);
+    expect(eth.avgCost).toBeCloseTo(3400);
+    expect(eth.unrealized).toBeCloseTo(2 * (2400 - 3400));
+    expect(eth).toMatchObject({ buysAll: 1, buys: 0 });
+    expect(b.open.map((a) => a.asset)).toEqual(['ETH']);
+    expect(b.closed.map((a) => a.asset).sort()).toEqual(['ARB', 'DRV']);
+    expect(b.closed.find((a) => a.asset === 'ARB')!.dust).toBe(true);
+    expect(b.totals.unrealized).toBeCloseTo(-2000);
+    expect(b.totals.realized).toBeCloseTo(-20);
+  });
+
+  it('توکنی که فقط از پل آمده و هم سواپ شده: مازاد بهای نامعلوم، سود باز فقط بخش معلوم', () => {
+    const swaps = toSwaps('0xw', [tx(1, [leg('out', 'USDC', 1000, 1000), leg('in', 'SOL', 10, 1000)])]);
+    const b = spotBook(swaps, new Map([['SOL', 150]]), 0, new Map([['SOL', 30]]));
+    const sol = b.open[0];
+    expect(sol).toMatchObject({ qty: 30, basisQty: 10, unknownQty: 20 });
+    expect(sol.unrealized).toBeCloseTo(500);
+    expect(sol.value).toBeCloseTo(4500);
+  });
 });

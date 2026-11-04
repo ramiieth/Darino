@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useCustody } from '@/features/custody/data/useCustody';
-import { keyedPerpsQuery } from '@/features/perps/data/usePerpVenues';
+import { hlLikeAccountQuery, keyedPerpsQuery } from '@/features/perps/data/usePerpVenues';
 import { lighterAccountQuery, LIGHTER_PLATFORM, type LighterNetwork } from '@/features/perps/data/lighterAccount';
 import { lighterAccounts } from '@/features/perps/domain/model';
 import type { JournalAccount, Venue } from '../domain/types';
@@ -21,12 +21,13 @@ import { localTimeZone } from '../domain/time';
 import { loadAccountHistory, loadLighterDaily, type AccountHistory } from './fetchHistory';
 import { useJournalData, type JournalData } from './journalStore';
 import type { OrderCoverage } from '../domain/autoPlan';
+import { hlLivePositions, mergeLivePositions, type LivePosition } from '../domain/livePositions';
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const HL_PLATFORMS: Record<string, Venue> = { hyperliquid: 'hyperliquid', txflow: 'txflow' };
 
 /** حساب‌های قابل‌خواندن ژورنال (بدون تکرار) */
-export function useJournalAccounts(): { accounts: JournalAccount[]; loading: boolean } {
+export function useJournalAccounts(): { accounts: JournalAccount[]; live: LivePosition[]; loading: boolean } {
   const custody = useCustody();
   const env = useQuery(keyedPerpsQuery);
   const links: { venue: Venue; label: string; address: string; network?: LighterNetwork; sub?: number }[] = [];
@@ -63,7 +64,23 @@ export function useJournalAccounts(): { accounts: JournalAccount[]; loading: boo
     return [...out.values()];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(links), lq.map((q) => q.dataUpdatedAt).join(',')]);
-  return { accounts, loading: env.isPending || lq.some((q) => q.isPending) };
+
+  // پوزیشن‌های باز لحظه‌ای (همان کش داشبورد پرپچوال) — برای «برنامهٔ معامله» حتی وقتی اجرای ورود در تاریخچه نیست
+  const hlAccounts = accounts.filter((a) => a.venue === 'hyperliquid' || a.venue === 'txflow');
+  const hq = useQueries({ queries: hlAccounts.map((a) => hlLikeAccountQuery(a.venue as 'hyperliquid' | 'txflow', a.address)) });
+  const live = useMemo(() => {
+    const out: LivePosition[] = [];
+    lighterLinks.forEach((l, i) => {
+      for (const a of lq[i].data ? lighterAccounts(lq[i].data, l.address) : []) {
+        const key = accountKey(l.venue, l.address, a.index);
+        for (const p of a.positions) out.push({ account: key, venue: l.venue, symbol: p.symbol, direction: p.side, size: p.size, entry: p.entry, mark: p.mark ?? null, pnl: p.pnl });
+      }
+    });
+    hlAccounts.forEach((a, i) => out.push(...hlLivePositions(a.key, a.venue, hq[i].data?.state ?? null)));
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, lq.map((q) => q.dataUpdatedAt).join(','), hq.map((q) => q.dataUpdatedAt).join(',')]);
+  return { accounts, live, loading: env.isPending || lq.some((q) => q.isPending) };
 }
 
 export type RangeKey = '30' | '90' | '180' | 'all';
@@ -82,7 +99,7 @@ export interface JournalState {
 
 export function useJournal(range: RangeKey, liveEquity: number | null): JournalState {
   const data = useJournalData();
-  const { accounts, loading: accLoading } = useJournalAccounts();
+  const { accounts, live, loading: accLoading } = useJournalAccounts();
   const tz = localTimeZone();
   const now = Date.now();
   const neutralFrom = now - data.settings.neutralFillDays * 86_400_000;
@@ -112,7 +129,8 @@ export function useJournal(range: RangeKey, liveEquity: number | null): JournalS
     const fills = ready.flatMap((h) => h.fills);
     const funding = ready.flatMap((h) => h.funding);
     const fAcc = fundingAccounts(accounts, new Set(ready.filter((h) => h.fundingFetched).map((h) => h.key)));
-    const trades = buildTrades(fills, funding, fAcc);
+    // پوزیشن باز صرافی که اجرای ورودش در تاریخچه نیست هم معاملهٔ باز است (قیمت ورود از خود صرافی)
+    const trades = mergeLivePositions(buildTrades(fills, funding, fAcc), live, now);
     const orders = ready.flatMap((h) => h.orders);
     const orderCoverage = new Map<string, OrderCoverage>(ready.map((h) => [h.key, h.orderCoverage]));
     const daily = new Map<string, DailyAccountPoint[]>();
@@ -122,7 +140,7 @@ export function useJournal(range: RangeKey, liveEquity: number | null): JournalS
     hq.forEach((q, i) => q.isError && !q.data && sourceNotes.push(`${accounts[i].label}: دریافت تاریخچه انجام نشد.`));
     return runJournal({ trades, fills, funding, accounts, notes: data.notes, plans: data.plans, settings: data.settings, accountSize, platformDaily: daily, from, tz, sourceNotes, orders, orderCoverage, now });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stamp, data, range, accountSize, accounts]);
+  }, [stamp, data, range, accountSize, accounts, live]);
 
   return {
     data,

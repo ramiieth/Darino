@@ -6,6 +6,10 @@
  *   بهای تمام‌شده: میانگین موزون. فروش = ارزش آنچه رفت؛ سود محقق = فروش − بهای سهم فروخته‌شده.
  *   توکنی که از راهی جز سواپ آمده (واریز، ایردراپ) بهای معلوم ندارد → آن بخش از فروش «بهای نامعلوم» است، نه سود.
  *   «هزینهٔ سواپ» = ارزش رفته − ارزش آمده (لغزش + کارمزد استخر)، فقط وقتی هر دو قیمت دارند.
+ *   موجودی واقعی (held، از موجودی کیف پول) بر دفتر سواپ مقدم است:
+ *     • کمتر از دفتر (توکن به صرافی/کیف دیگر رفت یا گاز شد) → بهای تمام‌شده به همان نسبت کم می‌شود (میانگین ثابت می‌ماند).
+ *     • بیشتر از دفتر (واریز، ایردراپ، پل) → مازاد «بهای نامعلوم» است: ارزشش دیده می‌شود ولی در سود باز نمی‌آید.
+ *   پوزیشن باز = موجودی واقعی با ارزش ≥ DUST_USD؛ کامل فروخته‌شده یا خرد در «تسویه‌شده» (سود محقق‌شان در جمع می‌ماند).
  *   حذف کامل (نه نمایش، نه محاسبه): توکن اسپم/مخفی (is_trash)، تأییدنشده (احتمال اسکم)، و توکنی که زریون برایش قیمت ندارد —
  *   هم در لحظهٔ سواپ (بدون ارزش دلاری) و هم الان (موجودی دارد ولی قیمت لحظه‌ای ندارد).
  */
@@ -15,6 +19,9 @@ const STABLES = new Set(['USDC', 'USDT', 'DAI', 'USDE', 'USDS', 'FDUSD', 'PYUSD'
 const WRAPPED: Record<string, string> = { WETH: 'ETH', WBTC: 'BTC', CBBTC: 'BTC', WSOL: 'SOL', WBNB: 'BNB', WAVAX: 'AVAX', WPOL: 'POL', WMATIC: 'POL', WHYPE: 'HYPE', WS: 'S' };
 
 export const isStable = (symbol: string) => STABLES.has(symbol.toUpperCase());
+
+/** زیر این ارزش دلاری = خرد (Dust) → جزو پوزیشن‌های باز نیست */
+export const DUST_USD = 10;
 
 export interface SpotLeg {
   /** کلید دارایی (نماد تأییدشده یا شناسهٔ زریون) */
@@ -127,17 +134,29 @@ export interface SpotAsset {
   asset: string;
   symbol: string;
   icon: string | null;
+  /** خرید/فروش در بازهٔ انتخابی */
   buys: number;
   sells: number;
+  /** خرید/فروش در کل تاریخچهٔ خوانده‌شده (میانگین بها از همین‌ها ساخته می‌شود) */
+  buysAll: number;
+  sellsAll: number;
   boughtUsd: number;
   soldUsd: number;
   realized: number;
   /** فروش بدون بهای معلوم (دلار) */
   unknownProceeds: number;
-  /** موجودی باقیمانده از خریدهای سواپی */
+  /** موجودی فعلی (واقعی کیف پول اگر داده شود؛ وگرنه باقیماندهٔ دفتر سواپ) */
   qty: number;
+  /** بخشی از موجودی که بهایش از سواپ معلوم است */
+  basisQty: number;
+  /** بخشی از موجودی بدون بهای معلوم (واریز، ایردراپ، پل) */
+  unknownQty: number;
   cost: number;
   avgCost: number | null;
+  /** پوزیشن باز: موجودی با ارزش ≥ DUST_USD */
+  open: boolean;
+  /** موجودی دارد ولی ارزشش خرد است */
+  dust: boolean;
   firstTime: number;
   lastTime: number;
   /** ارزش فعلی (اگر قیمت لحظه‌ای داده شود) */
@@ -147,7 +166,12 @@ export interface SpotAsset {
 
 export interface SpotBook {
   swaps: SpotSwap[];
+  /** همه (باز و تسویه‌شده) */
   assets: SpotAsset[];
+  /** پوزیشن‌های باز (غیر خرد) */
+  open: SpotAsset[];
+  /** کامل فروخته‌شده یا خرد */
+  closed: SpotAsset[];
   sales: SpotSale[];
   totals: {
     swaps: number;
@@ -164,13 +188,16 @@ export interface SpotBook {
   };
 }
 
-/** price: کلید دارایی → قیمت لحظه‌ای دلاری (از موجودی کیف پول) */
-export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, number> = new Map(), from = 0): SpotBook {
+/**
+ * price: کلید دارایی → قیمت لحظه‌ای دلاری (از موجودی کیف پول)
+ * held:  کلید دارایی → موجودی واقعی فعلی (جمع کیف پول‌ها). بدون آن موجودی از دفتر سواپ است.
+ */
+export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, number> = new Map(), from = 0, held?: ReadonlyMap<string, number>, dustUsd = DUST_USD): SpotBook {
   const assets = new Map<string, SpotAsset>();
   const sales: SpotSale[] = [];
   const get = (l: SpotLeg, t: number) => {
     let a = assets.get(l.asset);
-    if (!a) assets.set(l.asset, (a = { asset: l.asset, symbol: l.symbol, icon: l.icon, buys: 0, sells: 0, boughtUsd: 0, soldUsd: 0, realized: 0, unknownProceeds: 0, qty: 0, cost: 0, avgCost: null, firstTime: t, lastTime: t, value: null, unrealized: null }));
+    if (!a) assets.set(l.asset, (a = { asset: l.asset, symbol: l.symbol, icon: l.icon, buys: 0, sells: 0, buysAll: 0, sellsAll: 0, boughtUsd: 0, soldUsd: 0, realized: 0, unknownProceeds: 0, qty: 0, basisQty: 0, unknownQty: 0, cost: 0, avgCost: null, open: false, dust: false, firstTime: t, lastTime: t, value: null, unrealized: null }));
     a.icon ??= l.icon;
     a.lastTime = t;
     return a;
@@ -189,6 +216,7 @@ export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, 
       const costOut = a.qty > 0 ? (a.cost * known) / a.qty : 0;
       const knownProceeds = (proceeds * known) / l.qty;
       const unknownQty = l.qty - known;
+      a.sellsAll++;
       a.qty -= known;
       a.cost -= costOut;
       if (a.qty < 1e-12) { a.qty = 0; a.cost = 0; }
@@ -208,20 +236,34 @@ export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, 
       if (usd === null) continue;
       a.qty += l.qty;
       a.cost += usd;
+      a.buysAll++;
       if (s.time >= from) { a.buys++; a.boughtUsd += usd; }
     }
   }
   let unrealized: number | null = price.size ? 0 : null;
   const gone = new Set<string>();
   for (const a of [...assets.values()]) {
-    a.avgCost = a.qty > 0 ? a.cost / a.qty : null;
+    const ledgerQty = a.qty;
+    const actual = held ? Math.max(0, held.get(a.asset) ?? 0) : ledgerQty;
+    // بهای معلوم فقط برای min(دفتر، موجودی واقعی)؛ خروج غیر سواپی به میانگین بها کم می‌شود
+    const basisQty = Math.min(ledgerQty, actual);
+    a.cost = ledgerQty > 0 ? (a.cost * basisQty) / ledgerQty : 0;
+    a.basisQty = basisQty;
+    a.unknownQty = Math.max(0, actual - ledgerQty);
+    a.qty = actual;
+    a.avgCost = basisQty > 1e-12 ? a.cost / basisQty : null;
     const px = price.get(a.asset);
     if (a.qty > 0 && price.size) {
       // موجودی دارد ولی زریون الان قیمتش را ندارد → کامل حذف (نه نمایش، نه محاسبه)
       if (px === undefined) { assets.delete(a.asset); gone.add(a.asset); continue; }
       a.value = a.qty * px;
-      a.unrealized = a.value - a.cost;
-      if (unrealized !== null) unrealized += a.unrealized;
+      a.dust = a.value < dustUsd;
+      a.open = !a.dust;
+      // سود باز فقط بخش با بهای معلوم؛ خرد در سود باز نمی‌آید
+      a.unrealized = a.open && basisQty > 0 ? basisQty * px - a.cost : a.open ? null : 0;
+      if (unrealized !== null && a.open && a.unrealized !== null) unrealized += a.unrealized;
+    } else if (a.qty > 0 && !price.size) {
+      a.open = true;
     }
   }
   if (gone.size) for (let i = sales.length - 1; i >= 0; i--) if (gone.has(sales[i].asset)) sales.splice(i, 1);
@@ -234,10 +276,12 @@ export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, 
     p.n++; p.volume += s.usd ?? 0;
     protos.set(k, p);
   }
-  const list = [...assets.values()].filter((a) => a.buys || a.sells || a.qty > 0).sort((x, y) => Math.abs(y.realized) + (y.value ?? 0) - (Math.abs(x.realized) + (x.value ?? 0)));
+  const list = [...assets.values()].filter((a) => a.buys || a.sells || a.open).sort((x, y) => Math.abs(y.realized) + (y.value ?? 0) - (Math.abs(x.realized) + (x.value ?? 0)));
   return {
     swaps: inRange.slice().reverse(),
     assets: list,
+    open: list.filter((a) => a.open).sort((x, y) => (y.value ?? 0) - (x.value ?? 0)),
+    closed: list.filter((a) => !a.open),
     sales,
     totals: {
       swaps: inRange.length,

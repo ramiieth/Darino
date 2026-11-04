@@ -253,6 +253,9 @@ export interface WeeklyReview {
   commitments: Commitment[];
   /** پاسخ سؤال‌های سفارشی قالب */
   answers: Record<string, string>;
+  /** جمع‌بندی منتور (دستیار Gemini) و زمان آخرین تکمیل خودکار */
+  aiSummary?: string;
+  aiAt?: number;
   updatedAt: number;
 }
 

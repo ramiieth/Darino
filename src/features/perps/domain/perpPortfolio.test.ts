@@ -20,7 +20,7 @@ describe('perpPortfolio', () => {
     expect(a.allTimePnl).toBe(200);
     expect(a.positions[1]).toMatchObject({ side: 'short', size: 2, mark: null });
     // حساب بدون فعالیت (null) = صفر؛ هنوز دریافت‌نشده (undefined) = نامعلوم
-    expect(fromArcus('a', 'x', null, [], 'ready', false)).toMatchObject({ equity: 0, unrealizedPnl: 0, allTimePnl: 0 });
+    expect(fromArcus('a', 'x', null, [], 'ready', false)).toMatchObject({ equity: 0, unrealizedPnl: 0, allTimePnl: 0, unit: 'USDG' });
     expect(fromArcus('a', 'x', undefined, null, 'loading', false)).toMatchObject({ equity: null, unrealizedPnl: null });
   });
 
