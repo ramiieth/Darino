@@ -2,7 +2,8 @@
  * تب «اسپات» — سواپ‌های همهٔ کیف پول‌ها در DEXها، خودکار از زریون؛ بدون تایپ
  *
  *   بالا: سود محقق، سود باز (قیمت لحظه‌ای کیف پول)، حجم، گاز و هزینهٔ سواپ، نرخ برد فروش‌ها
- *   دارایی‌ها: خرید/فروش، میانگین بها، موجودی، سود محقق و باز
+ *   پوزیشن‌های باز: موجودی واقعی کیف پول ≥ ۱۰ دلار، میانگین بها، سود محقق و باز (فقط بخش با بهای معلوم)
+ *   تسویه‌شده: کامل فروخته‌شده یا خرد (Dust) — سود محققشان در جمع می‌ماند
  *   سواپ‌ها: خط زمان «چه رفت → چه آمد» با پروتکل، شبکه و هزینه
  *   توکن اسپم، مخفی، تأییدنشده یا بی‌قیمت اصلاً نمی‌آید (domain/spot.ts)
  */
@@ -19,7 +20,7 @@ import { useSpot } from '../data/useSpot';
 import type { SpotAsset, SpotLeg, SpotSwap } from '../domain/spot';
 import { fa, faDateTime, pct, pnlTone, usd } from './parts';
 
-type View = 'assets' | 'swaps';
+type View = 'assets' | 'closed' | 'swaps';
 
 export function SpotTab({ from }: { from: number }) {
   const s = useSpot(from);
@@ -58,17 +59,22 @@ export function SpotTab({ from }: { from: number }) {
           <SpotHero b={b} />
           <div className="flex flex-wrap items-center gap-2">
             <ChipGroup label="نمایش" value={view} onChange={setView} options={[
-              { value: 'assets', label: 'دارایی‌ها', badge: b.assets.length },
+              { value: 'assets', label: 'پوزیشن‌های باز', badge: b.open.length },
+              { value: 'closed', label: 'تسویه‌شده و خرد', badge: b.closed.length || undefined },
               { value: 'swaps', label: 'سواپ‌ها', badge: b.totals.swaps }
             ]} />
             {b.totals.protocols.length > 0 && (
               <p className="ms-auto text-[11px] text-muted">بیشترین: {b.totals.protocols.slice(0, 3).map((p) => `${p.name} (${fa(p.n)})`).join('، ')}</p>
             )}
           </div>
-          {view === 'assets' ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {b.assets.map((a) => <AssetCard key={a.asset} a={a} />)}
-            </div>
+          {view === 'assets' || view === 'closed' ? (
+            <>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {(view === 'assets' ? b.open : b.closed).map((a) => <AssetCard key={a.asset} a={a} />)}
+              </div>
+              {!(view === 'assets' ? b.open : b.closed).length && <p className="text-sm text-muted">{view === 'assets' ? 'پوزیشن اسپات بازی (بالای ۱۰ دلار) نیست.' : 'توکن تسویه‌شده یا خردی نیست.'}</p>}
+              {view === 'closed' && b.closed.length > 0 && <p className="text-xs text-muted">توکن‌های کامل فروخته‌شده و موجودی‌های زیر ۱۰ دلار؛ سود محقق آن‌ها همچنان در جمع بالا حساب می‌شود.</p>}
+            </>
           ) : (
             <Surface className="divide-y divide-divider">
               {b.swaps.slice(0, limit).map((x) => <SwapRow key={x.id} s={x} />)}
@@ -131,13 +137,14 @@ function TokenIcon({ symbol, icon, size = 32 }: { symbol: string; icon: string |
 
 function AssetCard({ a }: { a: SpotAsset }) {
   const total = a.realized + (a.unrealized ?? 0);
+  const unknownPart = a.qty > 0 ? a.unknownQty / a.qty : 0;
   return (
     <Surface className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2.5">
         <TokenIcon symbol={a.symbol} icon={a.icon} />
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-ink" dir="ltr">{a.symbol}</p>
-          <p className="text-[11px] text-muted">{fa(a.buys)} خرید · {fa(a.sells)} فروش</p>
+          <p className="text-[11px] text-muted">{fa(a.buysAll)} خرید · {fa(a.sellsAll)} فروش{a.buysAll + a.sellsAll > a.buys + a.sells ? ` (${fa(a.buys + a.sells)} در بازه)` : ''}</p>
         </div>
         <div className="ms-auto text-end">
           <p className={cn('num-ltr text-base font-extrabold', pnlTone(total))}>{usd(total, true)}</p>
@@ -146,12 +153,17 @@ function AssetCard({ a }: { a: SpotAsset }) {
       </div>
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-control border border-divider bg-divider text-center">
         <Cell label="محقق" value={usd(a.realized, true)} tone={pnlTone(a.realized)} />
-        <Cell label="باز" value={usd(a.unrealized, true)} tone={pnlTone(a.unrealized)} />
-        <Cell label="میانگین بها" value={a.avgCost === null ? '—' : `$${fa(a.avgCost, a.avgCost < 1 ? 6 : 2)}`} />
+        <Cell label="باز" value={a.unrealized === null ? '—' : usd(a.unrealized, true)} tone={pnlTone(a.unrealized)} />
+        <Cell label="میانگین بها" value={a.avgCost === null ? 'نامعلوم' : `$${fa(a.avgCost, a.avgCost < 1 ? 6 : 2)}`} />
       </div>
       <p className="text-[11px] text-muted">
-        خرید {usd(a.boughtUsd)} · فروش {usd(a.soldUsd)}{a.qty > 0 ? <> · موجودی <span className="num-ltr">{fa(a.qty, a.qty < 1 ? 6 : 2)}</span>{a.value !== null ? ` (${usd(a.value)})` : ''}</> : ' · کامل فروخته شد'}
+        خرید {usd(a.boughtUsd)} · فروش {usd(a.soldUsd)}{a.qty > 0 ? <> · موجودی <span className="num-ltr">{fa(a.qty, a.qty < 1 ? 6 : 2)}</span>{a.value !== null ? ` (${usd(a.value)})` : ''}{a.dust ? ' · خرد' : ''}</> : ' · کامل فروخته شد'}
       </p>
+      {unknownPart > 0.01 && (
+        <p className="text-[11px] leading-5 text-subtle">
+          {unknownPart >= 0.99 ? 'کل این موجودی' : <><span className="num-ltr">{fa(a.unknownQty, a.unknownQty < 1 ? 6 : 2)}</span> از موجودی</>} از راهی جز سواپ آمده (واریز، ایردراپ یا پل)؛ بهایش معلوم نیست و در سود باز حساب نشده.
+        </p>
+      )}
     </Surface>
   );
 }

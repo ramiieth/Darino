@@ -15,7 +15,7 @@ import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getLighterOrders, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
-import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, optionsAnalysisSchema } from './_assistant.js';
+import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePlan, analyzeReview, optionsAnalysisSchema, reviewAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
@@ -56,7 +56,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
-  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' || op === 'analyze-review' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
     if ((ALERT_OPS as readonly string[]).includes(op)) {
@@ -77,6 +77,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const parsed = optionsAnalysisSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات وضعیت دلتا نوترال کامل یا معتبر نیست' }); return; }
       json(res,200,{ answer: await analyzeDelta(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
+    }
+    if (req.method === 'POST' && op === 'analyze-review') {
+      const parsed = reviewAnalysisSchema.safeParse(await readBody(req));
+      if (!parsed.success) { json(res,400,{ error:'اطلاعات مرور هفتگی کامل یا معتبر نیست' }); return; }
+      json(res,200,{ review: await analyzeReview(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
     }
     if (req.method === 'POST' && op === 'analyze-plan') {
       const parsed = optionsAnalysisSchema.safeParse(await readBody(req));

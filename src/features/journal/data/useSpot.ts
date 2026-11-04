@@ -3,7 +3,7 @@
  *
  *   هر کیف پول: صفحه‌های ۱۰۰تایی؛ بار اول تا ۳ صفحه (۳۰۰ سواپ اخیر)، «قدیمی‌تر» صفحهٔ بعد را می‌خواند.
  *   پاسخ‌ها در سرور کش می‌شوند (سهمیهٔ زریون)؛ این‌جا ۳۰ دقیقه تازه می‌مانند.
- *   قیمت لحظه‌ای برای سود/زیان باز: از موجودی کیف پول (همان دادهٔ صفحهٔ دارایی من).
+ *   قیمت لحظه‌ای و موجودی واقعی برای پوزیشن باز و سود/زیان باز: از موجودی کیف پول (همان دادهٔ صفحهٔ دارایی من).
  */
 import { useEffect, useMemo } from 'react';
 import { useInfiniteQueries } from './infiniteQueries';
@@ -67,15 +67,22 @@ export function useSpot(fromMs: number): SpotState {
     if (!wallets.length || q.every((x) => !x.pages.length)) return null;
     const swaps = wallets.flatMap((w, i) => q[i].pages.flatMap((p) => toSwaps(w.address, p.rows)));
     const price = new Map<string, number>();
+    // موجودی واقعی فعلی (جمع همهٔ کیف پول‌ها و شبکه‌ها) — فقط وقتی موجودی همهٔ کیف پول‌ها رسیده باشد
+    const held = new Map<string, number>();
+    const allLoaded = wallets.every((w) => !!snaps[addressKey(w.address)]?.data);
     for (const w of wallets) {
       for (const p of snaps[addressKey(w.address)]?.data?.positions ?? []) {
-        if (p.spam || !p.displayable || p.verified === false || p.price === null || !(p.price > 0) || p.type !== 'wallet') continue;
-        price.set(assetKey({ symbol: p.symbol, tokenId: p.tokenId, verified: p.verified }), p.price);
+        if (p.spam || !p.displayable || p.type !== 'wallet') continue;
+        const k = assetKey({ symbol: p.symbol, tokenId: p.tokenId, verified: p.verified });
+        const qty = Number(p.quantity);
+        if (Number.isFinite(qty) && qty > 0) held.set(k, (held.get(k) ?? 0) + qty);
+        if (p.verified === false || p.price === null || !(p.price > 0)) continue;
+        price.set(k, p.price);
       }
     }
     // یک سواپ ممکن است از دو کیف پول خودی دیده شود (انتقال داخلی نیست، ولی شناسه یکی است)
     const unique = [...new Map(swaps.map((s) => [s.hash || s.id, s])).values()];
-    return spotBook(unique, price, fromMs);
+    return spotBook(unique, price, fromMs, allLoaded ? held : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, wallets, snaps, fromMs]);
 

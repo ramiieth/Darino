@@ -5,7 +5,9 @@
  * فقط تحلیل؛ هیچ سفارشی ثبت نمی‌شود و به حساب کاربر وصل نیست. محاسبات در domain (calcDeltaNeutral, deltaSensitivity, fundingSpreads).
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowLeftRight, Bot } from 'lucide-react';
+import { ArrowLeftRight, Bot, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { handoffVenues, pairHandoffUrl } from '@/features/journal/domain/pairHandoff';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Surface } from '@/shared/components/ui/GlassCard';
@@ -396,6 +398,20 @@ export function DeltaNeutralCalculator({ onOpenExecution }: { onOpenExecution?: 
 
           <Warnings result={result} holdHours={holdHours} feeAssumed={longFee.assumed || shortFee.assumed} mmfAssumed={longQ.maintenanceMarginFraction === null || shortQ.maintenanceMarginFraction === null} />
 
+          {(() => {
+            // همگام با ژورنال: همین دو صرافی، بازار، ارزش هر پا و سمت لانگ → راهنمای جفت با اندازهٔ دقیق و قیمت سقف/کف
+            const hv = handoffVenues(va, vb);
+            if (!hv) return null;
+            const longVenue = (shortSide === 'a' ? vb : va) as (typeof hv)[number];
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-field border border-accent/40 bg-accent-soft/40 px-3.5 py-2.5">
+                <p className="min-w-0 text-xs leading-6 text-muted">باز کردن دستی دو پا با تأخیر یعنی لغزش. با همین انتخاب، ژورنال اندازهٔ دقیق هر پا، قیمت سقف/کف سفارش محدود و ترتیب باز کردن را آماده می‌کند و بعد از باز شدن، جفت را خودکار پایش می‌کند.</p>
+                <Link to={pairHandoffUrl({ venues: hv, base: selected.base, notional: n.notional, long: longVenue, leverage: n.leverage })} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-control bg-accent px-3 text-xs font-bold text-on-accent hover:bg-accent-strong">
+                  <Zap className="h-3.5 w-3.5" />اجرای سریع این جفت
+                </Link>
+              </div>
+            );
+          })()}
           {onOpenExecution && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-field bg-surface-2/70 px-3.5 py-2.5">
               <p className="min-w-0 text-xs leading-6 text-muted">این عدد فرض می‌کند دو طرف یک‌باره باز می‌شوند. اجرای تدریجی ربات Tread.fi را کنارش ببینید.</p>

@@ -20,6 +20,7 @@ import { toFaDigits } from '@/shared/utils/formatters';
 import { SAFE_TARGET_7D, VERDICT_FA, assess, buildRiskModel, type Assessment, type RiskModel, type Side } from '../domain/survival';
 import { usePerpMarkets, useRiskCandles } from '../data/intelApi';
 import { fmtPrice } from './parts';
+import { FLOW_ROLE, TradeFlow } from '@/shared/components/layout/TradeFlow';
 
 const MARKETS = 40;
 const pct = (v: number, digits = 1) => `${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: digits }))}٪`;
@@ -76,6 +77,8 @@ export function CheckTab({
 
   return (
     <div className="space-y-4">
+      <TradeFlow current="check" />
+      <p className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-xs leading-6 text-muted">{FLOW_ROLE.check} <Link to="/journal" className="font-semibold text-accent underline">حسابرسی معاملات گذشته ←</Link></p>
       <Surface className="grid gap-4 p-4 sm:grid-cols-3">
         <Field label="بازار">
           <Select value={m ? market : ''} onChange={(e) => onChange({ m: e.target.value })}>

@@ -165,7 +165,8 @@ export function fromArcus(
     id,
     venue: 'arcus',
     label,
-    unit: 'USDC',
+    // وثیقهٔ آرکوس USDG است (docs.arcus.xyz: واریزها به USDG تبدیل می‌شوند)
+    unit: 'USDG',
     equity,
     unrealizedPnl,
     allTimePnl,

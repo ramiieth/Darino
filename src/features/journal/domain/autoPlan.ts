@@ -15,6 +15,7 @@ import type { JournalAccount } from './types';
 import type { Candle } from './excursions';
 import { emptyOutlook } from './plan';
 import { usToMs } from './fills';
+import { baseOf as baseOfSymbol } from './roundTrips';
 
 const MIN = 60_000;
 const BEFORE_OPEN = 6 * 60 * MIN;
@@ -84,16 +85,20 @@ export interface Levels {
 export function levelsFor(t: ClassifiedTrade, orders: readonly TriggerOrder[], cov: OrderCoverage | undefined, now: number, prevClose: number | null = null): Levels {
   const none = (stopSource: AutoPlanMeta['stopSource'], why: string | null = null): Levels => ({ stop: null, target: null, meta: { stopSource, unreadableWhy: why, stopLateMin: null, finalStop: null, stopMoved: null } });
   if (!cov || cov.from === null) return none('unreadable', cov?.why ?? 'سفارش‌های این پلتفرم عمومی خوانده نمی‌شود.');
-  if (t.openTime < cov.from) return none('unreadable', 'این معامله قدیمی‌تر از تاریخچهٔ سفارش‌هایی است که صرافی می‌دهد.');
+  // پوزیشن بازی که شروعش خارج از تاریخچه است: سفارش‌های زندهٔ فعلی (SL/TP روی صرافی) همچنان معتبرند
+  const liveOnly = t.open && t.truncated;
+  if (t.openTime < cov.from && !t.open) return none('unreadable', 'این معامله قدیمی‌تر از تاریخچهٔ سفارش‌هایی است که صرافی می‌دهد.');
   if (t.entryPx === null) return none('none');
   const long = t.direction === 'long';
   const closeSide = long ? 'sell' : 'buy';
   const end = t.closeTime ?? now;
   const start = Math.max(t.openTime - BEFORE_OPEN, prevClose ?? -Infinity);
+  const base = baseOfSymbol(t.symbol);
   const mine = orders
-    .filter((o) => o.account === t.account && o.symbol === t.symbol && o.side === closeSide)
-    .filter((o) => o.placedAt >= start && o.placedAt <= end && (o.endedAt === null || o.endedAt >= t.openTime))
+    .filter((o) => o.account === t.account && (o.symbol === t.symbol || baseOfSymbol(o.symbol) === base) && o.side === closeSide)
+    .filter((o) => (liveOnly ? o.endedAt === null && o.placedAt <= end && (prevClose === null || o.placedAt >= prevClose) : o.placedAt >= start && o.placedAt <= end && (o.endedAt === null || o.endedAt >= t.openTime)))
     .sort((a, b) => a.placedAt - b.placedAt);
+  if (!mine.length && t.openTime < cov.from) return none('unreadable', 'این معامله قدیمی‌تر از تاریخچهٔ سفارش‌هایی است که صرافی می‌دهد.');
   const entry = t.entryPx;
   const sls = mine.filter((o) => o.kind === 'sl');
   const first = sls.find((o) => (long ? o.triggerPx < entry : o.triggerPx > entry)) ?? null;
@@ -108,7 +113,7 @@ export function levelsFor(t: ClassifiedTrade, orders: readonly TriggerOrder[], c
     meta: {
       stopSource: 'exchange',
       unreadableWhy: null,
-      stopLateMin: first.placedAt - t.openTime > LATE ? Math.round((first.placedAt - t.openTime) / MIN) : null,
+      stopLateMin: !liveOnly && first.placedAt - t.openTime > LATE ? Math.round((first.placedAt - t.openTime) / MIN) : null,
       finalStop: last.triggerPx,
       stopMoved: Math.abs(diff) <= eps ? 'none' : diff > 0 ? 'tighter' : 'wider'
     }
@@ -190,7 +195,8 @@ export function autoPlans(
     if (t.closeTime !== null) lastClose.set(k, Math.max(lastClose.get(k) ?? 0, t.closeTime));
   }
   for (const t of trades) {
-    if (t.book !== 'directional' || manual.has(t.id)) continue;
+    // جهت‌دار: همه · نوترال: فقط پوزیشن باز (تا هر پوزیشن زنده در «برنامهٔ معامله» دیده شود)
+    if ((t.book !== 'directional' && !t.open) || manual.has(t.id)) continue;
     const lv = levelsFor(t, byAccount.get(t.account) ?? [], coverage.get(t.account), now, prevClose.get(t.id) ?? null);
     const outlook = outlookOf?.(t) ?? null;
     out.set(t.id, {

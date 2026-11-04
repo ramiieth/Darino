@@ -3,10 +3,14 @@
  *   • کلید هفته با سال (ISO)، ذخیرهٔ همگام بین دستگاه‌ها (نه localStorage)، بدون از دست رفتن فوکوس هنگام تایپ
  *   • لاگ معاملات خودکار از دفتر جهت‌دار (نه تایپ دستی)؛ «طبق قانون» و تگ‌ها از تب معاملات
  *   • تعهدها قابل‌سنجش: نوع قانون انتخاب می‌شود و روی هفتهٔ بعد خودکار بررسی می‌شود؛ تعهد آزاد تیک دستی دارد
- *   • مقایسهٔ هفته‌ها و الگوهای تکرارشونده محاسبه‌ای؛ «تحلیل منتور» به دستیار اپ سپرده می‌شود (سمت سرور)
+ *   • مقایسهٔ هفته‌ها و الگوهای تکرارشونده محاسبه‌ای
+ *   • تکمیل خودکار با دستیار (Gemini، سمت سرور): هفته‌ای که معامله دارد و هنوز تکمیل نشده، با باز شدن تب خودکار پر می‌شود؛
+ *     فقط فیلدهای خالی پر می‌شوند و نوشتهٔ شما دست نمی‌خورد (domain/reviewAssist.ts)
  */
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { fetchJson } from '@/repositories/remoteClient';
+import { mergeSuggestion, reviewPayload, type ReviewSuggestion } from '../domain/reviewAssist';
 import { Link } from 'react-router-dom';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -20,7 +24,7 @@ import { checkCommitment, crossWeekPatterns, emptyReview, RULE_FA, tradesByWeek,
 import { isoWeekKey, isoWeekStartUtc, shiftWeek } from '../domain/time';
 import { plannedRisks } from '../domain/plan';
 import { saveReview } from '../data/journalStore';
-import { fa, faDate, pct, pnlTone, TagPicker, usd } from './parts';
+import { fa, faDate, faDateTime, pct, pnlTone, TagPicker, usd } from './parts';
 import { Bars } from './charts';
 
 const STATUS_TONE: Record<CommitmentStatus, 'gain' | 'loss' | 'neutral' | 'warn' | 'info'> = { kept: 'gain', broken: 'loss', unknown: 'neutral', manual: 'info', pending: 'warn' };
@@ -53,7 +57,7 @@ function RuleParams({ rule, onChange, whyTags }: { rule: CommitmentRule; onChang
   }
 }
 
-export function ReviewTab({ trades, notes, links, reviews, settings, tz, accountSize }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; reviews: Map<string, WeeklyReview>; settings: JournalSettings; tz: string; accountSize: number | null }) {
+export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, accountSize }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; auto?: ReadonlyMap<string, TradePlan>; reviews: Map<string, WeeklyReview>; settings: JournalSettings; tz: string; accountSize: number | null }) {
   const thisWeek = isoWeekKey(Date.now(), tz);
   const [week, setWeek] = useState(thisWeek);
   const [view, setView] = useState<'review' | 'compare'>('review');
@@ -87,6 +91,35 @@ export function ReviewTab({ trades, notes, links, reviews, settings, tz, account
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviews, byWeek, notes, links, risks]);
   const patterns = useMemo(() => crossWeekPatterns(allStats.filter((s) => s.n > 0), reviews, broken), [allStats, reviews, broken]);
+
+  // ---------- تکمیل خودکار با دستیار ----------
+  const [ai, setAi] = useState<{ week: string; status: 'loading' | 'error'; error?: string } | null>(null);
+  const latest = useRef(r);
+  latest.current = r;
+  const tried = useRef(new Set<string>());
+  const allPlans = useMemo(() => new Map<string, TradePlan>([...(auto ?? new Map()), ...links]), [auto, links]);
+  const runAi = useCallback(async () => {
+    const w = week;
+    setAi({ week: w, status: 'loading' });
+    try {
+      const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz });
+      const res = await fetchJson<{ review: ReviewSuggestion }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 60_000 });
+      if (latest.current.week !== w) { setAi(null); return; }
+      await saveReview(mergeSuggestion(latest.current, res.review));
+      setDraft(null);
+      setAi(null);
+    } catch (e) {
+      setAi({ week: w, status: 'error', error: e instanceof Error ? e.message : 'دستیار پاسخ نداد' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [week, wTrades, notes, allPlans, settings, accountSize, tz]);
+  useEffect(() => {
+    // هر هفتهٔ دارای معامله یک‌بار خودکار؛ بعد از آن فقط با دکمهٔ «به‌روزرسانی»
+    if (view !== 'review' || !wTrades.length || saved?.aiAt || tried.current.has(week)) return;
+    tried.current.add(week);
+    void runAi();
+  }, [view, week, wTrades.length, saved?.aiAt, runAi]);
+  const aiBusy = ai?.week === week && ai.status === 'loading';
 
   const start = isoWeekStartUtc(week);
   const setCommit = (i: number, patch: Partial<Commitment>) => edit({ commitments: r.commitments.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
@@ -146,6 +179,20 @@ export function ReviewTab({ trades, notes, links, reviews, settings, tz, account
             <div><p className="text-[11px] text-muted">نرخ برد</p><p className="text-xl font-bold text-ink">{pct(stats.winRate, 0)}</p></div>
             <div><p className="text-[11px] text-muted">پوشش برنامه</p><p className="text-xl font-bold text-ink">{pct(stats.planCoverage, 0)}</p></div>
             <div><p className="text-[11px] text-muted">طبق قانون</p><p className={cn('text-xl font-bold', stats.ruleAdherence === null ? 'text-ink' : stats.ruleAdherence >= 90 ? 'text-positive' : stats.ruleAdherence >= 75 ? 'text-warn' : 'text-negative')}>{pct(stats.ruleAdherence, 0)}</p></div>
+          </Surface>
+
+          <Surface variant="focal" className="space-y-2 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Sparkles className="h-4 w-4 text-accent" />
+              <h3 className="text-sm font-bold text-ink">جمع‌بندی منتور (دستیار)</h3>
+              {r.aiAt && <span className="text-[11px] text-subtle">· {faDateTime(r.aiAt)}</span>}
+              <Button size="sm" variant="ghost" className="ms-auto" icon={<RefreshCw />} disabled={aiBusy || !wTrades.length} onClick={() => void runAi()}>{r.aiAt ? 'به‌روزرسانی' : 'تکمیل خودکار'}</Button>
+            </div>
+            {aiBusy ? <p className="text-xs text-muted">دستیار در حال مرور معاملات این هفته است…</p>
+              : ai?.week === week && ai.status === 'error' ? <Notice tone="warn">{ai.error}</Notice>
+              : r.aiSummary ? <p className="whitespace-pre-line text-sm leading-7 text-ink">{r.aiSummary}</p>
+              : <p className="text-xs text-muted">{wTrades.length ? 'با باز شدن هفته‌ای که معامله دارد، اشتباه‌ها، قوت‌ها، پاسخ سؤال‌ها و تعهدهای هفتهٔ بعد خودکار پیشنهاد و ذخیره می‌شوند.' : 'معاملهٔ بسته‌ای در این هفته نیست.'}</p>}
+            <p className="text-[11px] text-subtle">فقط فیلدهای خالی پر می‌شوند؛ هرچه خودتان نوشته‌اید دست نمی‌خورد و قابل ویرایش است.</p>
           </Surface>
 
           <Surface className="p-4">
