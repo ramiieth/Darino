@@ -1,5 +1,6 @@
 /**
- * ژورنال معاملاتی — حلقهٔ کامل: برنامه قبل از ورود → اجرا (از حساب‌های واقعی) → تگ «چرا» → حسابرسی خودکار → مرور هفتگی
+ * ژورنال معاملاتی — کاملاً خودکار، بدون تایپ: معاملات پرپ از حساب‌ها، برنامه از استاپ/هدف صرافی، اسپات از سواپ‌های کیف پول
+ *   → تگ «چرا» (اختیاری، با لمس) → حسابرسی خودکار → مرور هفتگی
  *
  *   دو دفتر جدا: «جهت‌دار» با معیارهای ارزیابی Prop، و «دلتا نوترال / فارم» با معیارهای حجم، فاندینگ و هزینه.
  *   همهٔ حالت‌ها در URL (?tab= ، ?range= ) تا لینک و برگشت PWA درست کار کند؛ ورود از چک قبل از ورود: ?tab=plan&m=&side=&lev=
@@ -7,7 +8,9 @@
  */
 import { useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BookOpenCheck, CalendarCheck, ClipboardList, ListChecks, Scale, Settings2 } from 'lucide-react';
+import { BookOpenCheck, CalendarCheck, ClipboardList, Coins, ListChecks, Scale, Settings2, Zap } from 'lucide-react';
+import { cn } from '@/shared/lib/cn';
+import { VENUE_FA } from '../domain/types';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { ChipGroup, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { EmptyState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
@@ -22,16 +25,18 @@ import { PlanTab } from './PlanTab';
 import { ReviewTab } from './ReviewTab';
 import { NeutralTab } from './NeutralTab';
 import { SettingsTab } from './SettingsTab';
+import { SpotTab } from './SpotTab';
 import { fa } from './parts';
 
-type Tab = 'audit' | 'trades' | 'plan' | 'review' | 'neutral' | 'settings';
-const TABS: Tab[] = ['audit', 'trades', 'plan', 'review', 'neutral', 'settings'];
+type Tab = 'audit' | 'trades' | 'plan' | 'spot' | 'review' | 'neutral' | 'settings';
+const TABS: Tab[] = ['audit', 'trades', 'plan', 'spot', 'review', 'neutral', 'settings'];
 const RANGES: RangeKey[] = ['30', '90', '180', 'all'];
 
 const INTRO: Record<Tab, string> = {
   audit: 'حسابرسی خودکار معاملات جهت‌دار شما از حساب‌های واقعی، به سبک ارزیابی شرکت‌های Prop: کجا با یک حرفه‌ای فرق دارید، با عدد، و اول چه چیزی را درست کنید.',
-  trades: 'معامله‌ها را با یک فایل استیتمنت متاتریدر یا با چند لمس اضافه کنید؛ برای هر معامله ۱۰ ثانیه: چرا وارد شدم، طبق قوانینم بود؟',
-  plan: 'قبل از ورود: نماد و جهت را بزنید؛ قیمت، استاپ، هدف و حجم مجاز خودکار پیشنهاد می‌شوند. برنامه خودکار به معاملهٔ واقعی وصل می‌شود.',
+  trades: 'همهٔ معاملات خودکار از هایپرلیکوئید، لایتر، تی‌اکس‌فلو و آرکوس می‌آیند؛ چیزی تایپ نمی‌شود. اختیاری: با یک لمس بگویید چرا وارد شدید.',
+  plan: 'برنامهٔ هر معامله خودکار از استاپ و هدفی که روی صرافی گذاشتید ساخته می‌شود: ریسک، R، جابه‌جایی استاپ و روند بازار لحظهٔ ورود.',
+  spot: 'سواپ‌های همهٔ کیف پول‌ها در DEXها خودکار ثبت می‌شوند: سود محقق و باز هر توکن، میانگین بها، گاز و لغزش.',
   review: 'هر هفته: پایبندی، اشتباه‌ها، کار درست و حداکثر سه تعهد قابل‌سنجش که هفتهٔ بعد خودکار بررسی می‌شوند.',
   neutral: 'دفتر دلتا نوترال و فارم پوینت: حجم ساخته‌شده، فاندینگ، کارمزد، هزینه به‌ازای هر ۱ میلیون دلار حجم و تعادل پوشش‌ها.',
   settings: 'نقش هر حساب (جهت‌دار یا نوترال)، اندازهٔ حساب، سقف ریسک، تگ‌ها، چک‌لیست و سؤال‌های مرور.'
@@ -57,6 +62,8 @@ export default function JournalPage() {
   }, [venues]);
 
   const j = useJournal(range, liveEquity);
+  // ساعت ثابت در طول جلسه تا کلید محاسبهٔ اسپات با هر رندر عوض نشود
+  const spotFrom = useMemo(() => Math.floor(Date.now() / 3_600_000) * 3_600_000 - Number(range === 'all' ? 0 : range) * 86_400_000, [range]);
   const a = j.audit;
   const d = a?.directional;
 
@@ -77,18 +84,19 @@ export default function JournalPage() {
   const clearPrefill = useCallback(() => update({ m: null, side: null, lev: null }), [update]);
 
   const directionalTrades = a ? a.all : [];
-  const noAccounts = !j.accounts.length && !j.data.manual.length && !j.data.mt.length;
+  const noAccounts = !j.accounts.length;
   const empty = (
     <EmptyState
       message={noAccounts ? 'هنوز حساب پرپچوالی متصل نیست' : 'هنوز معاملهٔ بسته‌شدهٔ جهت‌داری در این بازه نیست'}
-      hint={noAccounts ? 'حساب هایپرلیکوئید، لایتر یا آرکوس را با آدرس عمومی اضافه کنید؛ یا در تب «معاملات» استیتمنت متاتریدر را وارد کنید یا معامله را دستی ثبت کنید.' : 'بازه را بزرگ‌تر کنید یا نقش حساب‌ها را در تنظیمات ببینید (لایتر رابین‌هود و آرکوس پیش‌فرض نوترال‌اند).'}
+      hint={noAccounts ? 'حساب هایپرلیکوئید، لایتر، تی‌اکس‌فلو یا آرکوس را یک‌بار با آدرس عمومی اضافه کنید؛ از آن به بعد همه‌چیز خودکار است.' : 'بازه را بزرگ‌تر کنید یا نقش حساب‌ها را در تنظیمات ببینید (لایتر رابین‌هود و آرکوس پیش‌فرض نوترال‌اند).'}
       action={noAccounts ? <Link to="/wallets"><Button>مدیریت کیف پول‌ها</Button></Link> : <Button variant="outline" onClick={() => update({ tab: 'settings' })}>تنظیمات حساب‌ها</Button>}
     />
   );
 
   return (
     <Page>
-      <PageHeader eyebrow="معامله · فقط‌خواندنی" title="ژورنال معاملاتی" meta={<p className="max-w-3xl text-sm leading-7 text-muted">{INTRO[tab]}</p>} />
+      <PageHeader eyebrow="معامله · خودکار · فقط‌خواندنی" title="ژورنال معاملاتی" meta={<p className="max-w-3xl text-sm leading-7 text-muted">{INTRO[tab]}</p>} />
+      <Sources histories={j.histories} />
       <Tabs
         label="بخش‌های ژورنال"
         value={tab}
@@ -97,13 +105,14 @@ export default function JournalPage() {
           { value: 'audit', label: 'حسابرسی', icon: <Scale /> },
           { value: 'trades', label: 'معاملات', icon: <ListChecks />, badge: a ? a.all.filter((t) => t.book === 'directional' && !a.notes.get(t.id)?.whyTags.length).length || undefined : undefined },
           { value: 'plan', label: 'برنامهٔ معامله', icon: <ClipboardList /> },
+          { value: 'spot', label: 'اسپات', icon: <Coins /> },
           { value: 'review', label: 'مرور هفتگی', icon: <CalendarCheck /> },
           { value: 'neutral', label: 'دلتا نوترال', icon: <BookOpenCheck /> },
           { value: 'settings', label: 'تنظیمات', icon: <Settings2 /> }
         ]}
       />
       <div className="mt-4 space-y-4" role="tabpanel">
-        {(tab === 'audit' || tab === 'neutral') && (
+        {(tab === 'audit' || tab === 'neutral' || tab === 'spot') && (
           <ChipGroup label="بازهٔ زمانی" value={range} onChange={(v) => update({ range: v === '90' ? null : v })} options={RANGES.map((r) => ({ value: r, label: RANGE_FA[r] }))} />
         )}
         {j.histories.some((h) => h.status === 'error') && tab !== 'settings' && (
@@ -115,8 +124,9 @@ export default function JournalPage() {
           <>
             {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
             {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} />}
-            {tab === 'trades' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} settings={j.data.settings} manual={j.data.manual} mt={j.data.mt} />}
-            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} mt={j.data.mt} tz={j.tz} />}
+            {tab === 'trades' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} auto={a.auto} settings={j.data.settings} />}
+            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
+            {tab === 'spot' && <SpotTab from={range === 'all' ? 0 : spotFrom} />}
             {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
             {tab === 'neutral' && <NeutralTab nb={a.neutral} fillDays={j.data.settings.neutralFillDays} accounts={j.accounts} settings={j.data.settings} />}
             {tab === 'settings' && <SettingsTab settings={j.data.settings} accounts={j.accounts} histories={j.histories} liveEquity={liveEquity} onRefetch={j.refetch} />}
@@ -124,5 +134,23 @@ export default function JournalPage() {
         )}
       </div>
     </Page>
+  );
+}
+
+/** منبع‌های خودکار ژورنال: هر حساب با وضعیت همگام‌سازی — تایپی در کار نیست */
+function Sources({ histories }: { histories: ReturnType<typeof useJournal>['histories'] }) {
+  if (!histories.length) return null;
+  return (
+    <div className="no-scrollbar -mx-1 mb-3 flex items-center gap-2 overflow-x-auto px-1 pb-1">
+      <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold text-muted"><Zap className="h-3.5 w-3.5 text-accent" />ثبت خودکار از</span>
+      {histories.map((h) => (
+        <span key={h.account.key} className="flex shrink-0 items-center gap-1.5 rounded-full border border-divider bg-card px-2.5 py-1 text-[11px]">
+          <span className={cn('h-1.5 w-1.5 rounded-full', h.status === 'ready' ? 'bg-gain' : h.status === 'error' ? 'bg-negative' : 'animate-pulse bg-warn')} aria-hidden />
+          <span className="font-semibold text-ink">{VENUE_FA[h.account.venue]}</span>
+          <span className="max-w-[9rem] truncate text-subtle">{h.account.label}</span>
+          {h.history && <span className="text-subtle">· {fa(h.history.orders.length)} سفارش استاپ/هدف</span>}
+        </span>
+      ))}
+    </div>
   );
 }

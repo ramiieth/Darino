@@ -11,7 +11,7 @@ import { candleNeeds, excursionsFor, HL_CANDLE_CAP, summarize, type Candle, type
 
 const HL_INFO = 'https://api.hyperliquid.xyz/info';
 
-async function fetchCandles(coin: string, key: string, ms: number): Promise<CandleSet> {
+export async function fetchCandles(coin: string, key: string, ms: number): Promise<CandleSet> {
   const now = Date.now();
   const res = await fetch(HL_INFO, {
     method: 'POST',

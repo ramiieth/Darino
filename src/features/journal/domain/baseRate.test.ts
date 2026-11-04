@@ -112,10 +112,10 @@ describe('helpers', () => {
   });
 
   it('maps plan symbols to candle coins', () => {
-    expect(planCoin('BTC-PERP', 'crypto')).toBe('BTC');
-    expect(planCoin('xyz:GOLD', 'crypto')).toBe('xyz:GOLD');
-    expect(planCoin('XAUUSD', 'mt')).toBe('xyz:GOLD');
-    expect(planCoin('GBPJPY', 'mt')).toBeNull();
-    expect(planCoin(' ', 'crypto')).toBeNull();
+    expect(planCoin('BTC-PERP')).toBe('BTC');
+    expect(planCoin('xyz:GOLD')).toBe('xyz:GOLD');
+    expect(planCoin('GOLD')).toBe('xyz:GOLD');
+    expect(planCoin('XAU')).toBe('xyz:GOLD');
+    expect(planCoin(' ')).toBeNull();
   });
 });

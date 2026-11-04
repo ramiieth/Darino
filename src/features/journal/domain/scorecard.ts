@@ -243,12 +243,12 @@ export function buildScorecard({ core: m, behavior: b, planCoverage, ruleAdheren
   });
 
   rows.push({
-    id: 'planCoverage', cls: 'behaviour', title: 'چند درصد معاملات برنامهٔ قبلی داشتند', term: 'پوشش برنامه',
-    value: planCoverage, display: pc(planCoverage), benchmark: '۱۰۰٪ — هیچ ورودی بدون برنامهٔ نوشته‌شده',
+    id: 'planCoverage', cls: 'behaviour', title: 'چند درصد معاملات از اول استاپ داشتند (روی صرافی یا برنامه)', term: 'پوشش برنامه',
+    value: planCoverage, display: pc(planCoverage), benchmark: '۱۰۰٪ — هیچ ورودی بدون استاپ از همان اول',
     band: planCoverage === null ? null : { min: 0, max: 100, goodFrom: 90, goodTo: 100, mark: planCoverage },
     verdict: planCoverage === null ? 'na' : planCoverage >= 90 ? 'meets' : planCoverage >= 60 ? 'borderline' : 'fails',
-    action: 'اگر پایین است، قبل از هر ورود برگهٔ «برنامهٔ معامله» را پر کنید؛ ۶۰ ثانیه وقت می‌برد.',
-    note: null, impact: null, formula: 'معاملات متصل به برنامه ÷ همهٔ معاملات'
+    action: 'اگر پایین است، با همان سفارش ورود روی صرافی استاپ (SL) بگذارید؛ ژورنال خودش می‌خواند و R و ریسک را حساب می‌کند.',
+    note: null, impact: null, formula: '(معاملات با برنامهٔ نوشته‌شده یا استاپ صرافی تا ۱۵ دقیقه بعد از ورود) ÷ معاملاتی که سفارششان خواندنی است'
   });
 
   rows.push({

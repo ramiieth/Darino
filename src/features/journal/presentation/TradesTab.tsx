@@ -2,10 +2,11 @@
  * تب «معاملات» — ۱۰ ثانیه برای هر معامله: تگ «چرا»، طبق قانون بود؟، اشتباه/نقطهٔ قوت، یادداشت، دفتر
  *
  *   معامله‌های باز اول نمایش داده می‌شوند: تگ «چرا» روی معاملهٔ باز «قبل از نتیجه» حساب می‌شود و در تحلیل ستاپ بی‌طرف است.
- *   فیلتر «بدون تگ» برای کارِ عقب‌افتاده. معاملهٔ دستی برای پلتفرمی که اتصال ندارد.
+ *   فیلتر «بدون تگ» برای کارِ عقب‌افتاده. همهٔ معاملات خودکار از حساب‌های متصل می‌آیند؛ تایپ لازم نیست.
+ *   نشان استاپ: از برنامهٔ خودکار (سفارش SL روی صرافی).
  */
 import { useMemo, useState } from 'react';
-import { FileUp, Plus } from 'lucide-react';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
@@ -15,15 +16,12 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { ClassifiedTrade, JournalSettings, TradeNote, TradePlan } from '../domain/types';
 import { VENUE_FA } from '../domain/types';
-import { saveNote, type ManualTrade } from '../data/journalStore';
-import type { MtTrade } from '../domain/metatrader';
-import { MetaTraderImport } from './MetaTraderImport';
-import { ManualTradeSheet } from './ManualTradeSheet';
+import { saveNote } from '../data/journalStore';
 import { duration, fa, faDateTime, pnlTone, TagPicker, usd } from './parts';
 
 type Filter = 'all' | 'open' | 'untagged' | 'directional' | 'neutral';
 
-function TradeCard({ t, note, plan, settings }: { t: ClassifiedTrade; note: TradeNote | undefined; plan: TradePlan | undefined; settings: JournalSettings }) {
+function TradeCard({ t, note, plan, auto, settings }: { t: ClassifiedTrade; note: TradeNote | undefined; plan: TradePlan | undefined; auto: TradePlan | undefined; settings: JournalSettings }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(note?.note ?? '');
   const [err, setErr] = useState<string | null>(null);
@@ -38,6 +36,8 @@ function TradeCard({ t, note, plan, settings }: { t: ClassifiedTrade; note: Trad
         {t.open && <Badge tone="warn">باز</Badge>}
         {t.truncated && <Badge tone="neutral">شروع خارج از تاریخچه</Badge>}
         {plan && <Badge tone="gain">برنامه‌دار</Badge>}
+        {!plan && auto?.auto?.stopSource === 'exchange' && <Badge tone="gain"><ShieldCheck />استاپ {fa(auto.stop, 5)}</Badge>}
+        {!plan && auto?.auto?.stopSource === 'none' && <Badge tone="loss"><ShieldAlert />بدون استاپ</Badge>}
         <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(t.netPnl))}>{t.open ? 'باز' : usd(t.netPnl, true)}</span>
       </div>
       <p className="mt-1 text-xs text-muted">
@@ -79,20 +79,9 @@ function TradeCard({ t, note, plan, settings }: { t: ClassifiedTrade; note: Trad
   );
 }
 
-function AddButton({ icon, title, sub, onClick }: { icon: React.ReactNode; title: string; sub: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="flex items-center gap-2.5 rounded-card border border-divider bg-card p-3 text-start transition-colors hover:border-accent [&_svg]:h-5 [&_svg]:w-5">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field bg-accent-soft text-accent">{icon}</span>
-      <span className="min-w-0"><span className="block text-sm font-bold text-ink">{title}</span><span className="block truncate text-[11px] text-muted">{sub}</span></span>
-    </button>
-  );
-}
-
-export function TradesTab({ trades, notes, links, settings, manual, mt = [] }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; settings: JournalSettings; manual: ManualTrade[]; mt?: MtTrade[] }) {
+export function TradesTab({ trades, notes, links, auto, settings }: { trades: ClassifiedTrade[]; notes: Map<string, TradeNote>; links: Map<string, TradePlan>; auto: Map<string, TradePlan>; settings: JournalSettings }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit] = useState(30);
-  const [manualOpen, setManualOpen] = useState(false);
-  const [mtOpen, setMtOpen] = useState(false);
   const list = useMemo(() => {
     const base = [...trades].sort((a, b) => Number(b.open) - Number(a.open) || (b.closeTime ?? b.openTime) - (a.closeTime ?? a.openTime));
     return base.filter((t) => filter === 'all' || (filter === 'open' ? t.open : filter === 'untagged' ? !(notes.get(t.id)?.whyTags.length) : t.book === filter));
@@ -100,10 +89,6 @@ export function TradesTab({ trades, notes, links, settings, manual, mt = [] }: {
   const untagged = trades.filter((t) => t.book === 'directional' && !notes.get(t.id)?.whyTags.length).length;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:max-w-md">
-        <AddButton icon={<FileUp />} title="استیتمنت متاتریدر" sub="یک فایل، همهٔ معامله‌ها" onClick={() => setMtOpen(true)} />
-        <AddButton icon={<Plus />} title="معاملهٔ دستی" sub="چند لمس، بدون جزئیات" onClick={() => setManualOpen(true)} />
-      </div>
       <ChipGroup label="فیلتر معاملات" bleed value={filter} onChange={setFilter} options={[
         { value: 'all', label: 'همه', badge: trades.length },
         { value: 'open', label: 'باز', badge: trades.filter((t) => t.open).length },
@@ -112,11 +97,8 @@ export function TradesTab({ trades, notes, links, settings, manual, mt = [] }: {
         { value: 'neutral', label: 'دلتا نوترال' }
       ]} />
       {untagged > 0 && <Notice tone="info">{fa(untagged)} معاملهٔ جهت‌دار هنوز تگ «چرا» ندارد. بدون تگ، ستاپ سودده از دل داده بیرون نمی‌آید. برای معامله‌های باز همین حالا بزنید — قبل از دیدن نتیجه.</Notice>}
-      {manual.length > 0 && <p className="text-xs text-muted">{fa(manual.length)} معاملهٔ دستی ثبت شده (پلتفرم: {[...new Set(manual.map((m) => m.venueLabel || 'نامشخص'))].join('، ')}).</p>}
-      {!list.length ? <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p> : list.slice(0, limit).map((t) => <TradeCard key={t.id} t={t} note={notes.get(t.id)} plan={links.get(t.id)} settings={settings} />)}
+      {!list.length ? <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p> : list.slice(0, limit).map((t) => <TradeCard key={t.id} t={t} note={notes.get(t.id)} plan={links.get(t.id)} auto={auto.get(t.id)} settings={settings} />)}
       {list.length > limit && <Button variant="outline" onClick={() => setLimit((l) => l + 30)}>نمایش ۳۰ معاملهٔ بیشتر ({fa(list.length - limit)} باقی‌مانده)</Button>}
-      <ManualTradeSheet open={manualOpen} onClose={() => setManualOpen(false)} manual={manual} mt={mt} usedSymbols={trades.map((t) => t.symbol)} />
-      <MetaTraderImport open={mtOpen} onClose={() => setMtOpen(false)} existing={mt} />
     </div>
   );
 }

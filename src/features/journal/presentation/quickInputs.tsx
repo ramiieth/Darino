@@ -1,7 +1,7 @@
 /**
  * ورودی‌های سریع ژورنال (وب و PWA): انتخاب به‌جای تایپ — بازار، نماد، جهت، زمان، عدد آماده، قیمت بازار
- *   قیمت بازار از هایپرلیکوئید (کریپتو، طلا، نقره، نفت، یورو، پوند، ین؛ متقاطع‌ها از دو قیمت): لحظه‌ای،
- *   یا کندلِ همان لحظهٔ گذشته. با قیمت بروکر کمی فرق دارد و همیشه قابل‌ویرایش است.
+ *   قیمت بازار از هایپرلیکوئید (کریپتو، طلا و نقره از بازار xyz): لحظه‌ای،
+ *   یا کندلِ همان لحظهٔ گذشته؛ همیشه قابل‌ویرایش است.
  *   تایپ فقط آخرین راه است («دیگر…» / «عدد دیگر»).
  */
 import { useState } from 'react';
@@ -9,9 +9,7 @@ import { Input } from '@/shared/components/ui/Input';
 import { cn } from '@/shared/lib/cn';
 import type { Direction } from '../domain/types';
 import { planCoin } from '../domain/baseRate';
-import { inWeekendGap } from '../domain/excursions';
-import { ALL_CRYPTO, ALL_MT, crossOf, kindOf, pipFractions, priceAt, stopFractions, SYMBOL_FA, TIME_PRESETS, type PlanKind, type StopPreset } from '../domain/quick';
-import { quoteToUsd } from '../domain/forex';
+import { ALL_SYMBOLS, priceAt, stopFractions, SYMBOL_FA, type StopPreset } from '../domain/quick';
 import { useCandles, useLiveMid } from '../data/useExcursions';
 import { fa } from './parts';
 
@@ -39,31 +37,20 @@ const Row = ({ label, children }: { label: string; children: React.ReactNode }) 
   <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label={label}>{children}</div>
 );
 
-/** بازار (کریپتو / فارکس) + نمادهای پرکاربرد + «همه» (فهرست کامل انتخابی) + تایپ فقط برای نماد ناموجود */
-export function SymbolPicker({ value, onChange, options, kind, onKind }: {
+/** نمادهای پرکاربرد + «همه» (فهرست کامل انتخابی) + تایپ فقط برای نماد ناموجود */
+export function SymbolPicker({ value, onChange, options }: {
   value: string;
   onChange: (s: string) => void;
-  /** پرکاربردهای کاربر (هر دو بازار) */
+  /** پرکاربردهای کاربر */
   options: readonly string[];
-  kind?: PlanKind;
-  onKind?: (k: PlanKind) => void;
 }) {
   const v = value.trim().toUpperCase();
-  const [market, setMarket] = useState<PlanKind>(kind ?? kindOf(v || 'BTC'));
-  const m = kind ?? market;
-  const all = m === 'mt' ? ALL_MT : ALL_CRYPTO;
-  const quick = [...new Set([...options.filter((s) => kindOf(s) === m), ...all])].slice(0, 6);
+  const quick = [...new Set([...options, ...ALL_SYMBOLS])].slice(0, 7);
   const [more, setMore] = useState(false);
-  const [typing, setTyping] = useState(!!v && !all.includes(v) && !options.includes(v));
+  const [typing, setTyping] = useState(!!v && !ALL_SYMBOLS.includes(v) && !options.includes(v));
   const pick = (s: string) => { setTyping(false); setMore(false); onChange(s); };
-  const switchMarket = (k: PlanKind) => { setMarket(k); onKind?.(k); setTyping(false); };
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-1 rounded-field bg-surface-2 p-1" role="radiogroup" aria-label="بازار">
-        {([['crypto', 'کریپتو'], ['mt', 'فارکس، طلا، نفت']] as const).map(([k, l]) => (
-          <button key={k} type="button" role="radio" aria-checked={m === k} onClick={() => switchMarket(k)} className={cn('h-9 rounded-control text-sm font-semibold transition-colors', m === k ? 'bg-card text-ink shadow-card' : 'text-muted')}>{l}</button>
-        ))}
-      </div>
       <Label>نماد {v && SYMBOL_FA[v] ? <span className="font-normal text-subtle">· {SYMBOL_FA[v]}</span> : null}</Label>
       <Row label="نماد">
         {quick.map((s) => <Chip key={s} on={!typing && v === s} onClick={() => pick(s)}><span dir="ltr">{s}</span></Chip>)}
@@ -73,7 +60,7 @@ export function SymbolPicker({ value, onChange, options, kind, onKind }: {
       {more && (
         <div className="rounded-card border border-divider p-2">
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-            {all.map((s) => (
+            {ALL_SYMBOLS.map((s) => (
               <button key={s} type="button" onClick={() => pick(s)} className={cn('rounded-control border px-2 py-1.5 text-start', v === s ? 'border-ink bg-ink text-card' : 'border-divider hover:border-accent')}>
                 <span className="block text-sm font-bold" dir="ltr">{s}</span>
                 {SYMBOL_FA[s] && <span className={cn('block truncate text-[10px]', v === s ? 'text-card/70' : 'text-subtle')}>{SYMBOL_FA[s]}</span>}
@@ -83,7 +70,7 @@ export function SymbolPicker({ value, onChange, options, kind, onKind }: {
           <button type="button" onClick={() => { setTyping(true); setMore(false); }} className="mt-2 text-xs font-semibold text-accent hover:underline">نماد در فهرست نیست؟ بنویسید</button>
         </div>
       )}
-      {typing && <Input dir="ltr" autoFocus autoCapitalize="characters" aria-label="نماد دیگر" placeholder={m === 'mt' ? 'مثلاً AUDJPY' : 'مثلاً PENGU'} value={value} onChange={(e) => onChange(e.target.value.slice(0, 20))} />}
+      {typing && <Input dir="ltr" autoFocus autoCapitalize="characters" aria-label="نماد دیگر" placeholder="مثلاً PENGU" value={value} onChange={(e) => onChange(e.target.value.slice(0, 20))} />}
     </div>
   );
 }
@@ -109,27 +96,6 @@ export function DirectionPicker({ value, onChange }: { value: Direction; onChang
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-const toLocalInput = (t: number) => {
-  const d = new Date(t - new Date(t).getTimezoneOffset() * 60_000);
-  return d.toISOString().slice(0, 16);
-};
-
-/** «کی؟»: الان، چند ساعت پیش، دیروز، یا زمان دقیق */
-export function WhenPicker({ label, value, onChange, now }: { label: string; value: number; onChange: (t: number) => void; now: number }) {
-  const preset = TIME_PRESETS.find((p) => Math.abs(now - p.ago - value) < 60_000)?.key ?? null;
-  const [exact, setExact] = useState(preset === null);
-  return (
-    <div>
-      <Label>{label}</Label>
-      <Row label={label}>
-        {TIME_PRESETS.map((p) => <Chip key={p.key} on={!exact && preset === p.key} onClick={() => { setExact(false); onChange(now - p.ago); }}>{p.label}</Chip>)}
-        <Chip on={exact} onClick={() => setExact(true)}>زمان دقیق</Chip>
-      </Row>
-      {exact && <Input className="mt-2" type="datetime-local" dir="ltr" aria-label={`${label} — زمان دقیق`} max={toLocalInput(now)} value={toLocalInput(value)} onChange={(e) => { const t = Date.parse(e.target.value); if (Number.isFinite(t)) onChange(Math.min(t, now)); }} />}
     </div>
   );
 }
@@ -177,23 +143,18 @@ export function PresetNum({ label, values, value, onChange, format, suffix, asid
   );
 }
 
-/** قیمت بازار: لحظه‌ای (متقاطع از دو قیمت) + کندل‌ها (قیمتِ یک لحظهٔ گذشته و نوسان) + استاپ پیشنهادی */
-export function useMarket(symbol: string, kind: PlanKind) {
-  const coin = planCoin(symbol, kind);
-  const cross = kind === 'mt' ? crossOf(symbol) : null;
+/** قیمت بازار: لحظه‌ای + کندل‌ها (قیمتِ یک لحظهٔ گذشته و نوسان) + استاپ پیشنهادی */
+export function useMarket(symbol: string) {
+  const coin = planCoin(symbol);
   const live = useLiveMid(coin);
-  const xa = useLiveMid(cross?.a ?? null);
-  const xb = useLiveMid(cross?.b ?? null);
   const c15 = useCandles(coin, '15m', 15 * 60_000);
   const c1h = useCandles(coin, '1h', 3_600_000);
   const sets = [c15.data, c1h.data].filter((s): s is NonNullable<typeof s> => !!s);
-  const clean = (s: (typeof sets)[number]) => (kind === 'mt' ? s.candles.filter((c) => !inWeekendGap(c.t)) : s.candles);
-  const crossPx = cross && xa.data && xb.data ? (cross.op === 'mul' ? xa.data * xb.data : xa.data / xb.data) : null;
-  const livePx = live.data ?? crossPx ?? null;
-  const volStops = c1h.data ? stopFractions(clean(c1h.data), c1h.data.intervalMs) : c15.data ? stopFractions(clean(c15.data), c15.data.intervalMs) : null;
+  const livePx = live.data ?? null;
+  const volStops = c1h.data ? stopFractions(c1h.data.candles, c1h.data.intervalMs) : c15.data ? stopFractions(c15.data.candles, c15.data.intervalMs) : null;
   return {
     /** منبع قیمت داریم؟ */
-    covered: !!coin || !!cross,
+    covered: !!coin,
     live: livePx,
     /** قیمت لحظهٔ t؛ نزدیک به الان = لحظه‌ای */
     at(t: number): number | null {
@@ -204,24 +165,11 @@ export function useMarket(symbol: string, kind: PlanKind) {
       }
       return null;
     },
-    /** استاپ پیشنهادی (کسر قیمت): از نوسان بازار؛ فارکس بدون کندل → پیپ رایج */
-    stops(entry: number | null): { fracs: Record<StopPreset, number>; source: 'vol' | 'pips' } | null {
-      if (volStops) return { fracs: volStops, source: 'vol' };
-      if (kind === 'mt' && entry) {
-        const f = pipFractions(symbol, entry);
-        return f ? { fracs: f, source: 'pips' } : null;
-      }
-      return null;
+    /** استاپ پیشنهادی (کسر قیمت) از نوسان بازار */
+    stops(entry: number | null): { fracs: Record<StopPreset, number>; source: 'vol' } | null {
+      return volStops && entry ? { fracs: volStops, source: 'vol' } : null;
     }
   };
-}
-
-/** ارزش دلاری یک واحد ارز دوم نماد فارکس، از قیمت‌های لحظه‌ای ین، پوند و یورو */
-export function useQuoteUsd(symbol: string, price: number | null, enabled: boolean): number | null {
-  const jpy = useLiveMid(enabled ? 'xyz:JPY' : null);
-  const gbp = useLiveMid(enabled ? 'xyz:GBP' : null);
-  const eur = useLiveMid(enabled ? 'xyz:EUR' : null);
-  return enabled ? quoteToUsd(symbol.trim(), price, { USDJPY: jpy.data, GBPUSD: gbp.data, EURUSD: eur.data }) : null;
 }
 
 export const usdShort = (n: number) => (n >= 1000 ? `$${fa(n / 1000, 1)}K` : `$${fa(n)}`);

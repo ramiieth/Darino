@@ -1,7 +1,7 @@
 /**
  * ژورنال معاملاتی — مدل‌های مشترک دامنه (بدون React و بدون شبکه)
  *
- *   Fill      یک اجرای واقعی از صرافی (یا ورود دستی)
+ *   Fill      یک اجرای واقعی از صرافی
  *   Trade     یک معاملهٔ رفت‌وبرگشت کامل: از صفر شدن پوزیشن تا صفر شدن دوباره
  *   Book      دفتر «جهت‌دار» (ارزیابی حرفه‌ای) یا «دلتا نوترال» (فارم پوینت، فاندینگ، حجم)
  *   Note      یادداشت کاربر روی هر معامله (تگ «چرا»، اشتباه، دفتر دستی)
@@ -10,16 +10,14 @@
  * مقدار نامعلوم null است؛ هرگز با صفر جایگزین نمی‌شود.
  */
 
-export type Venue = 'hyperliquid' | 'txflow' | 'lighter-mainnet' | 'lighter-robinhood' | 'arcus' | 'metatrader' | 'manual';
+export type Venue = 'hyperliquid' | 'txflow' | 'lighter-mainnet' | 'lighter-robinhood' | 'arcus';
 
 export const VENUE_FA: Record<Venue, string> = {
   hyperliquid: 'هایپرلیکوئید',
   txflow: 'تی‌اکس‌فلو',
   'lighter-mainnet': 'لایتر',
   'lighter-robinhood': 'لایتر رابین‌هود',
-  arcus: 'آرکوس',
-  metatrader: 'متاتریدر',
-  manual: 'ثبت دستی'
+  arcus: 'آرکوس'
 };
 
 /** کدام داده را هر پلتفرم به‌صورت عمومی می‌دهد — منبع پنل «اعتماد داده» */
@@ -30,10 +28,7 @@ export const VENUE_COVERAGE: Record<Venue, { fees: boolean; funding: boolean; po
   // فاندینگ حساب اصلی لایتر فقط با توکن احراز هویت خوانده می‌شود؛ کارمزد در هر معامله گزارش می‌شود
   'lighter-mainnet': { fees: true, funding: false, positionBefore: true },
   'lighter-robinhood': { fees: true, funding: false, positionBefore: true },
-  arcus: { fees: true, funding: true, positionBefore: false },
-  // از استیتمنت: کمیسیون و سواپ (هم‌ارز فاندینگ) برای هر پوزیشن
-  metatrader: { fees: true, funding: true, positionBefore: true },
-  manual: { fees: true, funding: false, positionBefore: false }
+  arcus: { fees: true, funding: true, positionBefore: false }
 };
 
 export interface JournalAccount {
@@ -190,20 +185,43 @@ export interface TradePlan {
   /** ساعت اعتبار برای تطبیق خودکار با معاملهٔ واقعی */
   validHours: number;
   notes: string;
-  /** نوع برنامه؛ نبودن = کریپتو (برنامه‌های قدیمی) */
-  kind?: 'crypto' | 'mt';
-  /** تنظیمات حجم متاتریدر (فقط kind = mt)؛ size برنامه = لات × اندازهٔ قرارداد تا R حسابرسی درست بماند */
-  mt?: MtPlanParams;
+  /** «auto» = ساخته‌شده از خود معامله و سفارش‌های استاپ/هدف صرافی (ذخیره نمی‌شود؛ هر بار از داده ساخته می‌شود) */
+  source?: 'auto';
+  auto?: AutoPlanMeta;
   deleted?: boolean;
 }
 
-export interface MtPlanParams {
-  capital: number | null;
-  riskPct: number;
-  leverage: number | null;
-  contractSize: number | null;
-  spreadPips: number;
-  commissionPerLot: number;
+/** سفارش استاپ (SL) یا هدف (TP) روی صرافی — از تاریخچهٔ سفارش‌ها، فقط‌خواندنی */
+export interface TriggerOrder {
+  /** account|o:<oid> */
+  id: string;
+  account: string;
+  symbol: string;
+  kind: 'sl' | 'tp';
+  /** سمت بستن پوزیشن: لانگ ← sell، شورت ← buy */
+  side: 'buy' | 'sell';
+  triggerPx: number;
+  placedAt: number;
+  /** لغو، اجرا یا فعال‌شدن؛ null = هنوز باز */
+  endedAt: number | null;
+  status: string;
+}
+
+/** از کجا معلوم شد برنامهٔ خودکار استاپ دارد یا نه */
+export type StopSource = 'exchange' | 'none' | 'unreadable';
+
+export interface AutoPlanMeta {
+  stopSource: StopSource;
+  /** چرا خوانده نشد (فقط unreadable) */
+  unreadableWhy: string | null;
+  /** چند دقیقه بعد از ورود اولین استاپ گذاشته شد */
+  stopLateMin: number | null;
+  /** آخرین استاپ قبل از بستن */
+  finalStop: number | null;
+  /** tighter = به سود نزدیک‌تر (مثل سربه‌سر)، wider = دورتر (ریسک بیشتر از برنامه) */
+  stopMoved: 'none' | 'tighter' | 'wider' | null;
+  /** چشم‌انداز از کندل روزانه ساخته شد؟ */
+  outlookAuto: boolean;
 }
 
 export type CommitmentRule =

@@ -9,7 +9,7 @@ const T0 = Date.UTC(2026, 9, 20, 10);
 
 function trade(p: Partial<Trade>): Trade {
   return {
-    id: 'mt:1:1', account: 'mt:1', venue: 'metatrader', symbol: 'XAUUSD', base: 'XAU', direction: 'long',
+    id: 'lm:1:1', account: 'lm:1', venue: 'lighter-mainnet', symbol: 'XAU', base: 'GOLD', direction: 'long',
     openTime: T0, closeTime: T0 + 4 * H, open: false, truncated: false, entryPx: 2000, exitPx: 2010,
     maxSize: 50, maxNotional: 100_000, volume: 0, grossPnl: 500, fees: 0, funding: 0, netPnl: 500, fills: 2, liquidated: false, ...p
   };
@@ -20,14 +20,14 @@ const candles = (rows: [number, number, number, number][]): Candle[] => rows.map
 const set = (cs: Candle[]): CandleSet => ({ coin: 'xyz:GOLD', intervalMs: H, candles: cs });
 
 describe('excursions', () => {
-  it('maps MetaTrader symbols to Hyperliquid perps', () => {
-    expect(candleCoin({ venue: 'metatrader', symbol: 'XAUUSD' })).toBe('xyz:GOLD');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'EURUSD' })).toBe('xyz:EUR');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'UKOUSD' })).toBe('xyz:BRENTOIL');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'GBPUSD' })).toBe('xyz:GBP');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'USDJPY' })).toBe('xyz:JPY');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'XAGUSD' })).toBe('xyz:SILVER');
-    expect(candleCoin({ venue: 'metatrader', symbol: 'GBPJPY' })).toBeNull();
+  it('maps gold, silver, oil and FX of any venue to Hyperliquid xyz perps', () => {
+    expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'XAU' })).toBe('xyz:GOLD');
+    expect(candleCoin({ venue: 'lighter-robinhood', symbol: 'XAG' })).toBe('xyz:SILVER');
+    expect(candleCoin({ venue: 'arcus', symbol: 'XAUUSD' })).toBe('xyz:GOLD');
+    expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'EURUSD' })).toBe('xyz:EUR');
+    expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'BRENTOIL' })).toBe('xyz:BRENTOIL');
+    expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'WTI' })).toBe('xyz:CL');
+    expect(candleCoin({ venue: 'hyperliquid', symbol: 'xyz:GOLD' })).toBe('xyz:GOLD');
     expect(candleCoin({ venue: 'hyperliquid', symbol: 'BTC' })).toBe('BTC');
     expect(candleCoin({ venue: 'lighter-mainnet', symbol: 'BTC' })).toBeNull();
   });
@@ -68,7 +68,7 @@ describe('excursions', () => {
     expect(measure(trade({ openTime: T0 - 10 * H }), set(candles([[2000, 2001, 1999, 2000]])), NOW)).toMatchObject({ reason: 'too-old' });
   });
 
-  it('drops the weekend gap for MetaTrader trades only', () => {
+  it('detects the cash-market weekend gap; perps keep weekend moves', () => {
     expect(inWeekendGap(Date.UTC(2026, 9, 23, 22))).toBe(true); // جمعه ۲۲:۰۰
     expect(inWeekendGap(Date.UTC(2026, 9, 24, 12))).toBe(true); // شنبه
     expect(inWeekendGap(Date.UTC(2026, 9, 25, 22))).toBe(false); // یکشنبه ۲۲:۰۰
@@ -76,8 +76,8 @@ describe('excursions', () => {
     const cs: Candle[] = Array.from({ length: 60 }, (_, i) => ({ t: fri + i * H, o: 2000, h: 2001, l: 1999, c: 2000 }));
     cs[20] = { ...cs[20], l: 1900 }; // شنبه: فقط پرپ ۲۴ ساعته
     const t = trade({ openTime: fri, closeTime: fri + 59 * H, exitPx: 2000, grossPnl: 0, netPnl: 0 });
-    expect((measure(t, set(cs), NOW) as Excursion).mae).toBeLessThan(0.001);
-    expect((measure({ ...t, venue: 'hyperliquid', symbol: 'xyz:GOLD' }, set(cs), NOW) as Excursion).mae).toBeGreaterThan(0.04);
+    // پرپ‌ها ۲۴ ساعته معامله می‌شوند: حرکت آخر هفته هم در مسیر قیمت حساب می‌شود
+    expect((measure(t, set(cs), NOW) as Excursion).mae).toBeGreaterThan(0.04);
   });
 
   it('simulates stop, target and breakeven candle by candle (stop wins ties)', () => {

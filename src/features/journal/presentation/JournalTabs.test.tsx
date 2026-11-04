@@ -18,9 +18,6 @@ import { TradesTab } from './TradesTab';
 import { PlanTab } from './PlanTab';
 import { ReviewTab } from './ReviewTab';
 import { BaseRatePanel } from './BaseRatePanel';
-import { ManualTradeSheet } from './ManualTradeSheet';
-import { MetaTraderImport } from './MetaTraderImport';
-import type { ManualTrade } from '../data/journalStore';
 
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
 vi.mock('@/features/custody/data/repository', () => ({ savePref: vi.fn(() => Promise.resolve()), useCustodyStore: () => ({ prefs: [], loaded: true }) }));
@@ -76,10 +73,12 @@ describe('تب‌های ژورنال', () => {
     expect(screen.getByText('کدام پرپ‌ها در این دفتر باشند')).toBeTruthy();
     expect(screen.getByText('حجم ساخته‌شده')).toBeTruthy();
     unmount();
-    const t = render(<MemoryRouter><TradesTab trades={j.all} notes={j.notes} links={j.links} settings={DEFAULT_SETTINGS} manual={[]} /></MemoryRouter>);
+    const t = render(<MemoryRouter><TradesTab trades={j.all} notes={j.notes} links={j.links} auto={j.auto} settings={DEFAULT_SETTINGS} /></MemoryRouter>);
     expect(screen.getAllByText('چرا وارد شدم؟', { exact: false }).length).toBeGreaterThan(0);
     t.unmount();
-    const p = render(withQuery(<MemoryRouter><PlanTab plans={[newPlan(T0, { symbol: 'SOL', entry: 100, stop: 95, target: 110 })]} trades={j.all} links={j.links} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} /></MemoryRouter>));
+    const p = render(withQuery(<MemoryRouter><PlanTab plans={[newPlan(T0, { symbol: 'SOL', entry: 100, stop: 95, target: 110 })]} trades={j.all} links={j.links} auto={j.auto} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} /></MemoryRouter>));
+    expect(screen.getByText('نظم استاپ')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /قبل از ورود/ }));
     fireEvent.click(screen.getByText('برنامهٔ تازه'));
     expect(screen.getByText('ذخیرهٔ برنامه')).toBeTruthy();
     p.unmount();
@@ -88,22 +87,6 @@ describe('تب‌های ژورنال', () => {
     fireEvent.click(screen.getByText('مقایسهٔ هفته‌ها'));
     expect(screen.getByText('الگوهای شناسایی‌شده')).toBeTruthy();
   });
-  it('برنامهٔ متاتریدر: حالت کریپتو می‌ماند و حالت متاتریدر لات و پیپ می‌دهد', () => {
-    const j = journal();
-    render(withQuery(<MemoryRouter><PlanTab plans={[]} trades={j.all} links={j.links} settings={DEFAULT_SETTINGS} accounts={[HL]} accountSize={5000} prefill={null} onPrefillUsed={() => {}} mt={[]} tz="UTC" /></MemoryRouter>));
-    fireEvent.click(screen.getByText('برنامهٔ متاتریدر'));
-    expect(screen.getByText('پیشنهاد از تاریخچهٔ خودتان')).toBeTruthy();
-    expect(screen.getByText('کریپتو')).toBeTruthy();
-    const inputs = screen.getAllByRole('textbox');
-    const byLabel = (l: string) => screen.getByLabelText(l) as HTMLInputElement;
-    fireEvent.change(byLabel('قیمت ورود'), { target: { value: '3880' } });
-    fireEvent.change(byLabel('استاپ'), { target: { value: '3865' } });
-    fireEvent.change(byLabel('هدف'), { target: { value: '3910' } });
-    // ۱٪ از ۵۰۰۰ = ۵۰ دلار ÷ (۱۵ × ۱۰۰) → ۰٫۰۳ لات
-    expect(screen.getByText(/۰٫۰۳ لات|0.03 لات|۰.۰۳ لات/)).toBeTruthy();
-    expect(inputs.length).toBeGreaterThan(5);
-  });
-
   it('نرخ پایهٔ استاپ و هدف از کندل‌ها محاسبه و نشان داده می‌شود', async () => {
     // ۳۰۰۰ کندل ۱۵ دقیقه‌ای رفت‌وبرگشتی (بدون روند)
     const raw = Array.from({ length: 3000 }, (_, i) => {
@@ -111,7 +94,7 @@ describe('تب‌های ژورنال', () => {
       return { t: i * 900_000, o: String(c), h: String(c * 1.002), l: String(c * 0.998), c: String(c) };
     });
     vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(raw))));
-    render(withQuery(<BaseRatePanel symbol="BTC" kind="crypto" direction="long" entry={100} stop={98} target={104} />));
+    render(withQuery(<BaseRatePanel symbol="BTC" direction="long" entry={100} stop={98} target={104} />));
     expect(await screen.findByText('اول هدف')).toBeTruthy();
     expect(screen.getByText('اول استاپ')).toBeTruthy();
     expect(screen.getByText(/نمونهٔ مؤثر/)).toBeTruthy();
@@ -119,68 +102,8 @@ describe('تب‌های ژورنال', () => {
     expect(screen.getByText(/روند اخیر بازار/)).toBeTruthy();
   });
 
-  it('نرخ پایه: نماد متاتریدر بدون کندل → توضیح، و برنامهٔ نامعتبر → هیچ', () => {
-    const a = render(withQuery(<BaseRatePanel symbol="GBPJPY" kind="mt" direction="long" entry={190} stop={189} target={192} />));
-    expect(screen.getByText(/کندل هم‌نامی در هایپرلیکوئید نداریم/)).toBeTruthy();
-    a.unmount();
-    const b = render(withQuery(<BaseRatePanel symbol="BTC" kind="crypto" direction="long" entry={100} stop={101} target={104} />));
+  it('نرخ پایه: برنامهٔ نامعتبر → هیچ', () => {
+    const b = render(withQuery(<BaseRatePanel symbol="BTC" direction="long" entry={100} stop={101} target={104} />));
     expect(b.container.textContent).toBe('');
-  });
-});
-
-describe('ورود سریع: معاملهٔ دستی و استیتمنت', () => {
-  it('معاملهٔ دستی با چند لمس: نماد، اندازهٔ آماده، بسته‌شده با «ضرر کردم»', async () => {
-    const { savePref } = await import('@/features/custody/data/repository');
-    vi.mocked(savePref).mockClear();
-    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={['SOL', 'SOL', 'BTC']} /></MemoryRouter>));
-    fireEvent.click(screen.getByRole('button', { name: 'SOL' }));
-    fireEvent.click(screen.getByRole('radio', { name: /شورت/ }));
-    fireEvent.change(screen.getByLabelText('قیمت ورود'), { target: { value: '200' } });
-    fireEvent.click(screen.getByRole('button', { name: '$۱K' }));
-    fireEvent.click(screen.getByRole('button', { name: 'بسته شد' }));
-    fireEvent.click(screen.getByRole('button', { name: 'فقط سود/زیان را می‌دانم' }));
-    fireEvent.click(screen.getByRole('button', { name: 'ضرر کردم' }));
-    fireEvent.change(screen.getByLabelText('چند دلار؟'), { target: { value: '50' } });
-    fireEvent.click(screen.getByText('ثبت معامله'));
-    await vi.waitFor(() => expect(savePref).toHaveBeenCalled());
-    const m = vi.mocked(savePref).mock.calls[0][1] as ManualTrade;
-    // ۱۰۰۰ دلار ÷ ۲۰۰ = ۵ واحد؛ شورت با ۵۰ دلار ضرر → خروج ۲۱۰
-    expect(m).toMatchObject({ symbol: 'SOL', direction: 'short', entryPx: 200, size: 5, exitPx: 210, fees: null });
-    expect(m.closeTime).not.toBeNull();
-  });
-
-  it('معاملهٔ دستی بدون قیمت → پیام روشن، ذخیره نمی‌شود', async () => {
-    const { savePref } = await import('@/features/custody/data/repository');
-    vi.mocked(savePref).mockClear();
-    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={[]} /></MemoryRouter>));
-    fireEvent.click(screen.getByText('ثبت معامله'));
-    expect(screen.getByText(/قیمت ورود معلوم نیست/)).toBeTruthy();
-    expect(savePref).not.toHaveBeenCalled();
-  });
-
-  it('استیتمنت: شمارهٔ حساب از نام فایل، بدون تایپ', async () => {
-    const html = `<table><tr><td>Time</td><td>Position</td><td>Symbol</td><td>Type</td><td>Volume</td><td>Price</td><td>S / L</td><td>T / P</td><td>Time</td><td>Price</td><td>Commission</td><td>Swap</td><td>Profit</td></tr>
-      <tr><td>2026.09.01 10:00:00</td><td>111</td><td>XAUUSD</td><td>buy</td><td>0.10</td><td>2500.00</td><td></td><td></td><td>2026.09.01 12:00:00</td><td>2510.00</td><td>-0.70</td><td>0</td><td>100.00</td></tr></table>`;
-    render(<MetaTraderImport open onClose={() => {}} existing={[]} />);
-    const file = new File([html], 'ReportHistory-51234567.html', { type: 'text/html' });
-    fireEvent.change(screen.getByLabelText('فایل استیتمنت'), { target: { files: [file] } });
-    expect(await screen.findByText(/حساب ۵۱۲۳۴۵۶۷|حساب 51234567/)).toBeTruthy();
-    expect(screen.getByText(/افزودن .* پوزیشن تازه/)).toBeTruthy();
-  });
-
-  it('فارکس بدون تایپ نماد: بازار «فارکس» و فهرست کامل، لات آماده', async () => {
-    const { savePref } = await import('@/features/custody/data/repository');
-    vi.mocked(savePref).mockClear();
-    render(withQuery(<MemoryRouter><ManualTradeSheet open onClose={() => {}} manual={[]} mt={[]} usedSymbols={[]} /></MemoryRouter>));
-    fireEvent.click(screen.getByRole('radio', { name: 'فارکس، طلا، نفت' }));
-    fireEvent.click(screen.getByRole('button', { name: 'همه…' }));
-    fireEvent.click(screen.getByText('GBPJPY'));
-    expect(screen.getByText(/پوند\/ین/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('قیمت ورود'), { target: { value: '210.5' } });
-    fireEvent.click(screen.getByRole('radio', { name: 'دلار' }));
-    fireEvent.click(screen.getByRole('button', { name: '$۵۰۰' }));
-    fireEvent.click(screen.getByText('ثبت معامله'));
-    await vi.waitFor(() => expect(savePref).toHaveBeenCalled());
-    expect(vi.mocked(savePref).mock.calls[0][1]).toMatchObject({ symbol: 'GBPJPY', entryPx: 210.5, closeTime: null });
   });
 });
