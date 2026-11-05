@@ -14,6 +14,7 @@ import { saveSettings } from '../data/journalStore';
 import { ChartBlock, duration, fa, faDateTime, pct, pnlTone, Term, usd } from './parts';
 import { Bars } from './charts';
 import { usdText } from '@/shared/utils/formatters';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 const compact = (v: number) => usdText(v, { compact: true });
 
@@ -60,17 +61,17 @@ export function NeutralTab({ nb, fillDays, accounts, settings }: { nb: NeutralBo
   return (
     <div className="space-y-5">
       <Surface variant="focal" className="grid grid-cols-2 gap-5 p-5 sm:grid-cols-4">
-        <div><p className="text-xs text-muted">حجم ساخته‌شده</p><p className="num-ltr text-2xl font-extrabold text-ink">{compact(t.volume)}</p></div>
-        <div><p className="text-xs text-muted">فاندینگ دریافتی خالص</p><p className={cn('num-ltr text-2xl font-extrabold', pnlTone(t.funding))}>{usd(t.funding, true)}</p>{t.fundingPartial && <p className="text-[11px] text-subtle">بدون لایتر (عمومی نیست)</p>}</div>
-        <div><p className="text-xs text-muted">کارمزد</p><p className="num-ltr text-2xl font-extrabold text-ink">{usd(-t.fees)}</p></div>
-        <div><p className="text-xs text-muted"><Term id="costPerMillion">هزینه به‌ازای ۱M حجم</Term></p><p className={cn('num-ltr text-2xl font-extrabold', pnlTone(t.costPerMillion === null ? null : -t.costPerMillion))}>{t.costPerMillion === null ? '—' : usd(t.costPerMillion)}</p><p className="text-[11px] text-subtle">منفی = سود کردید</p></div>
+        <div><p className="text-xs text-muted">حجم ساخته‌شده</p><p className="num-ltr text-2xl font-extrabold text-ink"><AmountText text={compact(t.volume)} /></p></div>
+        <div><p className="text-xs text-muted">فاندینگ دریافتی خالص</p><p className={cn('num-ltr text-2xl font-extrabold', pnlTone(t.funding))}><AmountText text={usd(t.funding, true)} /></p>{t.fundingPartial && <p className="text-[11px] text-subtle">بدون لایتر (عمومی نیست)</p>}</div>
+        <div><p className="text-xs text-muted">کارمزد</p><p className="num-ltr text-2xl font-extrabold text-ink"><AmountText text={usd(-t.fees)} /></p></div>
+        <div><p className="text-xs text-muted"><Term id="costPerMillion">هزینه به‌ازای ۱M حجم</Term></p><p className={cn('num-ltr text-2xl font-extrabold', pnlTone(t.costPerMillion === null ? null : -t.costPerMillion))}><AmountText text={t.costPerMillion === null ? '—' : usd(t.costPerMillion)} /></p><p className="text-[11px] text-subtle">منفی = سود کردید</p></div>
       </Surface>
       {nb.platform && (
         <Surface className="grid grid-cols-2 gap-5 p-5 sm:grid-cols-3">
           <div className="col-span-2 sm:col-span-3"><p className="text-xs font-semibold text-ink">طبق سری روزانهٔ خود لایتر ({fa(nb.platform.accounts)} زیرحساب) — دقیق‌ترین منبع برای حساب‌های فارم</p></div>
-          <div><p className="text-xs text-muted">حجم در بازه</p><p className="num-ltr text-xl font-extrabold text-ink">{compact(nb.platform.volume)}</p></div>
-          <div><p className="text-xs text-muted">تغییر سود/زیان (با فاندینگ و سود باز)</p><p className={cn('num-ltr text-xl font-extrabold', pnlTone(nb.platform.pnlChange))}>{usd(nb.platform.pnlChange, true)}</p></div>
-          <div><p className="text-xs text-muted">هزینه به‌ازای ۱M حجم</p><p className={cn('num-ltr text-xl font-extrabold', pnlTone(nb.platform.costPerMillion === null ? null : -nb.platform.costPerMillion))}>{nb.platform.costPerMillion === null ? '—' : usd(nb.platform.costPerMillion)}</p></div>
+          <div><p className="text-xs text-muted">حجم در بازه</p><p className="num-ltr text-xl font-extrabold text-ink"><AmountText text={compact(nb.platform.volume)} /></p></div>
+          <div><p className="text-xs text-muted">تغییر سود/زیان (با فاندینگ و سود باز)</p><p className={cn('num-ltr text-xl font-extrabold', pnlTone(nb.platform.pnlChange))}><AmountText text={usd(nb.platform.pnlChange, true)} /></p></div>
+          <div><p className="text-xs text-muted">هزینه به‌ازای ۱M حجم</p><p className={cn('num-ltr text-xl font-extrabold', pnlTone(nb.platform.costPerMillion === null ? null : -nb.platform.costPerMillion))}><AmountText text={nb.platform.costPerMillion === null ? '—' : usd(nb.platform.costPerMillion)} /></p></div>
         </Surface>
       )}
       <p className="text-xs leading-6 text-muted">اعداد کارت بالا از اجراهاست: برای حساب‌های نوترال لایتر و هایپرلیکوئید فقط {fa(fillDays)} روز اخیر (برای جفت‌کردن پوشش‌ها؛ در تنظیمات قابل‌تغییر)، برای آرکوس کل تاریخچه. سود و زیان قیمتی پاها با فاندینگ و کارمزد جمع شده؛ سود باز پوزیشن‌های فعلی جزو آن نیست.</p>
@@ -83,7 +84,7 @@ export function NeutralTab({ nb, fillDays, accounts, settings }: { nb: NeutralBo
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-ink">{a.label}</span>
                 <Badge tone="info">{VENUE_FA[a.venue]}</Badge>
-                <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(a.net))}>{usd(a.net, true)}</span>
+                <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(a.net))}><AmountText text={usd(a.net, true)} /></span>
               </div>
               <p className="mt-1 text-xs leading-6 text-muted">
                 حجم {compact(a.volume)} · {fa(a.trades)} معامله · {fa(a.activeDays)} روز فعال · کارمزد {a.fees === null ? 'گزارش نشده' : usd(a.fees)} · فاندینگ {a.funding === null ? 'عمومی نیست' : usd(a.funding, true)} · سود قیمتی بسته {usd(a.realized, true)}
@@ -120,7 +121,7 @@ export function NeutralTab({ nb, fillDays, accounts, settings }: { nb: NeutralBo
                   <span className="text-sm font-semibold text-ink" dir="ltr">{h.base}</span>
                   {h.open ? <Badge tone="warn">باز</Badge> : <Badge tone="neutral">بسته</Badge>}
                   <span className="text-muted">{faDateTime(h.start)} · {duration(h.days * 86_400_000)}</span>
-                  <span className={cn('num-ltr ms-auto font-bold', pnlTone(h.net))}>{usd(h.net, true)}</span>
+                  <span className={cn('num-ltr ms-auto font-bold', pnlTone(h.net))}><AmountText text={usd(h.net, true)} /></span>
                 </div>
                 <p className="mt-1 leading-6 text-muted">
                   {h.legs.map((l) => `${VENUE_FA[l.venue]} ${l.direction === 'long' ? 'لانگ' : 'شورت'} ${compact(l.maxNotional)}`).join(' ↔ ')} · <Term id="imbalance">عدم‌تعادل</Term> <span className={(h.imbalancePct ?? 0) > 10 ? 'text-warn' : ''}>{pct(h.imbalancePct)}</span>

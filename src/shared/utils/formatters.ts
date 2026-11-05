@@ -83,13 +83,23 @@ export function fmtUsdAmount(usd: number | null | undefined): string {
  * مبلغ دلاری در متن روان (گزارش، ژورنال، اعلان) — «۲۳,۶۰۵.۰۰ دلار» / «-۱۲.۵۰ دلار» / «+۷.۰۰ دلار»
  *   همیشه دقیقاً دو رقم اعشار (مثل fmtUSD) تا «,» هزارگان با اعشار اشتباه نشود؛ compact: «۱.۲ میلیون دلار». هرگز «$».
  */
-export function usdText(v: number | null | undefined, opts: { signed?: boolean; compact?: boolean } = {}): string {
+export function usdText(v: number | null | undefined, opts: { signed?: boolean; compact?: boolean; plain?: boolean } = {}): string {
   if (bad(v) || !Number.isFinite(v)) return NA;
   const a = Math.abs(v);
   const sign = v < 0 ? '-' : opts.signed && v > 0 ? '+' : '';
   const body = opts.compact && a >= 1e3 ? fmtCompactFa(a) : toFaDigits(dec2.format(a));
-  return `${sign}${body} دلار`;
+  if (opts.plain) return `${sign}${body} دلار`;
+  // جدا کردن جهت: عبارت راست‌به‌چپ، عدد (با علامت) چپ‌به‌راست؛ داخل ظرف ltr (num-ltr) هم «دلار» برعکس نمی‌شود
+  const [num, ...scale] = body.split(' ');
+  return `${RLI}${LRI}${sign}${num}${PDI}${scale.length ? ` ${scale.join(' ')}` : ''} دلار${PDI}`;
 }
+
+/** نشانه‌های نامرئی جداسازی جهت یونیکد (RLI / LRI / PDI) */
+const RLI = '\u2067';
+const LRI = '\u2066';
+const PDI = '\u2069';
+/** حذف نشانه‌های جهت (برای مقایسه و متن ساده) */
+export const stripBidi = (t: string) => t.replace(/[\u2066-\u2069]/g, '');
 
 /* ---------- عدد و درصد ---------- */
 

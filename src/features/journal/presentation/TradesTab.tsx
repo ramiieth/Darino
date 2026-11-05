@@ -18,6 +18,7 @@ import type { ClassifiedTrade, JournalSettings, TradeNote, TradePlan } from '../
 import { VENUE_FA } from '../domain/types';
 import { saveNote } from '../data/journalStore';
 import { duration, fa, faDateTime, pnlTone, TagPicker, usd } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 type Filter = 'all' | 'open' | 'untagged' | 'directional' | 'neutral';
 
@@ -38,7 +39,7 @@ function TradeCard({ t, note, plan, auto, settings }: { t: ClassifiedTrade; note
         {plan && <Badge tone="gain">برنامه‌دار</Badge>}
         {!plan && auto?.auto?.stopSource === 'exchange' && <Badge tone="gain"><ShieldCheck />استاپ {fa(auto.stop, 5)}</Badge>}
         {!plan && auto?.auto?.stopSource === 'none' && <Badge tone="loss"><ShieldAlert />بدون استاپ</Badge>}
-        <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(t.netPnl))}>{t.open ? 'باز' : usd(t.netPnl, true)}</span>
+        <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(t.netPnl))}><AmountText text={t.open ? 'باز' : usd(t.netPnl, true)} /></span>
       </div>
       <p className="mt-1 text-xs text-muted">
         {VENUE_FA[t.venue]} · {faDateTime(t.openTime)}{t.closeTime ? ` · ${duration(t.closeTime - t.openTime)}` : ''} · ارزش {usd(t.maxNotional)}{t.entryPx ? ` · ورود ${fa(t.entryPx, 4)}` : ''}{t.exitPx && !t.open ? ` · خروج ${fa(t.exitPx, 4)}` : ''}

@@ -16,7 +16,7 @@ import { Field, Input } from '@/shared/components/ui/Input';
 import { SmartDateField } from '@/shared/components/ui/SmartDateField';
 import { SegmentedControl, ChipGroup } from '@/shared/components/ui/SegmentedControl';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { MetricGrid, Metric, MoneyValue, PercentValue, QuantityValue } from '@/shared/components/ui/FinancialValue';
+import { MetricGrid, Metric, MoneyValue, PercentValue, QuantityValue, AmountText } from '@/shared/components/ui/FinancialValue';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { Button, IconButton } from '@/shared/components/ui/Button';
 import { Badge, type Tone } from '@/shared/components/ui/Badge';
@@ -539,7 +539,7 @@ export function DcaCalculator() {
                         </td>
                         <td className="min-w-[6.5rem]">
                           {r.extra ? (
-                            <span className="num-ltr text-xs">{fmtUSD(r.amount)}</span>
+                            <span className="num-ltr text-xs"><AmountText text={fmtUSD(r.amount)} /></span>
                           ) : (
                             <input
                               dir="ltr"
@@ -555,7 +555,7 @@ export function DcaCalculator() {
                         <td className="min-w-[8rem]">
                           <div className="flex items-center gap-1.5">
                             {r.extra ? (
-                              <span className="num-ltr text-xs">{r.price ? fmtUSD(r.price) : '—'}</span>
+                              <span className="num-ltr text-xs"><AmountText text={r.price ? fmtUSD(r.price) : '—'} /></span>
                             ) : (
                               <input
                                 dir="ltr"

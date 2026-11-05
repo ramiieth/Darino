@@ -12,6 +12,7 @@ import type { Direction } from '../domain/types';
 import { baseRate, HORIZONS, MIN_EFFECTIVE, planCoin, splitEdge, type HorizonKey } from '../domain/baseRate';
 import { useCandles } from '../data/useExcursions';
 import { duration, fa, faDate, pct } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 /** امید ریاضی کمتر از این (به R) «≈ صفر» */
 const FLAT_EV = 0.05;
@@ -22,7 +23,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
   return (
     <div>
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={cn('num-ltr text-base font-bold', tone ?? 'text-ink')}>{value}</p>
+      <p className={cn('num-ltr text-base font-bold', tone ?? 'text-ink')}><AmountText text={value} /></p>
       {sub && <p className="text-[11px] text-subtle">{sub}</p>}
     </div>
   );
