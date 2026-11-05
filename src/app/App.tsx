@@ -27,6 +27,7 @@ const ShoppingPage = lazy(() => import('@/features/shopping/presentation/Shoppin
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
 const JournalPage = lazy(() => import('@/features/journal/presentation/JournalPage'));
+const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
 
@@ -79,6 +80,7 @@ export function App() {
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
           <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
           <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
+          <Route path="/performance" element={<Private label="عملکرد و مقایسه سرمایه"><PerformancePage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
           <Route path="/intel" element={<DeskRedirect />} />
           <Route path="/traders" element={<DeskRedirect />} />

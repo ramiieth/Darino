@@ -1,0 +1,129 @@
+/**
+ * ترکیب همهٔ محاسبات یک بازه: پرتفوی، مقایسه با بازارهای فعال، تورم، بازده با جریان نقدی و رشد سال‌به‌سال
+ * + ساخت ورودی ساختاریافتهٔ Gemini (فقط اعداد محاسبه‌شده و منابع؛ هیچ دادهٔ خام شخصی دیگری).
+ */
+import {
+  compareMarket, endpointOf, inflationAnalysis, portfolioRow, returnAnalysis, summarize, yearlyRows,
+  type CompareRow, type CompareSummary, type InflationAnalysis, type PortfolioRow, type ReturnAnalysis, type YearRow
+} from './engine';
+import { BASE_MARKETS, coinMarketId, propertyMarketId, type MarketDef } from './markets';
+import type { ExternalFlow, PerfSettings, Series, ValueRecord } from './types';
+
+export interface PeriodAnalysis {
+  start: ValueRecord;
+  end: ValueRecord;
+  portfolio: PortfolioRow;
+  rows: CompareRow[];
+  summary: CompareSummary;
+  inflation: InflationAnalysis;
+  returns: ReturnAnalysis | null;
+}
+
+/** بازارهای فعال (پایه + محله‌ها + ارزهای منتخب) با نام نهایی */
+export function activeMarkets(settings: PerfSettings, names: { neighborhoods: Record<string, string>; car?: string }): MarketDef[] {
+  const out: MarketDef[] = [];
+  for (const m of BASE_MARKETS) {
+    if (!settings.enabledMarkets.includes(m.id)) continue;
+    if (m.id === 'car') {
+      out.push(
+        settings.carModelId
+          ? { ...m, name: `خودرو — ${names.car ?? 'مدل انتخابی'}` }
+          : { ...m, kind: 'none', seriesId: null, missingReason: 'مدل خودرو انتخاب نشده است' }
+      );
+      continue;
+    }
+    out.push(m);
+  }
+  if (settings.enabledMarkets.includes('property')) {
+    for (const k of settings.neighborhoods) {
+      out.push({ id: propertyMarketId(k), name: `مسکن — ${names.neighborhoods[k] ?? k}`, group: 'iran', kind: 'price', currency: 'toman', seriesId: propertyMarketId(k) });
+    }
+  }
+  for (const sym of settings.extraCoins) {
+    out.push({ id: coinMarketId(sym), name: sym, group: 'global', kind: 'price', currency: 'usd', seriesId: coinMarketId(sym) });
+  }
+  return out;
+}
+
+export function analyzePeriod(
+  start: ValueRecord,
+  end: ValueRecord,
+  records: ValueRecord[],
+  flows: ExternalFlow[],
+  settings: PerfSettings,
+  markets: MarketDef[],
+  series: Record<string, Series>
+): PeriodAnalysis {
+  const s = endpointOf(start);
+  const e = endpointOf(end);
+  const rows = markets.map((m) => compareMarket(m, m.seriesId ? series[m.seriesId] : undefined, s, e));
+  return {
+    start,
+    end,
+    portfolio: portfolioRow(s, e),
+    rows,
+    summary: summarize(rows),
+    inflation: inflationAnalysis(s, e, { iranCpi: series.ir_cpi, usCpi: series.us_cpi, usdt: series.ir_usd, gold18: series.ir_gold18 }),
+    returns: returnAnalysis(records, start.id, end.id, flows, settings.flowsComplete)
+  };
+}
+
+export interface YearlyTable {
+  id: string;
+  name: string;
+  unit: string;
+  source?: string;
+  rows: YearRow[];
+}
+
+/** رشد سال‌به‌سال (اول فروردین هر سال از ۱۴۰۲ تا امروز) برای طلا، سکه، دلار، مسکن و خودرو */
+export function yearlyTables(series: Record<string, Series>, ids: { id: string; name: string; unit: string }[], years: number[], yearStart: (y: number) => number, now: number): YearlyTable[] {
+  return ids.map(({ id, name, unit }) => ({ id, name, unit, source: series[id]?.source, rows: yearlyRows(series[id], years, yearStart, now) }));
+}
+
+const r4 = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? null : Math.round(v * 10_000) / 10_000);
+const r0 = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? null : Math.round(v));
+const day = (ts: number) => new Date(ts).toISOString().slice(0, 10);
+
+/** ورودی Gemini: نسبت‌ها به‌صورت کسر (0.12 = ۱۲٪)، مبالغ گرد؛ توضیحات کاربر فقط به‌عنوان متن */
+export function geminiPayload(a: PeriodAnalysis, records: ValueRecord[], years: YearlyTable[], jalali: (ts: number) => string, now: number) {
+  const inf = a.inflation;
+  return {
+    preparedAt: day(now),
+    note: 'ratios are fractions (0.12 = 12%); usd in US dollars; toman in Iranian toman',
+    period: { start: day(a.start.dateTs), startJalali: jalali(a.start.dateTs), end: day(a.end.dateTs), endJalali: jalali(a.end.dateTs), days: Math.round((a.end.dateTs - a.start.dateTs) / 86_400_000) },
+    history: records.map((r) => ({ date: day(r.dateTs), jalali: jalali(r.dateTs), usd: r0(r.usd), rateToman: r0(r.rateToman), toman: r0(r.toman), origin: r.origin, note: r.note ? r.note.slice(0, 120) : undefined })),
+    portfolio: {
+      startUsd: r0(a.portfolio.startUsd), endUsd: r0(a.portfolio.endUsd), startToman: r0(a.portfolio.startToman), endToman: r0(a.portfolio.endToman),
+      pnlUsd: r0(a.portfolio.pnlUsd), pnlToman: r0(a.portfolio.pnlToman), changeUsd: r4(a.portfolio.returnUsd), changeToman: r4(a.portfolio.returnToman)
+    },
+    returnQualified: a.returns?.qualified ?? false,
+    returns: a.returns && { netExternalFlowsUsd: r0(a.returns.netFlowsUsd), flowsCount: a.returns.flowsCount, twr: r4(a.returns.twr), xirrAnnual: r4(a.returns.xirr), investmentGainUsd: r0(a.returns.investmentGainUsd) },
+    inflation: {
+      iranOfficial: inf.iran && { cumulative: r4(inf.iran.cumulative), from: day(inf.iran.from.at), to: day(inf.iran.to.at), source: inf.iran.source },
+      usOfficial: inf.us && { cumulative: r4(inf.us.cumulative), from: day(inf.us.from.at), to: day(inf.us.to.at), source: inf.us.source },
+      realToman: r4(inf.realToman),
+      realUsd: r4(inf.realUsd),
+      marketProxies: inf.proxies.map((p) => ({ name: p.name, change: r4(p.change), source: p.source })),
+      tomanChangeDecomposition: inf.fx && { totalToman: r0(inf.fx.total), fromUsdValueChangeToman: r0(inf.fx.fromUsdValue), fromDollarRateChangeToman: r0(inf.fx.fromRate), dollarRateChange: r4(inf.fx.rateChange) }
+    },
+    markets: a.rows.map((r) => ({
+      name: r.name,
+      group: r.group,
+      kind: r.kind,
+      status: r.status,
+      reason: r.status === 'ok' ? undefined : r.reason,
+      detail: r.detail,
+      priceDates: r.priceStart && r.priceEnd ? [day(r.priceStart.at), day(r.priceEnd.at)] : undefined,
+      endUsd: r0(r.endUsd), endToman: r0(r.endToman), returnUsd: r4(r.returnUsd), returnToman: r4(r.returnToman),
+      portfolioMinusMarketUsd: r0(r.vsPortfolioUsd), portfolioMinusMarketToman: r0(r.vsPortfolioToman),
+      opportunityCostUsd: r0(r.opportunityUsd), opportunityCostToman: r0(r.opportunityToman),
+      source: r.source, sourceUpdated: r.updatedAt ? day(r.updatedAt) : undefined
+    })),
+    summary: { bestMarket: a.summary.best?.name ?? null, portfolioBeat: a.summary.beaten.map((r) => r.name), portfolioLagged: a.summary.lagged.map((r) => r.name) },
+    yearlyGrowth: years.map((t) => ({
+      name: t.name, unit: t.unit, source: t.source,
+      rows: t.rows.map((r) => ({ jalaliYearStart: r.year || 'now', date: r.at ? day(r.at) : null, value: r0(r.value), changeFromPrevious: r4(r.change) }))
+    }))
+  };
+}

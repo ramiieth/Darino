@@ -2,7 +2,9 @@ import { SimulatedInvestmentCard } from '@/features/cryptomarkets/presentation/S
 import type { PerfPeriod } from '@/features/cryptomarkets/data/useTopPerformers';
 import { toFaDigits } from '@/shared/utils/formatters';
 import { useMemo, useState } from 'react';
-import { RefreshCw, SlidersHorizontal, Layers } from 'lucide-react';
+import { RefreshCw, SlidersHorizontal, Layers, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { buttonClass } from '@/shared/components/ui/Button';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Section } from '@/shared/components/ui/GlassCard';
@@ -168,9 +170,15 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
         title={t('simTitle')}
         subtitle={t('simSubtitle')}
         actions={
-          <Button variant="outline" size="sm" icon={<SlidersHorizontal />} onClick={onOpenScenario}>
-            {t('customScenario')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/performance" className={buttonClass('ghost', 'sm')}>
+              <TrendingUp aria-hidden className="h-4 w-4" />
+              عملکرد واقعی سرمایهٔ من
+            </Link>
+            <Button variant="outline" size="sm" icon={<SlidersHorizontal />} onClick={onOpenScenario}>
+              {t('customScenario')}
+            </Button>
+          </div>
         }
       />
 
