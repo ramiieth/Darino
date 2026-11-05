@@ -7,10 +7,11 @@ import { BarElement, CategoryScale, Chart as ChartJS, Filler, LinearScale, LineE
 import { Bar, Line } from 'react-chartjs-2';
 import { axisUsd, baseChartOptions, cssColor } from '@/shared/design/chartTheme';
 import { fmtCompactFa, toFaDigits } from '@/shared/utils/formatters';
+import { usdText } from '@/shared/utils/formatters';
 
 ChartJS.register(LineElement, PointElement, BarElement, CategoryScale, LinearScale, Tooltip, Filler);
 
-const usdTip = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`;
+const usdTip = (v: number) => usdText(Math.round(v));
 const tomanTip = (v: number) => `${fmtCompactFa(v)} تومان`;
 
 export function HistoryChart({ labels, values, unit, notes, height = 240 }: { labels: string[]; values: (number | null)[]; unit: 'usd' | 'toman'; notes?: string[]; height?: number }) {

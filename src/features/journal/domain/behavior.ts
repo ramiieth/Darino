@@ -10,6 +10,7 @@
 import type { ClassifiedTrade, TradeNote } from './types';
 import { dayKey, hourOf, mean, median, weekdayOf, WEEKDAY_FA } from './time';
 import { isScratch, scratchFloorOf, type PlannedRisk } from './metrics';
+import { usdText } from '@/shared/utils/formatters';
 
 export interface Bucket {
   key: string;
@@ -76,7 +77,7 @@ function groupBy(ts: readonly ClassifiedTrade[], key: (t: ClassifiedTrade) => st
 }
 
 const CONFIDENT = /(مطمئن|تمیز|قوی|عالی|قطعی|بی‌نقص|ستاپ خوب|clean|conviction|sure|perfect|a\+|high confidence)/i;
-const fmt = (v: number) => `${v < 0 ? '−' : ''}$${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : 2 })}`;
+const fmt = (v: number) => usdText(v);
 
 export function analyzeBehavior(
   input: readonly ClassifiedTrade[],

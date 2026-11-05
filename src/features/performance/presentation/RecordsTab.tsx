@@ -224,7 +224,7 @@ function FlowSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </Select>
         </Field>
         <Field label="مبلغ (دلار)">
-          <Input inputMode="decimal" dir="ltr" suffix="$" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <Input inputMode="decimal" dir="ltr" suffix="دلار" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
         <Field label="توضیح (اختیاری)">
           <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />

@@ -7,6 +7,7 @@
  */
 import { chainOrder, isPerpCoin } from './roundTrips.js';
 import type { Fill } from './types.js';
+import { usdText as usdFa } from '../../../shared/utils/formatters.js';
 
 export interface SavedTrader {
   address: string;
@@ -95,7 +96,7 @@ export function positionEvents(fills: Fill[], minUsd = MIN_EVENT_USD): PositionE
 }
 
 const SIDE_FA = { long: 'لانگ', short: 'شورت' } as const;
-const usdText = (v: number) => (v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(1)}k` : `$${v.toFixed(0)}`);
+const usdText = (v: number) => usdFa(Math.round(v), { compact: true });
 const pxText = (v: number) => (v >= 100 ? v.toLocaleString('en-US', { maximumFractionDigits: 0 }) : v.toPrecision(4));
 
 export function eventText(e: PositionEvent): string {

@@ -13,8 +13,9 @@ import { roleOf } from '../domain/classify';
 import { saveSettings } from '../data/journalStore';
 import { ChartBlock, duration, fa, faDateTime, pct, pnlTone, Term, usd } from './parts';
 import { Bars } from './charts';
+import { usdText } from '@/shared/utils/formatters';
 
-const compact = (v: number) => (Math.abs(v) >= 1e6 ? `$${fa(v / 1e6, 2)}M` : Math.abs(v) >= 1e3 ? `$${fa(v / 1e3, 1)}K` : usd(v));
+const compact = (v: number) => usdText(v, { compact: true });
 
 /** انتخاب سریع: کدام پرپ‌ها در دفتر نوترال باشند (همان تنظیم «نقش حساب») */
 function VenuePicker({ accounts, settings }: { accounts: JournalAccount[]; settings: JournalSettings }) {

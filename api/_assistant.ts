@@ -18,6 +18,8 @@ export async function analyze(data: z.infer<typeof analysisSchema>): Promise<str
 
 /** مدل‌های جایگزین وقتی مدل تنظیم‌شده بازنشسته یا در دسترس نیست (۴۰۴) */
 const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash'];
+/** سیاست ارز کل اپ در همهٔ پاسخ‌ها */
+const CURRENCY_RULE = '\nمبلغ دلاری را با واژهٔ «دلار» بعد از عدد بنویس (مثل «۷,۲۶۸ دلار» یا «-۱۲.۵ دلار»)؛ هرگز نماد «$» به کار نبر.';
 /** سقف کل زمان (فانکشن ۶۰ ثانیه دارد) */
 const GEMINI_DEADLINE_MS = 55_000;
 
@@ -50,7 +52,7 @@ async function gemini(req: { system: string; contents: unknown[]; config: Record
       r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: req.system }] }, contents: req.contents, generationConfig: { ...req.config, thinkingConfig: thinkingFor(model) } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: req.system + CURRENCY_RULE }] }, contents: req.contents, generationConfig: { ...req.config, thinkingConfig: thinkingFor(model) } }),
         signal: AbortSignal.timeout(Math.min(req.timeoutMs ?? 45_000, left))
       });
     } catch (e) {

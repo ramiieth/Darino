@@ -168,7 +168,7 @@ function HowMuch() {
           <Input type="number" inputMode="decimal" dir="ltr" min={0.1} max={10} step={0.1} value={s.risk} onChange={(e) => set({ risk: e.target.value })} suffix="%" />
         </Field>
         <Field label="کل سرمایه (اختیاری)">
-          <Input type="number" inputMode="decimal" dir="ltr" min={0} placeholder="10000" value={s.capital} onChange={(e) => set({ capital: e.target.value })} suffix="$" />
+          <Input type="number" inputMode="decimal" dir="ltr" min={0} placeholder="10000" value={s.capital} onChange={(e) => set({ capital: e.target.value })} suffix="دلار" />
         </Field>
         <Field label="چه می‌خرید؟">
           <SegmentedControl<AssetClass> fill label="چه می‌خرید" value={s.cls} onChange={(v) => set({ cls: v })} options={[{ value: 'crypto', label: 'کریپتو' }, { value: 'tradfi', label: 'سهام یا کالا' }]} />

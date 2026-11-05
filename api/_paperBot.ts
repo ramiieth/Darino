@@ -11,6 +11,7 @@ import { hlInfo, pool } from './_hyperliquid.js';
 import type { AlertsStore } from './_alerts.js';
 import type { PushMessage } from './_webpush.js';
 import { carryClose, floorToHour, HOUR_MS, type FundingPoint, type PriceBar } from '../src/features/carry-lab/domain/engine.js';
+import { usdText } from '../src/shared/utils/formatters.js';
 import {
   advanceLeg,
   needsTick,
@@ -88,7 +89,7 @@ export async function startBook(store: AlertsStore, userId: string, capitalUsd: 
 }
 
 const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}٪`;
-const usd = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`;
+const usd = (v: number) => usdText(Math.round(v));
 
 function message(ev: PaperEvent, book: PaperBook): PushMessage | null {
   const st = PAPER_STRATEGIES.find((s) => s.id === ev.strategy);

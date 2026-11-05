@@ -2,8 +2,9 @@
 import { Field, Select } from '@/shared/components/ui/Input';
 import { formatGregorianIso, formatJalali } from '@/shared/utils/jalali';
 import type { ValueRecord } from '../domain/types';
+import { usdText } from '@/shared/utils/formatters';
 
-const label = (r: ValueRecord) => `${formatJalali(r.dateTs)} · ${formatGregorianIso(r.dateTs)} · $${Math.round(r.usd).toLocaleString('en-US')}`;
+const label = (r: ValueRecord) => `${formatJalali(r.dateTs)} · ${formatGregorianIso(r.dateTs)} · ${usdText(Math.round(r.usd))}`;
 
 export function PeriodPicker({ records, startId, endId, onChange }: { records: ValueRecord[]; startId: string; endId: string; onChange: (start: string, end: string) => void }) {
   const start = records.find((r) => r.id === startId);

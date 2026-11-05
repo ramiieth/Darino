@@ -12,6 +12,7 @@
 import type { Behavior, Leak } from './behavior';
 import type { CoreMetrics, Style } from './metrics';
 import { STYLE_FA } from './metrics';
+import { usdText } from '@/shared/utils/formatters';
 
 export type MetricClass = 'performance' | 'behaviour' | 'confidence' | 'context';
 export type Verdict = 'meets' | 'borderline' | 'fails' | 'na' | 'notApplicable';
@@ -41,11 +42,7 @@ export interface ScoreRow {
   formula: string;
 }
 
-const usd = (v: number | null | undefined, signed = false) => {
-  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  const s = Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : 2 });
-  return `${v < 0 ? '−' : signed && v > 0 ? '+' : ''}$${s}`;
-};
+const usd = (v: number | null | undefined, signed = false) => usdText(v, { signed });
 const pc = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${v.toFixed(1)}٪`);
 const ratio = (v: number | null | undefined) => (v === null || v === undefined ? '—' : !Number.isFinite(v) ? '∞' : v.toFixed(2));
 

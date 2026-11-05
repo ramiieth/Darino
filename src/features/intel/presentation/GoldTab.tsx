@@ -91,7 +91,7 @@ function ValueCard({ d }: { d: GoldPayload }) {
         </div>
         <div>
           <dt className="text-2xs font-semibold text-muted">انس طلا</dt>
-          <dd className="mt-1 text-lg font-extrabold text-ink sm:text-xl"><bdi dir="ltr">{d.ounceUsd ? `$${d.ounceUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '—'}</bdi></dd>
+          <dd className="mt-1 text-lg font-extrabold text-ink sm:text-xl">{d.ounceUsd ? <>{toFaDigits(d.ounceUsd.toLocaleString('en-US', { maximumFractionDigits: 0 }))} <span className="text-xs font-semibold text-muted">دلار</span></> : '—'}</dd>
           <dd className="text-2xs text-subtle">دلار</dd>
         </div>
         <div>

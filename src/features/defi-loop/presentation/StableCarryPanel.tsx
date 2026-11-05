@@ -115,7 +115,7 @@ export function StableCarryPanel() {
       <Surface className="space-y-4 p-4 md:p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="سرمایهٔ شما">
-            <Input dir="ltr" inputMode="decimal" value={capitalText} onChange={(e) => setCapitalText(e.target.value)} suffix="$" />
+            <Input dir="ltr" inputMode="decimal" value={capitalText} onChange={(e) => setCapitalText(e.target.value)} suffix="دلار" />
           </Field>
           <Field label="LTV هدف (سهم از سقف بازار)">
             <SegmentedControl<LtvShare>
@@ -139,8 +139,8 @@ export function StableCarryPanel() {
             onChange={(v) => { setMinLiq(v); setLimit(PAGE); }}
             options={[
               { value: '0', label: 'همهٔ بازارها' },
-              { value: '100000', label: 'نقدینگی ≥ ۱۰۰ هزار $' },
-              { value: '1000000', label: 'نقدینگی ≥ ۱ میلیون $' }
+              { value: '100000', label: 'نقدینگی ≥ ۱۰۰ هزار دلار' },
+              { value: '1000000', label: 'نقدینگی ≥ ۱ میلیون دلار' }
             ]}
           />
           <SegmentedControl<SortKey>

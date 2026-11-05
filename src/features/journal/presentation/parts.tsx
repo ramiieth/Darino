@@ -6,15 +6,13 @@ import { useState, type ReactNode } from 'react';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Badge, type Tone } from '@/shared/components/ui/Badge';
 import { cn } from '@/shared/lib/cn';
-import { toFaDigits } from '@/shared/utils/formatters';
+import { toFaDigits, usdText } from '@/shared/utils/formatters';
 import { GLOSSARY } from '../domain/glossary';
 import { CLASS_FA, VERDICT_FA, type MetricClass, type ScoreRow, type Verdict } from '../domain/scorecard';
 
+/** «۷,۲۶۸ دلار» / «-۱۲.۵۰ دلار» — سیاست ارز کل اپ (بدون «$»، ارقام فارسی) */
 export function usd(v: number | null | undefined, signed = false): string {
-  if (v === null || v === undefined || !Number.isFinite(v)) return '—';
-  const a = Math.abs(v);
-  const s = a.toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 0 : 2, minimumFractionDigits: a >= 1000 ? 0 : a < 10 ? 2 : 0 });
-  return `${v < 0 ? '−' : signed && v > 0 ? '+' : ''}$${s}`;
+  return usdText(v, { signed });
 }
 export const pct = (v: number | null | undefined, d = 1) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${toFaDigits(v.toFixed(d))}٪`);
 export const fa = (v: number | null | undefined, d = 0) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: d })));

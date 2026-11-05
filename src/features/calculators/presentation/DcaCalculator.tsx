@@ -337,7 +337,7 @@ export function DcaCalculator() {
                   aria-label={`قیمت پیش‌بینی ${i + 1}`}
                   value={a.price}
                   onChange={(e) => setAnchors((l) => l.map((x) => (x.id === a.id ? { ...x, price: e.target.value } : x)))}
-                  suffix="$"
+                  suffix="دلار"
                 />
                 <IconButton size="sm" aria-label={`حذف نقطهٔ ${i + 1}`} onClick={() => setAnchors((l) => l.filter((x) => x.id !== a.id))}>
                   <Trash2 />
@@ -396,8 +396,8 @@ export function DcaCalculator() {
               </div>
               <SmartDateField compact value={x.date ? parseIsoToTs(x.date) : null} onChange={(ts) => setExtras((l) => l.map((e) => (e.id === x.id ? { ...e, date: ts ? formatGregorianIso(ts) : '' } : e)))} />
               <div className="grid grid-cols-2 gap-2">
-                <Input dir="ltr" inputMode="decimal" aria-label="مبلغ" value={x.amount} onChange={(e) => setExtras((l) => l.map((r) => (r.id === x.id ? { ...r, amount: e.target.value } : r)))} suffix="$" />
-                <Input dir="ltr" inputMode="decimal" aria-label="قیمت (اختیاری)" placeholder="قیمت خودکار" value={x.price} onChange={(e) => setExtras((l) => l.map((r) => (r.id === x.id ? { ...r, price: e.target.value } : r)))} suffix="$" />
+                <Input dir="ltr" inputMode="decimal" aria-label="مبلغ" value={x.amount} onChange={(e) => setExtras((l) => l.map((r) => (r.id === x.id ? { ...r, amount: e.target.value } : r)))} suffix="دلار" />
+                <Input dir="ltr" inputMode="decimal" aria-label="قیمت (اختیاری)" placeholder="قیمت خودکار" value={x.price} onChange={(e) => setExtras((l) => l.map((r) => (r.id === x.id ? { ...r, price: e.target.value } : r)))} suffix="دلار" />
               </div>
             </div>
           ))}
@@ -506,8 +506,8 @@ export function DcaCalculator() {
                   <tr>
                     <th scope="col" className="!ps-4 md:!ps-5"><span className="sr-only">فعال</span></th>
                     <th scope="col">تاریخ</th>
-                    <th scope="col">مبلغ ($)</th>
-                    <th scope="col">قیمت ($)</th>
+                    <th scope="col">مبلغ (دلار)</th>
+                    <th scope="col">قیمت (دلار)</th>
                     <th scope="col" className="col-num !pe-4 md:!pe-5">واحد</th>
                   </tr>
                 </thead>

@@ -99,7 +99,7 @@ export function PaperBotTab() {
           </ul>
           <div className="flex flex-wrap items-end gap-3">
             <Field label="سرمایهٔ مجازی" className="w-44">
-              <Input dir="ltr" inputMode="numeric" value={capital} onChange={(e) => setCapital(e.target.value)} suffix="$" />
+              <Input dir="ltr" inputMode="numeric" value={capital} onChange={(e) => setCapital(e.target.value)} suffix="دلار" />
             </Field>
             <Button icon={<Play />} loading={action.isPending} disabled={!(capNum >= 100)} onClick={() => action.mutate({ action: 'start', capitalUsd: capNum })}>
               شروع بات کاغذی
