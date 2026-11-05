@@ -30,6 +30,7 @@ const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPa
 const JournalPage = lazy(() => import('@/features/journal/presentation/JournalPage'));
 const FundingPage = lazy(() => import('@/features/funding/presentation/FundingPage'));
 const CompareSimulationPage = lazy(() => import('@/features/simulation/presentation/CompareSimulationPage'));
+const StableYieldPage = lazy(() => import('@/features/simulation/presentation/StableYieldPage'));
 const CarryLabPage = lazy(() => import('@/features/carry-lab/presentation/CarryLabPage'));
 const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
@@ -92,6 +93,7 @@ export function App() {
           <Route path="/funding" element={<Lazy label="درآمد فاندینگ"><FundingPage /></Lazy>} />
           <Route path="/venues" element={<VenuesRedirect />} />
           <Route path="/simulation/compare" element={<Lazy label="اگر خریده بودم"><CompareSimulationPage /></Lazy>} />
+          <Route path="/simulation/stable" element={<Lazy label="دلار بازده‌دار"><StableYieldPage /></Lazy>} />
           <Route path="/carry-lab" element={<Lazy label="آزمایشگاه کری فاندینگ"><CarryLabPage /></Lazy>} />
           <Route path="/performance" element={<Private label="عملکرد و مقایسه سرمایه"><PerformancePage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}

@@ -1,10 +1,10 @@
 /**
  * DeFi — capital flow, market overview, stablecoins.
  * Only the selected panel mounts, avoiding hidden provider requests.
- * Boros is the active yield module; «درآمد استیبل» compares leveraged dollar carry.
+ * Boros is the active yield module. «درآمد استیبل» moved to «اگر خریده بودم ← دلار بازده‌دار» (/simulation/stable).
  */
 import { useEffect, useState } from 'react';
-import { Radar } from 'lucide-react';
+import { PiggyBank, Radar } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
@@ -12,13 +12,13 @@ import { ListRow } from '@/shared/components/ui/ListRow';
 import { OverviewPanel } from './OverviewPanel';
 import { StablecoinsCG } from './StablecoinsCG';
 import { TvlFlowDashboard } from './TvlFlowDashboard';
-import { StableCarryPanel } from '@/features/defi-loop/presentation/StableCarryPanel';
 import { useUiStore } from '@/shared/store/uiStore';
 
 
-type DeFiTab = 'flow' | 'overview' | 'stablecoins' | 'carry';
+type DeFiTab = 'flow' | 'overview' | 'stablecoins';
 
 const YIELD_LINKS = [
+  { to: '/simulation/stable', title: 'دلار بازده‌دار به‌جای تتر', desc: 'اگر تتر یا یو اس دی سی را در هر بازار گذاشته بودید چقدر سود می‌کرد + درآمد اهرمی', icon: PiggyBank },
   { to: '/boros', title: 'بوروس', desc: 'بازارهای نرخ تأمین مالی', icon: Radar },
 ];
 
@@ -49,18 +49,16 @@ export function DeFiPage() {
           options={[
             { value: 'flow', label: 'شبکه‌ها و پروتکل‌ها' },
             { value: 'overview', label: 'نمای کلی بازار' },
-            { value: 'stablecoins', label: 'استیبل‌کوین‌ها' },
-            { value: 'carry', label: 'درآمد استیبل' }
+            { value: 'stablecoins', label: 'استیبل‌کوین‌ها' }
           ]}
         />
         {tab==='flow'&&<TvlFlowDashboard />}
         {tab==='overview'&&<OverviewPanel />}
         {tab==='stablecoins'&&<StablecoinsCG />}
-        {tab==='carry'&&<StableCarryPanel />}
       </div>
 
       <Section id="yield-products" title="محصولات بازدهی">
-        <Surface className="divide-y divide-divider px-4 md:grid md:grid-cols-1 md:divide-x md:divide-y-0 md:px-0 md:rtl:divide-x-reverse">
+        <Surface className="divide-y divide-divider px-4 md:grid md:grid-cols-2 md:divide-x md:divide-y-0 md:px-0 md:rtl:divide-x-reverse">
           {YIELD_LINKS.map((l) => (
             <div key={l.to} className="md:px-5">
               <ListRow
