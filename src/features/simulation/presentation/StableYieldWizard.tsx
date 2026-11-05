@@ -28,6 +28,7 @@ import { Check, Chips, StepCard } from '@/features/calculators/presentation/plan
 import { AssistantExplain } from '@/features/calculators/presentation/options/AssistantExplain';
 import { LineChartCard, fmtFaDate } from '@/features/calculators/presentation/CalcCharts';
 import { parseNum } from '@/features/calculators/presentation/parse';
+import { entryGuide } from '../domain/stableGuide';
 import { KIND_FA, PROJECT_FA, pickStableMarkets, simulateYield, stableBalance, type MarketKind, type StableMarket, type YieldSim } from '../domain/stableYield';
 
 const STEPS = ['پول شما', 'ریسک‌پذیری', 'اگر خریده بودم', 'از امروز به بعد'] as const;
@@ -129,7 +130,11 @@ export function StableYieldWizard() {
   const ready = visible.filter((r) => r.sim && r.sim.coveredDays > 0);
   const loadingCharts = rows.some((r) => r.loading);
   const best = ready[0] ?? null;
-  const picked = rows.find((r) => r.m.pool === s.pick) ?? best;
+  // pick: null = پیش‌فرض (بهترین بازار باز است)، '' = همه بسته
+  const picked = s.pick === '' ? null : rows.find((r) => r.m.pool === s.pick) ?? best;
+  const forwardPick = picked ?? best;
+  // همان پروتکل و شبکه، بازاری که مستقیم دلار کاربر را می‌گیرد (برای راهنمای ورود)
+  const altFor = (m: StableMarket) => (m.direct === s.coin ? null : all.find((x) => x.project === m.project && x.chain === m.chain && x.direct === s.coin) ?? null);
 
   const profitOf = (r: Row | null) => (r?.sim && amount ? amount * (r.sim.growth - 1) : null);
   const canNext = [amountOk, allowed.length > 0, ready.length > 0, true][s.step];
@@ -247,22 +252,28 @@ export function StableYieldWizard() {
               {loadingCharts && <p className="text-2xs text-subtle">بقیهٔ بازارها در حال دریافت‌اند…</p>}
               <ul className="space-y-2" aria-label="بازارها از بیشترین سود">
                 {visible.map((r, i) => (
-                  <li key={r.m.pool}>
-                    <MarketRow r={r} rank={i + 1} amount={amount ?? 0} active={picked?.m.pool === r.m.pool} onPick={() => set('pick', r.m.pool)} />
+                  <li key={r.m.pool} className="space-y-2">
+                    <MarketRow r={r} rank={i + 1} amount={amount ?? 0} active={picked?.m.pool === r.m.pool} onPick={() => set('pick', picked?.m.pool === r.m.pool ? '' : r.m.pool)} />
+                    {picked?.m.pool === r.m.pool && r.sim && (
+                      <div className="space-y-3 ps-2 sm:ps-10">
+                        <MarketDetail r={r} amount={amount ?? 0} days={days} />
+                        <HowTo m={r.m} coin={s.coin} alt={altFor(r.m)} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
               {hiddenLow > 0 && <p className="text-2xs text-subtle">{toFaDigits(hiddenLow)} بازار که در این مدت سود دلاری پایه نداشتند (فقط پاداش توکنی یا تقریباً صفر) نمایش داده نمی‌شوند.</p>}
               {chart && <LineChartCard key={chartKey} title="سود انباشته در هر بازار" description="پنج بازار برتر؛ خط‌چین صفر = نگه داشتن بی‌کار" labels={chart.labels} datasets={chart.datasets} />}
-              {picked?.sim && <MarketDetail r={picked} amount={amount ?? 0} days={days} />}
             </>
           )}
         </StepCard>
       )}
 
-      {s.step === 3 && picked && (
+      {s.step === 3 && forwardPick && (
         <StepCard n={4} title="از امروز به بعد چه؟" sub="گذشته تضمین آینده نیست. نرخ امروز، برآورد چند ماه آینده با همین نرخ، و چیزهایی که پیش از خرید باید بدانید.">
-          <Forward r={picked} amount={amount ?? 0} coin={s.coin} />
+          <Forward r={forwardPick} amount={amount ?? 0} coin={s.coin} />
+          <HowTo m={forwardPick.m} coin={s.coin} alt={altFor(forwardPick.m)} />
           <AssistantExplain
             payload={() => ({
               question: 'کاربر تتر/یو اس دی سی بی‌کار دارد. نتیجهٔ «اگر دلار بازده‌دار خریده بودم» را توضیح بده و بگو کدام گزینه با ریسک‌پذیری او جور است.',
@@ -287,7 +298,7 @@ export function StableYieldWizard() {
                 institutionalOnly: r.m.restricted,
                 partialHistory: r.sim!.partial
               })),
-              selected: picked.m.symbol
+              selected: forwardPick.m.symbol
             })}
             op="analyze-stable"
           />
@@ -395,6 +406,7 @@ function MarketRow({ r, rank, amount, active, onPick }: { r: Row; rank: number; 
         ) : (
           <span className="text-2xs text-subtle">بدون تاریخچه</span>
         )}
+        <span className="mt-0.5 block text-2xs font-semibold text-accent">{active ? 'بستن راهنما ▲' : 'جزئیات و راهنمای ورود ▼'}</span>
       </span>
     </button>
   );
@@ -468,5 +480,41 @@ function Forward({ r, amount, coin }: { r: Row; amount: number; coin: Coin }) {
         </Check>
       </ul>
     </div>
+  );
+}
+
+function HowTo({ m, coin, alt }: { m: StableMarket; coin: Coin; alt: StableMarket | null }) {
+  const g = entryGuide(m, coin, alt);
+  return (
+    <Surface className="space-y-3 border-accent/40 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-bold text-ink">چطور وارد {nameOf(m)} شوم؟</h3>
+        {!g.official && <Badge tone="warn" className="text-2xs">نشانی رسمی بررسی‌نشده</Badge>}
+      </div>
+      <ol className="space-y-2.5">
+        {g.steps.map((t, i) => (
+          <li key={i} className="flex items-start gap-2.5 text-xs leading-6">
+            <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-2xs font-bold text-accent">{toFaDigits(i + 1)}</span>
+            <span className="min-w-0 text-ink">{t}</span>
+          </li>
+        ))}
+      </ol>
+      <a
+        href={g.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-control bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong"
+      >
+        {g.official ? `ورود به ${nameOf(m)}` : 'صفحهٔ این بازار در DeFiLlama'}
+        <bdi dir="ltr" className="font-latin text-xs opacity-80">{g.host}</bdi>
+        <ExternalLink aria-hidden className="h-4 w-4" />
+      </a>
+      <p className="text-xs leading-6 text-muted"><span className="font-semibold text-ink">خروج:</span> {g.exit}</p>
+      <ul className="space-y-1">
+        {g.warnings.map((w) => (
+          <li key={w} className="text-2xs leading-5 text-warn">⚠ {w}</li>
+        ))}
+      </ul>
+    </Surface>
   );
 }
