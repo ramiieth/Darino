@@ -8,6 +8,7 @@
 import type { ClassifiedTrade, Commitment, CommitmentRule, TradeNote, TradePlan, WeeklyReview } from './types';
 import { dayKey, hourOf, isoWeekKey, mean, median } from './time';
 import { isScratch, scratchFloorOf, type PlannedRisk } from './metrics';
+import { toFaDigits, usdText } from '@/shared/utils/formatters';
 
 export interface WeekStats {
   week: string;
@@ -180,7 +181,7 @@ export function crossWeekPatterns(
     const r = off.reduce((s, t) => s + t.netPnl, 0);
     out.push({
       tone: r < 0 ? 'bad' : 'neutral',
-      text: `${off.length} معاملهٔ خلاف قانون در مجموع ${r >= 0 ? '+' : '−'}$${Math.abs(r).toFixed(0)}. ${r < 0 ? 'برای شکستن قوانین خودتان پول می‌دهید.' : 'نتیجهٔ مثبت معاملهٔ خلاف قانون را تأیید نمی‌کند؛ فقط درس را عقب می‌اندازد.'}`
+      text: `${off.length} معاملهٔ خلاف قانون در مجموع ${usdText(Math.round(r), { signed: true })}. ${r < 0 ? 'برای شکستن قوانین خودتان پول می‌دهید.' : 'نتیجهٔ مثبت معاملهٔ خلاف قانون را تأیید نمی‌کند؛ فقط درس را عقب می‌اندازد.'}`
     });
   }
 
@@ -197,8 +198,8 @@ export function crossWeekPatterns(
   if (enough.length) {
     const best = enough.reduce((a, b) => (a[1].net >= b[1].net ? a : b));
     const worst = enough.reduce((a, b) => (a[1].net <= b[1].net ? a : b));
-    out.push({ tone: 'neutral', text: `بهترین نوع ورود تا اینجا: «${best[0]}» (${best[1].net >= 0 ? '+' : '−'}$${Math.abs(best[1].net).toFixed(0)} در ${best[1].n} معامله).` });
-    if (worst[0] !== best[0] && worst[1].net < 0) out.push({ tone: 'neutral', text: `ضعیف‌ترین: «${worst[0]}» (−$${Math.abs(worst[1].net).toFixed(0)} در ${worst[1].n} معامله). نمونه کوچک است؛ قبل از قضاوت ستاپ، کیفیت اجرا را ببینید.` });
+    out.push({ tone: 'neutral', text: `بهترین نوع ورود تا اینجا: «${best[0]}» (${usdText(Math.round(best[1].net), { signed: true })} در ${toFaDigits(best[1].n)} معامله).` });
+    if (worst[0] !== best[0] && worst[1].net < 0) out.push({ tone: 'neutral', text: `ضعیف‌ترین: «${worst[0]}» (${usdText(Math.round(worst[1].net))} در ${toFaDigits(worst[1].n)} معامله). نمونه کوچک است؛ قبل از قضاوت ستاپ، کیفیت اجرا را ببینید.` });
   }
 
   const counts = weeks.map((w) => w.n);

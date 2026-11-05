@@ -300,7 +300,7 @@ function LotteryView({ onToken }: { onToken: (address: string) => void }) {
           <h3 className="mb-3 text-sm font-bold text-ink">برنامهٔ بلیت شما</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="کل سرمایهٔ شما (دلار)">
-              <Input type="number" inputMode="decimal" dir="ltr" min={0} value={capital} onChange={(e) => setCapital(e.target.value)} suffix="$" />
+              <Input type="number" inputMode="decimal" dir="ltr" min={0} value={capital} onChange={(e) => setCapital(e.target.value)} suffix="دلار" />
             </Field>
             <Field label={`تعداد بلیت (${toFaDigits(LOTTERY.minTickets)} تا ${toFaDigits(LOTTERY.maxTickets)})`}>
               <Input type="number" inputMode="numeric" dir="ltr" min={LOTTERY.minTickets} max={LOTTERY.maxTickets} value={tickets} onChange={(e) => setTickets(e.target.value)} />

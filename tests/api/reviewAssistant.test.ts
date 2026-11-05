@@ -17,3 +17,19 @@ describe('sanitizeReview', () => {
     expect(r.commitments).toEqual([{ type: 'maxTradesPerDay', text: 'a', n: 50 }, { type: 'allowedSetups', text: 'c', tags: ['شکست'] }, { type: 'free', text: 'd' }]);
   });
 });
+
+describe('sanitizeReview — پاسخ بلند رد نمی‌شود', () => {
+  it('متن بلندتر از سقف کوتاه می‌شود و فیلد خراب خالی می‌شود', () => {
+    const r = sanitizeReview({
+      summary: 'خ'.repeat(5000), mistakeTags: 'نه آرایه', mistakeNote: 'ی'.repeat(3000), goodTags: [], goodNote: 12,
+      answers: [{ id: 'q1', text: 'پ'.repeat(2500) }],
+      commitments: [{ type: 'maxRiskPct', text: 'ت'.repeat(400), pct: 'یک' }]
+    }, input);
+    expect(r.summary).toHaveLength(3000);
+    expect(r.mistakeTags).toEqual([]);
+    expect(r.mistakeNote).toHaveLength(2000);
+    expect(r.goodNote).toBe('');
+    expect(r.answers[0].text).toHaveLength(2000);
+    expect(r.commitments).toEqual([{ type: 'maxRiskPct', text: 'ت'.repeat(200), pct: 1 }]);
+  });
+});

@@ -200,7 +200,7 @@ export function CompareCalculator() {
                   value={targets[a.symbol] ?? ''}
                   placeholder={priceInput(endInPast ? priceFromSeries(hist[histKey(a.symbol)], endTs) : prices[a.symbol])}
                   onChange={(e) => setTargets((t) => ({ ...t, [a.symbol]: e.target.value }))}
-                  suffix="$"
+                  suffix="دلار"
                 />
               </li>
             ))}

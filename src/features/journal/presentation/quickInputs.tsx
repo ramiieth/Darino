@@ -12,6 +12,7 @@ import { planCoin } from '../domain/baseRate';
 import { ALL_SYMBOLS, priceAt, stopFractions, SYMBOL_FA, type StopPreset } from '../domain/quick';
 import { useCandles, useLiveMid } from '../data/useExcursions';
 import { fa } from './parts';
+import { usdText } from '@/shared/utils/formatters';
 
 const chip = (on: boolean) =>
   cn(
@@ -172,4 +173,4 @@ export function useMarket(symbol: string) {
   };
 }
 
-export const usdShort = (n: number) => (n >= 1000 ? `$${fa(n / 1000, 1)}K` : `$${fa(n)}`);
+export const usdShort = (n: number) => usdText(n, { compact: true });

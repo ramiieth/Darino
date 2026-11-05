@@ -433,7 +433,7 @@ export default function DesignSystemPage() {
               onClick={() => undefined}
               leading={<AssetLogo symbol="ETH" kind="crypto" size={36} />}
               title="اتریوم"
-              subtitle="3.33 ETH · میانگین $2,820.00"
+              subtitle="۳.۳۳ ETH · میانگین ۲,۸۲۰.۰۰ دلار"
               trailing={<MoneyValue value={8967.19} />}
               trailingSub={<MoneyValue value={-423.41} signed tone="auto" />}
             />
@@ -490,7 +490,7 @@ export default function DesignSystemPage() {
               { label: 'اعداد مالی', value: 'ارقام لاتین، LTR، جداکننده هزارگان، دو رقم اعشار برای مبالغ' },
               { label: 'تومان', value: 'ارقام فارسی (سیاست مشتری) — «≈ ۴٫۷۵ میلیارد تومان»' },
               { label: 'درصد', value: '+2.41% / -1.20% — علامت صریح برای تغییر؛ APY بدون علامت' },
-              { label: 'ارز', value: '$ پیش از عدد؛ منفی: -$12.50' },
+              { label: 'ارز', value: 'بدون «$»؛ واژهٔ «دلار» کوچک پس از عدد؛ منفی: -۱۲.۵۰ دلار' },
               { label: 'تاریخ', value: 'شمسی به‌صورت پیش‌فرض، میلادی در صورت نیاز کنار آن' },
               { label: 'نیم‌فاصله', value: 'دارایی‌ها، پیش‌نمایش، تراکنش‌ها — همیشه با ZWNJ' },
               { label: 'سلب مسئولیت', value: 'بازده گذشته یا اعلام‌شده تضمینی برای آینده نیست؛ شبیه‌سازی‌ها فرضی‌اند' },

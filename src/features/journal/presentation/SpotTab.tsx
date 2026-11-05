@@ -154,7 +154,7 @@ function AssetCard({ a }: { a: SpotAsset }) {
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-control border border-divider bg-divider text-center">
         <Cell label="محقق" value={usd(a.realized, true)} tone={pnlTone(a.realized)} />
         <Cell label="باز" value={a.unrealized === null ? '—' : usd(a.unrealized, true)} tone={pnlTone(a.unrealized)} />
-        <Cell label="میانگین بها" value={a.avgCost === null ? 'نامعلوم' : `$${fa(a.avgCost, a.avgCost < 1 ? 6 : 2)}`} />
+        <Cell label="میانگین بها" value={a.avgCost === null ? 'نامعلوم' : `${fa(a.avgCost, a.avgCost < 1 ? 6 : 2)} دلار`} />
       </div>
       <p className="text-[11px] text-muted">
         خرید {usd(a.boughtUsd)} · فروش {usd(a.soldUsd)}{a.qty > 0 ? <> · موجودی <span className="num-ltr">{fa(a.qty, a.qty < 1 ? 6 : 2)}</span>{a.value !== null ? ` (${usd(a.value)})` : ''}{a.dust ? ' · خرد' : ''}</> : ' · کامل فروخته شد'}

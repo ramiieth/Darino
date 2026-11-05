@@ -79,6 +79,18 @@ export function fmtUsdAmount(usd: number | null | undefined): string {
   return `${toFaDigits(int0.format(usd))} دلار`;
 }
 
+/**
+ * مبلغ دلاری در متن روان (گزارش، ژورنال، اعلان) — «۲۳,۶۰۵.۰۰ دلار» / «-۱۲.۵۰ دلار» / «+۷.۰۰ دلار»
+ *   همیشه دقیقاً دو رقم اعشار (مثل fmtUSD) تا «,» هزارگان با اعشار اشتباه نشود؛ compact: «۱.۲ میلیون دلار». هرگز «$».
+ */
+export function usdText(v: number | null | undefined, opts: { signed?: boolean; compact?: boolean } = {}): string {
+  if (bad(v) || !Number.isFinite(v)) return NA;
+  const a = Math.abs(v);
+  const sign = v < 0 ? '-' : opts.signed && v > 0 ? '+' : '';
+  const body = opts.compact && a >= 1e3 ? fmtCompactFa(a) : toFaDigits(dec2.format(a));
+  return `${sign}${body} دلار`;
+}
+
 /* ---------- عدد و درصد ---------- */
 
 /** عدد با دو رقم اعشار (مثل مقدار اتر) — نام تاریخی؛ ارقام فارسی */

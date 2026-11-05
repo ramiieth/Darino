@@ -20,6 +20,8 @@ import { ReviewTab } from './ReviewTab';
 import { BaseRatePanel } from './BaseRatePanel';
 
 vi.mock('react-chartjs-2', () => ({ Line: () => null, Bar: () => null }));
+// مرور هفتگی سواپ‌های اسپات را از کیف پول‌ها می‌خواند؛ این‌جا بدون کیف پول
+vi.mock('../data/useSpot', () => ({ useSpot: () => ({ wallets: [], book: null, loading: false, loadMore: () => undefined, refetch: () => undefined }) }));
 vi.mock('@/features/custody/data/repository', () => ({ savePref: vi.fn(() => Promise.resolve()), useCustodyStore: () => ({ prefs: [], loaded: true }) }));
 afterEach(cleanup);
 // پنل MAE/MFE کندل می‌خواهد؛ در آزمون شبکه نداریم

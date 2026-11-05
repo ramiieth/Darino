@@ -472,7 +472,7 @@ export function PerpCalculator() {
               <Metric label="قیمت مارک" value={<MoneyValue value={live.markPrice} />} sub={live.change24hPct !== null ? <>۲۴ساعت <PercentValue value={live.change24hPct} /></> : undefined} />
               <Metric label="مارجین نگهداری" value={<MoneyValue value={longR.maintenanceMargin} />} sub={`${toFaDigits((input.maintenanceMarginFraction * 100).toFixed(2))}٪ ارزش`} />
               <Metric label="حداکثر اهرم" value={<span className="num-ltr">{live.maxLeverage ? `${live.maxLeverage}x` : '—'}</span>} />
-              <Metric label="حجم ۲۴ساعته" value={live.volume24hUsd !== null ? <span>{fmtCompactFa(live.volume24hUsd)} $</span> : '—'} />
+              <Metric label="حجم ۲۴ساعته" value={live.volume24hUsd !== null ? <span>{fmtCompactFa(live.volume24hUsd)} <span className="text-xs text-muted">دلار</span></span> : '—'} />
             </MetricGrid>
           </ResultHero>
 

@@ -42,8 +42,8 @@ describe('رویدادهای پوزیشن برای اعلان', () => {
     expect(ev[0]).toMatchObject({ usd: 160000, pnl: 5000 });
     const msg = followMessage('نهنگ', ev);
     expect(msg.title).toContain('نهنگ');
-    expect(msg.body).toContain('لانگ BTC را بست @ 80,000 · سود +$5.0k');
-    expect(msg.body).toContain('لانگ ETH باز کرد $30.0k @ 3,000');
+    expect(msg.body).toContain('لانگ BTC را بست @ 80,000 · سود +۵ هزار دلار');
+    expect(msg.body).toContain('لانگ ETH باز کرد ۳۰ هزار دلار @ 3,000');
   });
 
   it('چند fill پشت‌سرهم یک رویداد خالص می‌سازند', () => {

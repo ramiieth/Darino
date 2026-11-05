@@ -294,7 +294,7 @@ function AccountSizeAsk({ settings }: { settings: JournalSettings }) {
   const n = parseNum(v);
   return (
     <div className="space-y-2 rounded-card border border-dashed border-divider-strong p-3">
-      <PresetNum label="سرمایهٔ حسابتان حدوداً چقدر است؟ (یک‌بار؛ برای حساب حجم مجاز)" values={CAPITALS} value={v} onChange={setV} format={usdShort} suffix="$" />
+      <PresetNum label="سرمایهٔ حسابتان حدوداً چقدر است؟ (یک‌بار؛ برای حساب حجم مجاز)" values={CAPITALS} value={v} onChange={setV} format={usdShort} suffix="دلار" />
       <Button size="sm" disabled={!n || n <= 0} onClick={() => void saveSettings({ ...settings, accountSize: n })}>ذخیره</Button>
     </div>
   );

@@ -126,7 +126,7 @@ describe('تریدرهای دنبال‌شده و «آدرس‌های من»', (
     expect(hlBodies[0]).toMatchObject({ type: 'userFillsByTime', user: T, startTime: t0 + 1 });
     const log = (await store.get<{ title: string; body: string }[]>('u1', 'log'))!;
     expect(log[0].title).toBe('تریدر دنبال‌شده: نهنگ');
-    expect(log[0].body).toContain('لانگ BTC باز کرد $160.0k @ 80,000');
+    expect(log[0].body).toContain('لانگ BTC باز کرد ۱۶۰ هزار دلار @ 80,000');
     expect((await checkUser(store, 'u1', t0 + 180_000)).sent).toBe(0);
     expect(hlBodies[1].startTime).toBe(t0 + 60_001);
   });

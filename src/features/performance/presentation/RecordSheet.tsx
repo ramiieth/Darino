@@ -180,7 +180,7 @@ export function RecordSheet({
             ) : undefined
           }
         >
-          <Input inputMode="decimal" dir="ltr" suffix="$" value={usd} onChange={(e) => { setUsd(e.target.value); if (origin === 'live') { setOrigin('manual'); setBreakdown(null); } }} placeholder="مثلاً 35000" />
+          <Input inputMode="decimal" dir="ltr" suffix="دلار" value={usd} onChange={(e) => { setUsd(e.target.value); if (origin === 'live') { setOrigin('manual'); setBreakdown(null); } }} placeholder="مثلاً 35000" />
         </Field>
         {breakdown && origin === 'live' && (
           <p className="text-2xs leading-5 text-muted">

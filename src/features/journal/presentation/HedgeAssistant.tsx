@@ -141,7 +141,7 @@ function NewPair({ quotes, status }: { quotes: ReturnType<typeof useHedge>['quot
         )}
       </div>
 
-      <PresetNum label="ارزش هر پا" values={AMOUNTS} value={amount} onChange={setAmount} format={usdShort} suffix="$" />
+      <PresetNum label="ارزش هر پا" values={AMOUNTS} value={amount} onChange={setAmount} format={usdShort} suffix="دلار" />
 
       {plan && (
         <>
