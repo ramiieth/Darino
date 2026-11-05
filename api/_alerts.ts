@@ -353,7 +353,11 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
   ];
   for (const [name, needMs, run] of warmers) {
     if (Date.now() - now + needMs > TICK_BUDGET_MS) { errors.push(`skip-${name}`); continue; }
-    await run().catch(() => { errors.push(name); });
+    // سقف سخت: گرم‌کنی که بیش از سهم خودش طول بکشد کل تیک را از ۶۰ ثانیه رد نمی‌کند (کارش در تیک بعد ادامه می‌یابد)
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cap = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), needMs); });
+    await Promise.race([run(), cap]).catch((e: unknown) => { errors.push(e instanceof Error && e.message === 'timeout' ? `timeout-${name}` : name); });
+    clearTimeout(timer);
   }
   const latest = (await store.get<TickInfo>(SYSTEM, 'tick')) ?? info;
   await store.put(SYSTEM, 'tick', { ...latest, lastAt: now, lastResult: { users: users.length, sent, errors: [...new Set(errors)] } });
