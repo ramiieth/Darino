@@ -8,6 +8,7 @@
  *  GET /api/intel?op=swing                         ← سوینگ: رژیم بازار پرپ‌ها + کاندید آزمایشی و عملکرد زنده‌اش (ساخت تدریجی در تیک)
  *  GET /api/intel?op=gold                          ← طلای ایران: ۴ پلتفرم + حباب نسبت به انس و تتر (کش ۶۰ ثانیه)
  *  GET /api/intel?op=irx&coin=USDT|BTC|…           ← صرافی‌های ایران: بهترین خرید/فروش و اسپرد در ۱۱ صرافی (کش ۳۰ ثانیه)
+ *  GET /api/intel?op=benchmarks&from=<ms>&coins=…  ← سری تاریخی بازارهای مقایسهٔ سرمایه + تورم ایران/آمریکا (کش ۱۲ ساعت)
  *
  * منبعی که خطا بدهد فقط از حکم کنار می‌رود (sources نشان می‌دهد کدام‌ها پاسخ داده‌اند).
  * ============================================================ */
@@ -21,6 +22,7 @@ import { getMemeScreen } from './_memeScreen.js';
 import { getSwing } from './_swingScreen.js';
 import { getGold } from './_gold.js';
 import { getIrExchanges } from './_irExchanges.js';
+import { getBenchmarks, parseExtraCoins } from './_benchmarks.js';
 import { IRX_COINS, type IrxCoin } from '../src/features/intel/domain/irExchanges.js';
 
 const CHAINS: Chain[] = ['solana', 'ethereum', 'base', 'bsc', 'arbitrum'];
@@ -134,6 +136,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const payload = await getIrExchanges(coin);
       if (!payload.rows.length) throw new Error('exchanges unavailable');
       res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=30');
+      json(res, 200, payload);
+      return;
+    }
+    if (op === 'benchmarks') {
+      const from = Number(params.get('from'));
+      const payload = await getBenchmarks(Number.isFinite(from) && from > 0 ? from : 0, parseExtraCoins(params.get('coins')));
+      if (!Object.keys(payload.series).length) throw new Error('benchmark sources unavailable');
+      res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600');
       json(res, 200, payload);
       return;
     }

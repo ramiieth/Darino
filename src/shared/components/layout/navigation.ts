@@ -7,11 +7,11 @@
  *   بازارها      what the global market is doing (home route `/`)
  *   بازار ایران  Iranian gold, crypto exchanges, cars and real estate
  *   معامله       decide before a trade (desk), then the venues: Boros, Arcus, Lighter, Ondo Perps
- *   دارایی من    what I own, its record, alerts and security
+ *   دارایی من    what I own, its record and performance vs. markets, alerts and security
  *   ابزارها      what-if tools
  *   خرید         Iranian shops, food, travel, doctors (read-only)
  */
-import { Activity, ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, Wallet, type LucideIcon } from 'lucide-react';
+import { Activity, ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -144,6 +144,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'ارزش خالص، تخصیص و تغییرات امروز',
         icon: LayoutDashboard,
         primary: true
+      },
+      {
+        id: 'performance',
+        to: '/performance',
+        label: 'عملکرد سرمایه',
+        title: 'عملکرد و مقایسه سرمایه',
+        description: 'تاریخچهٔ ارزش دارایی، مقایسه با تورم، طلا، مسکن، خودرو و بازارهای جهانی، و گزارش Gemini',
+        icon: TrendingUp
       },
       { id: 'wallets', to: '/wallets', label: 'کیف پول‌ها', title: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
       { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
