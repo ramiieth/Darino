@@ -6,11 +6,13 @@
  *   • مقایسهٔ هفته‌ها و الگوهای تکرارشونده محاسبه‌ای
  *   • تکمیل خودکار با دستیار (Gemini، سمت سرور): هفته‌ای که معامله دارد و هنوز تکمیل نشده، با باز شدن تب خودکار پر می‌شود؛
  *     فقط فیلدهای خالی پر می‌شوند و نوشتهٔ شما دست نمی‌خورد (domain/reviewAssist.ts)
+ *   • تگ، یادداشت و «چرا وارد شدم» اختیاری‌اند؛ مرور از روی اعداد معاملات پرپ و سواپ‌های اسپات همان هفته هم کامل می‌شود
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { fetchJson } from '@/repositories/remoteClient';
-import { mergeSuggestion, reviewPayload, type ReviewSuggestion } from '../domain/reviewAssist';
+import { mergeSuggestion, reviewPayload, spotWeek, type ReviewSuggestion } from '../domain/reviewAssist';
+import { useSpot } from '../data/useSpot';
 import { Link } from 'react-router-dom';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -71,6 +73,12 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
   const dirty = !!draft && draft.week === week;
 
   const wTrades = byWeek.get(week) ?? [];
+  // اسپات همان هفته (سواپ‌های کیف پول‌های «دارایی من»)؛ دادهٔ همان تب «اسپات» و همان کش
+  const spot = useSpot(0);
+  const weekStart = isoWeekStartUtc(week) ?? 0;
+  const wSpot = useMemo(() => spotWeek(spot.book, weekStart, weekStart + 7 * 86_400_000), [spot.book, weekStart]);
+  const spotSwaps = typeof wSpot?.swaps === 'number' ? wSpot.swaps : 0;
+  const hasActivity = wTrades.length > 0 || spotSwaps > 0;
   const stats = weekStats(week, wTrades, notes, links);
   const prevWeek = shiftWeek(week, -1);
   const prevReview = reviews.get(prevWeek);
@@ -102,7 +110,7 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
     const w = week;
     setAi({ week: w, status: 'loading' });
     try {
-      const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz });
+      const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz, spot: wSpot });
       const res = await fetchJson<{ review: ReviewSuggestion }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 60_000 });
       if (latest.current.week !== w) { setAi(null); return; }
       await saveReview(mergeSuggestion(latest.current, res.review));
@@ -112,13 +120,14 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
       setAi({ week: w, status: 'error', error: e instanceof Error ? e.message : 'دستیار پاسخ نداد' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [week, wTrades, notes, allPlans, settings, accountSize, tz]);
+  }, [week, wTrades, notes, allPlans, settings, accountSize, tz, wSpot]);
   useEffect(() => {
-    // هر هفتهٔ دارای معامله یک‌بار خودکار؛ بعد از آن فقط با دکمهٔ «به‌روزرسانی»
-    if (view !== 'review' || !wTrades.length || saved?.aiAt || tried.current.has(week)) return;
+    // هر هفتهٔ دارای معامله (پرپ یا اسپات) یک‌بار خودکار، حتی بدون تگ و یادداشت؛ بعد از آن فقط با دکمهٔ «به‌روزرسانی».
+    // اول صبر تا سواپ‌های اسپات برسند تا مرور ناقص ذخیره نشود
+    if (view !== 'review' || spot.loading || !hasActivity || saved?.aiAt || tried.current.has(week)) return;
     tried.current.add(week);
     void runAi();
-  }, [view, week, wTrades.length, saved?.aiAt, runAi]);
+  }, [view, week, hasActivity, spot.loading, saved?.aiAt, runAi]);
   const aiBusy = ai?.week === week && ai.status === 'loading';
 
   const start = isoWeekStartUtc(week);
@@ -186,12 +195,18 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
               <Sparkles className="h-4 w-4 text-accent" />
               <h3 className="text-sm font-bold text-ink">جمع‌بندی منتور (دستیار)</h3>
               {r.aiAt && <span className="text-[11px] text-subtle">· {faDateTime(r.aiAt)}</span>}
-              <Button size="sm" variant="ghost" className="ms-auto" icon={<RefreshCw />} disabled={aiBusy || !wTrades.length} onClick={() => void runAi()}>{r.aiAt ? 'به‌روزرسانی' : 'تکمیل خودکار'}</Button>
+              <Button size="sm" variant="ghost" className="ms-auto" icon={<RefreshCw />} disabled={aiBusy || !hasActivity} onClick={() => void runAi()}>{r.aiAt ? 'به‌روزرسانی' : 'تکمیل خودکار'}</Button>
             </div>
             {aiBusy ? <p className="text-xs text-muted">دستیار در حال مرور معاملات این هفته است…</p>
-              : ai?.week === week && ai.status === 'error' ? <Notice tone="warn">{ai.error}</Notice>
+              : ai?.week === week && ai.status === 'error' ? (
+                <Notice tone="warn">
+                  {ai.error}{' '}
+                  <button type="button" className="underline" onClick={() => void runAi()}>تلاش دوباره</button>
+                </Notice>
+              )
               : r.aiSummary ? <p className="whitespace-pre-line text-sm leading-7 text-ink">{r.aiSummary}</p>
-              : <p className="text-xs text-muted">{wTrades.length ? 'با باز شدن هفته‌ای که معامله دارد، اشتباه‌ها، قوت‌ها، پاسخ سؤال‌ها و تعهدهای هفتهٔ بعد خودکار پیشنهاد و ذخیره می‌شوند.' : 'معاملهٔ بسته‌ای در این هفته نیست.'}</p>}
+              : <p className="text-xs text-muted">{hasActivity ? 'با باز شدن هفته‌ای که معامله دارد، اشتباه‌ها، قوت‌ها، پاسخ سؤال‌ها و تعهدهای هفتهٔ بعد خودکار پیشنهاد و ذخیره می‌شوند؛ تگ و یادداشت لازم نیست.' : spot.loading ? 'در حال خواندن سواپ‌های اسپات…' : 'معاملهٔ بسته‌ای (پرپ یا اسپات) در این هفته نیست.'}</p>}
+            {spotSwaps > 0 && <p className="text-[11px] text-subtle">اسپات این هفته هم در مرور است: {fa(spotSwaps)} سواپ.</p>}
             <p className="text-[11px] text-subtle">فقط فیلدهای خالی پر می‌شوند؛ هرچه خودتان نوشته‌اید دست نمی‌خورد و قابل ویرایش است.</p>
           </Surface>
 

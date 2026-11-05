@@ -79,7 +79,8 @@ export function apiUrl(path: string): string {
 /** خطای HTTP با کد وضعیت (برای تشخیص 401/403) */
 export class HttpError extends Error {
   constructor(public status: number, public code: string | null, public retryAfter = 0) {
-    super(`HTTP ${status}`);
+    // پیام فارسی سرور (علت واقعی) اگر آمده؛ وگرنه کد وضعیت
+    super(code || `HTTP ${status}`);
     this.name = 'HttpError';
   }
 }
