@@ -96,7 +96,7 @@ export function positionEvents(fills: Fill[], minUsd = MIN_EVENT_USD): PositionE
 }
 
 const SIDE_FA = { long: 'لانگ', short: 'شورت' } as const;
-const usdText = (v: number) => usdFa(Math.round(v), { compact: true });
+const usdText = (v: number) => usdFa(Math.round(v), { compact: true, plain: true });
 const pxText = (v: number) => (v >= 100 ? v.toLocaleString('en-US', { maximumFractionDigits: 0 }) : v.toPrecision(4));
 
 export function eventText(e: PositionEvent): string {

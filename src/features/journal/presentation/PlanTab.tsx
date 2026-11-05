@@ -25,6 +25,7 @@ import { CAPITALS, digitsFor, R_PRESETS, recentSymbols, roundPx, STOP_PRESETS, s
 import { savePlan, saveSettings } from '../data/journalStore';
 import { fa, faDateTime, parseNum, pct, pnlTone, TagPicker, usd } from './parts';
 import { Chip, DirectionPicker, Label, NumInput, PresetNum, SymbolPicker, useMarket, usdShort } from './quickInputs';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 const BIAS: { value: Bias; label: string }[] = [{ value: 'neutral', label: 'خنثی' }, { value: 'bullish', label: 'صعودی' }, { value: 'bearish', label: 'نزولی' }];
 const YN: { value: YesNo; label: string }[] = [{ value: '-', label: '—' }, { value: 'y', label: 'بله' }, { value: 'n', label: 'خیر' }];
@@ -306,8 +307,8 @@ function Cell({ label, value, sub, strong, tone }: { label: string; value: strin
   return (
     <div className="min-w-0">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={cn('num-ltr font-bold', strong ? 'text-lg' : 'text-sm', tone ?? 'text-ink')}>{value}</p>
-      {sub && <p className="num-ltr text-[11px] text-subtle">{sub}</p>}
+      <p className={cn('num-ltr font-bold', strong ? 'text-lg' : 'text-sm', tone ?? 'text-ink')}><AmountText text={value} /></p>
+      {sub && <p className="num-ltr text-[11px] text-subtle"><AmountText text={sub} /></p>}
     </div>
   );
 }

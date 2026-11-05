@@ -19,6 +19,7 @@ import { cn } from '@/shared/lib/cn';
 import { useSpot } from '../data/useSpot';
 import type { SpotAsset, SpotLeg, SpotSwap } from '../domain/spot';
 import { fa, faDateTime, pct, pnlTone, usd } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 type View = 'assets' | 'closed' | 'swaps';
 
@@ -98,10 +99,10 @@ function SpotHero({ b }: { b: NonNullable<ReturnType<typeof useSpot>['book']> })
       <div className="grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]">
         <div className="border-b border-divider bg-surface-2/50 p-5 md:border-b-0 md:border-e">
           <p className="text-xs font-semibold text-muted">سود محقق اسپات</p>
-          <p className={cn('num-ltr mt-1 text-4xl font-black tracking-tight', pnlTone(t.realized))}>{usd(t.realized, true)}</p>
+          <p className={cn('num-ltr mt-1 text-4xl font-black tracking-tight', pnlTone(t.realized))}><AmountText text={usd(t.realized, true)} /></p>
           <p className="mt-2 text-xs text-muted">
-            باز: <b className={cn('num-ltr', pnlTone(t.unrealized))}>{t.unrealized === null ? '—' : usd(t.unrealized, true)}</b>
-            {' · '}خالص پس از گاز: <b className={cn('num-ltr', pnlTone(t.realized - t.gas))}>{usd(t.realized - t.gas, true)}</b>
+            باز: <b className={cn('num-ltr', pnlTone(t.unrealized))}><AmountText text={t.unrealized === null ? '—' : usd(t.unrealized, true)} /></b>
+            {' · '}خالص پس از گاز: <b className={cn('num-ltr', pnlTone(t.realized - t.gas))}><AmountText text={usd(t.realized - t.gas, true)} /></b>
           </p>
           {t.chains.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{t.chains.slice(0, 6).map((c) => <Badge key={c} tone="neutral">{c}</Badge>)}</div>}
         </div>
@@ -120,7 +121,7 @@ function Tile({ icon, label, value, sub, tone }: { icon: React.ReactNode; label:
   return (
     <div className="min-w-0 border-b border-divider p-4 sm:border-b-0 sm:border-e sm:last:border-e-0 [&:nth-child(odd)]:border-e">
       <div className="flex items-center gap-1.5 text-muted [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}<p className="truncate text-[11px] font-semibold">{label}</p></div>
-      <p className={cn('num-ltr mt-2 text-2xl font-extrabold', tone ?? 'text-ink')}>{value}</p>
+      <p className={cn('num-ltr mt-2 text-2xl font-extrabold', tone ?? 'text-ink')}><AmountText text={value} /></p>
       {sub && <p className="mt-0.5 truncate text-[11px] text-subtle">{sub}</p>}
     </div>
   );
@@ -147,7 +148,7 @@ function AssetCard({ a }: { a: SpotAsset }) {
           <p className="text-[11px] text-muted">{fa(a.buysAll)} خرید · {fa(a.sellsAll)} فروش{a.buysAll + a.sellsAll > a.buys + a.sells ? ` (${fa(a.buys + a.sells)} در بازه)` : ''}</p>
         </div>
         <div className="ms-auto text-end">
-          <p className={cn('num-ltr text-base font-extrabold', pnlTone(total))}>{usd(total, true)}</p>
+          <p className={cn('num-ltr text-base font-extrabold', pnlTone(total))}><AmountText text={usd(total, true)} /></p>
           <p className="text-[10px] text-subtle">محقق + باز</p>
         </div>
       </div>
@@ -172,7 +173,7 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
   return (
     <div className="bg-card px-2 py-1.5">
       <p className="text-[10px] text-subtle">{label}</p>
-      <p className={cn('num-ltr truncate text-xs font-bold', tone ?? 'text-ink')}>{value}</p>
+      <p className={cn('num-ltr truncate text-xs font-bold', tone ?? 'text-ink')}><AmountText text={value} /></p>
     </div>
   );
 }
@@ -198,7 +199,7 @@ function SwapRow({ s }: { s: SpotSwap }) {
         <p className="mt-0.5 truncate text-[11px] text-muted">{faDateTime(s.time)}{s.protocol ? ` · ${s.protocol}` : ''}{s.chain ? ` · ${s.chain}` : ''}{s.gas !== null ? ` · گاز ${usd(s.gas)}` : ''}{s.cost !== null && s.cost > 0 && s.usd ? ` · لغزش ${pct((s.cost / s.usd) * 100, 2)}` : ''}</p>
       </div>
       <div className="shrink-0 text-end">
-        <p className="num-ltr text-sm font-bold text-ink">{usd(s.usd)}</p>
+        <p className="num-ltr text-sm font-bold text-ink"><AmountText text={usd(s.usd)} /></p>
         {buy ? <Badge tone="gain"><Coins />خرید</Badge> : sell ? <Badge tone="loss">فروش</Badge> : <Badge tone="info">تبدیل</Badge>}
       </div>
     </div>

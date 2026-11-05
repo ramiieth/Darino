@@ -7,7 +7,7 @@
  */
 import type { ReactNode } from 'react';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { Metric } from '@/shared/components/ui/FinancialValue';
+import { Metric, AmountText } from '@/shared/components/ui/FinancialValue';
 import { cn } from '@/shared/lib/cn';
 
 export function CalcShell({
@@ -95,7 +95,7 @@ export function StatCard({
       label={label}
       value={
         <span className={cn('num-ltr', tone === 'positive' && 'text-positive', tone === 'negative' && 'text-negative')}>
-          {value}
+          <AmountText text={value} />
         </span>
       }
       sub={sub}
