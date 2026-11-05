@@ -10,7 +10,7 @@ import { cn } from '@/shared/lib/cn';
 import { useSidebarStore } from '@/shared/store/sidebarStore';
 import { useThemeStore } from '@/shared/store/themeStore';
 import { useShellStore } from '@/shared/store/shellStore';
-import { DESIGN_SYSTEM_ITEM, NAV_GROUPS, isItemActive, type NavItem } from './navigation';
+import { NAV_GROUPS, isItemActive, type NavItem } from './navigation';
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const { pathname } = useLocation();
@@ -138,7 +138,6 @@ export function Sidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
         {!installed && deferredPrompt && (
           <FooterButton onClick={openPrompt} icon={<Download />} label="نصب برنامه" collapsed={collapsed} />
         )}
-        <SidebarLink item={DESIGN_SYSTEM_ITEM} collapsed={collapsed} />
         <FooterButton
           onClick={toggleTheme}
           icon={theme === 'dark' ? <Sun /> : <Moon />}

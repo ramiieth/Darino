@@ -1,14 +1,15 @@
 /**
  * میز معامله — یک جا برای تصمیم‌های پیش از معامله، بدون شلوغی:
- *   چک قبل از ورود (حکم اهرم) · سوینگ (رژیم بازار و اندازهٔ پوزیشن) · تریدرهای برتر (امتیاز ثبات، دنبال کردن) · پوزیشن برترها (اجماع) · بازار مشتقات (ازدحام فاندینگ) · میم‌کوین · امنیت توکن
+ *   چک قبل از ورود (حکم اهرم) · سوینگ (رژیم بازار و اندازهٔ پوزیشن) · تریدرهای برتر (امتیاز ثبات، دنبال کردن، و پوزیشن برترها: اجماع) · بازار مشتقات (ازدحام فاندینگ) · میم‌کوین و امنیت توکن
+ *   تب‌های قدیمی ?tab=positions و ?tab=safety به جای تازه‌شان می‌روند.
  * همهٔ حالت‌ها در URL (?tab= ، ?a= ، ?coin= ، ?token=) تا لینک و دکمهٔ برگشت PWA درست کار کند.
  * فقط‌خواندنی: هیچ معامله، کلید خصوصی یا امضایی در کار نیست.
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Compass, Flame, Gauge, Layers, ShieldCheck, Trophy } from 'lucide-react';
+import { Activity, Compass, Flame, Gauge, ShieldCheck, Trophy } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
-import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useAuth } from '@/features/auth/authClient';
 import { isHlAddress } from '@/features/traders/domain/candidates';
 import { useSavedTraders } from '@/features/traders/data/savedTraders';
@@ -24,23 +25,25 @@ import { SafetyTab } from './SafetyTab';
 import { CoinSheet } from './CoinSheet';
 import { TokenSheet } from './TokenSheet';
 
-type Tab = 'check' | 'swing' | 'traders' | 'positions' | 'derivs' | 'memes' | 'safety';
-const TABS: Tab[] = ['check', 'swing', 'traders', 'positions', 'derivs', 'memes', 'safety'];
+type Tab = 'check' | 'swing' | 'traders' | 'derivs' | 'memes';
+const TABS: Tab[] = ['check', 'swing', 'traders', 'derivs', 'memes'];
 
 const INTRO: Record<Tab, string> = {
   check: 'بازار، جهت و اهرم را بدهید تا بدانید در شرایط عادی و در یک آبشار مثل بدترین روز همین بازار چه می‌شود، و چه اهرمی معقول است. جهت قیمت را پیش‌بینی نمی‌کند.',
   swing: 'برای خریدهایی که چند روز تا یک ماه نگه می‌دارید: امروز وقت خوبی برای خرید آلت‌کوین است یا نه، و هر خرید چقدر باشد.',
-  traders: 'تریدرهای هایپرلیکوئید که در ماه‌های متوالی سود کرده‌اند و افتشان کنترل‌شده است، همراه با پوزیشن‌هایی که الان دارند. هر کدام را دنبال کنید تا باز و بسته شدن پوزیشن‌هایش را اعلان بگیرید.',
-  positions: 'برترها روی کدام بازار هم‌نظرند، ثابت‌قدم‌ها هم همین را می‌گویند یا نه، و طرف غالب الان در سود است یا زیان.',
+  traders: 'تریدرهای هایپرلیکوئید که در ماه‌های متوالی سود کرده‌اند و افتشان کنترل‌شده است، همراه با پوزیشن‌هایی که الان دارند و اینکه روی کدام بازار هم‌نظرند. هر کدام را دنبال کنید تا باز و بسته شدن پوزیشن‌هایش را اعلان بگیرید.',
   derivs: 'کجا لانگ‌ها یا شورت‌ها شلوغ‌اند و برای پوزیشن جهت‌دار یا درآمد دلتا نوترال شما چه معنایی دارد.',
-  memes: 'میم‌کوین‌های سولانا با فیلترهای آزموده روی یک سال داده: رژیم بازار، بقا، روند، ضد نقدینگی خروج و امنیت، به‌اضافهٔ فهرست انتظار با اعلان. یا حالت «بلیت بخت‌آزمایی» با سقف بودجه.',
-  safety: 'قبل از خرید هر توکن: هانی‌پات، مالیات، مینت، فریز، تمرکز هولدرها و نقدینگی.'
+  memes: 'میم‌کوین‌های سولانا با فیلترهای آزموده روی یک سال داده، فهرست انتظار با اعلان و حالت «بلیت بخت‌آزمایی» با سقف بودجه؛ و قبل از خرید هر توکن: هانی‌پات، مالیات، مینت، فریز، تمرکز هولدرها و نقدینگی.'
 };
 
 export default function IntelHubPage() {
   const [params, setParams] = useSearchParams();
-  const raw = params.get('tab') as Tab | null;
+  // تب‌های قدیمی: «پوزیشن برترها» ← تریدرها، «امنیت توکن» ← میم‌کوین
+  const rawTab = params.get('tab');
+  const raw = (rawTab === 'positions' ? 'traders' : rawTab === 'safety' ? 'memes' : rawTab) as Tab | null;
   const tab: Tab = raw && TABS.includes(raw) ? raw : 'check';
+  const traderView = rawTab === 'positions' || params.get('view') === 'consensus' ? 'consensus' : params.get('view') === 'mine' ? 'mine' : 'top';
+  const memeView = rawTab === 'safety' || params.get('view') === 'safety' ? 'safety' : 'screen';
   const trader = params.get('a');
   const coin = params.get('coin');
   const token = params.get('token');
@@ -82,10 +85,8 @@ export default function IntelHubPage() {
           { value: 'check', label: 'چک قبل از ورود', icon: <Gauge /> },
           { value: 'swing', label: 'سوینگ', icon: <Compass /> },
           { value: 'traders', label: 'تریدرهای برتر', icon: <Trophy /> },
-          { value: 'positions', label: 'پوزیشن برترها', icon: <Layers /> },
           { value: 'derivs', label: 'بازار مشتقات', icon: <Activity /> },
-          { value: 'memes', label: 'میم‌کوین', icon: <Flame /> },
-          { value: 'safety', label: 'امنیت توکن', icon: <ShieldCheck /> }
+          { value: 'memes', label: 'میم‌کوین و امنیت توکن', icon: <Flame /> }
         ]}
       />
       <div role="tabpanel">
@@ -100,12 +101,28 @@ export default function IntelHubPage() {
         )}
         {tab === 'swing' && <SwingTab onCheck={(c) => update({ tab: null, view: null, m: c })} />}
         {tab === 'traders' && (
-          <TradersTab view={params.get('view') === 'mine' ? 'mine' : 'top'} onView={(v) => update({ view: v === 'top' ? null : v })} onOpen={(a) => update({ a })} />
+          <TradersTab
+            view={traderView}
+            onView={(v) => update({ tab: 'traders', view: v === 'top' ? null : v })}
+            onOpen={(a) => update({ a })}
+            consensus={<PositionsTab onCoin={(c) => update({ coin: c })} />}
+          />
         )}
-        {tab === 'positions' && <PositionsTab onCoin={(c) => update({ coin: c })} />}
         {tab === 'derivs' && <DerivativesTab onCoin={(c) => update({ coin: c })} />}
-        {tab === 'memes' && <MemesTab onToken={(t) => update({ token: t })} />}
-        {tab === 'safety' && <SafetyTab />}
+        {tab === 'memes' && (
+          <div className="space-y-4">
+            <SegmentedControl<'screen' | 'safety'>
+              label="میم‌کوین یا امنیت توکن"
+              value={memeView}
+              onChange={(v) => update({ tab: 'memes', view: v === 'screen' ? null : v })}
+              options={[
+                { value: 'screen', label: 'غربال میم‌کوین', icon: <Flame /> },
+                { value: 'safety', label: 'امنیت یک توکن', icon: <ShieldCheck /> }
+              ]}
+            />
+            {memeView === 'safety' ? <SafetyTab /> : <MemesTab onToken={(t) => update({ token: t })} />}
+          </div>
+        )}
       </div>
 
       <TraderReportSheet address={trader && isHlAddress(trader) ? trader : null} name={traderName} onClose={() => update({ a: null })} />

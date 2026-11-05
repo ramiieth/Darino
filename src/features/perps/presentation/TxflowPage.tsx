@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
+import { VenueTabs } from '@/shared/components/layout/SectionTabs';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
@@ -127,6 +128,7 @@ export default function TxflowPage() {
   return (
     <Page>
       <PageHeader title="تی‌اکس‌فلو" subtitle="موجودی، سود/زیان و پوزیشن‌های حساب، به‌اضافهٔ بازارها و فاندینگ زنده" />
+      <VenueTabs />
       <Surface className="flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="flex min-w-0 items-center gap-3">
           <LogoImage src="/logos/platform-txflow.png" label="تی‌اکس‌فلو" size={44} />
@@ -151,8 +153,8 @@ export default function TxflowPage() {
         venues.map((a) => <AccountCard key={a.id} a={a} removable={registered.has(a.id)} />)
       )}
       <Notice>
-        سود/زیان ۲۴ ساعت، ۷ و ۳۰ روز برای تی‌اکس‌فلو عمومی نیست و نمایش داده نمی‌شود. برای تحلیل معاملات و استفاده در دفتر دلتا نوترال به{' '}
-        <Link className="font-semibold text-accent underline" to="/journal?tab=neutral">ژورنال معاملاتی</Link> بروید.
+        سود/زیان ۲۴ ساعت، ۷ و ۳۰ روز برای تی‌اکس‌فلو عمومی نیست و نمایش داده نمی‌شود. برای دفتر دلتا نوترال به{' '}
+        <Link className="font-semibold text-accent underline" to="/funding?tab=ledger">دفتر جفت‌ها در درآمد فاندینگ</Link> بروید.
       </Notice>
 
       <Surface className="space-y-4 p-5">

@@ -1,6 +1,7 @@
 /**
  * Markets (home route) — scan the market fast on desktop, drill down on phones.
  */
+import { MARKET_TABS, SectionTabs } from '@/shared/components/layout/SectionTabs';
 import { useCallback, useMemo, useState } from 'react';
 import { Percent, RefreshCw } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
@@ -58,6 +59,7 @@ export function MarketsHomePage() {
         }
       />
 
+      <SectionTabs tabs={MARKET_TABS} label="بخش‌های بازار" />
       <MarketsPage tab={tab} onTabChange={onTabChange} />
 
       <Surface className="px-4">

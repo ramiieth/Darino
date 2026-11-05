@@ -82,7 +82,7 @@ export function DerivativesTab({ onCoin }: { onCoin: (coin: string) => void }) {
       <p className="text-xs leading-6 text-subtle">
         «شلوغ» یعنی فاندینگ سالانه دست‌کم دو برابر نرخ پایهٔ هایپرلیکوئید (~۱۱٪) یا منفی، و فقط در بازارهایی با OI بالای <MoneyValue value={MIN_SIGNAL_OI} compact />؛ فاندینگ بازار کم‌عمق نویز است.
         «رژیم» نرخ امروز را با همهٔ ساعت‌های ۳۰ روز گذشته مقایسه می‌کند. پیش‌بینی جهت قیمت نیست.{' '}
-        <Link to="/calculators" className="font-semibold text-brand hover:underline">محاسبهٔ سود خالص دلتا نوترال روی صرافی‌های شما</Link>
+        <Link to="/funding?tab=decide" className="font-semibold text-brand hover:underline">محاسبهٔ سود خالص دلتا نوترال روی صرافی‌های شما</Link>
       </p>
 
       <Disclosure summary={`همهٔ بازارها (${toFaDigits(all.length)})`}>

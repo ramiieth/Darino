@@ -29,6 +29,7 @@ import { readMemeScreen, warmMemeScreen } from './_memeScreen.js';
 import { warmSwing } from './_swingScreen.js';
 import { recordGold } from './_gold.js';
 import { warmDivarCars } from './_divarCars.js';
+import { runPaperBots } from './_paperBot.js';
 import { sanitizeWatch, watchEvents, watchMessage, type MemeWatchState } from '../src/features/intel/domain/memeWatch.js';
 import { followMessage, positionEvents, sanitizeSaved, shortAddr, type SavedTrader } from '../src/features/traders/domain/follow.js';
 import type { Fill } from '../src/features/traders/domain/types.js';
@@ -245,7 +246,7 @@ export async function checkUser(store: AlertsStore, userId: string, now = Date.n
 
   let sent = 0;
   const { flips, next } = evaluateFunding(rules.funding, market.rates);
-  for (const f of flips) { await notify(store, userId, { ...fundingMessage(f), url: '/calculators', tag: `funding-${f.watch.key}` }); sent++; }
+  for (const f of flips) { await notify(store, userId, { ...fundingMessage(f), url: '/funding', tag: `funding-${f.watch.key}` }); sent++; }
   if (flips.length) await store.put(userId, 'rules', { ...rules, funding: next });
 
   let near = 0; let exposures = 0;
@@ -337,6 +338,8 @@ export async function runTick(store: AlertsStore, now = Date.now()): Promise<{ s
   // گرم‌کن‌های پس‌زمینه با بودجهٔ زمان: فانکشن ۶۰ ثانیه سقف دارد و قبلاً آخری‌ها (دیوار) هرگز نوبت نمی‌گرفتند.
   // هر کدام فقط وقتی اجرا می‌شود که به‌اندازهٔ سقف زمان خودش وقت مانده باشد؛ نماندن وقت = «skip-…» در lastResult
   const warmers: [string, number, () => Promise<unknown>][] = [
+    // بات کاغذی کری + ثبت ساعتی فاندینگ صرافی‌ها (فقط وقتی ساعت تازه‌ای تسویه شده کار دارد)
+    ['paper-bot', 14_000, () => runPaperBots(store, (userId, msg) => notify(store, userId, msg), now)],
     // آگهی‌های خودروی داخلی دیوار تهران، چند صفحه در هر تیک (بازار خودرو)
     ['divar-cars', 11_000, () => warmDivarCars()],
     // رژیم بازار سوینگ و ثبت روزانهٔ کاندید آزمایشی (حتی وقتی کسی صفحه را باز نکرده)

@@ -3,58 +3,39 @@
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
-import { BadgeDollarSign, Bot, Layers, ListChecks, Radar, Scale, ShieldHalf, Store } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ListChecks, ShieldHalf, Store } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
-import { toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 import { PnlCalculator } from './PnlCalculator';
 import { DcaCalculator } from './DcaCalculator';
 import { CagrCalculator } from './CagrCalculator';
 import { XirrCalculator } from './XirrCalculator';
-import { CompareCalculator } from './CompareCalculator';
 import { PerpCalculator } from './PerpCalculator';
 import { HedgeCalculator } from './hedge/HedgeCalculator';
-import { DeltaNeutralCalculator } from './delta/DeltaNeutralCalculator';
-import { DeltaProfitCalculator } from './delta/DeltaProfitCalculator';
-import { FundingScanner } from './delta/FundingScanner';
-import { DeltaExecutionTab } from './delta/execution/DeltaExecutionTab';
 import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
 import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
-import { FundingStrategiesCalculator } from './strategies/FundingStrategiesCalculator';
-import type { ExecutionHandoff } from './delta/execution/ExecutionPlanner';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'delta' | 'strategies' | 'cagr' | 'xirr' | 'compare' | 'shop';
-type Group = 'invest' | 'income' | 'risk' | 'business';
-/** قدم‌های تب «درآمد دلتا نوترال»: پیدا کن ← تصمیم بگیر ← اجرا و پایش */
-type HubStep = 'find' | 'decide' | 'run';
-type FindView = 'scanner' | 'arb';
+/**
+ * دلتا نوترال و استراتژی‌های فاندینگ به «درآمد فاندینگ» (/funding) رفته‌اند و «مقایسه دارایی‌ها» به
+ * «اگر خریده بودم» (/simulation/compare)؛ این صفحه فقط ماشین‌حساب‌های عمومی را نگه می‌دارد.
+ */
+type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
+type Group = 'invest' | 'risk' | 'business';
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
   { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
   { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش، یا پیش‌بینی ارزش آینده با واریز دوره‌ای' },
   { value: 'xirr', label: 'بازده واقعی', description: 'بازده سالانه جریان‌های نقدی در تاریخ‌های مختلف' },
-  { value: 'compare', label: 'مقایسه دارایی‌ها', description: 'سرمایه یکسان در چند دارایی و یک بازه' },
   {
     value: 'plan',
     label: 'برنامهٔ من',
     description: 'همراه قدم به قدم: تقسیم پول بین خرید پله‌ای و دلتا نوترال، و برنامهٔ نهایی',
     icon: <ListChecks aria-hidden />
-  },
-  {
-    value: 'delta',
-    label: 'درآمد دلتا نوترال',
-    description: 'یک خرید و یک فروش هم‌اندازه در دو صرافی؛ قیمت هرچه شود، این دو هم را خنثی می‌کنند و درآمد از اختلاف فاندینگ می‌آید. سه قدم: پیدا کن، تصمیم بگیر، اجرا و پایش.',
-    icon: <Scale aria-hidden />
-  },
-  {
-    value: 'strategies',
-    label: 'استراتژی‌های فاندینگ',
-    description: 'یک نماد انتخاب کنید؛ همهٔ راه‌های گرفتن فاندینگ روی صرافی‌های شما، با نرخ ثابت Boros، محاسبه و رتبه‌بندی می‌شود.',
-    icon: <Layers aria-hidden />
   },
   {
     value: 'hedge',
@@ -74,41 +55,24 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
 
 /** چهار گروه به‌جای چهارده تب کنار هم */
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
-  { value: 'invest', label: 'سرمایه‌گذاری', tabs: ['pnl', 'dca', 'cagr', 'xirr', 'compare', 'plan'] },
-  { value: 'income', label: 'دلتا نوترال', tabs: ['delta', 'strategies'] },
+  { value: 'invest', label: 'سرمایه‌گذاری', tabs: ['pnl', 'dca', 'cagr', 'xirr', 'plan'] },
   { value: 'risk', label: 'ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
 const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.value;
 
-const HUB_STEPS: { value: HubStep; title: string; sub: string; icon: ReactNode }[] = [
-  { value: 'find', title: 'پیدا کن', sub: 'کدام ارز و کدام دو صرافی', icon: <Radar aria-hidden className="h-4 w-4" /> },
-  { value: 'decide', title: 'تصمیم بگیر', sub: 'وضعیت امروز و سود خالص', icon: <BadgeDollarSign aria-hidden className="h-4 w-4" /> },
-  { value: 'run', title: 'اجرا و پایش', sub: 'موقعیت باز شما متعادل است؟', icon: <Bot aria-hidden className="h-4 w-4" /> }
-];
-
 export function CalculatorsPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<CalcTab>('pnl');
-  const [step, setStep] = useState<HubStep>('decide');
-  const [findView, setFindView] = useState<FindView>('scanner');
   // PERP polls live market APIs — mount it only once it has been opened
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
   // آپشن هم دادهٔ زندهٔ Derive می‌خواند — فقط بعد از باز شدن
   const [optionsOpened, setOptionsOpened] = useState(false);
   if (tab === 'options' && !optionsOpened) setOptionsOpened(true);
-  // ابزارهای دلتا سه صرافی را می‌خوانند — هر کدام فقط بعد از اولین باز شدن mount می‌شود و بعد زنده می‌ماند
-  const [opened, setOpened] = useState<Partial<Record<'plan' | 'strategies' | HubStep | FindView, true>>>({});
-  const visibleKeys: ('plan' | 'strategies' | HubStep | FindView)[] = tab === 'plan' ? ['plan'] : tab === 'strategies' ? ['strategies'] : tab === 'delta' ? (step === 'find' ? ['find', findView] : [step]) : [];
-  if (visibleKeys.some((k) => !opened[k])) setOpened((o) => ({ ...o, ...Object.fromEntries(visibleKeys.map((k) => [k, true])) }));
-  const venuesOpened = Object.keys(opened).length > 0;
-  // انتقال انتخاب به «اجرا و پایش»
-  const [handoff, setHandoff] = useState<ExecutionHandoff | null>(null);
-  const openExecution = (h: Omit<ExecutionHandoff, 'nonce'>) => {
-    setHandoff({ ...h, nonce: Date.now() });
-    setTab('delta');
-    setStep('run');
-  };
+  // «برنامهٔ من» سه صرافی را می‌خواند — فقط بعد از اولین باز شدن
+  const [planOpened, setPlanOpened] = useState(false);
+  if (tab === 'plan' && !planOpened) setPlanOpened(true);
   const group = groupOf(tab);
   const groupTabs = GROUPS.find((g) => g.value === group)!.tabs;
   const current = TABS.find((t) => t.value === tab);
@@ -118,7 +82,6 @@ export function CalculatorsPage() {
     inert: !visible ? ('' as const) : undefined
   });
   const panel = (id: CalcTab) => hide(tab === id);
-  const hubPanel = (id: HubStep) => hide(tab === 'delta' && step === id);
 
   return (
     <Page>
@@ -133,28 +96,11 @@ export function CalculatorsPage() {
           />
           {groupTabs.length > 1 && <Tabs<CalcTab> label="ماشین‌حساب‌ها" options={TABS.filter((t) => groupTabs.includes(t.value))} value={tab} onChange={setTab} />}
           {current && <p className="text-sm text-muted">{current.description}</p>}
-          {tab === 'delta' && (
-            <ol className="grid grid-cols-3 gap-2" aria-label="قدم‌های دلتا نوترال">
-              {HUB_STEPS.map((h, i) => {
-                const here = h.value === step;
-                return (
-                  <li key={h.value}>
-                    <button
-                      type="button"
-                      onClick={() => setStep(h.value)}
-                      aria-current={here ? 'step' : undefined}
-                      className={cn('flex h-full w-full flex-col items-start gap-0.5 rounded-card border p-2.5 text-start transition-colors', here ? 'border-accent bg-accent-soft' : 'border-divider bg-card hover:border-divider-strong')}
-                    >
-                      <span className={cn('flex items-center gap-1.5 text-sm font-bold', here ? 'text-accent' : 'text-ink')}>
-                        {h.icon}
-                        {toFaDigits(i + 1)}. {h.title}
-                      </span>
-                      <span className="text-2xs leading-4 text-muted">{h.sub}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
+          {group === 'invest' && (
+            <p className="text-xs leading-6 text-muted">
+              درآمد دلتا نوترال و اسکنر فاندینگ در <Link to="/funding" className="font-semibold text-accent underline">درآمد فاندینگ</Link> است؛ مقایسهٔ سرمایهٔ یکسان در چند دارایی در{' '}
+              <Link to="/simulation/compare" className="font-semibold text-accent underline">اگر خریده بودم</Link>.
+            </p>
           )}
         </div>
         <div {...panel('pnl')}>
@@ -168,38 +114,14 @@ export function CalculatorsPage() {
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>
-        {venuesOpened && (
+        {planOpened && (
           <DeltaVenuesProvider>
-            <div {...panel('strategies')}>{opened.strategies && <FundingStrategiesCalculator />}</div>
             <div {...panel('plan')}>
-              {opened.plan && (
-                <PlanWizard
-                  onOpenExecution={openExecution}
-                  onOpenDecide={() => {
-                    setTab('delta');
-                    setStep('decide');
-                  }}
-                />
-              )}
+              <PlanWizard
+                onOpenExecution={(handoff) => navigate('/funding?tab=run', { state: { handoff } })}
+                onOpenDecide={() => navigate('/funding?tab=decide')}
+              />
             </div>
-            <div {...hubPanel('find')} >
-              <div className="mb-4">
-                <SegmentedControl<FindView>
-                  size="sm"
-                  label="روش پیدا کردن"
-                  value={findView}
-                  onChange={setFindView}
-                  options={[
-                    { value: 'scanner', label: 'اختلاف فاندینگ الان و ۷ و ۳۰ روز' },
-                    { value: 'arb', label: 'سود واقعی با سرمایهٔ من' }
-                  ]}
-                />
-              </div>
-              <div {...hide(findView === 'scanner')}>{opened.scanner && <FundingScanner />}</div>
-              <div {...hide(findView === 'arb')}>{opened.arb && <DeltaProfitCalculator onOpenScanner={() => setFindView('scanner')} />}</div>
-            </div>
-            <div {...hubPanel('decide')}>{opened.decide && <DeltaNeutralCalculator onOpenExecution={openExecution} />}</div>
-            <div {...hubPanel('run')}>{opened.run && <DeltaExecutionTab handoff={handoff} />}</div>
           </DeltaVenuesProvider>
         )}
         <div {...panel('cagr')}>
@@ -207,9 +129,6 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('xirr')}>
           <XirrCalculator />
-        </div>
-        <div {...panel('compare')}>
-          <CompareCalculator />
         </div>
         <div {...panel('shop')}>
           <ShopBreakEvenCalculator />

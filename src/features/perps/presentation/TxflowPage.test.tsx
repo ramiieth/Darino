@@ -20,5 +20,5 @@ it('حساب تی‌اکس‌فلو با ارزش، سود/زیان و پوزی�
   expect(screen.getByText('لانگ')).toBeTruthy();
   expect(screen.getByText('حذف اتصال')).toBeTruthy();
   expect(screen.getByText(/فاندینگ:/)).toBeTruthy();
-  expect(screen.getByRole('link', { name: 'ژورنال معاملاتی' }).getAttribute('href')).toBe('/journal?tab=neutral');
+  expect(screen.getByRole('link', { name: 'دفتر جفت‌ها در درآمد فاندینگ' }).getAttribute('href')).toBe('/funding?tab=ledger');
 });

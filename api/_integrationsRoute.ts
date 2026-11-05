@@ -9,6 +9,7 @@ import { requireSession } from './_authCore.js';
 import { db, isDbConfigured, json, readBody } from './_neon.js';
 import { ensureSchema } from './_schema.js';
 import { ALERT_OPS, handleAlertsOp, neonAlertsStore, runTick, verifyTickKey } from './_alerts.js';
+import { handlePaperOp, PAPER_OPS } from './_paperBot.js';
 import { validPublicAddress } from '../src/features/connected/domain/model.js';
 import { zerionQuota,walletActivityAt, getWallet, getTransactions, getPnl, getBalanceChart, ProviderError } from './_zerion.js';
 import { lookupBridge } from './_bridge.js';
@@ -62,6 +63,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if ((ALERT_OPS as readonly string[]).includes(op)) {
       if (!isDbConfigured()) { json(res,503,{ error:'پایگاه داده تنظیم نشده' }); return; }
       const [status, body] = await handleAlertsOp(neonAlertsStore(db()), op, req.method ?? 'GET', auth.userId, () => readBody(req));
+      json(res,status,body); return;
+    }
+    // بات کاغذی کری: فقط کاربر واردشده؛ دفتر در alertsStore
+    if ((PAPER_OPS as readonly string[]).includes(op)) {
+      if (!isDbConfigured()) { json(res,503,{ error:'پایگاه داده تنظیم نشده' }); return; }
+      const sql = db(); if (!(await ensureSchema(sql))) { json(res,503,{ error:'پایگاه داده آماده نیست' }); return; }
+      const [status, body] = await handlePaperOp(neonAlertsStore(sql), op, req.method ?? 'GET', auth.userId, () => readBody(req));
       json(res,status,body); return;
     }
     // حساب‌های اوندو با کلید فقط‌خواندنی env؛ فقط کاربر واردشده، بدون کش عمومی

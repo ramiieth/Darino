@@ -3,6 +3,7 @@
  *  - برترین‌ها: پیش‌فرض فقط «شایسته‌ها» (امتیاز ثبات ≥ ۶۵)، به ترتیب امتیاز، با پوزیشن فعلی هر نفر
  *  - آدرس‌های من: همگام بین دستگاه‌ها
  */
+import type { ReactNode } from 'react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Cloud, CloudOff, Plus, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
@@ -19,11 +20,12 @@ import { MAX_SAVED, useSavedTraders } from '../data/savedTraders';
 import { TraderRow } from './TraderRow';
 import { useFollow } from './useFollow';
 
-type View = 'top' | 'mine';
+type View = 'top' | 'mine' | 'consensus';
 type Filter = 'good' | 'copy' | 'all';
 const PAGE = 12;
 
-export function TradersTab({ view, onView, onOpen }: { view: View; onView: (v: View) => void; onOpen: (address: string) => void }) {
+/** consensus = «پوزیشن برترها» (هم‌نظری روی بازارها) که قبلاً تب جدای میز معامله بود */
+export function TradersTab({ view, onView, onOpen, consensus }: { view: View; onView: (v: View) => void; onOpen: (address: string) => void; consensus?: ReactNode }) {
   const saved = useSavedTraders((s) => s.saved);
   return (
     <>
@@ -34,10 +36,11 @@ export function TradersTab({ view, onView, onOpen }: { view: View; onView: (v: V
         onChange={onView}
         options={[
           { value: 'top', label: 'برترین‌ها' },
-          { value: 'mine', label: 'آدرس‌های من', badge: saved.length || undefined }
+          { value: 'mine', label: 'آدرس‌های من', badge: saved.length || undefined },
+          ...(consensus ? [{ value: 'consensus' as const, label: 'پوزیشن برترها' }] : [])
         ]}
       />
-      {view === 'top' ? <TopList onOpen={onOpen} /> : <MineList onOpen={onOpen} />}
+      {view === 'consensus' && consensus ? consensus : view === 'mine' ? <MineList onOpen={onOpen} /> : <TopList onOpen={onOpen} />}
     </>
   );
 }

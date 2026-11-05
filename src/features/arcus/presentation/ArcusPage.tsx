@@ -1,3 +1,4 @@
+import { VenueTabs } from '@/shared/components/layout/SectionTabs';
 import { ArcusBalanceCard } from './ArcusBalanceCard';
 import { AssetValue } from '@/features/connected/presentation/AssetValue';
 import { chainIdentity,tokenQuantity } from '@/features/connected/presentation/identity';
@@ -137,6 +138,7 @@ export default function ArcusPage() {
           </div>
         }
       />
+      <VenueTabs />
 
       {arcusHoldings.length === 0 ? (
         <div className="space-y-4">
