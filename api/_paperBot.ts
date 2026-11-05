@@ -89,7 +89,7 @@ export async function startBook(store: AlertsStore, userId: string, capitalUsd: 
 }
 
 const pct = (v: number, d = 1) => `${(v * 100).toFixed(d)}٪`;
-const usd = (v: number) => usdText(Math.round(v));
+const usd = (v: number) => usdText(Math.round(v), { plain: true });
 
 function message(ev: PaperEvent, book: PaperBook): PushMessage | null {
   const st = PAPER_STRATEGIES.find((s) => s.id === ev.strategy);

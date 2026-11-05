@@ -24,6 +24,7 @@ import { t } from '@/shared/i18n/fa';
 import { cn } from '@/shared/lib/cn';
 import type { AssetKind } from '@/shared/types';
 import { ALL_NAV_ITEMS, type NavItem } from './navigation';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 type Entry =
   | { type: 'page'; key: string; item: NavItem }
@@ -187,7 +188,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                 {persianAssetName(e.symbol)}
               </bdi></span>
             </span>
-            <span className="num-ltr shrink-0 text-sm font-semibold text-ink">{fmtUSD(e.price)}</span>
+            <span className="num-ltr shrink-0 text-sm font-semibold text-ink"><AmountText text={fmtUSD(e.price)} /></span>
           </>
         )}
         {selected && <CornerDownLeft aria-hidden className="h-4 w-4 shrink-0 text-subtle" />}

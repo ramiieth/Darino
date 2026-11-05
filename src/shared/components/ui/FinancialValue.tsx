@@ -14,7 +14,7 @@ import { persianAssetName } from '@/shared/i18n/assetDisplayName';
 import type { ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight, Clock3, Minus } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
-import { fmtCompactFa, fmtNumLatin, fmtPct, fmtPctEn, fmtUsdNumber, toFaDigits } from '@/shared/utils/formatters';
+import { fmtCompactFa, fmtNumLatin, fmtPct, fmtPctEn, fmtUsdNumber, stripBidi, toFaDigits } from '@/shared/utils/formatters';
 
 export type ValueState = 'ready' | 'loading' | 'stale' | 'unavailable';
 
@@ -82,6 +82,24 @@ export function UsdText({ value, compact = false, signed = false, className, dig
     <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
       <bdi dir="ltr" className="num-ltr">{sign}{number}</bdi>
       {scale.length > 0 && <span>{scale.join(' ')}</span>}
+      <span className="text-[0.62em] font-medium opacity-70">دلار</span>
+    </span>
+  );
+}
+
+/**
+ * مبلغ متنی ازپیش‌قالب‌شده («-۲۳,۶۰۵.۰۰ دلار»، «۱.۳ میلیون دلار») → همان نمای UsdText: جهت درست، «دلار» کوچک.
+ * اگر متن فقط یک مبلغ نباشد (مثلاً «۵۰.۰۰ دلار در ۳ معامله» یا «—»)، همان متن نمایش داده می‌شود.
+ */
+const AMOUNT = /^([+-]?[۰-۹0-9][۰-۹0-9,.]*)(?: (هزار|میلیون|میلیارد|تریلیون))? دلار$/;
+export function AmountText({ text, className }: { text: ReactNode; className?: string }) {
+  if (typeof text !== 'string') return <>{text}</>;
+  const m = AMOUNT.exec(stripBidi(text).trim());
+  if (!m) return <>{text}</>;
+  return (
+    <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
+      <bdi dir="ltr" className="num-ltr">{m[1]}</bdi>
+      {m[2] && <span>{m[2]}</span>}
       <span className="text-[0.62em] font-medium opacity-70">دلار</span>
     </span>
   );

@@ -9,6 +9,7 @@ import { cn } from '@/shared/lib/cn';
 import { toFaDigits, usdText } from '@/shared/utils/formatters';
 import { GLOSSARY } from '../domain/glossary';
 import { CLASS_FA, VERDICT_FA, type MetricClass, type ScoreRow, type Verdict } from '../domain/scorecard';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 /** «۷,۲۶۸ دلار» / «-۱۲.۵۰ دلار» — سیاست ارز کل اپ (بدون «$»، ارقام فارسی) */
 export function usd(v: number | null | undefined, signed = false): string {
@@ -114,7 +115,7 @@ export function ScoreRowView({ row }: { row: ScoreRow }) {
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="num-ltr text-lg font-bold text-ink">{row.display}</span>
+        <span className="num-ltr text-lg font-bold text-ink"><AmountText text={row.display} /></span>
         <span className="text-xs text-muted">معیار: {row.benchmark}</span>
         {row.impact !== null && row.impact > 0 && <span className="text-xs font-semibold text-negative">هزینه ≈ {usd(row.impact)}</span>}
       </div>

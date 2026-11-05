@@ -35,7 +35,9 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
   grouped.set(id,old?{...old,quantity:new Decimal(old.quantity??0).plus(position.quantity??0).toString(),value:old.value===null||position.value===null?null:new Decimal(old.value).plus(position.value).toNumber()}:{...position,id});
  }
  const positions=[...grouped.values()],networks=[...new Set(positions.map(x=>x.chain))];
- const snapshot={address:'',fetchedAt:Date.now(),total:p.total,change:null,positions:positions.filter(x=>network==='all'||x.chain===network),chains,complete:p.wallets.every(w=>w.state?.data?.complete),unpriced:0};
+ // کدام کیف پول و چرا ناقص است — قبلاً فقط «جزئیات کامل دریافت نشده» بدون نام و علت؛ کیف پولِ هنوز در حال دریافت ناقص شمرده نمی‌شود
+ const incomplete=p.wallets.flatMap(w=>{const st=w.state;if(!st)return [];if(!st.data)return st.error&&!st.loading?[`${w.holding.label}: ${st.error}`]:[];return st.data.complete?[]:[`${w.holding.label}: ${st.data.detailsError??'فهرست دارایی‌ها کامل خوانده نشد'}`];});
+ const snapshot={address:'',fetchedAt:Date.now(),total:p.total,change:null,positions:positions.filter(x=>network==='all'||x.chain===network),chains,complete:incomplete.length===0,detailsError:incomplete.length?`جزئیات بعضی کیف پول‌ها کامل نیست — ${incomplete.join(' · ')}`:undefined,unpriced:0};
  const walletValue=p.wallets.some(w=>w.value!==null)?p.wallets.reduce((s,w)=>s.plus(w.value??0),new Decimal(0)).toNumber():null;
  const realArcus=p.arcus.filter(s=>s.holding.arcus!.env==='mainnet');const arcusValue=realArcus.some(s=>s.value!==null)?realArcus.reduce((s,a)=>s.plus(a.value??0),new Decimal(0)).toNumber():null;
  // لایتر (رابین‌هود/اصلی)، هایپرلیکوئید، تی‌اکس‌فلو، اوندو: ارزش حساب جزو ارزش کل (آرکوس از قبل در p.total)

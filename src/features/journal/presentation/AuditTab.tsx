@@ -20,6 +20,7 @@ import { dayKey } from '../domain/time';
 import { ChartBlock, ClassBadge, duration, fa, faDate, faDateTime, pct, pnlTone, ScoreRowView, Term, usd, VerdictBadge } from './parts';
 import { Bars, EquityChart } from './charts';
 import { ExcursionPanel } from './ExcursionPanel';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 const BAND_STYLE = { pass: 'border-gain/50 bg-gain/5', conditions: 'border-warn/50 bg-warn/5', fail: 'border-negative/50 bg-negative/5', insufficient: 'border-divider bg-surface-2/60' } as const;
 
@@ -50,7 +51,7 @@ function Hero({ label, value, sub, tone }: { label: React.ReactNode; value: stri
   return (
     <div className="min-w-0">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-muted"><span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden />{label}</p>
-      <p className="num-ltr mt-1 text-2xl font-extrabold text-ink">{value}</p>
+      <p className="num-ltr mt-1 text-2xl font-extrabold text-ink"><AmountText text={value} /></p>
       <p className="text-xs text-muted">{sub}</p>
     </div>
   );
@@ -312,7 +313,7 @@ export function AuditTab({ a, empty, tz }: { a: BookAudit; empty: React.ReactNod
                 <span className={t.direction === 'long' ? 'text-positive' : 'text-negative'}>{t.direction === 'long' ? 'لانگ' : 'شورت'}</span>
                 <span className="text-muted">{VENUE_FA[t.venue]}</span>
                 <span className="text-muted">{faDateTime(t.openTime)} ← {duration((t.closeTime ?? 0) - t.openTime)}</span>
-                <span className={cn('num-ltr ms-auto font-bold', pnlTone(t.netPnl))}>{usd(t.netPnl, true)}</span>
+                <span className={cn('num-ltr ms-auto font-bold', pnlTone(t.netPnl))}><AmountText text={usd(t.netPnl, true)} /></span>
                 {worstIds.has(t.id) && <Badge tone="loss">بدترین ۵٪</Badge>}
               </div>
             ))}
@@ -363,7 +364,7 @@ function BucketTable({ title, rows, empty }: { title: string; rows: BookAudit['b
               <span className="text-muted">{fa(r.n)} معامله</span>
               <span className="text-muted">برد {pct(r.winRate, 0)}</span>
               <span className={cn('num-ltr', pnlTone(r.expectancy))}>هر معامله {usd(r.expectancy, true)}</span>
-              <span className={cn('num-ltr ms-auto font-semibold', pnlTone(r.net))}>{usd(r.net, true)}</span>
+              <span className={cn('num-ltr ms-auto font-semibold', pnlTone(r.net))}><AmountText text={usd(r.net, true)} /></span>
               <Badge tone={r.verdict === 'keep' ? 'gain' : r.verdict === 'delete' ? 'loss' : r.verdict === 'fix' ? 'warn' : 'neutral'}>{VERDICT_LABEL[r.verdict]}</Badge>
             </div>
           ))}

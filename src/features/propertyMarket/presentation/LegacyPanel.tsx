@@ -56,8 +56,8 @@ export function LegacyPanel({ assets }: { assets: LegacyRealAssetRow[] }) {
                 <KeyValueList
                   dense
                   rows={[
-                    { label: 'خرید', value: <span>{fmtTomanAmount(a.purchasePriceToman)} <span className="num-ltr text-muted">({fmtUsdAmount(a.purchasePriceUsd)})</span></span> },
-                    { label: 'ارزش فعلی', value: <span>{fmtTomanAmount(a.currentValueToman)} <span className="num-ltr text-muted">({fmtUsdAmount(a.currentValueUsd)})</span></span> },
+                    { label: 'خرید', value: <span>{fmtTomanAmount(a.purchasePriceToman)} <span className="text-muted">({fmtUsdAmount(a.purchasePriceUsd)})</span></span> },
+                    { label: 'ارزش فعلی', value: <span>{fmtTomanAmount(a.currentValueToman)} <span className="text-muted">({fmtUsdAmount(a.currentValueUsd)})</span></span> },
                     { label: 'سود دلاری', value: <MoneyValue value={Math.round(profitUsd)} signed tone="auto" /> }
                   ]}
                 />

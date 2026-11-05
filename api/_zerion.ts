@@ -97,6 +97,8 @@ export async function getWallet(address: string, userId: string, force = false):
       const link = str(obj(r.links).next); next = link ? checkedNext(link, address, 'positions') : '';
     }
     } catch(e) {if(e instanceof ProviderError&&e.retryAfter)retryAt=Date.now()+e.retryAfter*1000; detailsError = e instanceof ProviderError ? e.message : 'جزئیات دارایی‌ها دریافت نشد؛ دوباره تلاش کنید'; }
+    // سقف ۱۰ صفحه (۱۰۰۰ دارایی، اغلب توکن اسپم/خرد) بدون خطا هم ناقص است؛ علتش را بگو، نه پیام کلی
+    if (next && !detailsError) detailsError = `این کیف پول بیش از ${(pages * 100).toLocaleString('en-US').replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])} دارایی دارد (بیشترشان معمولاً توکن‌های اسپم)؛ فقط همین تعداد خوانده شد و جمع کل نامعلوم است`;
     const positions = deduplicatePositions(rows);
     const quota=await zerionQuota();
     const value: WalletSnapshot = { address, fetchedAt,refreshAfterMs:quota?.walletMs??1800000, total: !next&&!detailsError?positions.reduce((sum,p)=>sum.plus(p.value??0),new Decimal(0)).toNumber():null, change: null, positions, chains, complete: !next && !detailsError, detailsError, retryAt, unpriced: positions.filter(p => p.value === null).length };

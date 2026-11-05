@@ -18,6 +18,7 @@ import { VENUE_FA } from '../domain/types';
 import { autoReport, type AutoReport } from '../domain/autoPlan';
 import { useAutoOutlook } from '../data/useOutlook';
 import { fa, faDateTime, pct, pnlTone, usd } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 type Filter = 'all' | 'nostop' | 'counter' | 'moved' | 'open';
 
@@ -104,7 +105,7 @@ function Tile({ icon, label, value, sub, tone }: { icon: React.ReactNode; label:
   return (
     <div className="min-w-0 border-b border-divider p-4 sm:border-b-0 [&:nth-child(odd)]:border-e sm:[&:nth-child(odd)]:border-e-0">
       <div className="flex items-center gap-1.5 text-muted [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}<p className="truncate text-[11px] font-semibold">{label}</p></div>
-      <p className={cn('num-ltr mt-2 text-2xl font-extrabold', tone ?? 'text-ink')}>{value}</p>
+      <p className={cn('num-ltr mt-2 text-2xl font-extrabold', tone ?? 'text-ink')}><AmountText text={value} /></p>
       {sub && <p className="mt-0.5 truncate text-[11px] text-subtle">{sub}</p>}
     </div>
   );
@@ -167,8 +168,8 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
           <p className="text-[11px] text-muted">{VENUE_FA[t.venue]} · {t.fills === 0 ? 'از پوزیشن زندهٔ صرافی' : faDateTime(t.openTime)}{t.book === 'neutral' ? ' · پای دلتا نوترال' : ''}</p>
         </div>
         <div className="ms-auto text-end">
-          <p className={cn('num-ltr text-base font-extrabold', t.open ? 'text-warn' : pnlTone(t.netPnl))}>{t.open ? 'باز' : usd(t.netPnl, true)}</p>
-          {t.open && t.fills === 0 && t.netPnl !== 0 && <p className={cn('num-ltr text-[11px] font-semibold', pnlTone(t.netPnl))}>{usd(t.netPnl, true)}</p>}
+          <p className={cn('num-ltr text-base font-extrabold', t.open ? 'text-warn' : pnlTone(t.netPnl))}><AmountText text={t.open ? 'باز' : usd(t.netPnl, true)} /></p>
+          {t.open && t.fills === 0 && t.netPnl !== 0 && <p className={cn('num-ltr text-[11px] font-semibold', pnlTone(t.netPnl))}><AmountText text={usd(t.netPnl, true)} /></p>}
           {R !== null && <p className={cn('num-ltr text-[11px] font-semibold', pnlTone(R))}>{fa(R, 2)}R</p>}
         </div>
       </div>

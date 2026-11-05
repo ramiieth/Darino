@@ -19,6 +19,7 @@ import { useHedge } from '../data/useHedge';
 import { HEDGE_VENUE_FA, openPairs, pairMarkets, planHedge, type HedgeLeg, type HedgeVenue, type OpenPair } from '../domain/hedge';
 import { Chip, PresetNum, usdShort } from './quickInputs';
 import { fa, parseNum, pct, pnlTone, usd } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 const PAIRS: [HedgeVenue, HedgeVenue][] = [['lighterRh', 'arcus'], ['lighterRh', 'txflow'], ['arcus', 'txflow']];
 const AMOUNTS = [500, 1000, 2500, 5000, 10_000];
@@ -50,7 +51,7 @@ function PairCard({ p }: { p: OpenPair }) {
       <div className="flex items-center gap-2">
         <span className="text-sm font-bold text-ink" dir="ltr">{p.base}</span>
         {ok ? <Badge tone="gain"><Scale />متعادل</Badge> : <Badge tone="warn"><Scale />نامتعادل {pct(p.imbalancePct, 1)}</Badge>}
-        <span className={cn('num-ltr ms-auto text-sm font-bold', pnlTone(p.dailyUsd))}>{p.dailyUsd === null ? '—' : `${usd(p.dailyUsd, true)}/روز`}</span>
+        <span className={cn('ms-auto text-sm font-bold', pnlTone(p.dailyUsd))}>{p.dailyUsd === null ? '—' : `${usd(p.dailyUsd, true)}/روز`}</span>
       </div>
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-divider bg-divider text-center">
         <Side tone="long" label={p.longs.map((x) => HEDGE_VENUE_FA[x.venue]).join(' + ')} value={units(p.longUnits)} />
@@ -72,7 +73,7 @@ function Side({ tone, label, value }: { tone: 'long' | 'short'; label: string; v
   return (
     <div className="bg-card px-2 py-2">
       <p className={cn('text-[11px] font-semibold', tone === 'long' ? 'text-positive' : 'text-negative')}>{tone === 'long' ? 'لانگ' : 'شورت'} · {label}</p>
-      <p className="num-ltr mt-0.5 text-sm font-bold text-ink">{value}</p>
+      <p className="num-ltr mt-0.5 text-sm font-bold text-ink"><AmountText text={value} /></p>
     </div>
   );
 }
@@ -201,7 +202,7 @@ function FastExecution({ plan }: { plan: HedgePlan }) {
         {step(3, second, 'بلافاصله بعد از پر شدن پای اول، سفارش محدود/بازار تا')}
       </ol>
       <p className="text-[11px] leading-5 text-muted">
-        بدترین لغزش در این تحمل حدود <b className="num-ltr">{usd(worstSlippageUsd(plan, tol))}</b>
+        بدترین لغزش در این تحمل حدود <b><AmountText text={usd(worstSlippageUsd(plan, tol))} /></b>
         {plan.dailyUsd !== null && plan.dailyUsd > 0 ? <> (معادل {fa(worstSlippageUsd(plan, tol) / plan.dailyUsd, 1)} روز درآمد فاندینگ)</> : null}.
         پای اول ({HEDGE_VENUE_FA[first.venue]}) کارمزد تیکر بیشتری دارد؛ سفارش محدود (میکر) هم کارمزد را کم می‌کند و هم از لغزش جلوگیری می‌کند.
         بعد از باز شدن، دو پا خودکار در «یادآور جفت‌های باز» بالا و در «برنامهٔ معامله» دیده می‌شوند و اگر نامتعادل شدند اندازهٔ دقیق اصلاح می‌آید.
@@ -234,7 +235,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   return (
     <div className="bg-card p-3">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={cn('num-ltr mt-1 text-lg font-extrabold', tone ?? 'text-ink')}>{value}</p>
+      <p className={cn('num-ltr mt-1 text-lg font-extrabold', tone ?? 'text-ink')}><AmountText text={value} /></p>
     </div>
   );
 }

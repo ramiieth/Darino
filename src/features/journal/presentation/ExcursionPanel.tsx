@@ -15,6 +15,7 @@ import type { Trade } from '../domain/types';
 import { candleCoin, MIN_TRADES, MIN_WINNERS, type SymbolExcursions, type Unmeasured } from '../domain/excursions';
 import { useExcursions } from '../data/useExcursions';
 import { fa, pct, pnlTone, usd } from './parts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 /** فاصلهٔ قیمت: جفت‌ارز زیر ۲۰ به پیپ، بقیه به دلارِ واحد قیمت */
 function dist(frac: number | null, refPx: number): string {
@@ -35,7 +36,7 @@ function RuleLine({ title, body, delta, changed }: { title: string; body: ReactN
     <div className="border-t border-divider pt-2 first:border-0 first:pt-0">
       <p className="text-xs font-semibold text-ink">{title}</p>
       <p className="text-xs leading-6 text-muted">{body}</p>
-      <p className="text-xs">اگر از اول این قانون را داشتید: <span className={cn('num-ltr font-bold', pnlTone(delta))}>{usd(delta, true)}</span> <span className="text-subtle">({fa(changed)} معامله نتیجهٔ دیگری می‌گرفت)</span></p>
+      <p className="text-xs">اگر از اول این قانون را داشتید: <span className={cn('num-ltr font-bold', pnlTone(delta))}><AmountText text={usd(delta, true)} /></span> <span className="text-subtle">({fa(changed)} معامله نتیجهٔ دیگری می‌گرفت)</span></p>
     </div>
   );
 }

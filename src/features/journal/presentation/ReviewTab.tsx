@@ -28,6 +28,7 @@ import { plannedRisks } from '../domain/plan';
 import { saveReview } from '../data/journalStore';
 import { fa, faDate, faDateTime, pct, pnlTone, TagPicker, usd } from './parts';
 import { Bars } from './charts';
+import { AmountText } from '@/shared/components/ui/FinancialValue';
 
 const STATUS_TONE: Record<CommitmentStatus, 'gain' | 'loss' | 'neutral' | 'warn' | 'info'> = { kept: 'gain', broken: 'loss', unknown: 'neutral', manual: 'info', pending: 'warn' };
 const STATUS_FA: Record<CommitmentStatus, string> = { kept: 'رعایت شد', broken: 'شکسته شد', unknown: 'دادهٔ ناکافی', manual: 'دستی', pending: 'در جریان' };
@@ -184,7 +185,7 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
         <>
           <Surface className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-5">
             <div><p className="text-[11px] text-muted">معامله</p><p className="text-xl font-bold text-ink">{fa(stats.n)}</p></div>
-            <div><p className="text-[11px] text-muted">سود خالص</p><p className={cn('num-ltr text-xl font-bold', pnlTone(stats.net))}>{usd(stats.net, true)}</p></div>
+            <div><p className="text-[11px] text-muted">سود خالص</p><p className={cn('num-ltr text-xl font-bold', pnlTone(stats.net))}><AmountText text={usd(stats.net, true)} /></p></div>
             <div><p className="text-[11px] text-muted">نرخ برد</p><p className="text-xl font-bold text-ink">{pct(stats.winRate, 0)}</p></div>
             <div><p className="text-[11px] text-muted">پوشش برنامه</p><p className="text-xl font-bold text-ink">{pct(stats.planCoverage, 0)}</p></div>
             <div><p className="text-[11px] text-muted">طبق قانون</p><p className={cn('text-xl font-bold', stats.ruleAdherence === null ? 'text-ink' : stats.ruleAdherence >= 90 ? 'text-positive' : stats.ruleAdherence >= 75 ? 'text-warn' : 'text-negative')}>{pct(stats.ruleAdherence, 0)}</p></div>
