@@ -80,14 +80,14 @@ export function fmtUsdAmount(usd: number | null | undefined): string {
 }
 
 /**
- * مبلغ دلاری در متن روان (گزارش، ژورنال، اعلان) — «۷,۲۶۸ دلار» / «-۷,۲۶۸ دلار» / «+۱۲.۵ دلار»
- *   ≥ ۱۰۰۰ بدون اعشار، زیر ۱۰ دو رقم، بقیه تا دو رقم؛ compact: «۱.۲ میلیون دلار». هرگز «$».
+ * مبلغ دلاری در متن روان (گزارش، ژورنال، اعلان) — «۲۳,۶۰۵.۰۰ دلار» / «-۱۲.۵۰ دلار» / «+۷.۰۰ دلار»
+ *   همیشه دقیقاً دو رقم اعشار (مثل fmtUSD) تا «,» هزارگان با اعشار اشتباه نشود؛ compact: «۱.۲ میلیون دلار». هرگز «$».
  */
 export function usdText(v: number | null | undefined, opts: { signed?: boolean; compact?: boolean } = {}): string {
   if (bad(v) || !Number.isFinite(v)) return NA;
   const a = Math.abs(v);
   const sign = v < 0 ? '-' : opts.signed && v > 0 ? '+' : '';
-  const body = opts.compact && a >= 1e3 ? fmtCompactFa(a) : faNumber(a, { maximumFractionDigits: a >= 1000 ? 0 : 2, minimumFractionDigits: a >= 1000 ? 0 : a < 10 && a > 0 ? 2 : 0 });
+  const body = opts.compact && a >= 1e3 ? fmtCompactFa(a) : toFaDigits(dec2.format(a));
   return `${sign}${body} دلار`;
 }
 
