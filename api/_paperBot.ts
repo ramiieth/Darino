@@ -166,10 +166,11 @@ export async function logFunding(store: AlertsStore, now = Date.now()): Promise<
           ? await lighterFunding(m.market, since, now)
           : parseArcus(await getJson(`${ARCUS}/v1/fundingRates?market=${encodeURIComponent(m.market)}&limit=${LOG_CATCHUP_HOURS + 4}`));
     const fresh = pts.filter((p) => p.hour >= since && p.hour <= hour);
-    for (const p of fresh) {
-      await sql`INSERT INTO "fundingLog" (venue, market, hour, rate) VALUES (${m.venue}, ${m.market}, ${p.hour}, ${p.rate})
-        ON CONFLICT (venue, market, hour) DO UPDATE SET rate = EXCLUDED.rate`;
-    }
+    if (!fresh.length) return 0;
+    // یک کوئری برای هر بازار (نه یکی برای هر ساعت): جبران ۷۲ ساعته × ۱۵ بازار ≈ ۱۰۰۰ ردیف بود و تیک را از سقف ۶۰ ثانیه رد می‌کرد
+    await sql`INSERT INTO "fundingLog" (venue, market, hour, rate)
+      SELECT ${m.venue}::text, ${m.market}::text, h, r FROM unnest(${fresh.map((p) => p.hour)}::bigint[], ${fresh.map((p) => p.rate)}::float8[]) AS t(h, r)
+      ON CONFLICT (venue, market, hour) DO UPDATE SET rate = EXCLUDED.rate`;
     return fresh.length;
   });
   await store.put(SYSTEM, 'fundingLog', { lastHour: hour, at: now });
