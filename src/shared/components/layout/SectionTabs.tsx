@@ -76,7 +76,8 @@ export const MARKET_TABS: readonly SectionTab[] = [
 
 export const SIMULATION_TABS: readonly SectionTab[] = [
   { to: '/simulation', label: 'با تاریخچهٔ بازار' },
-  { to: '/simulation/compare', label: 'سرمایهٔ یکسان در چند دارایی' }
+  { to: '/simulation/compare', label: 'سرمایهٔ یکسان در چند دارایی' },
+  { to: '/simulation/stable', label: 'دلار بازده‌دار به‌جای تتر' }
 ];
 
 const LAST_VENUE_KEY = 'darino:last-venue';

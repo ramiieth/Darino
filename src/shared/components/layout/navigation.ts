@@ -120,7 +120,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/simulation',
         label: 'اگر خریده بودم',
         title: 'اگر خریده بودم (شبیه‌سازی)',
-        description: 'سناریوی «اگر سرمایه‌گذاری کرده بودم» و مقایسهٔ سرمایهٔ یکسان در چند دارایی',
+        description: 'سناریوی «اگر سرمایه‌گذاری کرده بودم»، مقایسهٔ سرمایهٔ یکسان در چند دارایی و دلار بازده‌دار به‌جای تتر',
         icon: LineChart
       }
     ]
@@ -140,7 +140,7 @@ export const NAV_GROUPS: NavGroup[] = [
         primary: true,
         match: ['/market', '/market-performance']
       },
-      { id: 'defi', to: '/defi', label: 'دیفای', description: 'جریان سرمایه، ارزش قفل‌شده، استیبل‌کوین‌ها و درآمد استیبل', icon: Boxes }
+      { id: 'defi', to: '/defi', label: 'دیفای', description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها', icon: Boxes }
     ]
   },
   {
