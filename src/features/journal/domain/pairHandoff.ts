@@ -2,7 +2,7 @@
  * همگام‌سازی «ماشین‌حساب دلتا نوترال» ↔ «راهنمای جفت ژورنال» — خالص و آزمون‌پذیر
  *
  *   انتخاب ماشین‌حساب (دو صرافی، بازار، ارزش هر پا، سمت لانگ، اهرم) با یک لینک به ژورنال می‌رود
- *   (?tab=neutral&pv=a,b&pb=BASE&pa=1000&pl=venue&plev=3) و همان‌جا اندازهٔ دقیق هر پا آماده است — بدون انتخاب دوباره.
+ *   (/funding?tab=run&pv=a,b&pb=BASE&pa=1000&pl=venue&plev=3) و همان‌جا اندازهٔ دقیق هر پا آماده است — بدون انتخاب دوباره.
  *
  *   کم کردن لغزش هنگام باز کردن دستی دو پا (دارینو سفارش ثبت نمی‌کند):
  *     • قیمت سقف هر پا: لانگ ≤ مارک × (۱ + تحمل)، شورت ≥ مارک × (۱ − تحمل) → سفارش محدود به‌جای بازار
@@ -27,11 +27,11 @@ export function handoffVenues(a: string, b: string): [HedgeVenue, HedgeVenue] | 
 }
 
 export function pairHandoffUrl(h: PairHandoff): string {
-  const q = new URLSearchParams({ tab: 'neutral', pv: h.venues.join(','), pb: h.base });
+  const q = new URLSearchParams({ tab: 'run', pv: h.venues.join(','), pb: h.base });
   if (h.notional && h.notional > 0) q.set('pa', String(Math.round(h.notional)));
   if (h.long) q.set('pl', h.long);
   if (h.leverage && h.leverage > 0) q.set('plev', String(h.leverage));
-  return `/journal?${q}`;
+  return `/funding?${q}`;
 }
 
 export function readPairHandoff(p: URLSearchParams): PairHandoff | null {

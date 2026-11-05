@@ -15,7 +15,6 @@ import { useShellStore } from '@/shared/store/shellStore';
 import { useThemeStore } from '@/shared/store/themeStore';
 import { useInstallStore } from '@/shared/store/installStore';
 import {
-  DESIGN_SYSTEM_ITEM,
   NAV_GROUPS,
   PRIMARY_MOBILE,
   isItemActive,
@@ -246,9 +245,6 @@ export function MoreSheet({ onOpenSettings }: { onOpenSettings: () => void }) {
             نصب دارینو روی دستگاه
           </button>
         )}
-        <Link to={DESIGN_SYSTEM_ITEM.to} onClick={close} className="block text-center text-xs font-semibold text-muted underline-offset-4 hover:underline">
-          {DESIGN_SYSTEM_ITEM.label}
-        </Link>
       </div>
     </Sheet>
   );

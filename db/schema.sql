@@ -329,3 +329,16 @@ CREATE TABLE IF NOT EXISTS "alertsStore" (
   "updatedAt" BIGINT NOT NULL,
   PRIMARY KEY ("userId", "key")
 );
+
+-- ------------------------------------------------------------
+-- fundingLog: ثبت ساعتی فاندینگ تسویه‌شدهٔ چند صرافی (هایپرلیکوئید، لایتر، آرکوس)
+-- توسط تیک بات کاغذی؛ برای بک‌تست اسپرد بین صرافی‌ها در آینده (بیشتر صرافی‌ها تاریخچهٔ بلند نمی‌دهند)
+-- rate = کسری ساعتی، مثبت = لانگ می‌پردازد
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "fundingLog" (
+  venue   TEXT NOT NULL,
+  market  TEXT NOT NULL,
+  hour    BIGINT NOT NULL,
+  rate    DOUBLE PRECISION NOT NULL,
+  PRIMARY KEY (venue, market, hour)
+);

@@ -1,3 +1,4 @@
+import { FUNDING_TABS, SectionTabs } from '@/shared/components/layout/SectionTabs';
 import { EntryRecommendations } from './EntryRecommendations';
 import type { PreviewDraft } from '../domain/workflow';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
@@ -72,6 +73,7 @@ export default function BorosDashboard() {
     <Page>
       <div className="boros-workspace space-y-5">
       {header}
+      <SectionTabs tabs={FUNDING_TABS} label="بخش‌های درآمد فاندینگ" />
 
       {!error && stale && (
         <Notice

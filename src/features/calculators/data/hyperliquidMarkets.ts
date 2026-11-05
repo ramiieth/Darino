@@ -32,7 +32,8 @@ const fin = (v: unknown): number | null => {
 const rows = (v: unknown): Record<string, unknown>[] =>
   Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : [];
 
-async function info(body: Record<string, unknown>, timeoutMs = 15_000): Promise<unknown> {
+/** درخواست عمومی Info (برای ابزارهای دیگر هم صادر می‌شود — آزمایشگاه کری) */
+export async function hyperliquidInfo(body: Record<string, unknown>, timeoutMs = 15_000): Promise<unknown> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -119,11 +120,11 @@ export function pickPerBase(markets: readonly HyperliquidMarket[]): HyperliquidM
 const DEX_NAME = /^[a-z0-9]{1,16}$/;
 
 export async function fetchHyperliquidMarkets(): Promise<HyperliquidMarket[]> {
-  const dexes = await info({ type: 'perpDexs' }).catch(() => []);
+  const dexes = await hyperliquidInfo({ type: 'perpDexs' }).catch(() => []);
   const names = rows(dexes).flatMap((d) => (typeof d.name === 'string' && DEX_NAME.test(d.name) ? [d.name] : []));
-  const main = normalizeHyperliquidDex(null, await info({ type: 'metaAndAssetCtxs' }));
+  const main = normalizeHyperliquidDex(null, await hyperliquidInfo({ type: 'metaAndAssetCtxs' }));
   // یک DEX خراب نباید کل بازارها را از کار بیندازد
-  const hip3 = await Promise.all(names.map((dex) => info({ type: 'metaAndAssetCtxs', dex }).then((b) => normalizeHyperliquidDex(dex, b), () => [])));
+  const hip3 = await Promise.all(names.map((dex) => hyperliquidInfo({ type: 'metaAndAssetCtxs', dex }).then((b) => normalizeHyperliquidDex(dex, b), () => [])));
   return pickPerBase([...main, ...hip3.flat()]);
 }
 
@@ -155,7 +156,7 @@ export async function fetchHyperliquidFundingHistory(coin: string, sinceMs: numb
   const out: RatePoint[] = [];
   let start = sinceMs;
   for (let page = 0; page < MAX_PAGES; page++) {
-    const body = await info({ type: 'fundingHistory', coin, startTime: start });
+    const body = await hyperliquidInfo({ type: 'fundingHistory', coin, startTime: start });
     const list = rows(body);
     out.push(...parseHyperliquidFundings(list));
     const last = fin(list[list.length - 1]?.time);
@@ -180,5 +181,5 @@ export function parseHyperliquidBook(body: unknown): { bids: BookLevel[]; asks: 
 
 export async function fetchHyperliquidBook(coin: string) {
   if (!COIN.test(coin)) throw new Error('invalid market');
-  return parseHyperliquidBook(await info({ type: 'l2Book', coin }));
+  return parseHyperliquidBook(await hyperliquidInfo({ type: 'l2Book', coin }));
 }

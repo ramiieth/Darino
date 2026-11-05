@@ -6,6 +6,7 @@ import { RefreshCw, SlidersHorizontal, Layers, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { buttonClass } from '@/shared/components/ui/Button';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
+import { SectionTabs, SIMULATION_TABS } from '@/shared/components/layout/SectionTabs';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Section } from '@/shared/components/ui/GlassCard';
 import { Notice } from '@/shared/components/ui/StateViews';
@@ -181,6 +182,7 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
           </div>
         }
       />
+      <SectionTabs tabs={SIMULATION_TABS} label="بخش‌های شبیه‌سازی" />
 
       <ScenarioCashCard />
 

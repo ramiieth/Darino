@@ -57,7 +57,7 @@ export function CoinSheet({ coin, onClose, onTrader }: { coin: string | null; on
                 <SignedBars className="mt-5" ariaLabel="فاندینگ سالانهٔ روزانه در ۳۰ روز" values={days.map((d) => d.apr)} labels={days.map((d, i) => (i % 5 === 0 ? toFaDigits(Number(d.day.slice(8))) : ''))} />
               )}
               <p className="mt-3 text-xs text-muted">
-                برای مقایسه با آرکوس، لایتر و بقیهٔ صرافی‌هایتان: <Link to="/calculators" className="font-semibold text-brand hover:underline">اسکنر فاندینگ</Link>
+                برای مقایسه با آرکوس، لایتر و بقیهٔ صرافی‌هایتان: <Link to="/funding" className="font-semibold text-brand hover:underline">اسکنر فاندینگ</Link>
                 {' · '}قبل از ورود: <Link to={`/desk?m=${encodeURIComponent(coin)}`} className="font-semibold text-brand hover:underline">چک بقا با اهرم شما</Link>
               </p>
             </>

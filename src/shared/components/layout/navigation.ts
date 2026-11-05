@@ -3,15 +3,18 @@
  * Sidebar (≥ lg), NavRail (md–lg), BottomNav (< md), the "More" sheet,
  * the top bar title and the command palette all read from here.
  *
- * Grouping follows user goals, not data providers:
- *   بازارها      what the global market is doing (home route `/`)
- *   بازار ایران  Iranian gold, crypto exchanges, cars and real estate
- *   معامله       decide before a trade (desk), then the venues: Boros, Arcus, Lighter, Ondo Perps
- *   دارایی من    what I own, its record and performance vs. markets, alerts and security
- *   ابزارها      what-if tools
- *   خرید         Iranian shops, food, travel, doctors (read-only)
+ * Grouping follows user goals, not data providers (most-used first):
+ *   دارایی من        what I own and how it performed (dashboard incl. per-network view, performance, assistant)
+ *   معامله           decide (desk), earn funding (one hub: opportunities → execute → ledger, Boros, backtest),
+ *                    journal, and one entry for all exchange accounts
+ *   ابزارها          calculators and "what if I had bought"
+ *   بازارها          global market prices and returns, DeFi
+ *   بازار ایران      Iranian gold, crypto exchanges, cars and real estate
+ *   خرید             Iranian shops, food, travel, doctors (read-only)
+ *   تنظیمات و اتصال‌ها wallets, alerts and security (setup, not daily destinations)
+ * Pages inside one section share a SectionTabs bar; old URLs keep working.
  */
-import { Activity, ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, LayoutDashboard, LineChart, Palette, Radar, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -37,6 +40,92 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
+    id: 'mine',
+    label: 'دارایی من',
+    items: [
+      {
+        id: 'dashboard',
+        to: '/dashboard',
+        label: 'داشبورد',
+        description: 'ارزش خالص، تخصیص، تغییرات امروز و دارایی‌ها به تفکیک شبکه',
+        icon: LayoutDashboard,
+        primary: true,
+        match: ['/holdings']
+      },
+      {
+        id: 'performance',
+        to: '/performance',
+        label: 'عملکرد سرمایه',
+        title: 'عملکرد و مقایسه سرمایه',
+        description: 'تاریخچهٔ ارزش دارایی، مقایسه با تورم، طلا، مسکن، خودرو و بازارهای جهانی، و گزارش Gemini',
+        icon: TrendingUp
+      },
+      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles }
+    ]
+  },
+  {
+    id: 'trade',
+    label: 'معامله',
+    items: [
+      {
+        id: 'desk',
+        to: '/desk',
+        label: 'میز معامله',
+        description: 'چک قبل از ورود، سوینگ، تریدرهای برتر، بازار مشتقات و میم‌کوین',
+        icon: Telescope,
+        primary: true,
+        match: ['/intel', '/traders']
+      },
+      {
+        id: 'funding',
+        to: '/funding',
+        label: 'درآمد فاندینگ',
+        title: 'درآمد فاندینگ (دلتا نوترال)',
+        description: 'فرصت‌ها، سود خالص، اجرا و پایش جفت‌ها، دفتر جفت‌ها، نرخ ثابت بوروس، بک‌تست و بات کاغذی',
+        icon: Percent,
+        primary: true,
+        match: ['/boros', '/carry-lab']
+      },
+      {
+        id: 'journal',
+        to: '/journal',
+        label: 'ژورنال معاملاتی',
+        description: 'حسابرسی خودکار، معاملات پرپ و اسپات، برنامهٔ قبل از معامله و مرور هفتگی',
+        icon: BookOpenCheck
+      },
+      {
+        id: 'venues',
+        to: '/venues',
+        label: 'حساب‌های صرافی',
+        description: 'موجودی، پوزیشن‌ها و تاریخچهٔ لایتر، رابین‌هود، آرکوس، تی‌اکس‌فلو و اوندو (فقط‌خواندنی)',
+        icon: Landmark,
+        match: ['/lighter', '/lighter-robinhood', '/arcus', '/txflow', '/ondo-perps']
+      }
+    ]
+  },
+  {
+    id: 'tools',
+    label: 'ابزارها',
+    items: [
+      {
+        id: 'calculators',
+        to: '/calculators',
+        label: 'ماشین‌حساب',
+        title: 'ماشین‌حساب سرمایه‌گذاری',
+        description: 'سود و زیان، خرید دوره‌ای، رشد سالانه، بازده واقعی، پوشش ریسک، آپشن، پرپ و کسب‌وکار',
+        icon: Calculator
+      },
+      {
+        id: 'simulation',
+        to: '/simulation',
+        label: 'اگر خریده بودم',
+        title: 'اگر خریده بودم (شبیه‌سازی)',
+        description: 'سناریوی «اگر سرمایه‌گذاری کرده بودم» و مقایسهٔ سرمایهٔ یکسان در چند دارایی',
+        icon: LineChart
+      }
+    ]
+  },
+  {
     id: 'markets',
     label: 'بازارها',
     items: [
@@ -45,14 +134,13 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/',
         label: 'بازار',
         title: 'بازارها',
-        description: 'رمزارز، دارایی توکن‌ایز و بازار سنتی',
+        description: 'قیمت رمزارز، دارایی توکن‌ایز و بازار سنتی، و بازده ۱ تا ۹۰ روز گذشته',
         icon: CandlestickChart,
         end: true,
         primary: true,
-        match: ['/market']
+        match: ['/market', '/market-performance']
       },
-      { id: 'market-performance', to: '/market-performance', label: 'بازده بازار', description: 'بازده بازار در ۱، ۷، ۳۰، ۶۰ و ۹۰ روز گذشته', icon: Activity },
-      { id: 'defi', to: '/defi', label: 'دیفای', description: 'جریان سرمایه، ارزش قفل‌شده و استیبل‌کوین‌ها', icon: Boxes }
+      { id: 'defi', to: '/defi', label: 'دیفای', description: 'جریان سرمایه، ارزش قفل‌شده، استیبل‌کوین‌ها و درآمد استیبل', icon: Boxes }
     ]
   },
   {
@@ -93,102 +181,6 @@ export const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
-    id: 'trade',
-    label: 'معامله',
-    items: [
-      {
-        id: 'desk',
-        to: '/desk',
-        label: 'میز معامله',
-        description: 'چک قبل از ورود، سوینگ، تریدرهای برتر، پوزیشن‌ها، مشتقات، میم‌کوین و امنیت توکن',
-        icon: Telescope,
-        primary: true,
-        match: ['/intel', '/traders']
-      },
-      {
-        id: 'journal',
-        to: '/journal',
-        label: 'ژورنال معاملاتی',
-        description: 'برنامهٔ قبل از معامله، حسابرسی خودکار، تگ «چرا»، مرور هفتگی و دفتر دلتا نوترال',
-        icon: BookOpenCheck
-      },
-      {
-        id: 'boros',
-        to: '/boros',
-        label: 'بوروس',
-        title: 'تحلیل بوروس',
-        description: 'بازارهای نرخ تأمین مالی',
-        icon: Radar
-      },
-      {
-        id: 'arcus',
-        to: '/arcus',
-        label: 'آرکوس',
-        title: 'آرکوس — پرپچوال و اسپات',
-        description: 'موجودی، پوزیشن‌ها و تاریخچه (فقط‌خواندنی)',
-        icon: Activity
-      },
-      { id: 'lighter', to: '/lighter', label: 'لایتر', description: 'پرپچوال، اسپات، دارایی‌ها و رابین‌هود', icon: Activity },
-      { id: 'txflow', to: '/txflow', label: 'تی‌اکس‌فلو', description: 'موجودی، سود/زیان، پوزیشن‌ها و بازارهای تی‌اکس‌فلو', icon: Activity },
-      { id: 'ondo-perps', to: '/ondo-perps', label: 'اوندو پرپس', description: 'بازارهای قرارداد دائمی Ondo', icon: Activity }
-    ]
-  },
-  {
-    id: 'mine',
-    label: 'دارایی من',
-    items: [
-      {
-        id: 'dashboard',
-        to: '/dashboard',
-        label: 'داشبورد',
-        description: 'ارزش خالص، تخصیص و تغییرات امروز',
-        icon: LayoutDashboard,
-        primary: true
-      },
-      {
-        id: 'performance',
-        to: '/performance',
-        label: 'عملکرد سرمایه',
-        title: 'عملکرد و مقایسه سرمایه',
-        description: 'تاریخچهٔ ارزش دارایی، مقایسه با تورم، طلا، مسکن، خودرو و بازارهای جهانی، و گزارش Gemini',
-        icon: TrendingUp
-      },
-      { id: 'wallets', to: '/wallets', label: 'کیف پول‌ها', title: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
-      { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles },
-      { id: 'alerts', to: '/alerts', label: 'اعلان‌ها', description: 'برعکس شدن اسپرد فاندینگ و نزدیک لیکویید، حتی وقتی اپ بسته است', icon: Bell },
-      {
-        id: 'security',
-        to: '/security',
-        label: 'امنیت',
-        title: 'امنیت و دستگاه‌ها',
-        description: 'کلید عبور، نشست‌های دستگاه‌ها و خروج',
-        icon: ShieldCheck
-      }
-    ]
-  },
-  {
-    id: 'tools',
-    label: 'ابزارها',
-    items: [
-      {
-        id: 'calculators',
-        to: '/calculators',
-        label: 'ماشین‌حساب',
-        title: 'ماشین‌حساب سرمایه‌گذاری',
-        description: 'سود و زیان، خرید دوره‌ای، رشد سالانه و بازده واقعی',
-        icon: Calculator
-      },
-      {
-        id: 'simulation',
-        to: '/simulation',
-        label: 'شبیه‌سازی',
-        title: 'شبیه‌سازی سرمایه‌گذاری',
-        description: 'سناریوهای «اگر سرمایه‌گذاری کرده بودم»',
-        icon: LineChart
-      }
-    ]
-  },
-  {
     id: 'shopping',
     label: 'خرید',
     items: [
@@ -202,10 +194,26 @@ export const NAV_GROUPS: NavGroup[] = [
         match: ['/digikala']
       }
     ]
+  },
+  {
+    id: 'settings',
+    label: 'تنظیمات و اتصال‌ها',
+    items: [
+      { id: 'wallets', to: '/wallets', label: 'کیف پول‌ها', title: 'مدیریت کیف پول‌ها', description: 'آدرس‌ها و حساب‌های متصل', icon: Wallet },
+      { id: 'alerts', to: '/alerts', label: 'اعلان‌ها', description: 'برعکس شدن اسپرد فاندینگ و نزدیک لیکویید، حتی وقتی اپ بسته است', icon: Bell },
+      {
+        id: 'security',
+        to: '/security',
+        label: 'امنیت',
+        title: 'امنیت و دستگاه‌ها',
+        description: 'ورود، نشست‌های دستگاه‌ها و خروج',
+        icon: ShieldCheck
+      }
+    ]
   }
 ];
 
-/** Utility destination (footer of the sidebar / end of "More") */
+/** Developer page — reachable by URL and the command palette only, not in the user menu */
 export const DESIGN_SYSTEM_ITEM: NavItem = {
   id: 'design-system',
   to: '/design-system',
@@ -216,8 +224,8 @@ export const DESIGN_SYSTEM_ITEM: NavItem = {
 
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), DESIGN_SYSTEM_ITEM];
 
-/** Bottom bar order — home first, then the portfolio, the trading desk and wallets */
-export const PRIMARY_MOBILE: NavItem[] = ['market', 'dashboard', 'desk', 'wallets']
+/** Bottom bar order — same priority as the menu: portfolio, trading desk, funding income, markets */
+export const PRIMARY_MOBILE: NavItem[] = ['dashboard', 'desk', 'funding', 'market']
   .map((id) => ALL_NAV_ITEMS.find((i) => i.id === id))
   .filter((i): i is NavItem => !!i);
 

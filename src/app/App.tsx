@@ -4,6 +4,7 @@ import { AppShell } from '@/app/providers/AppProviders';
 import { MarketsHomePage } from '@/features/market/presentation/MarketsHomePage';
 import { PageSkeleton } from '@/shared/components/ui/Skeleton';
 import { AuthBootstrap, AuthGate } from '@/features/auth/AuthGate';
+import { lastVenue } from '@/shared/components/layout/SectionTabs';
 
 // ⚠️ فقط صفحه اصلی (بازار) مستقیم import می‌شود — بقیه lazy تا باندل
 // اولیه سبک بماند و اپ زود بالا بیاید (تغییر اساسی برای روان‌سازی)
@@ -27,6 +28,9 @@ const ShoppingPage = lazy(() => import('@/features/shopping/presentation/Shoppin
 const DesignSystemPage = lazy(() => import('@/features/design-system/DesignSystemPage'));
 const IntelHubPage = lazy(() => import('@/features/intel/presentation/IntelHubPage'));
 const JournalPage = lazy(() => import('@/features/journal/presentation/JournalPage'));
+const FundingPage = lazy(() => import('@/features/funding/presentation/FundingPage'));
+const CompareSimulationPage = lazy(() => import('@/features/simulation/presentation/CompareSimulationPage'));
+const CarryLabPage = lazy(() => import('@/features/carry-lab/presentation/CarryLabPage'));
 const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
@@ -38,6 +42,11 @@ function DeskRedirect() {
   const params = new URLSearchParams(search);
   if (params.get('tab') === 'gold') return <Navigate to="/gold" replace />;
   return <Navigate to={{ pathname: '/desk', search }} replace />;
+}
+
+/** «حساب‌های صرافی»: آخرین صرافی بازشده روی همین دستگاه (پیش‌فرض لایتر) */
+function VenuesRedirect() {
+  return <Navigate to={lastVenue()} replace />;
 }
 
 function Private({ children, label }: { children: React.ReactNode; label?: string }) {
@@ -80,6 +89,10 @@ export function App() {
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
           <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
           <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
+          <Route path="/funding" element={<Lazy label="درآمد فاندینگ"><FundingPage /></Lazy>} />
+          <Route path="/venues" element={<VenuesRedirect />} />
+          <Route path="/simulation/compare" element={<Lazy label="اگر خریده بودم"><CompareSimulationPage /></Lazy>} />
+          <Route path="/carry-lab" element={<Lazy label="آزمایشگاه کری فاندینگ"><CarryLabPage /></Lazy>} />
           <Route path="/performance" element={<Private label="عملکرد و مقایسه سرمایه"><PerformancePage /></Private>} />
           {/* نشانی‌های قبلی میز معامله؛ پارامترها (?tab= ، ?a= ، ?m=) حفظ می‌شوند */}
           <Route path="/intel" element={<DeskRedirect />} />
