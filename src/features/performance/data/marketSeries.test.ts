@@ -40,8 +40,32 @@ describe('carSeries', () => {
     expect(DIVAR_CAR_FROM).toBe(day('2026-10-23'));
     const s = carSeries(snaps, '472', day('2026-10-01'))!;
     expect(s.id).toBe('car:472');
-    expect(s.points).toEqual([[day('2026-10-01'), 100], [day('2026-10-25'), Math.round((120 * 3 + 130) / 4)]]);
+    // دیوار وزن‌دار (۱۲۰×۳ + ۱۳۰) ÷ ۴ = ۱۲۳؛ car.ir همان روز ۱۱۰ → ضریب ۱۲۳/۱۱۰؛ قبل از آبان ۱۰۰ × ضریب
+    const dv = Math.round((120 * 3 + 130) / 4);
+    expect(s.points).toEqual([[day('2026-10-01'), Math.round(100 * dv / 110)], [day('2026-10-25'), dv]]);
     expect(s.source).toContain('دیوار');
+    expect(s.source).toContain('هم‌تراز');
+  });
+  it('بدون پرش: درصد تغییر car.ir حفظ، قیمت فعلی دقیقاً دیوار، قیمت دستی قبل از آبان و روز بی‌آگهی بعد از آبان هم‌تراز', () => {
+    const dv = (iso: string, market: number) => row({ id: `dv:Peugeot 207i manual TU5:1404`, modelId: 'dv:Peugeot 207i manual TU5', source: 'divar', market, n: 5 });
+    const snaps = [
+      snap('2026-09-01', [row({ market: 1000 })]),
+      snap('2026-10-20', [row({ market: 1100 })]),
+      snap('2026-10-24', [row({ market: 1100 }), dv('2026-10-24', 1320)]),
+      snap('2026-10-30', [row({ market: 1150 })]),
+      snap('2026-11-05', [row({ market: 1200 }), dv('2026-11-05', 1452)])
+    ];
+    const manual: ManualPricePoint[] = [{ id: 'm', market: 'car:472', dateTs: day('2025-01-01'), price: 500, source: 'منبع' }];
+    const s = carSeries(snaps, '472', day('2025-01-01'), manual)!;
+    const v = Object.fromEntries(s.points.map(([t, x]) => [new Date(t).toISOString().slice(0, 10), x]));
+    // ضریب ۱۳۲۰/۱۱۰۰ = ۱٫۲
+    expect(v['2025-01-01']).toBe(600);
+    expect(v['2026-09-01']).toBe(1200);
+    expect(v['2026-10-20']).toBe(1320);
+    expect(v['2026-10-24']).toBe(1320); // روز اتصال: بدون پرش
+    expect(v['2026-10-30']).toBe(1380); // بعد از آبان بی‌آگهی دیوار: car.ir × ضریب
+    expect(v['2026-11-05']).toBe(1452); // قیمت فعلی = دیوار
+    expect(v['2026-10-20'] / v['2026-09-01']).toBeCloseTo(1100 / 1000, 10);
   });
   it('بعد از آبان بدون آگهی کافی دیوار → car.ir', () => {
     const snaps = [snap('2026-10-25', [row({ market: 110 }), row({ id: 'dv:x', modelId: 'dv:Peugeot 207i manual TU5', source: 'divar', market: 120, n: 2 })])];

@@ -71,7 +71,7 @@ export function withManual(base: { points: Pt[]; source: string; detail?: string
   const manualNote = extra.length ? `قیمت دستی ثبت‌شده توسط شما (${toFa(extra.length)} نقطه${srcs.length ? ` — ${srcs.join('، ')}` : ''})` : '';
   return { points, source: [base?.source, manualNote].filter(Boolean).join(' + '), manualCount: extra.length };
 }
-const toFa = (n: number) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+const toFa = (n: number | string) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
 
 /** از ۱ آبان ۱۴۰۵ قیمت خودرو از دیوارِ خود اپ (میانهٔ آگهی‌های همان مدل و سال) خوانده می‌شود */
 export const DIVAR_CAR_FROM = Date.parse('2026-10-23T00:00:00Z');
@@ -93,6 +93,16 @@ export function divarCarPrice(snap: CarSnapshot, modelId: string, year: string):
   return { price: Math.round(hits.reduce((a, r) => a + (r.market as number) * (r.n ?? 1), 0) / n), n };
 }
 
+/** ضریب اتصال car.ir → دیوار در اولین روز دیوار (با آخرین قیمت car.ir تا همان روز)؛ null = اتصالی لازم نیست */
+export function linkFactor(days: { t: number; cir: number | null; dv: number | null }[]): number | null {
+  let lastCir: number | null = null;
+  for (const d of days) {
+    if (d.cir !== null) lastCir = d.cir;
+    if (d.dv !== null) return lastCir && lastCir > 0 ? d.dv / lastCir : null;
+  }
+  return null;
+}
+
 /**
  * سری «قیمت بازار» (نه کارخانه) یک مدل خودرو برای «خرید در تاریخ شروع»: همان تیپ-سالی که در Snapshot نزدیک به شروع
  * جدیدترین سال با قیمت بازار بود؛ در Snapshotهای بعدی همان ردیف (خودروی کارکرده‌شدهٔ همان سال) + قیمت‌های دستی.
@@ -105,22 +115,33 @@ export function carSeries(snaps: CarSnapshot[], modelId: string | null, startTs:
   base ??= snaps.find((s) => s.dateTs - startTs <= 15 * DAY) ?? snaps[0];
   const rows = (base?.rows ?? []).filter((r) => r.modelId === modelId && r.market && (r.source ?? 'car.ir') === 'car.ir');
   const trim = rows.sort((a, b) => Number(b.year) - Number(a.year))[0];
-  const pts: Pt[] = [];
-  let divarDays = 0;
+  // روز به روز: قیمت car.ir همان تیپ-سال و (از آبان ۱۴۰۵) قیمت دیوار همان مدل و سال
+  const days: { t: number; cir: number | null; dv: number | null }[] = [];
   if (trim) {
     for (const s of snaps) {
       const t = Date.parse(`${s.day}T00:00:00Z`);
-      // از آبان ۱۴۰۵: دیوار اپ (همان مدل و سال)؛ اگر آن روز آگهی کافی نبود، car.ir
-      const dv = t >= DIVAR_CAR_FROM ? divarCarPrice(s, modelId, trim.year) : null;
-      if (dv) { pts.push([t, dv.price]); divarDays++; continue; }
       const r = s.rows.find((x) => x.id === trim.id && (x.source ?? 'car.ir') === 'car.ir');
-      if (r?.market) pts.push([t, r.market]);
+      days.push({ t, cir: r?.market ?? null, dv: t >= DIVAR_CAR_FROM ? divarCarPrice(s, modelId, trim.year)?.price ?? null : null });
     }
   }
-  const baseSrc = divarDays
-    ? 'car.ir (قیمت بازار، نه کارخانه) تا مهر ۱۴۰۵ + دیوار اپ دارینو از آبان ۱۴۰۵ (میانهٔ آگهی‌های همان مدل و سال، تهران)'
+  /**
+   * زنجیره‌سازی (بدون پرش): در اولین روزی که دیوار قیمت دارد، ضریب = دیوار ÷ car.ir (همان روز یا آخرین قبل از آن).
+   * قیمت‌های قبل از آبان (car.ir و دستی) و روزهای بعد از آبان که دیوار آگهی کافی نداشت × ضریب، تا سطح سری با دیوار یکی شود؛
+   * تغییرات واقعی قیمت (نسبت‌ها) دست نمی‌خورد و قیمت فعلی دقیقاً دیوار می‌ماند.
+   */
+  const factor = linkFactor(days);
+  const scale = (v: number) => Math.round(v * (factor ?? 1));
+  const pts: Pt[] = [];
+  for (const d of days) {
+    if (d.dv !== null) pts.push([d.t, d.dv]);
+    else if (d.cir !== null) pts.push([d.t, scale(d.cir)]);
+  }
+  const scaledManual = factor === null ? manual : manual.map((m) => (m.market === id && m.dateTs < DIVAR_CAR_FROM ? { ...m, price: scale(m.price) } : m));
+  const factorFa = factor === null ? '' : ` — قیمت‌های قبل از آبان ۱۴۰۵ با ضریب ×${toFa(factor.toFixed(3))} به سطح دیوار هم‌تراز شده‌اند (بدون پرش؛ درصد تغییرها همان است)`;
+  const baseSrc = factor !== null
+    ? `car.ir (قیمت بازار، نه کارخانه) تا مهر ۱۴۰۵ + دیوار اپ دارینو از آبان ۱۴۰۵ (میانهٔ آگهی‌های همان مدل و سال، تهران)${factorFa}`
     : 'car.ir — قیمت بازار (نه کارخانه)، Snapshotهای روزانهٔ بخش بازار خودرو';
-  const merged = withManual(pts.length ? { points: pts, source: baseSrc } : null, manual, id);
+  const merged = withManual(pts.length ? { points: pts, source: baseSrc } : null, scaledManual, id);
   if (!merged) return undefined;
   const last = snaps[snaps.length - 1];
   return {
