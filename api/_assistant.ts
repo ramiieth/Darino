@@ -37,8 +37,8 @@ const isSlowModel = (m: string) => /pro|argon/i.test(m);
 const CURRENCY_RULE = '\nمبلغ دلاری را با واژهٔ «دلار» بعد از عدد بنویس (مثل «۷,۲۶۸ دلار» یا «-۱۲.۵ دلار»)؛ هرگز نماد «$» به کار نبر.';
 /** سقف کل زمان همهٔ تلاش‌ها (فانکشن services در vercel.json سقف ۱۲۰ ثانیه دارد) */
 const GEMINI_DEADLINE_MS = 110_000;
-/** سقف یک تلاش Flash وقتی مدل دیگری برای امتحان مانده */
-const FLASH_ATTEMPT_MS = 40_000;
+/** سقف یک تلاش Flash وقتی مدل دیگری برای امتحان مانده (گزارش عملکرد طولانی است و Flash گاهی ۴۵–۶۰ث لازم دارد) */
+const FLASH_ATTEMPT_MS = 75_000;
 /** کمترین زمانی که برای یک تلاش ارزش دارد */
 const MIN_ATTEMPT_MS = 8_000;
 /** وقتی همهٔ مدل‌ها رد شدند: چند دور دیگر، با مکث (۲ث، ۴ث) */
@@ -57,7 +57,7 @@ const DISCOVERY_TTL_MS = 6 * 60 * 60_000;
 const DISCOVERY_FAIL_TTL_MS = 5 * 60_000;
 let flashCache: { at: number; ttl: number; models: string[] } | undefined;
 /** فقط برای تست */
-export const _resetGeminiDiscovery = () => { flashCache = undefined; };
+export const _resetGeminiDiscovery = () => { flashCache = undefined; modelCooldown.clear(); };
 
 /**
  * فهرست Flashهایی که همین کلید واقعاً به آن‌ها دسترسی دارد، جدیدترین اول (از ListModels گوگل).
@@ -98,6 +98,13 @@ const LANE_ENV: Record<GeminiLane, string> = {
 /** کلیدی که اخیراً ۴۲۹ (سهمیه) یا نامعتبر گرفته تا این زمان در انتهای صف می‌رود */
 const keyCooldown = new Map<string, number>();
 const QUOTA_COOLDOWN_MS = 60_000;
+/**
+ * مدلی که ۴۲۹ گرفته (سهمیهٔ گوگل برای هر مدل جداست) تا این زمان به انتهای صف می‌رود تا درخواست‌های بعدی
+ * وقت را روی آن تلف نکنند. «check your plan and billing» یعنی این مدل برای کلید سهمیه ندارد → ۳۰ دقیقه.
+ */
+const modelCooldown = new Map<string, number>();
+const MODEL_QUOTA_COOLDOWN_MS = 2 * 60_000;
+const MODEL_NO_PLAN_COOLDOWN_MS = 30 * 60_000;
 const BAD_KEY_COOLDOWN_MS = 10 * 60_000;
 
 /** کلیدهای قابل استفاده برای یک بخش: کلید خود بخش، سپس GEMINI_API_KEY، سپس کلید بخش‌های دیگر (بدون تکرار) */
@@ -132,7 +139,9 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
   // مدل اختصاصی بخش (اگر تنظیم شده) → اگر شلوغ/کند/ناموجود بود، زنجیرهٔ Flash
   const laneModel = process.env[LANE_MODEL_ENV[req.lane]]?.trim() || LANE_MODEL_DEFAULT[req.lane] || configured;
   if (![configured, laneModel].every((m) => /^[a-zA-Z0-9.-]+$/.test(m))) throw new ProviderError(503, 'مدل دستیار در سرور معتبر نیست');
-  const models = [...new Set([laneModel, configured, ...FALLBACK_MODELS])];
+  const cooling = (m: string) => (modelCooldown.get(m) ?? 0) > Date.now();
+  const chain = [...new Set([laneModel, configured, ...FALLBACK_MODELS])];
+  const models = [...chain.filter((m) => !cooling(m)), ...chain.filter(cooling)];
   /** مدل‌هایی که برای این کلید وجود ندارند یا درخواست را نمی‌پذیرند — دیگر امتحان نمی‌شوند */
   const dead = new Set<string>();
   /** مدل‌هایی که thinkingConfig را نمی‌پذیرند */
@@ -149,7 +158,8 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
       if (found.length) {
         const tried = new Set(models.slice(0, mi + 1));
         const rest = [...found, ...FALLBACK_MODELS.filter((m) => !FLASH_RE.test(m) || found.includes(m))].filter((m) => !tried.has(m));
-        models.splice(mi + 1, models.length, ...new Set(rest));
+        const uniq = [...new Set(rest)];
+        models.splice(mi + 1, models.length, ...uniq.filter((m) => !cooling(m)), ...uniq.filter(cooling));
       }
     }
     for (let i = mi + 1; i < models.length; i++) if (alive(i)) { mi = i; return true; }
@@ -212,6 +222,7 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
     if (r.status === 429) {
       // سهمیه → کلید بعدی؛ اگر کلیدی نماند، مدل بعدی (سهمیهٔ گوگل برای هر مدل جداست)
       if (nextKey(QUOTA_COOLDOWN_MS)) continue;
+      modelCooldown.set(model, Date.now() + (/billing|plan/i.test(detail) ? MODEL_NO_PLAN_COOLDOWN_MS : MODEL_QUOTA_COOLDOWN_MS));
       last = keys.length > 1 ? 'سهمیهٔ همهٔ کلیدهای Gemini تمام شده؛ کمی بعد دوباره تلاش کنید' : 'سهمیهٔ دستیار Gemini تمام شده؛ بعداً دوباره تلاش کنید';
       lastStatus = 429;
       if (await advance()) continue;
