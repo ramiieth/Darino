@@ -70,13 +70,33 @@ export interface CpiPoint {
   source: string;
 }
 
+/**
+ * قیمت تاریخی که کاربر خودش از یک منبع وارد می‌کند (برای تاریخ‌های قبل از Snapshotهای اپ).
+ * market: «car:<شناسهٔ مدل car.ir>» (قیمت بازار، نه کارخانه) یا «prop:<کلید محله>» (تومان بر مترمربع).
+ */
+export interface ManualPricePoint {
+  id: string;
+  market: string;
+  dateTs: number;
+  /** تومان (خودرو: قیمت بازار؛ مسکن: قیمت هر مترمربع) */
+  price: number;
+  /** نام منبع (مثلاً «همراه مکانیک، ۱۲ دی ۱۴۰۳») */
+  source: string;
+}
+
 export interface PerfSettings {
   /** بازارهای فعال در مقایسه */
   enabledMarkets: string[];
   /** ارزهای دیجیتال منتخب اضافه (نماد هایپرلیکوئید) */
   extraCoins: string[];
-  /** مدل خودرو (شناسهٔ مدل car.ir) */
+  /** @deprecated مدل تکی قدیمی — به carModelIds منتقل می‌شود */
   carModelId: string | null;
+  /** مدل‌های خودرو (شناسهٔ مدل car.ir؛ هر مدل یک ردیف جدا + میانگین) */
+  carModelIds: string[];
+  /** قیمت‌های تاریخی دستی خودرو و مسکن */
+  manualPrices: ManualPricePoint[];
+  /** نسخهٔ پیش‌فرض‌ها؛ کمتر از ۲ = تنظیمات قدیمی (پیش‌فرض‌های تازه یک بار اضافه می‌شوند) */
+  defaultsVersion?: number;
   /** محله‌های املاک اهواز (کلید محله یا منطقه) */
   neighborhoods: string[];
   /** کاربر تأیید کرده همهٔ واریز/برداشت‌های خارجی ثبت شده‌اند → TWR/XIRR معتبر */

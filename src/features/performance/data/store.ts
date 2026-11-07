@@ -14,7 +14,7 @@
 import { useMemo } from 'react';
 import { savePref, useCustodyStore } from '@/features/custody/data/repository';
 import type { ExternalFlow, PerfSettings, SavedReport, ValueRecord } from '../domain/types';
-import { DEFAULT_ENABLED, DEFAULT_NEIGHBORHOODS } from '../domain/markets';
+import { DEFAULT_CAR_MODELS, DEFAULT_ENABLED, DEFAULT_NEIGHBORHOODS, DEFAULTS_VERSION } from '../domain/markets';
 
 export const SETTINGS_ID = 'pv-settings';
 const recId = (id: string) => `pv:${id}`;
@@ -25,10 +25,32 @@ export const DEFAULT_SETTINGS: PerfSettings = {
   enabledMarkets: DEFAULT_ENABLED,
   extraCoins: [],
   carModelId: null,
+  carModelIds: DEFAULT_CAR_MODELS,
+  manualPrices: [],
+  defaultsVersion: DEFAULTS_VERSION,
   neighborhoods: DEFAULT_NEIGHBORHOODS,
   flowsComplete: false,
   iranCpi: []
 };
+
+const uniq = (xs: string[]) => [...new Set(xs)];
+
+/**
+ * تنظیمات ذخیره‌شده + پیش‌فرض‌ها. تنظیمات قدیمی (قبل از نسخهٔ ۲) یک بار خودروها (۲۰۷ دستی/اتوماتیک، تارا)
+ * و محله‌های کیانپارس، کیان‌آباد، گلستان و پاداد را اضافه می‌گیرند؛ انتخاب‌های قبلی کاربر حفظ می‌شود.
+ */
+export function mergeSettings(saved: Partial<PerfSettings> | null): PerfSettings {
+  const out: PerfSettings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) };
+  if (saved && (saved.defaultsVersion ?? 1) < DEFAULTS_VERSION) {
+    out.carModelIds = uniq([...(saved.carModelIds ?? []), ...(saved.carModelId ? [saved.carModelId] : []), ...DEFAULT_CAR_MODELS]);
+    out.neighborhoods = uniq([...(saved.neighborhoods ?? []), ...DEFAULT_NEIGHBORHOODS]);
+    out.enabledMarkets = uniq([...(saved.enabledMarkets ?? DEFAULT_ENABLED), 'car', 'property']);
+    out.defaultsVersion = DEFAULTS_VERSION;
+  }
+  out.carModelIds ??= [];
+  out.manualPrices ??= [];
+  return out;
+}
 
 export interface PerformanceData {
   loaded: boolean;
@@ -57,7 +79,7 @@ export function usePerformanceData(): PerformanceData {
     records.sort((a, b) => a.dateTs - b.dateTs || a.createdAt - b.createdAt);
     flows.sort((a, b) => a.dateTs - b.dateTs);
     reports.sort((a, b) => b.createdAt - a.createdAt);
-    return { loaded: s.loaded, persistent: s.persistent, records, flows, reports, settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) } };
+    return { loaded: s.loaded, persistent: s.persistent, records, flows, reports, settings: mergeSettings(settings) };
   }, [s.prefs, s.loaded, s.persistent]);
 }
 

@@ -3,10 +3,10 @@
  * + ساخت ورودی ساختاریافتهٔ Gemini (فقط اعداد محاسبه‌شده و منابع؛ هیچ دادهٔ خام شخصی دیگری).
  */
 import {
-  compareMarket, endpointOf, inflationAnalysis, portfolioRow, returnAnalysis, summarize, yearlyRows,
+  compareMarket, endpointOf, valueAt, inflationAnalysis, portfolioRow, returnAnalysis, summarize, yearlyRows,
   type CompareRow, type CompareSummary, type InflationAnalysis, type PortfolioRow, type ReturnAnalysis, type YearRow
 } from './engine';
-import { BASE_MARKETS, coinMarketId, propertyMarketId, type MarketDef } from './markets';
+import { BASE_MARKETS, CAR_AVG_ID, PROP_AVG_ID, carMarketId, coinMarketId, propertyMarketId, type MarketDef } from './markets';
 import type { ExternalFlow, PerfSettings, Series, ValueRecord } from './types';
 
 export interface PeriodAnalysis {
@@ -20,16 +20,19 @@ export interface PeriodAnalysis {
 }
 
 /** بازارهای فعال (پایه + محله‌ها + ارزهای منتخب) با نام نهایی */
-export function activeMarkets(settings: PerfSettings, names: { neighborhoods: Record<string, string>; car?: string }): MarketDef[] {
+export function activeMarkets(settings: PerfSettings, names: { neighborhoods: Record<string, string>; cars?: Record<string, string> }): MarketDef[] {
   const out: MarketDef[] = [];
+  const carIds = settings.carModelIds ?? [];
   for (const m of BASE_MARKETS) {
     if (!settings.enabledMarkets.includes(m.id)) continue;
     if (m.id === 'car') {
-      out.push(
-        settings.carModelId
-          ? { ...m, name: `خودرو — ${names.car ?? 'مدل انتخابی'}` }
-          : { ...m, kind: 'none', seriesId: null, missingReason: 'مدل خودرو انتخاب نشده است' }
-      );
+      if (!carIds.length) {
+        out.push({ ...m, kind: 'none', seriesId: null, missingReason: 'مدل خودرو انتخاب نشده است' });
+        continue;
+      }
+      // هر مدل یک ردیف (قیمت بازار) + میانگین مدل‌ها
+      for (const id of carIds) out.push({ ...m, id: carMarketId(id), name: `خودرو — ${names.cars?.[id] ?? `مدل ${id}`}`, seriesId: carMarketId(id) });
+      if (carIds.length >= 2) out.push({ ...m, id: CAR_AVG_ID, name: 'خودرو — میانگین مدل‌های منتخب', seriesId: CAR_AVG_ID });
       continue;
     }
     out.push(m);
@@ -38,6 +41,7 @@ export function activeMarkets(settings: PerfSettings, names: { neighborhoods: Re
     for (const k of settings.neighborhoods) {
       out.push({ id: propertyMarketId(k), name: `مسکن — ${names.neighborhoods[k] ?? k}`, group: 'iran', kind: 'price', currency: 'toman', seriesId: propertyMarketId(k) });
     }
+    if (settings.neighborhoods.length >= 2) out.push({ id: PROP_AVG_ID, name: 'مسکن — میانگین محله‌های منتخب', group: 'iran', kind: 'price', currency: 'toman', seriesId: PROP_AVG_ID });
   }
   for (const sym of settings.extraCoins) {
     out.push({ id: coinMarketId(sym), name: sym, group: 'global', kind: 'price', currency: 'usd', seriesId: coinMarketId(sym) });
@@ -56,7 +60,7 @@ export function analyzePeriod(
 ): PeriodAnalysis {
   const s = endpointOf(start);
   const e = endpointOf(end);
-  const rows = markets.map((m) => compareMarket(m, m.seriesId ? series[m.seriesId] : undefined, s, e));
+  const rows = markets.map((m) => withDataRange(compareMarket(m, m.seriesId ? series[m.seriesId] : undefined, s, e), m.seriesId ? series[m.seriesId] : undefined, e.ts));
   return {
     start,
     end,
@@ -66,6 +70,25 @@ export function analyzePeriod(
     inflation: inflationAnalysis(s, e, { iranCpi: series.ir_cpi, usCpi: series.us_cpi, usdt: series.ir_usd, gold18: series.ir_gold18 }),
     returns: returnAnalysis(records, start.id, end.id, flows, settings.flowsComplete)
   };
+}
+
+/**
+ * «از چه تاریخی داده داریم» + اگر داده بعد از شروع دوره آغاز شده، تغییر قیمت از اولین داده تا پایان
+ * (برای خودرو و مسکن که اپ از وسط دوره جمع‌آوری را شروع کرده).
+ */
+function withDataRange(row: CompareRow, s: Series | undefined, endTs: number): CompareRow {
+  if (!s?.points.length) return row;
+  const first = s.points[0];
+  const out: CompareRow = { ...row, dataFrom: first[0] };
+  const label = /^car[:_]/.test(row.id) ? 'دستگاه' : /^prop[:_]/.test(row.id) ? 'مترمربع' : null;
+  if (label && row.status === 'ok' && row.priceStart && row.priceEnd && row.startToman && row.priceStart.value > 0) {
+    out.units = { count: row.startToman / row.priceStart.value, label, priceStart: row.priceStart.value, priceEnd: row.priceEnd.value };
+  }
+  if (row.status !== 'ok' && !row.priceStart) {
+    const p1 = valueAt(s, endTs);
+    if (p1 && p1.at > first[0] && first[1] > 0) out.sinceDataStart = { from: first[0], to: p1.at, change: p1.value / first[1] - 1 };
+  }
+  return out;
 }
 
 export interface YearlyTable {
@@ -118,7 +141,13 @@ export function geminiPayload(a: PeriodAnalysis, records: ValueRecord[], years: 
       endUsd: r0(r.endUsd), endToman: r0(r.endToman), returnUsd: r4(r.returnUsd), returnToman: r4(r.returnToman),
       portfolioMinusMarketUsd: r0(r.vsPortfolioUsd), portfolioMinusMarketToman: r0(r.vsPortfolioToman),
       opportunityCostUsd: r0(r.opportunityUsd), opportunityCostToman: r0(r.opportunityToman),
-      source: r.source, sourceUpdated: r.updatedAt ? day(r.updatedAt) : undefined
+      source: r.source, sourceUpdated: r.updatedAt ? day(r.updatedAt) : undefined,
+      dataFrom: r.dataFrom ? day(r.dataFrom) : undefined,
+      // خودرو/مسکن: با ارزش تومانی پرتفوی در شروع چند دستگاه یا مترمربع، و قیمت واحد در شروع و پایان (تومان)
+      unitsBought: r.units && { count: Math.round(r.units.count * 100) / 100, unit: r.units.label, unitPriceStartToman: r0(r.units.priceStart), unitPriceEndToman: r0(r.units.priceEnd), sellValueEndToman: r0(r.endToman) },
+      dataFromJalali: r.dataFrom ? jalali(r.dataFrom) : undefined,
+      // فقط وقتی status≠ok: تغییر قیمت از اولین داده تا پایان دوره (بازهٔ کوتاه‌تر از دورهٔ اصلی)
+      changeSinceDataStart: r.sinceDataStart && { from: day(r.sinceDataStart.from), fromJalali: jalali(r.sinceDataStart.from), to: day(r.sinceDataStart.to), change: r4(r.sinceDataStart.change) }
     })),
     summary: { bestMarket: a.summary.best?.name ?? null, portfolioBeat: a.summary.beaten.map((r) => r.name), portfolioLagged: a.summary.lagged.map((r) => r.name) },
     yearlyGrowth: years.map((t) => ({

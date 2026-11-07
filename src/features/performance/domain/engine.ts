@@ -200,6 +200,18 @@ export interface CompareRow {
   /** هزینهٔ فرصت: چقدر بیشتر می‌داشتید اگر اینجا بودید (۰ اگر پرتفوی جلوتر است) */
   opportunityUsd: number | null;
   opportunityToman: number | null;
+  /** تاریخ اولین قیمت سری (برای «از چه تاریخی داده داریم») */
+  dataFrom?: number;
+  /**
+   * وقتی سری بعد از شروع دوره آغاز می‌شود: تغییر قیمت از اولین داده تا پایان دوره (بازهٔ کوتاه‌تر؛
+   * با بقیهٔ بازارها هم‌بازه نیست و فقط اطلاع است).
+   */
+  sinceDataStart?: { from: number; to: number; change: number };
+  /**
+   * خودرو و مسکن: با ارزش تومانی پرتفوی در تاریخ شروع چند دستگاه / چند مترمربع می‌شد خرید
+   * و ارزش فروش همان مقدار در تاریخ پایان (= endToman).
+   */
+  units?: { count: number; label: 'دستگاه' | 'مترمربع'; priceStart: number; priceEnd: number };
 }
 
 export interface PortfolioRow {

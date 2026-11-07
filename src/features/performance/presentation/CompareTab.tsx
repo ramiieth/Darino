@@ -4,7 +4,7 @@
  *  با برچسب «داده کافی موجود نیست» می‌ماند. منبع و زمان به‌روزرسانی هر بازار کنار آن است.
  */
 import { useMemo, useState } from 'react';
-import { RefreshCw, Settings2 } from 'lucide-react';
+import { Plus, RefreshCw, Settings2, Trash2 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -14,13 +14,14 @@ import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Sheet } from '@/shared/components/ui/Sheet';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { formatJalali } from '@/shared/utils/jalali';
-import { toFaDigits } from '@/shared/utils/formatters';
+import { SmartDateField } from '@/shared/components/ui/SmartDateField';
+import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 import type { CompareRow } from '../domain/engine';
 import type { PeriodAnalysis, YearlyTable } from '../domain/analysis';
 import { BASE_MARKETS, EXTRA_COIN_RE, MAX_EXTRA_COINS } from '../domain/markets';
-import type { PerfSettings, ValueRecord } from '../domain/types';
-import { saveSettings } from '../data/store';
+import type { ManualPricePoint, PerfSettings, ValueRecord } from '../domain/types';
+import { newId, saveSettings } from '../data/store';
 import type { MarketSeries } from '../data/useMarketSeries';
 import { ReturnBars } from './charts';
 import { PeriodPicker } from './PeriodPicker';
@@ -59,7 +60,24 @@ function RowCard({ r }: { r: CompareRow }) {
           <div className="col-span-2"><dt className="text-subtle">هزینهٔ فرصت</dt><dd>{(r.opportunityUsd ?? 0) > 0 ? <><Usd v={r.opportunityUsd} compact /> · <Toman v={r.opportunityToman} /></> : <span className="text-muted">ندارد</span>}</dd></div>
         </dl>
       ) : (
-        <p className="mt-1 text-xs text-muted">{r.reason}</p>
+        <>
+          <p className="mt-1 text-xs text-muted">{r.reason}</p>
+          {r.sinceDataStart && (
+            <p className="mt-1 text-xs text-muted">
+              از اولین دادهٔ موجود ({formatJalali(r.sinceDataStart.from)}) تا {formatJalali(r.sinceDataStart.to)}: <Pct v={r.sinceDataStart.change} />{' '}
+              <span className="text-subtle">(بازهٔ کوتاه‌تر؛ هم‌بازه با بقیه نیست)</span>
+            </p>
+          )}
+        </>
+      )}
+      {r.dataFrom && <p className="mt-1 text-2xs text-subtle">داده از {formatJalali(r.dataFrom)}</p>}
+      {r.units && (
+        <p className="mt-2 rounded-control bg-surface-2 px-3 py-2 text-xs leading-6 text-muted">
+          با <Toman v={r.startToman} /> در {r.priceStart ? formatJalali(r.priceStart.at) : 'تاریخ شروع'} می‌شد حدود{' '}
+          <b className="text-ink">{toFaDigits(r.units.count.toLocaleString('en-US', { maximumFractionDigits: r.units.label === 'دستگاه' ? 1 : 0 }))} {r.units.label}</b> خرید
+          (هر {r.units.label === 'دستگاه' ? 'دستگاه' : 'مترمربع'} <Toman v={r.units.priceStart} />)؛ فروش همان مقدار در {r.priceEnd ? formatJalali(r.priceEnd.at) : 'تاریخ پایان'} (هر {r.units.label === 'دستگاه' ? 'دستگاه' : 'مترمربع'} <Toman v={r.units.priceEnd} />):{' '}
+          <b className="text-ink"><Toman v={r.endToman} /></b> · سود/زیان <Toman v={r.pnlToman} signed />
+        </p>
       )}
       {ok && r.priceStart && r.priceEnd && (
         <p className="mt-1.5 text-2xs text-subtle">
@@ -100,7 +118,7 @@ export function YearlyGrowth({ tables }: { tables: YearlyTable[] }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-2xs leading-5 text-subtle">«—» یعنی برای آن تاریخ دادهٔ معتبر در اپ نیست (مسکن و خودرو از زمانی که بخش مربوط Snapshot ثبت کرده‌اند).</p>
+      <p className="mt-2 text-2xs leading-5 text-subtle">«—» یعنی برای آن تاریخ دادهٔ معتبر در اپ نیست (مسکن و خودرو از زمانی که بخش مربوط Snapshot ثبت کرده‌اند یا قیمت دستی وارد کرده‌اید). خودرو = قیمت بازار، نه کارخانه؛ مسکن = چارک بالای قیمت هر مترمربع.</p>
     </div>
   );
 }
@@ -227,6 +245,10 @@ function MarketSetup({ open, onClose, settings, market }: { open: boolean; onClo
     const on = settings.enabledMarkets.includes(id);
     void saveSettings({ ...settings, enabledMarkets: on ? settings.enabledMarkets.filter((x) => x !== id) : [...settings.enabledMarkets, id] });
   };
+  const toggleCar = (id: string) => {
+    const on = settings.carModelIds.includes(id);
+    void saveSettings({ ...settings, carModelIds: on ? settings.carModelIds.filter((x) => x !== id) : [...settings.carModelIds, id] });
+  };
   const toggleN = (k: string) => {
     const on = settings.neighborhoods.includes(k);
     void saveSettings({ ...settings, neighborhoods: on ? settings.neighborhoods.filter((x) => x !== k) : [...settings.neighborhoods, k] });
@@ -250,13 +272,16 @@ function MarketSetup({ open, onClose, settings, market }: { open: boolean; onClo
           </div>
         ))}
 
-        <Field label="مدل خودرو">
-          <Select value={settings.carModelId ?? ''} onChange={(e) => void saveSettings({ ...settings, carModelId: e.target.value || null })}>
-            <option value="">انتخاب کنید</option>
-            {market.carOptions.map((o) => <option key={o.modelId} value={o.modelId}>{o.name}</option>)}
-          </Select>
-        </Field>
-        {!market.carOptions.length && <p className="-mt-3 text-2xs text-subtle">قیمت خودرو هنوز در اپ ثبت نشده؛ یک بار صفحهٔ «خودرو» را باز کنید.</p>}
+        <Disclosure summary={`مدل‌های خودرو — قیمت بازار (${faInt(settings.carModelIds.length)})`} defaultOpen>
+          <div className="flex flex-wrap gap-2 py-2">
+            {market.carOptions.length
+              ? [...market.carOptions]
+                  .sort((a, b) => Number(settings.carModelIds.includes(b.modelId)) - Number(settings.carModelIds.includes(a.modelId)))
+                  .map((o) => chip(`car-${o.modelId}`, o.name.trim(), settings.carModelIds.includes(o.modelId), () => toggleCar(o.modelId)))
+              : <p className="text-2xs text-subtle">قیمت خودرو هنوز در اپ ثبت نشده؛ یک بار صفحهٔ «خودرو» را باز کنید.</p>}
+          </div>
+          <p className="text-2xs text-subtle">هر مدل یک ردیف جدا؛ با دو مدل یا بیشتر ردیف «میانگین» هم اضافه می‌شود.</p>
+        </Disclosure>
 
         <Disclosure summary={`محله‌های مسکن اهواز (${faInt(settings.neighborhoods.length)})`} defaultOpen>
           <div className="flex flex-wrap gap-2 py-2">
@@ -265,6 +290,8 @@ function MarketSetup({ open, onClose, settings, market }: { open: boolean; onClo
               : <p className="text-2xs text-subtle">آمار محله‌ها هنوز در اپ نیست؛ یک بار در «بازار املاک» داده جمع‌آوری کنید.</p>}
           </div>
         </Disclosure>
+
+        <ManualPrices settings={settings} market={market} />
 
         <div>
           <p className="mb-2 text-xs font-bold text-ink">ارزهای دیجیتال منتخب دیگر</p>
@@ -285,5 +312,80 @@ function MarketSetup({ open, onClose, settings, market }: { open: boolean; onClo
         </div>
       </div>
     </Sheet>
+  );
+}
+
+const parseNum = (v: string): number | null => {
+  const n = Number(toEnDigits(v).replace(/[,\s٬]/g, ''));
+  return v.trim() && Number.isFinite(n) ? n : null;
+};
+
+/**
+ * قیمت‌های تاریخی دستی (برای تاریخ‌های قبل از Snapshotهای اپ): کاربر قیمت معتبری را که در منبعی پیدا کرده با
+ * تاریخ و نام منبع ثبت می‌کند؛ همان محاسبهٔ مقایسه و گزارش Gemini از آن استفاده می‌کند. Snapshot اپ در همان روز مقدم است.
+ */
+function ManualPrices({ settings, market }: { settings: PerfSettings; market: MarketSeries }) {
+  const targets = [
+    ...settings.carModelIds.map((id) => ({ key: `car:${id}`, label: `خودرو — ${market.carOptions.find((c) => c.modelId === id)?.name.trim() ?? id}`, unit: 'تومان (قیمت بازار)' })),
+    ...settings.neighborhoods.map((k) => ({ key: `prop:${k}`, label: `مسکن — ${market.neighborhoodOptions.find((n) => n.key === k)?.name ?? k}`, unit: 'تومان بر مترمربع' }))
+  ];
+  const [target, setTarget] = useState('');
+  const [date, setDate] = useState<number | null>(null);
+  const [price, setPrice] = useState('');
+  const [source, setSource] = useState('');
+  const tKey = target || targets[0]?.key || '';
+  const t = targets.find((x) => x.key === tKey);
+  const priceN = parseNum(price);
+  const list = [...(settings.manualPrices ?? [])].sort((a, b) => a.market.localeCompare(b.market) || a.dateTs - b.dateTs);
+  const labelOf = (k: string) => targets.find((x) => x.key === k)?.label ?? k;
+  const add = () => {
+    if (!tKey || date === null || !priceN || priceN <= 0 || !source.trim()) return;
+    const p: ManualPricePoint = { id: newId(), market: tKey, dateTs: date, price: priceN, source: source.trim().slice(0, 160) };
+    void saveSettings({ ...settings, manualPrices: [...(settings.manualPrices ?? []), p] });
+    setPrice('');
+  };
+  const remove = (id: string) => void saveSettings({ ...settings, manualPrices: (settings.manualPrices ?? []).filter((x) => x.id !== id) });
+  return (
+    <Disclosure summary={`قیمت‌های تاریخی دستی (${faInt(list.length)})`}>
+      <div className="space-y-3 py-2">
+        <p className="text-2xs leading-5 text-subtle">
+          برای تاریخ‌هایی که اپ هنوز قیمت جمع نکرده بود (مثلاً ۱۴۰۳/۱۰/۱۲)، قیمتی را که در یک منبع معتبر دیده‌اید با تاریخ و نام منبع وارد کنید.
+          خودرو: قیمت بازار همان مدل، نه قیمت کارخانه. مسکن: قیمت هر مترمربع. از امروز به بعد اپ خودش هر روز ثبت می‌کند.
+        </p>
+        {targets.length ? (
+          <>
+            <Field label="بازار">
+              <Select value={tKey} onChange={(e) => setTarget(e.target.value)}>
+                {targets.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+              </Select>
+            </Field>
+            <SmartDateField label="تاریخ (شمسی · میلادی)" value={date} onChange={setDate} max={Date.now()} />
+            <Field label="قیمت">
+              <Input inputMode="numeric" dir="ltr" suffix={t?.unit ?? 'تومان'} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="مثلاً 1450000000" />
+            </Field>
+            <Field label="منبع">
+              <Input value={source} onChange={(e) => setSource(e.target.value)} maxLength={160} placeholder="مثلاً همراه مکانیک، ۱۲ دی ۱۴۰۳" />
+            </Field>
+            <Button variant="outline" icon={<Plus />} disabled={date === null || !priceN || priceN <= 0 || !source.trim()} onClick={add}>افزودن قیمت</Button>
+          </>
+        ) : (
+          <p className="text-2xs text-subtle">اول مدل خودرو یا محلهٔ مسکن را انتخاب کنید.</p>
+        )}
+        {list.length > 0 && (
+          <ul className="divide-y divide-divider rounded-control border border-divider">
+            {list.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink">{labelOf(p.market)}</p>
+                  <p className="text-muted">{formatJalali(p.dateTs)} · <Toman v={p.price} /></p>
+                  <p className="truncate text-2xs text-subtle">{p.source}</p>
+                </div>
+                <Button size="sm" variant="ghost" icon={<Trash2 />} aria-label="حذف قیمت" onClick={() => remove(p.id)} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Disclosure>
   );
 }
