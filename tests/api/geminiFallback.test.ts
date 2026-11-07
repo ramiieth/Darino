@@ -180,6 +180,16 @@ describe('پیش‌فرض: Gemini 4 Argon', () => {
     await expect(run()).resolves.toBe('گزارش');
     expect(urls[1]).toContain('/models/gemini-3.8-flash:');
   });
+  it('Argon بدون سهمیه (۴۲۹ billing) → Flash؛ درخواست بعدی مستقیم از Flash شروع می‌شود', async () => {
+    serve(err(429, 'You exceeded your current quota, please check your plan and billing details.'), ok('اول'));
+    await expect(run()).resolves.toBe('اول');
+    expect(urls[1]).toContain('/models/gemini-3.8-flash:');
+    urls.length = 0;
+    vi.mocked(globalThis.fetch).mockRestore();
+    serve(ok('دوم'));
+    await expect(run()).resolves.toBe('دوم');
+    expect(urls[0]).toContain('/models/gemini-3.8-flash:');
+  });
   it('Argon در دسترس نیست (۴۰۴) → Flash 3.8', async () => {
     serve(err(404, 'models/gemini-4-argon is not found'), ok('گزارش'));
     await expect(run()).resolves.toBe('گزارش');

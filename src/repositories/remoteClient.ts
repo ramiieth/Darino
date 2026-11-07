@@ -119,6 +119,10 @@ export async function fetchJson<T>(
       throw new HttpError(res.status, code, Number(res.headers.get('Retry-After')) || 0);
     }
     return (await res.json()) as T;
+  } catch (e) {
+    // به‌جای پیام خام مرورگر («signal is aborted without reason»)
+    if (controller.signal.aborted) throw new Error('پاسخ در زمان مجاز نرسید؛ چند لحظه بعد دوباره تلاش کنید');
+    throw e;
   } finally {
     clearTimeout(timer);
   }
