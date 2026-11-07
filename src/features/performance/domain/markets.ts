@@ -59,11 +59,18 @@ export const BASE_MARKETS: MarketDef[] = [
 
 /** شناسهٔ بازار ملک هر محله و رمزارز منتخب اضافه */
 export const propertyMarketId = (key: string) => `prop:${key}`;
+export const carMarketId = (modelId: string) => `car:${modelId}`;
+/** میانگین هم‌وزن مدل‌های خودروی منتخب / محله‌های منتخب */
+export const CAR_AVG_ID = 'car_avg';
+export const PROP_AVG_ID = 'prop_avg';
 export const coinMarketId = (sym: string) => `coin:${sym}`;
 
 /** پیش‌فرض‌ها فقط «انتخاب» هستند، نه داده: کدام بازارها روشن باشند و کدام محله‌ها */
 export const DEFAULT_ENABLED = [...BASE_MARKETS.map((m) => m.id), 'property'];
-export const DEFAULT_NEIGHBORHOODS = ['golestan', 'shahrak-daneshgah', 'padad'];
+export const DEFAULT_NEIGHBORHOODS = ['kianpars', 'kianabad', 'golestan', 'padad'];
+/** مدل‌های car.ir: ۲۰۷ دستی، ۲۰۷ اتوماتیک، تارا دنده‌ای، تارا اتوماتیک */
+export const DEFAULT_CAR_MODELS = ['472', '473', '761', '762'];
+export const DEFAULTS_VERSION = 2;
 
 /** منبع نمایشی هر سری سرور */
 export const SOURCE_FA: Record<string, { name: string; url: string }> = {

@@ -14,8 +14,8 @@ import { usePropertyMarketStore } from '@/features/propertyMarket/data/store';
 import type { CarSnapshot } from '@/features/carMarket/domain/types';
 import type { PropertyMarketSnapshot } from '@/features/propertyMarket/domain/types';
 import { normalizePoints, valueAt } from '../domain/engine';
-import { SOURCE_FA } from '../domain/markets';
-import type { BenchmarksPayload, CpiPoint, PerfSettings, Pt, Series } from '../domain/types';
+import { CAR_AVG_ID, PROP_AVG_ID, SOURCE_FA, carMarketId, propertyMarketId } from '../domain/markets';
+import type { BenchmarksPayload, CpiPoint, ManualPricePoint, PerfSettings, Pt, Series } from '../domain/types';
 
 const MONTH = 30 * 86_400_000;
 
@@ -54,59 +54,136 @@ export function carOptions(snaps: CarSnapshot[]): CarOption[] {
   return [...m.entries()].map(([modelId, name]) => ({ modelId, name })).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
 
+const DAY = 86_400_000;
+const dayStart = (ts: number) => Math.floor(ts / DAY) * DAY;
+
 /**
- * سری قیمت خودرو برای «خرید در تاریخ شروع»: همان تیپ-سالی که در Snapshot نزدیک به شروع
- * جدیدترین سال با قیمت بازار بود؛ در Snapshotهای بعدی همان ردیف (خودروی کارکرده‌شدهٔ همان سال).
+ * قیمت‌های دستی کاربر برای یک بازار به سری اضافه می‌شوند (همان روز → قیمت دستی جایگزین Snapshot نمی‌شود؛
+ * Snapshot اپ مقدم است). منبع سری فهرست منابع دستی را هم نشان می‌دهد.
  */
-export function carSeries(snaps: CarSnapshot[], modelId: string | null, startTs: number): Series | undefined {
-  if (!modelId || !snaps.length) return undefined;
+export function withManual(base: { points: Pt[]; source: string; detail?: string } | null, manual: ManualPricePoint[], market: string): { points: Pt[]; source: string; manualCount: number } | null {
+  const mine = manual.filter((m) => m.market === market && m.price > 0 && Number.isFinite(m.price));
+  const days = new Set((base?.points ?? []).map(([t]) => dayStart(t)));
+  const extra: Pt[] = mine.filter((m) => !days.has(dayStart(m.dateTs))).map((m) => [dayStart(m.dateTs), m.price]);
+  const points = normalizePoints([...(base?.points ?? []), ...extra]);
+  if (!points.length) return null;
+  const srcs = [...new Set(mine.map((m) => m.source.trim()).filter(Boolean))];
+  const manualNote = extra.length ? `قیمت دستی ثبت‌شده توسط شما (${toFa(extra.length)} نقطه${srcs.length ? ` — ${srcs.join('، ')}` : ''})` : '';
+  return { points, source: [base?.source, manualNote].filter(Boolean).join(' + '), manualCount: extra.length };
+}
+const toFa = (n: number) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+
+/** از ۱ آبان ۱۴۰۵ قیمت خودرو از دیوارِ خود اپ (میانهٔ آگهی‌های همان مدل و سال) خوانده می‌شود */
+export const DIVAR_CAR_FROM = Date.parse('2026-10-23T00:00:00Z');
+/** مدل car.ir → نام مدل‌های دیوار (فقط همان گیربکس؛ سقف شیشه‌ای «P» جداست) */
+export const DIVAR_CAR_MATCH: Record<string, RegExp> = {
+  '472': /^Peugeot 207i manual(?:-normal)?(?: TU[35])?$/i,
+  '473': /^Peugeot 207i automatic(?:-normal)?(?: TU[35])?$/i,
+  '761': /^Tara Manual$/i,
+  '762': /^Tara Automatic$/i
+};
+
+/** قیمت دیوار یک مدل/سال در یک Snapshot: میانگین وزنی (تعداد آگهی) میانه‌های ردیف‌های هم‌نام */
+export function divarCarPrice(snap: CarSnapshot, modelId: string, year: string): { price: number; n: number } | null {
+  const re = DIVAR_CAR_MATCH[modelId];
+  if (!re) return null;
+  const hits = snap.rows.filter((r) => r.source === 'divar' && r.year === year && r.market && re.test(r.modelId.replace(/^dv:/, '')));
+  const n = hits.reduce((a, r) => a + (r.n ?? 1), 0);
+  if (!hits.length || n < 3) return null;
+  return { price: Math.round(hits.reduce((a, r) => a + (r.market as number) * (r.n ?? 1), 0) / n), n };
+}
+
+/**
+ * سری «قیمت بازار» (نه کارخانه) یک مدل خودرو برای «خرید در تاریخ شروع»: همان تیپ-سالی که در Snapshot نزدیک به شروع
+ * جدیدترین سال با قیمت بازار بود؛ در Snapshotهای بعدی همان ردیف (خودروی کارکرده‌شدهٔ همان سال) + قیمت‌های دستی.
+ */
+export function carSeries(snaps: CarSnapshot[], modelId: string | null, startTs: number, manual: ManualPricePoint[] = []): Series | undefined {
+  if (!modelId) return undefined;
+  const id = carMarketId(modelId);
   let base: CarSnapshot | undefined;
-  for (const s of snaps) if (s.dateTs <= startTs + 15 * 86_400_000) base = s;
-  base ??= snaps.find((s) => s.dateTs - startTs <= 15 * 86_400_000);
-  const rows = (base ?? snaps[0]).rows.filter((r) => r.modelId === modelId && r.market && (r.source ?? 'car.ir') === 'car.ir');
+  for (const s of snaps) if (s.dateTs <= startTs + 15 * DAY) base = s;
+  base ??= snaps.find((s) => s.dateTs - startTs <= 15 * DAY) ?? snaps[0];
+  const rows = (base?.rows ?? []).filter((r) => r.modelId === modelId && r.market && (r.source ?? 'car.ir') === 'car.ir');
   const trim = rows.sort((a, b) => Number(b.year) - Number(a.year))[0];
-  if (!trim) return undefined;
   const pts: Pt[] = [];
-  for (const s of snaps) {
-    const r = s.rows.find((x) => x.id === trim.id && (x.source ?? 'car.ir') === 'car.ir');
-    if (r?.market) pts.push([Date.parse(`${s.day}T00:00:00Z`), r.market]);
+  let divarDays = 0;
+  if (trim) {
+    for (const s of snaps) {
+      const t = Date.parse(`${s.day}T00:00:00Z`);
+      // از آبان ۱۴۰۵: دیوار اپ (همان مدل و سال)؛ اگر آن روز آگهی کافی نبود، car.ir
+      const dv = t >= DIVAR_CAR_FROM ? divarCarPrice(s, modelId, trim.year) : null;
+      if (dv) { pts.push([t, dv.price]); divarDays++; continue; }
+      const r = s.rows.find((x) => x.id === trim.id && (x.source ?? 'car.ir') === 'car.ir');
+      if (r?.market) pts.push([t, r.market]);
+    }
   }
-  if (!pts.length) return undefined;
+  const baseSrc = divarDays
+    ? 'car.ir (قیمت بازار، نه کارخانه) تا مهر ۱۴۰۵ + دیوار اپ دارینو از آبان ۱۴۰۵ (میانهٔ آگهی‌های همان مدل و سال، تهران)'
+    : 'car.ir — قیمت بازار (نه کارخانه)، Snapshotهای روزانهٔ بخش بازار خودرو';
+  const merged = withManual(pts.length ? { points: pts, source: baseSrc } : null, manual, id);
+  if (!merged) return undefined;
   const last = snaps[snaps.length - 1];
   return {
-    id: 'car',
-    points: normalizePoints(pts),
+    id,
+    points: merged.points,
     unit: 'toman',
     frequency: 'snapshot',
-    source: 'car.ir — Snapshotهای روزانهٔ بخش بازار خودرو',
+    source: merged.source,
     sourceUrl: 'https://car.ir',
-    fetchedAt: last.dateTs,
-    detail: `${trim.model} مدل ${trim.year}${trim.option ? ` (${trim.option})` : ''}`
+    fetchedAt: last?.dateTs ?? merged.points[merged.points.length - 1][0],
+    detail: trim ? `قیمت بازار ${trim.model.trim()} مدل ${trim.year}${trim.option ? ` (${trim.option})` : ''}` : 'فقط قیمت‌های دستی'
   };
 }
 
-/** میانهٔ قیمت هر مترمربع یک محله/منطقه در Snapshotهای بازار املاک */
-export function propertySeries(snaps: PropertyMarketSnapshot[], key: string): Series | undefined {
+/**
+ * قیمت هر مترمربع یک محله/منطقه در Snapshotهای بازار املاک — چارک بالا (۷۵٪ آگهی‌ها ارزان‌ترند)،
+ * نه میانه یا میانگین، تا قیمت واحدهای بهتر محله را نشان دهد. + قیمت‌های دستی.
+ */
+export function propertySeries(snaps: PropertyMarketSnapshot[], key: string, manual: ManualPricePoint[] = []): Series | undefined {
+  const id = propertyMarketId(key);
   const pts: Pt[] = [];
   let name: string | undefined;
   for (const s of snaps) {
     const hit = s.groupStats?.find((g) => g.neighborhoodKey === key) ?? s.neighborhoodStats.find((n) => n.neighborhoodKey === key);
-    if (hit?.stats.medianTomanPerM2 && hit.stats.listingCount >= 3) {
-      pts.push([s.dateTs, hit.stats.medianTomanPerM2]);
+    if (hit?.stats.p75TomanPerM2 && hit.stats.listingCount >= 3) {
+      pts.push([s.dateTs, hit.stats.p75TomanPerM2]);
       name = hit.displayName;
     }
   }
-  if (!pts.length) return undefined;
+  const merged = withManual(pts.length ? { points: pts, source: 'دیوار — Snapshotهای بخش بازار املاک اهواز (چارک بالای قیمت هر مترمربع)' } : null, manual, id);
+  if (!merged) return undefined;
   return {
-    id: `prop:${key}`,
-    points: normalizePoints(pts),
+    id,
+    points: merged.points,
     unit: 'toman',
     frequency: 'snapshot',
-    source: 'دیوار — Snapshotهای بخش بازار املاک اهواز (میانهٔ قیمت هر مترمربع)',
+    source: merged.source,
     sourceUrl: 'https://divar.ir',
-    fetchedAt: snaps[snaps.length - 1].dateTs,
-    detail: name
+    fetchedAt: snaps.length ? snaps[snaps.length - 1].dateTs : merged.points[merged.points.length - 1][0],
+    detail: `${name ?? key} — چارک بالای قیمت هر مترمربع`
   };
+}
+
+/**
+ * میانگین هم‌وزن چند سری: از اولین روزی که همه داده دارند، شاخص = میانگین (قیمت ÷ قیمت روز اول) هر جزء
+ * × میانگین قیمت‌های روز اول (تا عدد در مقیاس تومان بماند). فقط روزهایی که همهٔ اجزا قیمت معتبر دارند.
+ */
+export function averageSeries(id: string, comps: Series[], source: string, detail: string): Series | undefined {
+  if (comps.length < 2) return undefined;
+  const days = [...new Set(comps.flatMap((c) => c.points.map(([t]) => t)))].sort((a, b) => a - b);
+  let base: number[] | null = null;
+  const pts: Pt[] = [];
+  for (const t of days) {
+    const vals = comps.map((c) => valueAt(c, t)?.value ?? null);
+    if (vals.some((v) => v === null || !(v > 0))) continue;
+    const vs = vals as number[];
+    base ??= vs;
+    const b = base;
+    const idx = vs.reduce((acc, v, i) => acc + v / b[i], 0) / vs.length;
+    pts.push([t, idx * (b.reduce((x, y) => x + y, 0) / b.length)]);
+  }
+  if (!pts.length) return undefined;
+  return { id, points: normalizePoints(pts), unit: 'toman', frequency: 'snapshot', source, fetchedAt: Math.max(...comps.map((c) => c.fetchedAt)), detail };
 }
 
 /** فهرست محله‌ها/مناطق موجود در Snapshotها (برای انتخاب) */
@@ -169,16 +246,25 @@ export function useMarketSeries(startTs: number | null, settings: PerfSettings):
     if (usdtS) out.ir_usd = usdtS;
     const cpi = iranCpiSeries(settings.iranCpi, out.ir_cpi_wb);
     if (cpi) out.ir_cpi = cpi;
+    const manual = settings.manualPrices ?? [];
+    const carComps: Series[] = [];
     if (startTs !== null) {
-      const car = carSeries(cars, settings.carModelId, startTs);
-      if (car) out.car = car;
+      for (const id of settings.carModelIds ?? []) {
+        const car = carSeries(cars, id, startTs, manual);
+        if (car) { out[car.id] = car; carComps.push(car); }
+      }
     }
+    const avgCar = averageSeries(CAR_AVG_ID, carComps, 'میانگین هم‌وزن قیمت بازار مدل‌های منتخب (car.ir + قیمت‌های دستی)', `${toFa(carComps.length)} مدل`);
+    if (avgCar) out[CAR_AVG_ID] = avgCar;
+    const propComps: Series[] = [];
     for (const k of settings.neighborhoods) {
-      const p = propertySeries(props, k);
-      if (p) out[`prop:${k}`] = p;
+      const p = propertySeries(props, k, manual);
+      if (p) { out[p.id] = p; propComps.push(p); }
     }
+    const avgProp = averageSeries(PROP_AVG_ID, propComps, 'میانگین هم‌وزن چارک بالای قیمت هر مترمربع محله‌های منتخب (دیوار + قیمت‌های دستی)', `${toFa(propComps.length)} محله`);
+    if (avgProp) out[PROP_AVG_ID] = avgProp;
     return out;
-  }, [bench.data, usdtS, settings.iranCpi, settings.carModelId, settings.neighborhoods, cars, props, startTs]);
+  }, [bench.data, usdtS, settings.iranCpi, settings.carModelIds, settings.manualPrices, settings.neighborhoods, cars, props, startTs]);
 
   const carOpts = useMemo(() => carOptions(cars), [cars]);
   const nOpts = useMemo(() => neighborhoodOptions(props), [props]);

@@ -72,9 +72,9 @@ export default function PerformancePage() {
   const names = useMemo(
     () => ({
       neighborhoods: Object.fromEntries(market.neighborhoodOptions.map((n) => [n.key, n.name])),
-      car: market.series.car?.detail ?? market.carOptions.find((c) => c.modelId === data.settings.carModelId)?.name
+      cars: Object.fromEntries(market.carOptions.map((c) => [c.modelId, c.name.trim()]))
     }),
-    [market.neighborhoodOptions, market.series.car, market.carOptions, data.settings.carModelId]
+    [market.neighborhoodOptions, market.carOptions]
   );
   const markets = useMemo(() => activeMarkets(data.settings, names), [data.settings, names]);
 
@@ -91,11 +91,11 @@ export default function PerformancePage() {
       { id: 'ir_gold18', name: 'طلای ۱۸ عیار', unit: 'تومان / گرم' },
       { id: 'ir_sekee', name: 'سکه امامی', unit: 'تومان' },
       { id: 'ir_usd', name: 'دلار آزاد (تتر)', unit: 'تومان' },
-      ...(data.settings.enabledMarkets.includes('property') ? data.settings.neighborhoods.map((k) => ({ id: `prop:${k}`, name: `مسکن ${names.neighborhoods[k] ?? k}`, unit: 'تومان / مترمربع (میانه)' })) : []),
-      ...(data.settings.carModelId ? [{ id: 'car', name: names.car ?? 'خودرو', unit: 'تومان' }] : [])
+      ...(data.settings.enabledMarkets.includes('property') ? data.settings.neighborhoods.map((k) => ({ id: `prop:${k}`, name: `مسکن ${names.neighborhoods[k] ?? k}`, unit: 'تومان / مترمربع (چارک بالا)' })) : []),
+      ...(data.settings.enabledMarkets.includes('car') ? data.settings.carModelIds.map((id) => ({ id: `car:${id}`, name: names.cars[id] ?? `خودرو ${id}`, unit: 'تومان (قیمت بازار)' })) : [])
     ];
     return yearlyTables(market.series, ids, years, (y) => jalaaliToTimestamp(y, 1, 1), now);
-  }, [market.series, data.settings.enabledMarkets, data.settings.neighborhoods, data.settings.carModelId, names]);
+  }, [market.series, data.settings.enabledMarkets, data.settings.neighborhoods, data.settings.carModelIds, names]);
 
   const sources = useMemo(() => {
     const out = new Set<string>(['سوابق ارزش دارایی ثبت‌شده توسط شما در دارینو']);

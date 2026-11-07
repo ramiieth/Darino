@@ -168,7 +168,7 @@ describe('yearlyRows', () => {
 });
 
 describe('analysis + gemini payload', () => {
-  const settings: PerfSettings = { enabledMarkets: ['btc', 'car', 'property'], extraCoins: ['AAVE'], carModelId: null, neighborhoods: ['golestan'], flowsComplete: false, iranCpi: [] };
+  const settings: PerfSettings = { enabledMarkets: ['btc', 'car', 'property'], extraCoins: ['AAVE'], carModelId: null, carModelIds: [], manualPrices: [], neighborhoods: ['golestan'], flowsComplete: false, iranCpi: [] };
   it('builds markets incl. car without model as no-source', () => {
     const ms = activeMarkets(settings, { neighborhoods: { golestan: 'گلستان' } });
     expect(ms.map((m) => m.id)).toEqual(['car', 'btc', 'prop:golestan', 'coin:AAVE']);
