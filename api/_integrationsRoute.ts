@@ -16,7 +16,7 @@ import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getLighterOrders, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
-import { analyze, analysisSchema, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReview, optionsAnalysisSchema, reviewAnalysisSchema } from './_assistant.js';
+import { analyze, analysisSchema, hasGeminiKey, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReview, optionsAnalysisSchema, reviewAnalysisSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
@@ -53,7 +53,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
   const op = u.searchParams.get('op') ?? 'status';
-  if (op === 'status' && req.method === 'GET') { json(res,200,{ zerion: !!process.env.ZERION_API_KEY, gemini: !!process.env.GEMINI_API_KEY,quota:await zerionQuota(),webhookConfigured:!!process.env.ZERION_WEBHOOK_CERTIFICATE_PEM&&!!process.env.ZERION_WEBHOOK_WALLETS }); return; }
+  if (op === 'status' && req.method === 'GET') { json(res,200,{ zerion: !!process.env.ZERION_API_KEY, gemini: hasGeminiKey(),quota:await zerionQuota(),webhookConfigured:!!process.env.ZERION_WEBHOOK_CERTIFICATE_PEM&&!!process.env.ZERION_WEBHOOK_WALLETS }); return; }
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };

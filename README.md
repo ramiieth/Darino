@@ -438,7 +438,9 @@ External API → Server Fetch → Normalize → Validate → Cache مرکزی �
 
 - `ZERION_API_KEY` (Secret)
 - `GEMINI_API_KEY` (Secret)
-- `GEMINI_MODEL` (اختیاری؛ پیش‌فرض `gemini-3.8-flash`)
+- `GEMINI_API_KEY_CHAT` / `GEMINI_API_KEY_PERFORMANCE` / `GEMINI_API_KEY_REVIEW` / `GEMINI_API_KEY_TOOLS` (اختیاری، Secret) — کلید اختصاصی دستیار پرتفولیو، گزارش عملکرد و مقایسه، مرور هفتگی، و ابزارها (آپشن/پلن/دلتا/دلار بازده‌دار). هر بخش اول کلید خودش را می‌زند؛ با ۴۲۹ یا کلید نامعتبر خودکار سراغ کلید بعدی می‌رود.
+- `GEMINI_MODEL` (اختیاری؛ پیش‌فرض `gemini-4-argon` — فقط کلید پولی؛ اگر شلوغ، کندتر از ۶۰ ثانیه یا ناموجود بود → `gemini-3.8-flash` و بقیهٔ Flashها. برای فقط Flash: `GEMINI_MODEL=gemini-3.8-flash`)
+- `GEMINI_MODEL_CHAT` / `GEMINI_MODEL_PERFORMANCE` / `GEMINI_MODEL_REVIEW` / `GEMINI_MODEL_TOOLS` (اختیاری) — مدل اول هر بخش؛ پیش‌فرض همه `GEMINI_MODEL`. اگر مدل اول شلوغ (۵۰۳)، کند (Argon/Pro بیش از ۶۰ ثانیه) یا ناموجود باشد، سرور فهرست واقعی Flashهای فعال همان کلید را از گوگل می‌گیرد (۶ ساعت کش) و جدیدترین‌ها را به‌ترتیب امتحان می‌کند؛ اگر فهرست در دسترس نبود `gemini-3.7-flash` ← `gemini-3.6-flash`. پشتیبان نهایی همیشه `gemini-flash-latest` است.
 
 ### حساب‌های پرپچوال با کلید فقط‌خواندنی (اختیاری)
 

@@ -112,7 +112,7 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
     setAi({ week: w, status: 'loading' });
     try {
       const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz, spot: wSpot });
-      const res = await fetchJson<{ review: ReviewSuggestion }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 60_000 });
+      const res = await fetchJson<{ review: ReviewSuggestion }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 120_000 });
       if (latest.current.week !== w) { setAi(null); return; }
       await saveReview(mergeSuggestion(latest.current, res.review));
       setDraft(null);
