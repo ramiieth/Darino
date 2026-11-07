@@ -54,7 +54,7 @@ export function AssistantExplain({
     setBusy(true);
     setError(null);
     try {
-      const r = await fetchJson<{ answer: string }>(`/api/integrations?op=${op}`, { method: 'POST', body: { analysis: payload() }, timeoutMs: 60_000 });
+      const r = await fetchJson<{ answer: string }>(`/api/integrations?op=${op}`, { method: 'POST', body: { analysis: payload() }, timeoutMs: 120_000 });
       setAnswer(r.answer);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'دستیار پاسخ نداد');

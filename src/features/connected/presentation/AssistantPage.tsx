@@ -55,7 +55,7 @@ export default function AssistantPage() {
 
       const app = appContextSchema.parse(buildAppContext(portfolio,Date.now(),activityRef.current));
       setLastContext(app);
-      const answer = await fetchJson<{answer:string;generatedAt:number}>('/api/integrations?op=analyze',{method:'POST',body:{question:text.trim(),history:messages.slice(-8).map(m => ({role:m.role,text:m.text.slice(0,14000)})),context:{total:portfolio.total,partial:portfolio.partial||portfolio.arcus.some(s=>s.holding.arcus!.env==='mainnet'&&(!s.state?.positions.fetchedAt||!!s.state.positions.error)),sources,positions,arcus,profile,app}},timeoutMs:55000});
+      const answer = await fetchJson<{answer:string;generatedAt:number}>('/api/integrations?op=analyze',{method:'POST',body:{question:text.trim(),history:messages.slice(-8).map(m => ({role:m.role,text:m.text.slice(0,14000)})),context:{total:portfolio.total,partial:portfolio.partial||portfolio.arcus.some(s=>s.holding.arcus!.env==='mainnet'&&(!s.state?.positions.fetchedAt||!!s.state.positions.error)),sources,positions,arcus,profile,app}},timeoutMs:120_000});
       setMessages(m => [...m,{role:'user',text:text.trim(),at:Date.now()},{role:'assistant',text:answer.answer,at:answer.generatedAt}]);setQuestion('');
     } catch(e) {setError(providerError(e));} finally {setBusy(false);}
   }

@@ -51,7 +51,7 @@ export function ReportTab({
     setBusy(true);
     setError(null);
     try {
-      const r = await fetchJson<{ answer: string; generatedAt?: number }>('/api/integrations?op=analyze-performance', { method: 'POST', body: { analysis: payload }, timeoutMs: 70_000 });
+      const r = await fetchJson<{ answer: string; generatedAt?: number }>('/api/integrations?op=analyze-performance', { method: 'POST', body: { analysis: payload }, timeoutMs: 120_000 });
       const period = payload.period as { start: string; end: string };
       const rep: SavedReport = {
         id: newId(),
