@@ -89,6 +89,33 @@ const pct = (v: number | null | undefined, digits = 1) =>
     ? '—'
     : `${v > 0 ? '+' : ''}${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: digits }))}٪`;
 
+/**
+ * نمایش استاندارد قیمت دلاری دارینو در چیدمان راست‌به‌چپ:
+ * عدد در جعبه LTR ایزوله (<bdi dir="ltr" class="num-ltr">) و واژهٔ «دلار» بیرون از آن،
+ * تا در خوانش فارسی همیشه ابتدا عدد (سمت راست) و سپس «دلار» (سمت چپ عدد) قرار بگیرد: «۸۳.۶۷ دلار».
+ */
+function PriceUsd({
+  value,
+  className,
+  unitClassName = 'text-[0.82em] font-medium text-muted'
+}: {
+  value: number | null | undefined;
+  className?: string;
+  unitClassName?: string;
+}) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return <span className={cn('num-ltr text-subtle', className)}>—</span>;
+  }
+  return (
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', className)}>
+      <bdi dir="ltr" className="num-ltr">
+        {fmtPrice(value)}
+      </bdi>
+      <span className={unitClassName}>دلار</span>
+    </span>
+  );
+}
+
 function resolveMarketVisual(coin: string) {
   const meta = getMarketVisualMeta(coin);
   const perpsFa = marketAssetName(meta.base);
@@ -354,20 +381,18 @@ export function TradingAgentsTab({
                     </Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    <span className="num-ltr font-bold text-ink">
-                      {selectedMarket ? fmtPrice(selectedMarket.markPx) : '—'} دلار
-                    </span>
+                    <PriceUsd value={selectedMarket?.markPx} className="font-bold text-ink" />
                     {selectedMarket?.change24h !== null && selectedMarket?.change24h !== undefined && (
-                      <span
+                      <bdi
                         dir="ltr"
                         className={cn(
-                          'font-bold',
+                          'num-ltr font-bold',
                           selectedMarket.change24h >= 0 ? 'text-positive' : 'text-negative'
                         )}
                       >
                         {selectedMarket.change24h >= 0 ? '+' : ''}
-                        {selectedMarket.change24h.toFixed(2)}%
-                      </span>
+                        {toFaDigits(selectedMarket.change24h.toFixed(2))}٪
+                      </bdi>
                     )}
                     {selectedMarket && (
                       <span className="text-2xs text-subtle">
@@ -861,19 +886,19 @@ function MarketPickerSheet({
                   </div>
 
                   <div className="shrink-0 text-end">
-                    <div className="num-ltr text-xs font-extrabold text-ink sm:text-sm">
-                      {fmtPrice(m.markPx)} <span className="text-[10px] font-normal text-muted">دلار</span>
+                    <div className="text-xs font-extrabold text-ink sm:text-sm">
+                      <PriceUsd value={m.markPx} unitClassName="text-[10px] font-normal text-muted" />
                     </div>
                     {m.change24h !== null && (
                       <div
                         dir="ltr"
                         className={cn(
-                          'mt-0.5 text-2xs font-bold',
+                          'num-ltr mt-0.5 text-2xs font-bold',
                           m.change24h >= 0 ? 'text-positive' : 'text-negative'
                         )}
                       >
                         {m.change24h >= 0 ? '+' : ''}
-                        {m.change24h.toFixed(2)}%
+                        {toFaDigits(m.change24h.toFixed(2))}٪
                       </div>
                     )}
                   </div>
@@ -921,7 +946,7 @@ function LiveQuantitativePreReadCard({
             <p className="text-2xs font-semibold text-muted">پیش‌خوانش کمی زنده (محاسبه مستقیم از ۱۱ اندیکاتور و فاندینگ)</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-extrabold text-ink">
-                {visual.nameFa} (<bdi dir="ltr">{visual.ticker}</bdi>) · <span className="num-ltr">{fmtPrice(t.close)}</span> دلار
+                {visual.nameFa} (<bdi dir="ltr">{visual.ticker}</bdi>) · <PriceUsd value={t.close} />
               </h3>
               <Badge tone={bandMeta.tone}>{bandMeta.label}</Badge>
               <Badge tone="neutral">اطمینان: {CONFIDENCE_FA[baseline.confidence]}</Badge>
@@ -1086,16 +1111,16 @@ function ExecutiveVerdictHero({
       <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className="rounded-field bg-surface-2/70 p-3">
           <dt className="text-2xs text-muted">نقطه ورود مرجع</dt>
-          <dd className="mt-1 text-sm font-extrabold text-ink" dir="ltr">
-            {fmtPrice(tp.entryPrice ?? input.technical.close)}
+          <dd className="mt-1 text-sm font-extrabold text-ink">
+            <PriceUsd value={tp.entryPrice ?? input.technical.close} unitClassName="text-[0.75em] font-medium text-muted" />
           </dd>
           <dd className="mt-0.5 text-2xs text-subtle">افق: {pm.timeHorizon}</dd>
         </div>
 
         <div className="rounded-field bg-negative/5 border border-negative/20 p-3">
           <dt className="text-2xs text-muted">حد ضرر (مبتنی بر ATR)</dt>
-          <dd className="mt-1 text-sm font-extrabold text-negative" dir="ltr">
-            {fmtPrice(tp.stopLoss)}
+          <dd className="mt-1 text-sm font-extrabold text-negative">
+            <PriceUsd value={tp.stopLoss} unitClassName="text-[0.75em] font-medium text-muted" />
           </dd>
           <dd className="mt-0.5 text-2xs text-subtle">
             فاصله: {geometry.stopDistancePct !== null ? `${toFaDigits(geometry.stopDistancePct.toFixed(1))}٪` : '—'}
@@ -1104,8 +1129,8 @@ function ExecutiveVerdictHero({
 
         <div className="rounded-field bg-gain/5 border border-gain/20 p-3">
           <dt className="text-2xs text-muted">هدف قیمتی کمیته</dt>
-          <dd className="mt-1 text-sm font-extrabold text-positive" dir="ltr">
-            {fmtPrice(targetPx)}
+          <dd className="mt-1 text-sm font-extrabold text-positive">
+            <PriceUsd value={targetPx} unitClassName="text-[0.75em] font-medium text-muted" />
           </dd>
           <dd className="mt-0.5 text-2xs text-subtle">
             فاصله: {geometry.targetDistancePct !== null ? `+${toFaDigits(geometry.targetDistancePct.toFixed(1))}٪` : '—'}
@@ -1305,7 +1330,7 @@ function IndicatorsMatrixView({
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
         <span>
           تعداد کندل‌های بررسی‌شده: <strong>{toFaDigits(input.technical.barsCount)}</strong> کندل ۴ ساعته · قیمت مرجع:{' '}
-          <strong className="num-ltr text-ink">{fmtPrice(input.technical.close)}</strong> دلار
+          <PriceUsd value={input.technical.close} className="font-bold text-ink" />
         </span>
         <span>
           حمایت/مقاومت ۲۰ کندل: <strong className="num-ltr text-ink">{fmtPrice(input.technical.support20)}</strong> /{' '}
