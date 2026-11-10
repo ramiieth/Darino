@@ -2,40 +2,44 @@
  * تب «کمیته ایجنت‌ها» (TradingAgents) در میز معامله دارینو — بازطراحی مینیمال برای وب و PWA
  *
  * معماری ۴ مرحله‌ای مخزن TauricResearch/TradingAgents:
- *   ۱) نوار کنترل مینیمال + شیت تنظیمات سایزینگ (سازگار با هدف لمسی ۴۴ پیکسل و safe-area در PWA)
+ *   ۱) انتخابگر بصری و رنگی «بازار مورد بررسی» با لوگوی رنگی، نام فارسی، نماد بازار و دسته‌بندی کامل
+ *      (رمزارزها · طلا، نفت و کالاها · سهام و شاخص‌های جهانی · فارکس و ارزها) + نوار انتخاب سریع
  *   ۲) کارت کانونی پیش‌خوانش کمی + نوار دوقطبی امتیاز (۰ تا ۱۰) و هندسه استاپ/هدف مبتنی بر ATR
  *   ۳) محیط تعاملی و تب‌بندی‌شده برای ۴ مرحله کمیته (مناظره Bull/Bear · کمیته ریسک ۳ نفره · ۴ تحلیلگر · جدول ۱۱ اندیکاتور)
- *   ۴) شیت «حافظه تصمیم‌ها و تسویه خودکار» (Memory Log) و خروجی گزارش تک‌صفحه‌ای HTML
+ *   ۴) شیت «حافظه تصمیم‌ها با الگوریتم BM25 و تسویه خودکار» (Memory Log) و خروجی گزارش تک‌صفحه‌ای HTML
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bot,
+  ChevronDown,
   Download,
   History,
+  Layers,
   Scale,
   Settings2,
   ShieldAlert,
   Sparkles,
   Trash2,
   TrendingDown,
-  TrendingUp,
-  Layers
+  TrendingUp
 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge, StatusDot } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { Field, Input, Select } from '@/shared/components/ui/Input';
+import { Field, Input, SearchField } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Sheet } from '@/shared/components/ui/Sheet';
 import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
+import { MarketAssetLogo, marketAssetName } from '@/features/perps/presentation/MarketAssetIdentity';
 import { fetchJson } from '@/repositories/remoteClient';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits } from '@/shared/utils/formatters';
-import { usePerpMarkets, useRiskCandles, useFundingStats, useSwing } from '../data/intelApi';
+import { useCommitteeMarkets, useRiskCandles, useFundingStats, useSwing, type PerpMarket } from '../data/intelApi';
 import { assess, buildRiskModel } from '../domain/survival';
 import {
   CONFIDENCE_FA,
+  MARKET_CATEGORY_FA,
   RATING_FA,
   SENTIMENT_BAND_FA,
   TRADER_ACTION_FA,
@@ -45,24 +49,57 @@ import {
   buildPastLessonsContext,
   computeTechnicalSnapshot,
   computeTradeGeometry,
+  getMarketVisualMeta,
   renderCompleteReportHtml,
   settleMemoryEntries,
   type CommitteeMarketInput,
   type IndicatorDiagnosticRow,
+  type MarketAssetCategory,
   type TradingAgentsReport,
   type TradingMemoryEntry
 } from '../domain/tradingAgents';
 import { fmtPrice, UsdShort } from './parts';
 
 const MEMORY_STORAGE_KEY = 'darino:trading-agents:memory:v1';
-const MARKETS_LIMIT = 40;
+
+/** نمادهای منتخب روی نوار دسترسی سریع (رمزارز، طلا، نقره، نفت، سهام و شاخص، فارکس) */
+const QUICK_PICK_COINS = [
+  'BTC',
+  'ETH',
+  'xyz:GOLD',
+  'xyz:SILVER',
+  'xyz:BRENTOIL',
+  'xyz:CL',
+  'xyz:NVDA',
+  'xyz:TSLA',
+  'xyz:AAPL',
+  'xyz:MSFT',
+  'xyz:SPY',
+  'xyz:QQQ',
+  'xyz:EUR',
+  'SOL',
+  'HYPE'
+] as const;
 
 type StageView = 'debate' | 'risk' | 'analysts' | 'indicators';
+type CategoryFilter = 'all' | MarketAssetCategory;
 
 const pct = (v: number | null | undefined, digits = 1) =>
   v === null || v === undefined || !Number.isFinite(v)
     ? '—'
     : `${v > 0 ? '+' : ''}${toFaDigits(v.toLocaleString('en-US', { maximumFractionDigits: digits }))}٪`;
+
+function resolveMarketVisual(coin: string) {
+  const meta = getMarketVisualMeta(coin);
+  const perpsFa = marketAssetName(meta.base);
+  const nameFa =
+    meta.nameFa !== meta.base
+      ? meta.nameFa
+      : perpsFa && perpsFa.toUpperCase() !== meta.base
+        ? perpsFa
+        : meta.nameFa;
+  return { ...meta, nameFa };
+}
 
 function loadMemory(): TradingMemoryEntry[] {
   try {
@@ -90,12 +127,31 @@ export function TradingAgentsTab({
   onChangeMarket: (coin: string) => void;
   onSelectCoin: (coin: string) => void;
 }) {
-  const markets = usePerpMarkets();
-  const selectedMarket = markets.data?.find((x) => x.coin === market) ?? markets.data?.[0] ?? null;
-  const activeCoin = selectedMarket?.coin ?? market;
+  const markets = useCommitteeMarkets();
+  const selectedMarket = useMemo(() => {
+    const list = markets.data ?? [];
+    const upper = market.toUpperCase();
+    return (
+      list.find((x) => x.coin.toUpperCase() === upper) ??
+      list.find((x) => getMarketVisualMeta(x.coin).base === upper) ??
+      list[0] ??
+      null
+    );
+  }, [markets.data, market]);
 
-  const candles = useRiskCandles(selectedMarket ? activeCoin : null);
-  const funding = useFundingStats(selectedMarket ? activeCoin : null, selectedMarket?.fundingHourly ?? null);
+  const activeCoin = selectedMarket?.coin ?? market;
+  const activeVisual = useMemo(() => resolveMarketVisual(activeCoin), [activeCoin]);
+
+  const candles = useRiskCandles(
+    selectedMarket ? activeCoin : null,
+    selectedMarket?.markPx ?? null,
+    selectedMarket?.change24h ?? null
+  );
+  const funding = useFundingStats(
+    selectedMarket ? activeCoin : null,
+    selectedMarket?.fundingHourly ?? null,
+    !selectedMarket?.isReference
+  );
   const swing = useSwing();
 
   const [depth, setDepth] = useState<1 | 2 | 3>(1);
@@ -103,6 +159,7 @@ export function TradingAgentsTab({
   const [riskPctInput, setRiskPctInput] = useState('1');
   const [holdingDaysInput, setHoldingDaysInput] = useState<'5' | '14' | '30'>('14');
   const [stageView, setStageView] = useState<StageView>('debate');
+  const [marketPickerOpen, setMarketPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [indicatorsSheetOpen, setIndicatorsSheetOpen] = useState(false);
@@ -113,10 +170,11 @@ export function TradingAgentsTab({
   const [reportCoin, setReportCoin] = useState<string | null>(null);
   const [memory, setMemory] = useState<TradingMemoryEntry[]>(loadMemory);
 
-  const marketOptions = useMemo(() => {
-    const top = (markets.data ?? []).slice(0, MARKETS_LIMIT);
-    return selectedMarket && !top.includes(selectedMarket) ? [selectedMarket, ...top] : top;
-  }, [markets.data, selectedMarket]);
+  const quickMarkets = useMemo(() => {
+    const list = markets.data ?? [];
+    const byUpper = new Map(list.map((m) => [m.coin.toUpperCase(), m]));
+    return QUICK_PICK_COINS.map((c) => byUpper.get(c.toUpperCase())).filter((m): m is PerpMarket => !!m);
+  }, [markets.data]);
 
   // تسویه خودکار تصمیم‌های قبلی در Memory Log با قیمت‌های زنده بازار
   useEffect(() => {
@@ -152,6 +210,7 @@ export function TradingAgentsTab({
     const cashNum = Number(cashInput);
     const riskNum = Number(riskPctInput);
     const analysisDate = new Date().toISOString().slice(0, 10);
+    const situationHint = `${technical.trendRegime} rsi:${technical.rsi14 ?? 50} funding:${funding.data?.regime ?? 'normal'}`;
     return {
       coin: activeCoin,
       analysisDate,
@@ -179,7 +238,7 @@ export function TradingAgentsTab({
         cashUsd: Number.isFinite(cashNum) && cashNum > 0 ? cashNum : null,
         maxRiskPct: Number.isFinite(riskNum) && riskNum > 0 ? Math.min(20, Math.max(0.1, riskNum)) : 1
       },
-      pastLessons: buildPastLessonsContext(memory, activeCoin, 4)
+      pastLessons: buildPastLessonsContext(memory, activeCoin, 4, situationHint)
     };
   }, [technical, selectedMarket, cashInput, riskPctInput, activeCoin, depth, funding.data, riskAssessment, swing.data, memory]);
 
@@ -254,28 +313,80 @@ export function TradingAgentsTab({
   }
 
   if (markets.isLoading) return <ListSkeleton rows={4} />;
-  if (markets.isError) return <ErrorState message="بازارهای هایپرلیکوئید دریافت نشد" onRetry={() => void markets.refetch()} />;
+  if (markets.isError) return <ErrorState message="بازارهای کمیته دریافت نشد" onRetry={() => void markets.refetch()} />;
 
   const activeReport = report && reportCoin === activeCoin ? report : null;
+  const catMeta = MARKET_CATEGORY_FA[activeVisual.category];
 
   return (
     <div className="space-y-4">
-      {/* ۱) نوار کنترل مینیمال — وب و PWA */}
+      {/* ۱) نوار کنترل و انتخابگر بصری بازار (با لوگوی رنگی، نماد، نام فارسی و دسته‌بندی کامل) */}
       <Surface className="p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-12 sm:items-end">
-          <div className="sm:col-span-5">
-            <Field label="بازار مورد بررسی">
-              <Select value={activeCoin} onChange={(e) => onChangeMarket(e.target.value)}>
-                {marketOptions.map((o) => (
-                  <option key={o.coin} value={o.coin}>
-                    {o.coin} · {fmtPrice(o.markPx)} دلار ({o.change24h !== null ? (o.change24h >= 0 ? '+' : '') + o.change24h.toFixed(1) + '%' : '—'})
-                  </option>
-                ))}
-              </Select>
-            </Field>
+        <div className="grid gap-3.5 lg:grid-cols-12 lg:items-end">
+          {/* دکمه کارت انتخابگر بازار مورد بررسی */}
+          <div className="lg:col-span-6">
+            <span className="mb-1.5 block text-xs font-semibold text-muted">
+              بازار مورد بررسی (رمزارز، طلا، نفت، سهام، شاخص و فارکس)
+            </span>
+            <button
+              type="button"
+              onClick={() => setMarketPickerOpen(true)}
+              aria-label="انتخاب بازار مورد بررسی"
+              className="group flex w-full items-center justify-between gap-3 rounded-card border border-divider bg-surface-2/70 px-3.5 py-2.5 text-start transition hover:border-accent/60 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="relative shrink-0 rounded-full ring-2 ring-divider transition group-hover:ring-accent/40">
+                  <MarketAssetLogo symbol={activeVisual.logoKey} size={40} />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-extrabold text-ink sm:text-base">
+                      {activeVisual.nameFa}
+                    </span>
+                    <span
+                      dir="ltr"
+                      className="rounded-md bg-card px-1.5 py-0.5 text-[11px] font-bold text-muted ring-1 ring-divider"
+                    >
+                      {activeVisual.ticker}
+                    </span>
+                    <Badge tone={catMeta.tone} className="text-[10px]">
+                      {catMeta.short}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                    <span className="num-ltr font-bold text-ink">
+                      {selectedMarket ? fmtPrice(selectedMarket.markPx) : '—'} دلار
+                    </span>
+                    {selectedMarket?.change24h !== null && selectedMarket?.change24h !== undefined && (
+                      <span
+                        dir="ltr"
+                        className={cn(
+                          'font-bold',
+                          selectedMarket.change24h >= 0 ? 'text-positive' : 'text-negative'
+                        )}
+                      >
+                        {selectedMarket.change24h >= 0 ? '+' : ''}
+                        {selectedMarket.change24h.toFixed(2)}%
+                      </span>
+                    )}
+                    {selectedMarket && (
+                      <span className="text-2xs text-subtle">
+                        · اهرم تا {toFaDigits(selectedMarket.maxLeverage)}x
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-control bg-card px-2.5 py-1.5 text-xs font-bold text-accent shadow-2xs ring-1 ring-divider group-hover:bg-accent group-hover:text-on-accent">
+                <span>تغییر بازار</span>
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            </button>
           </div>
 
-          <div className="sm:col-span-4">
+          {/* عمق مناظره ایجنت‌ها */}
+          <div className="lg:col-span-3">
             <Field label="عمق مناظره ایجنت‌ها">
               <SegmentedControl<string>
                 fill
@@ -291,9 +402,10 @@ export function TradingAgentsTab({
             </Field>
           </div>
 
-          <div className="sm:col-span-3">
+          {/* دکمه اجرای کمیته */}
+          <div className="lg:col-span-3">
             <Button
-              className="w-full"
+              className="min-h-[46px] w-full"
               loading={busy}
               icon={<Sparkles />}
               disabled={!committeeInput || busy}
@@ -302,6 +414,43 @@ export function TradingAgentsTab({
               {busy ? 'در حال مناظره…' : 'اجرای کمیته'}
             </Button>
           </div>
+        </div>
+
+        {/* نوار انتخاب سریع بازارها (رمزارز، طلا، نفت، سهام و فارکس) با لوگوی رنگی */}
+        <div
+          aria-label="انتخاب سریع بازار"
+          className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5"
+        >
+          {quickMarkets.map((m) => {
+            const v = resolveMarketVisual(m.coin);
+            const selected = m.coin.toUpperCase() === activeCoin.toUpperCase();
+            return (
+              <button
+                key={m.coin}
+                type="button"
+                onClick={() => onChangeMarket(m.coin)}
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition',
+                  selected
+                    ? 'border-accent bg-accent-soft font-extrabold text-accent shadow-2xs'
+                    : 'border-divider bg-surface-2/60 font-semibold text-ink hover:border-accent/40 hover:bg-surface-2'
+                )}
+              >
+                <MarketAssetLogo symbol={v.logoKey} size={18} />
+                <span>{v.nameFa}</span>
+                <span dir="ltr" className="text-[10px] text-muted">
+                  {v.base}
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMarketPickerOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-accent/50 bg-accent-soft/30 px-3 py-1 text-xs font-bold text-accent hover:bg-accent-soft"
+          >
+            <span>همه بازارها ({toFaDigits((markets.data ?? []).length)}) ←</span>
+          </button>
         </div>
 
         {/* نوار وضعیت و دکمه‌های سریع دسترسی (سایزینگ، اندیکاتورها، حافظه) */}
@@ -343,7 +492,7 @@ export function TradingAgentsTab({
             onClick={() => onSelectCoin(activeCoin)}
             className="font-semibold text-accent hover:underline"
           >
-            پوزیشن برترها روی <bdi dir="ltr">{activeCoin}</bdi> ←
+            پوزیشن برترها روی <bdi dir="ltr">{activeVisual.ticker}</bdi> ←
           </button>
         </div>
 
@@ -351,7 +500,9 @@ export function TradingAgentsTab({
           <div className="mt-3 rounded-field bg-accent-soft/60 px-3.5 py-2.5 text-xs text-ink" role="status">
             <div className="flex items-center gap-2 font-bold text-accent">
               <Bot className="h-4 w-4 animate-pulse" aria-hidden />
-              <span>در حال اجرای زنجیره ۴ مرحله‌ای TradingAgents روی {activeCoin}…</span>
+              <span>
+                در حال اجرای زنجیره ۴ مرحله‌ای TradingAgents روی {activeVisual.nameFa} ({activeVisual.ticker})…
+              </span>
             </div>
             <p className="mt-1 text-muted">
               ۱. تحلیل ۱۱ اندیکاتور و فاندینگ ← ۲. مناظره پژوهشگر صعودی و نزولی ← ۳. تعیین استاپ ATR معامله‌گر ← ۴. کمیته ریسک و حکم مدیر پرتفولیو
@@ -372,6 +523,7 @@ export function TradingAgentsTab({
           {activeReport ? (
             <ExecutiveVerdictHero
               coin={activeCoin}
+              visual={activeVisual}
               input={committeeInput}
               report={activeReport}
               maxLeverage={selectedMarket?.maxLeverage ?? 10}
@@ -379,7 +531,7 @@ export function TradingAgentsTab({
             />
           ) : (
             <LiveQuantitativePreReadCard
-              coin={activeCoin}
+              visual={activeVisual}
               input={committeeInput}
               baseline={baseline}
               onOpenIndicators={() => setIndicatorsSheetOpen(true)}
@@ -389,7 +541,6 @@ export function TradingAgentsTab({
           {/* ۳) محیط تب‌بندی‌شده ۴ مرحله کمیته (وقتی گزارش آماده است) */}
           {activeReport && (
             <Surface className="overflow-hidden p-0">
-              {/* نوار تب‌های لمسی با پشتیبانی از اسکرول افقی نرم در PWA */}
               <div
                 role="tablist"
                 aria-label="مراحل کمیته ایجنت‌ها"
@@ -439,6 +590,18 @@ export function TradingAgentsTab({
           )}
         </>
       )}
+
+      {/* شیت ۰: انتخابگر کامل بازار با دسته‌بندی (رمزارز، طلا و نفت و کالا، سهام و شاخص، فارکس) و جستجو */}
+      <MarketPickerSheet
+        open={marketPickerOpen}
+        onClose={() => setMarketPickerOpen(false)}
+        markets={markets.data ?? []}
+        activeCoin={activeCoin}
+        onSelect={(coin) => {
+          onChangeMarket(coin);
+          setMarketPickerOpen(false);
+        }}
+      />
 
       {/* شیت ۱: تنظیمات سایزینگ، ریسک و افق ارزیابی (موبایل/PWA و دسکتاپ) */}
       <Sheet
@@ -499,7 +662,7 @@ export function TradingAgentsTab({
       <Sheet
         open={indicatorsSheetOpen}
         onClose={() => setIndicatorsSheetOpen(false)}
-        title={`ماتریس ۱۱ اندیکاتور تکنیکال — ${activeCoin}`}
+        title={`ماتریس ۱۱ اندیکاتور تکنیکال — ${activeVisual.nameFa} (${activeVisual.ticker})`}
         description="محاسبه‌شده روی کندل‌های ۴ ساعته طبق استاندارد ماژول market_analyst در مخزن TradingAgents."
         size="lg"
       >
@@ -514,8 +677,8 @@ export function TradingAgentsTab({
       <Sheet
         open={memoryOpen}
         onClose={() => setMemoryOpen(false)}
-        title="حافظه تصمیم‌ها و تسویه خودکار (Memory Log)"
-        description="هر حکم کمیته ذخیره می‌شود و با قیمت زنده بازار تسویه می‌گردد تا درس‌های قبلی به تصمیم بعدی مدیر پرتفولیو منتقل شوند."
+        title="حافظه تصمیم‌ها با الگوریتم BM25 و تسویه خودکار"
+        description="هر حکم کمیته ذخیره می‌شود و با قیمت زنده بازار تسویه می‌گردد تا درس‌های مشابه (با رتبه‌بندی BM25) به تصمیم بعدی مدیر پرتفولیو منتقل شوند."
         size="lg"
         footer={
           memory.length > 0 ? (
@@ -544,15 +707,195 @@ export function TradingAgentsTab({
   );
 }
 
+// ─── ۰) شیت انتخابگر بازار با لوگوی رنگی، دسته‌بندی کامل و جستجوی فارسی/لاتین ────
+
+function MarketPickerSheet({
+  open,
+  onClose,
+  markets,
+  activeCoin,
+  onSelect
+}: {
+  open: boolean;
+  onClose: () => void;
+  markets: PerpMarket[];
+  activeCoin: string;
+  onSelect: (coin: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<CategoryFilter>('all');
+
+  const enriched = useMemo(
+    () =>
+      markets.map((m) => {
+        const visual = resolveMarketVisual(m.coin);
+        return { market: m, visual };
+      }),
+    [markets]
+  );
+
+  const counts = useMemo(() => {
+    const c = { all: enriched.length, crypto: 0, commodity: 0, equity: 0, fx: 0 };
+    for (const item of enriched) c[item.visual.category]++;
+    return c;
+  }, [enriched]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return enriched.filter(({ market: m, visual: v }) => {
+      if (category !== 'all' && v.category !== category) return false;
+      if (!q) return true;
+      return (
+        m.coin.toLowerCase().includes(q) ||
+        v.base.toLowerCase().includes(q) ||
+        v.ticker.toLowerCase().includes(q) ||
+        v.nameFa.toLowerCase().includes(q) ||
+        MARKET_CATEGORY_FA[v.category].label.toLowerCase().includes(q)
+      );
+    });
+  }, [enriched, category, query]);
+
+  const categories: { id: CategoryFilter; label: string; count: number }[] = [
+    { id: 'all', label: 'همه بازارها', count: counts.all },
+    { id: 'crypto', label: 'رمزارزها', count: counts.crypto },
+    { id: 'commodity', label: 'طلا، نفت و کالا', count: counts.commodity },
+    { id: 'equity', label: 'سهام و شاخص', count: counts.equity },
+    { id: 'fx', label: 'فارکس و ارزها', count: counts.fx }
+  ];
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="انتخاب بازار مورد بررسی"
+      description="جستجو بر اساس نام فارسی (طلا، نفت برنت، انویدیا، تسلا، بیت‌کوین…) یا نماد جهانی (BTC, GOLD, WTI, NVDA, TSLA, SPY, EUR…)"
+      size="lg"
+    >
+      <div className="space-y-3 py-1">
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder="جستجوی نام یا نماد (مثلاً: طلا، نفت، انویدیا، تسلا، BTC، XAU…)"
+          className="w-full"
+        />
+
+        {/* تب‌های دسته‌بندی بازارها */}
+        <div
+          role="tablist"
+          aria-label="دسته‌بندی بازارها"
+          className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-1"
+        >
+          {categories.map((cat) => {
+            const selected = category === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setCategory(cat.id)}
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition',
+                  selected
+                    ? 'bg-accent text-on-accent shadow-2xs'
+                    : 'bg-surface-2 text-muted hover:bg-surface-2/80 hover:text-ink'
+                )}
+              >
+                <span>{cat.label}</span>
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.2 text-[10px]',
+                    selected ? 'bg-white/20 text-on-accent' : 'bg-card text-subtle'
+                  )}
+                >
+                  {toFaDigits(cat.count)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* فهرست کارت‌های بازار با لوگوی رنگی */}
+        {filtered.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted">
+            بازاری با عبارت «{query}» در این دسته پیدا نشد.
+          </div>
+        ) : (
+          <div className="grid max-h-[60vh] gap-2 overflow-y-auto pe-1 sm:grid-cols-2">
+            {filtered.slice(0, 120).map(({ market: m, visual: v }) => {
+              const selected = m.coin.toUpperCase() === activeCoin.toUpperCase();
+              const catMeta = MARKET_CATEGORY_FA[v.category];
+              return (
+                <button
+                  key={m.coin}
+                  type="button"
+                  onClick={() => onSelect(m.coin)}
+                  className={cn(
+                    'flex items-center justify-between gap-3 rounded-card border p-3 text-start transition',
+                    selected
+                      ? 'border-accent bg-accent-soft/50 ring-1 ring-accent'
+                      : 'border-divider bg-surface-2/50 hover:border-accent/40 hover:bg-surface-2'
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <MarketAssetLogo symbol={v.logoKey} size={36} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate text-xs font-extrabold text-ink sm:text-sm">
+                          {v.nameFa}
+                        </span>
+                        <span
+                          dir="ltr"
+                          className="rounded bg-card px-1.5 py-0.5 text-[10px] font-bold text-muted ring-1 ring-divider"
+                        >
+                          {v.ticker}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-subtle">
+                        <Badge tone={catMeta.tone} className="text-[9px] px-1.5 py-0">
+                          {catMeta.short}
+                        </Badge>
+                        <span>اهرم {toFaDigits(m.maxLeverage)}x</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-end">
+                    <div className="num-ltr text-xs font-extrabold text-ink sm:text-sm">
+                      {fmtPrice(m.markPx)} <span className="text-[10px] font-normal text-muted">دلار</span>
+                    </div>
+                    {m.change24h !== null && (
+                      <div
+                        dir="ltr"
+                        className={cn(
+                          'mt-0.5 text-2xs font-bold',
+                          m.change24h >= 0 ? 'text-positive' : 'text-negative'
+                        )}
+                      >
+                        {m.change24h >= 0 ? '+' : ''}
+                        {m.change24h.toFixed(2)}%
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 // ─── ۱) کارت پیش‌خوانش کمی زنده (قبل از اجرای هوش مصنوعی) ──────────────────────
 
 function LiveQuantitativePreReadCard({
-  coin,
+  visual,
   input,
   baseline,
   onOpenIndicators
 }: {
-  coin: string;
+  visual: ReturnType<typeof resolveMarketVisual>;
   input: CommitteeMarketInput;
   baseline: ReturnType<typeof buildDeterministicCommitteeBaseline>;
   onOpenIndicators: () => void;
@@ -572,14 +915,17 @@ function LiveQuantitativePreReadCard({
   return (
     <Surface variant="focal" className="p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-2xs font-semibold text-muted">پیش‌خوانش کمی زنده (محاسبه مستقیم از ۱۱ اندیکاتور و فاندینگ)</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-extrabold text-ink">
-              <bdi dir="ltr">{coin}</bdi> · <span className="num-ltr">{fmtPrice(t.close)}</span> دلار
-            </h3>
-            <Badge tone={bandMeta.tone}>{bandMeta.label}</Badge>
-            <Badge tone="neutral">اطمینان: {CONFIDENCE_FA[baseline.confidence]}</Badge>
+        <div className="flex items-center gap-3">
+          <MarketAssetLogo symbol={visual.logoKey} size={42} />
+          <div>
+            <p className="text-2xs font-semibold text-muted">پیش‌خوانش کمی زنده (محاسبه مستقیم از ۱۱ اندیکاتور و فاندینگ)</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-extrabold text-ink">
+                {visual.nameFa} (<bdi dir="ltr">{visual.ticker}</bdi>) · <span className="num-ltr">{fmtPrice(t.close)}</span> دلار
+              </h3>
+              <Badge tone={bandMeta.tone}>{bandMeta.label}</Badge>
+              <Badge tone="neutral">اطمینان: {CONFIDENCE_FA[baseline.confidence]}</Badge>
+            </div>
           </div>
         </div>
 
@@ -672,12 +1018,14 @@ function LiveQuantitativePreReadCard({
 
 function ExecutiveVerdictHero({
   coin,
+  visual,
   input,
   report,
   maxLeverage,
   onDownloadHtml
 }: {
   coin: string;
+  visual: ReturnType<typeof resolveMarketVisual>;
   input: CommitteeMarketInput;
   report: TradingAgentsReport;
   maxLeverage: number;
@@ -708,14 +1056,17 @@ function ExecutiveVerdictHero({
     >
       {/* ردیف عنوان و بج حکم نهایی */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusDot tone={meta.tone} label="حکم نهایی مدیر پرتفولیو (Portfolio Manager)" />
-            <span className="text-2xs text-subtle">· عمق مناظره: {toFaDigits(input.researchDepth)} دور</span>
+        <div className="flex items-center gap-3">
+          <MarketAssetLogo symbol={visual.logoKey} size={44} />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusDot tone={meta.tone} label="حکم نهایی مدیر پرتفولیو (Portfolio Manager)" />
+              <span className="text-2xs text-subtle">· عمق مناظره: {toFaDigits(input.researchDepth)} دور</span>
+            </div>
+            <h3 className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
+              {visual.nameFa} (<bdi dir="ltr">{visual.ticker}</bdi>) — {meta.label}
+            </h3>
           </div>
-          <h3 className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
-            <bdi dir="ltr">{coin}</bdi> — {meta.label}
-          </h3>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
@@ -1025,12 +1376,15 @@ function MemoryLogList({ entries }: { entries: TradingMemoryEntry[] }) {
     <div className="space-y-2.5 py-2">
       {entries.map((e) => {
         const rMeta = RATING_FA[e.rating];
+        const v = resolveMarketVisual(e.coin);
         return (
           <div key={e.id} className="rounded-card border border-divider bg-surface-2/60 p-3.5 text-xs space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-extrabold text-ink" dir="ltr">
-                  {e.coin}
+                <MarketAssetLogo symbol={v.logoKey} size={22} />
+                <span className="text-sm font-extrabold text-ink">{v.nameFa}</span>
+                <span className="text-2xs text-muted" dir="ltr">
+                  ({v.ticker})
                 </span>
                 <Badge tone={rMeta.tone}>
                   {rMeta.short} ({e.rating})
