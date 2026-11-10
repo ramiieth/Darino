@@ -78,10 +78,10 @@ export const RATING_FA: Record<
   }
 };
 
-export const TRADER_ACTION_FA: Record<TraderAction, { label: string; tone: 'gain' | 'neutral' | 'loss' }> = {
-  Buy: { label: 'پیشنهاد خرید / لانگ (Buy)', tone: 'gain' },
-  Hold: { label: 'پیشنهاد صبر و نگه‌داری (Hold)', tone: 'neutral' },
-  Sell: { label: 'پیشنهاد فروش / شورت (Sell)', tone: 'loss' }
+export const TRADER_ACTION_FA: Record<TraderAction, { label: string; short: string; tone: 'gain' | 'neutral' | 'loss' }> = {
+  Buy: { label: 'پیشنهاد خرید / لانگ (Buy)', short: 'خرید / لانگ', tone: 'gain' },
+  Hold: { label: 'پیشنهاد صبر و نگه‌داری (Hold)', short: 'صبر / بدون ورود', tone: 'neutral' },
+  Sell: { label: 'پیشنهاد فروش / شورت (Sell)', short: 'فروش / شورت', tone: 'loss' }
 };
 
 export const SENTIMENT_BAND_FA: Record<SentimentBand, { label: string; tone: 'gain' | 'warn' | 'loss' | 'neutral' }> = {
@@ -183,6 +183,17 @@ export interface TechnicalSnapshot {
   resistance50: number | null;
   /** خلاصه وضعیت روند برای تزریق به پرامپت ایجنت‌ها */
   trendRegime: 'bullish' | 'bearish' | 'sideways';
+}
+
+export interface IndicatorDiagnosticRow {
+  key: string;
+  nameFa: string;
+  code: string;
+  category: 'روند' | 'مومنتوم' | 'نوسان' | 'حجم و ساختار';
+  value: number | null;
+  signal: 'bullish' | 'bearish' | 'neutral';
+  signalFa: string;
+  noteFa: string;
 }
 
 function calcSma(values: number[], period: number): number | null {
@@ -305,7 +316,6 @@ export function computeTechnicalSnapshot(rawCandles: Candle[], barsPerDay = 6): 
   const atr14 = calcWilderAtr(candles, 14);
   const atrPct = atr14 !== null && close > 0 ? (atr14 / close) * 100 : null;
 
-  // VWMA (20): وزن‌دهی با دامنه نوسان و بدنه کندل به‌عنوان پروکسی فعالیت در کندل‌های بدون حجم، یا حجم واقعی
   let vwma20: number | null = null;
   if (candles.length >= 20) {
     const slice20 = candles.slice(-20);
@@ -365,6 +375,176 @@ export function computeTechnicalSnapshot(rawCandles: Candle[], barsPerDay = 6): 
     resistance50,
     trendRegime
   };
+}
+
+/**
+ * تولید ردیف‌های تفکیکی ۱۱ اندیکاتور تکنیکال `TradingAgents` همراه با سیگنال و تفسیر فارسی
+ * برای نمایش در جدول تکنیکال وب و شیت موبایل/PWA.
+ */
+export function buildIndicatorDiagnostics(t: TechnicalSnapshot): IndicatorDiagnosticRow[] {
+  const c = t.close;
+  const ema10Sig = t.close10Ema === null ? 'neutral' : c > t.close10Ema ? 'bullish' : 'bearish';
+  const sma50Sig = t.close50Sma === null ? 'neutral' : c > t.close50Sma ? 'bullish' : 'bearish';
+  const sma200Sig = t.close200Sma === null ? 'neutral' : c > t.close200Sma ? 'bullish' : 'bearish';
+  const macdSig = t.macd === null || t.macds === null ? 'neutral' : t.macd > t.macds ? 'bullish' : 'bearish';
+  const macdhSig = t.macdh === null ? 'neutral' : t.macdh > 0 ? 'bullish' : 'bearish';
+  const rsiSig =
+    t.rsi14 === null
+      ? 'neutral'
+      : t.rsi14 >= 70
+        ? 'bearish'
+        : t.rsi14 <= 30
+          ? 'bullish'
+          : t.rsi14 >= 53
+            ? 'bullish'
+            : t.rsi14 <= 47
+              ? 'bearish'
+              : 'neutral';
+  const bollPos =
+    t.bollUpper !== null && t.bollLower !== null && t.bollMid !== null
+      ? c >= t.bollUpper
+        ? 'سقف باند (اشباع خرید)'
+        : c <= t.bollLower
+          ? 'کف باند (اشباع فروش)'
+          : c >= t.bollMid
+            ? 'نیمه بالایی باند'
+            : 'نیمه پایینی باند'
+      : '—';
+  const vwmaSig = t.vwma20 === null ? 'neutral' : c >= t.vwma20 ? 'bullish' : 'bearish';
+
+  return [
+    {
+      key: 'close_10_ema',
+      nameFa: 'میانگین متحرک نمایی ۱۰',
+      code: '10 EMA',
+      category: 'روند',
+      value: t.close10Ema,
+      signal: ema10Sig,
+      signalFa: ema10Sig === 'bullish' ? 'بالای میانگین' : ema10Sig === 'bearish' ? 'زیر میانگین' : 'خنثی',
+      noteFa: 'شتاب کوتاه‌مدت قیمت و نقطه ورود سریع'
+    },
+    {
+      key: 'close_50_sma',
+      nameFa: 'میانگین متحرک ساده ۵۰',
+      code: '50 SMA',
+      category: 'روند',
+      value: t.close50Sma,
+      signal: sma50Sig,
+      signalFa: sma50Sig === 'bullish' ? 'روند میان‌مدت صعودی' : sma50Sig === 'bearish' ? 'روند میان‌مدت نزولی' : 'خنثی',
+      noteFa: 'حمایت یا مقاومت دینامیک میان‌مدت'
+    },
+    {
+      key: 'close_200_sma',
+      nameFa: 'میانگین متحرک ساده ۲۰۰',
+      code: '200 SMA',
+      category: 'روند',
+      value: t.close200Sma,
+      signal: sma200Sig,
+      signalFa: sma200Sig === 'bullish' ? 'بالای خط روند کلان' : sma200Sig === 'bearish' ? 'زیر خط روند کلان' : 'داده ناکافی',
+      noteFa: 'معیار کلان جهت بازار و تقاطع طلایی/مرگ'
+    },
+    {
+      key: 'macd',
+      nameFa: 'خط مکدی (۱۲، ۲۶)',
+      code: 'MACD',
+      category: 'مومنتوم',
+      value: t.macd,
+      signal: macdSig,
+      signalFa: macdSig === 'bullish' ? 'بالای خط سیگنال' : macdSig === 'bearish' ? 'زیر خط سیگنال' : 'خنثی',
+      noteFa: 'تفاضل میانگین‌های نمایی ۱۲ و ۲۶ دوره‌ای'
+    },
+    {
+      key: 'macds',
+      nameFa: 'خط سیگنال مکدی (۹)',
+      code: 'MACD Signal',
+      category: 'مومنتوم',
+      value: t.macds,
+      signal: macdSig,
+      signalFa: macdSig === 'bullish' ? 'تقاطع صعودی' : macdSig === 'bearish' ? 'تقاطع نزولی' : 'خنثی',
+      noteFa: 'میانگین ۹ دوره‌ای خط مکدی برای تشخیص چرخش'
+    },
+    {
+      key: 'macdh',
+      nameFa: 'هیستوگرام مکدی',
+      code: 'MACD Hist',
+      category: 'مومنتوم',
+      value: t.macdh,
+      signal: macdhSig,
+      signalFa: macdhSig === 'bullish' ? 'مومنتوم مثبت' : macdhSig === 'bearish' ? 'مومنتوم منفی' : 'خنثی',
+      noteFa: 'فاصله خط مکدی و سیگنال (قدرت شتاب)'
+    },
+    {
+      key: 'rsi',
+      nameFa: 'شاخص قدرت نسبی (۱۴)',
+      code: 'RSI 14',
+      category: 'مومنتوم',
+      value: t.rsi14,
+      signal: rsiSig,
+      signalFa:
+        t.rsi14 === null
+          ? '—'
+          : t.rsi14 >= 70
+            ? 'اشباع خرید (>۷۰)'
+            : t.rsi14 <= 30
+              ? 'اشباع فروش (<۳۰)'
+              : t.rsi14 >= 53
+                ? 'متمایل به صعود'
+                : t.rsi14 <= 47
+                  ? 'متمایل به نزول'
+                  : 'تعادل (۴۷ تا ۵۳)',
+      noteFa: 'سنجش اشباع خرید/فروش با فرمول Wilder'
+    },
+    {
+      key: 'boll',
+      nameFa: 'میانه باند بولینگر (۲۰)',
+      code: 'Boll Mid',
+      category: 'نوسان',
+      value: t.bollMid,
+      signal: t.bollMid === null ? 'neutral' : c >= t.bollMid ? 'bullish' : 'bearish',
+      signalFa: bollPos,
+      noteFa: 'محور تعادل ۲۰ کندل اخیر'
+    },
+    {
+      key: 'boll_ub',
+      nameFa: 'سقف باند بولینگر (+۲σ)',
+      code: 'Boll Upper',
+      category: 'نوسان',
+      value: t.bollUpper,
+      signal: t.bollUpper !== null && c >= t.bollUpper ? 'bearish' : 'neutral',
+      signalFa: t.bollUpper !== null && c >= t.bollUpper ? 'برخورد به سقف' : 'مرز بالایی نوسان',
+      noteFa: 'ناحیه مقاومت دینامیک و شکست نوسانی'
+    },
+    {
+      key: 'boll_lb',
+      nameFa: 'کف باند بولینگر (−۲σ)',
+      code: 'Boll Lower',
+      category: 'نوسان',
+      value: t.bollLower,
+      signal: t.bollLower !== null && c <= t.bollLower ? 'bullish' : 'neutral',
+      signalFa: t.bollLower !== null && c <= t.bollLower ? 'برخورد به کف' : 'مرز پایینی نوسان',
+      noteFa: 'ناحیه حمایت دینامیک و بازگشت به میانگین'
+    },
+    {
+      key: 'atr',
+      nameFa: 'میانگین دامنه واقعی (۱۴)',
+      code: 'ATR 14',
+      category: 'نوسان',
+      value: t.atr14,
+      signal: 'neutral',
+      signalFa: t.atrPct !== null ? `${t.atrPct.toFixed(2)}% قیمت` : '—',
+      noteFa: 'مبنای تعیین فاصله حد ضرر (۲×ATR) و اندازه پوزیشن'
+    },
+    {
+      key: 'vwma',
+      nameFa: 'میانگین وزنی فعالیت (۲۰)',
+      code: 'VWMA 20',
+      category: 'حجم و ساختار',
+      value: t.vwma20,
+      signal: vwmaSig,
+      signalFa: vwmaSig === 'bullish' ? 'تأیید روند با حجم' : vwmaSig === 'bearish' ? 'فشار فروش وزنی' : 'خنثی',
+      noteFa: 'میانگین قیمت وزن‌دهی‌شده با فعالیت هر کندل'
+    }
+  ];
 }
 
 // ─── ۳) ورودی و خروجی کامل کمیته ایجنت‌ها (۴ مرحله TradingAgents) ─────────────
@@ -444,6 +624,30 @@ export interface TradingAgentsReport {
       timeHorizon: string;
     };
   };
+}
+
+/**
+ * محاسبه نسبت ریسک به ریوارد (R:R) و درصد فاصله استاپ و هدف از نقطه ورود
+ */
+export function computeTradeGeometry(
+  entry: number | null,
+  stop: number | null,
+  target: number | null
+): {
+  stopDistancePct: number | null;
+  targetDistancePct: number | null;
+  riskRewardRatio: number | null;
+} {
+  if (!entry || !(entry > 0)) return { stopDistancePct: null, targetDistancePct: null, riskRewardRatio: null };
+  const riskAbs = stop && stop > 0 ? Math.abs(entry - stop) : null;
+  const rewardAbs = target && target > 0 ? Math.abs(target - entry) : null;
+  const stopDistancePct = riskAbs !== null ? (riskAbs / entry) * 100 : null;
+  const targetDistancePct = rewardAbs !== null ? (rewardAbs / entry) * 100 : null;
+  const riskRewardRatio =
+    riskAbs !== null && riskAbs > 0 && rewardAbs !== null && rewardAbs > 0
+      ? Math.round((rewardAbs / riskAbs) * 100) / 100
+      : null;
+  return { stopDistancePct, targetDistancePct, riskRewardRatio };
 }
 
 /**
