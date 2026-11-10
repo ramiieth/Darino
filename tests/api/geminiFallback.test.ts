@@ -133,7 +133,7 @@ describe('مدل اختصاصی بخش (اختیاری)', () => {
     await expect(run()).resolves.toBe('گزارش');
     expect(urls[1]).toContain('/models/gemini-3.8-flash:');
   });
-  it('Pro کند (timeout) → Flash به‌جای خطا', async () => {
+  it('Pro کند (timeout) → Flash به‌جای خطا و درخواست بعدی مستقیم از Flash', async () => {
     let n = 0;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (u) => {
       if (isList(u)) return listResponse();
@@ -143,6 +143,10 @@ describe('مدل اختصاصی بخش (اختیاری)', () => {
     });
     await expect(run()).resolves.toBe('گزارش');
     expect(urls[1]).toContain('/models/gemini-3.8-flash:');
+    // مدلی که timeout خورده در modelCooldown قرار گرفته و درخواست بعدی وقت را روی آن تلف نمی‌کند
+    urls.length = 0;
+    await expect(run()).resolves.toBe('گزارش');
+    expect(urls[0]).toContain('/models/gemini-3.8-flash:');
   });
 });
 });

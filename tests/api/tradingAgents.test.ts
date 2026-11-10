@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { sanitizeTradingAgentsResult, tradingAgentsRequestSchema } from '../../api/_assistant';
+import { describe, expect, it, vi } from 'vitest';
+import { analyzeTradingAgents, sanitizeTradingAgentsResult, tradingAgentsRequestSchema, _resetGeminiDiscovery } from '../../api/_assistant';
 import { computeTechnicalSnapshot, type CommitteeMarketInput } from '../../src/features/intel/domain/tradingAgents';
 
 const candles = Array.from({ length: 80 }, (_, i) => ({
@@ -89,4 +89,38 @@ describe('tradingAgentsRequestSchema & sanitizeTradingAgentsResult', () => {
     expect(sanitized.riskDebate.portfolioDecision.rating).toBe('Overweight');
     expect(sanitized.riskDebate.portfolioDecision.priceTarget).toBe(2650);
   });
+
+  it('در صورت timeout یک یا همه مدل‌ها، بعد از امتحان مدل‌های جایگزین گزارش کامل ۴ مرحله‌ای را بدون خطا برمی‌گرداند', async () => {
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.GEMINI_MODEL = 'gemini-3.8-flash';
+    _resetGeminiDiscovery();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const triedModels: string[] = [];
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u) => {
+      const url = String(u);
+      if (/\/models\?/.test(url)) {
+        return new Response(JSON.stringify({ models: [] }), { status: 200 });
+      }
+      triedModels.push(url.split('/models/')[1].split(':')[0]);
+      const e = new Error('The operation was aborted due to timeout');
+      e.name = 'TimeoutError';
+      throw e;
+    });
+
+    try {
+      const report = await analyzeTradingAgents(sampleInput);
+      // همه مدل‌های زنجیره امتحان شده‌اند
+      expect(new Set(triedModels).size).toBe(4);
+      // به جای خطای تایم‌اوت، گزارش کامل ۴ مرحله‌ای از موتور کمی بومی برگردانده شده است
+      expect(report.analysts.marketReport).toContain('ETH');
+      expect(report.researchDebate.bullHistory).toContain('پژوهشگر صعودی');
+      expect(report.researchDebate.bearHistory).toContain('پژوهشگر نزولی');
+      expect(report.riskDebate.portfolioDecision.executiveSummary).toContain('ETH');
+    } finally {
+      fetchSpy.mockRestore();
+      errSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  }, 20_000);
 });

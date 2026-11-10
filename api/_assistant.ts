@@ -39,17 +39,17 @@ const LANE_MODEL_ENV: Record<GeminiLane, string> = { chat: 'GEMINI_MODEL_CHAT', 
 const LANE_MODEL_DEFAULT: Partial<Record<GeminiLane, string>> = {};
 /** مدل اول پیش‌فرض: Gemini 4 Argon (جدیدترین و قوی‌ترین؛ فقط کلید پولی). اگر جواب نداد → زنجیرهٔ Flash */
 const DEFAULT_MODEL = 'gemini-4-argon';
-/** سقف زمان یک تلاش با مدل سنگین (Argon/Pro) وقتی Flash پشتیبان هست — تا Flash هنوز وقت پاسخ داشته باشد */
-const PRO_ATTEMPT_MS = 60_000;
+/** سقف زمان یک تلاش با مدل سنگین (Argon/Pro) وقتی Flash پشتیبان هست — تا بلافاصله مدل‌های بعدی امتحان شوند */
+const PRO_ATTEMPT_MS = 20_000;
 const isSlowModel = (m: string) => /pro|argon/i.test(m);
 /** سیاست ارز کل اپ در همهٔ پاسخ‌ها */
 const CURRENCY_RULE = '\nمبلغ دلاری را با واژهٔ «دلار» بعد از عدد بنویس (مثل «۷,۲۶۸ دلار» یا «-۱۲.۵ دلار»)؛ هرگز نماد «$» به کار نبر.';
 /** سقف کل زمان همهٔ تلاش‌ها (فانکشن services در vercel.json سقف ۱۲۰ ثانیه دارد) */
 const GEMINI_DEADLINE_MS = 110_000;
-/** سقف یک تلاش Flash وقتی مدل دیگری برای امتحان مانده (گزارش عملکرد طولانی است و Flash گاهی ۴۵–۶۰ث لازم دارد) */
-const FLASH_ATTEMPT_MS = 75_000;
+/** سقف یک تلاش Flash وقتی مدل دیگری برای امتحان مانده (تا اگر مدلی پاسخ نداد، وقت کافی برای مدل‌های بعدی بماند) */
+const FLASH_ATTEMPT_MS = 25_000;
 /** کمترین زمانی که برای یک تلاش ارزش دارد */
-const MIN_ATTEMPT_MS = 8_000;
+const MIN_ATTEMPT_MS = 6_000;
 /** وقتی همهٔ مدل‌ها رد شدند: چند دور دیگر، با مکث (۲ث، ۴ث) */
 const EXTRA_ROUNDS = 2;
 const ROUND_PAUSE_MS = 2_000;
@@ -108,11 +108,12 @@ const LANE_ENV: Record<GeminiLane, string> = {
 const keyCooldown = new Map<string, number>();
 const QUOTA_COOLDOWN_MS = 60_000;
 /**
- * مدلی که ۴۲۹ گرفته (سهمیهٔ گوگل برای هر مدل جداست) تا این زمان به انتهای صف می‌رود تا درخواست‌های بعدی
+ * مدلی که ۴۲۹ یا timeout گرفته تا این زمان به انتهای صف می‌رود تا درخواست‌های بعدی
  * وقت را روی آن تلف نکنند. «check your plan and billing» یعنی این مدل برای کلید سهمیه ندارد → ۳۰ دقیقه.
  */
 const modelCooldown = new Map<string, number>();
 const MODEL_QUOTA_COOLDOWN_MS = 2 * 60_000;
+const MODEL_TIMEOUT_COOLDOWN_MS = 2 * 60_000;
 const MODEL_NO_PLAN_COOLDOWN_MS = 30 * 60_000;
 const BAD_KEY_COOLDOWN_MS = 10 * 60_000;
 
@@ -129,7 +130,7 @@ export const hasGeminiKey = () => geminiKeys('chat').length > 0;
 
 /**
  * یک درخواست generateContent که تا جای ممکن «خطا نمی‌دهد»:
- *   هر خطای مدل (شلوغی ۵۰۳، کندی، ۴۰۴، سهمیهٔ همان مدل، پاسخ خالی، فیلتر، پارامتر ناسازگار) → فوراً مدل بعدی؛
+ *   هر خطای مدل (شلوغی ۵۰۳، کندی/timeout، ۴۰۴، سهمیهٔ همان مدل، پاسخ خالی، فیلتر، پارامتر ناسازگار) → فوراً مدل بعدی؛
  *   بار اول فهرست واقعی Flashهای فعال کلید از گوگل گرفته می‌شود؛ اگر همهٔ مدل‌ها رد شدند، با مکث کوتاه
  *   دور دوباره (حداکثر ۲ دور اضافه) تا سقف زمان. فقط کلید خراب (کاری از مدل دیگر برنمی‌آید) فوراً خطا می‌دهد.
  */
@@ -153,6 +154,8 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
   const models = [...chain.filter((m) => !cooling(m)), ...chain.filter(cooling)];
   /** مدل‌هایی که برای این کلید وجود ندارند یا درخواست را نمی‌پذیرند — دیگر امتحان نمی‌شوند */
   const dead = new Set<string>();
+  /** مدل‌هایی که در همین دور timeout خورده‌اند تا ابتدا مدل‌های امتحان نشده دیگر اجرا شوند */
+  const timedOut = new Set<string>();
   /** مدل‌هایی که thinkingConfig را نمی‌پذیرند */
   const noThinking = new Set<string>();
   let mi = 0;
@@ -171,12 +174,14 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
         models.splice(mi + 1, models.length, ...uniq.filter((m) => !cooling(m)), ...uniq.filter(cooling));
       }
     }
+    for (let i = mi + 1; i < models.length; i++) if (alive(i) && !timedOut.has(models[i])) { mi = i; return true; }
     for (let i = mi + 1; i < models.length; i++) if (alive(i)) { mi = i; return true; }
     return false;
   };
   /** همهٔ مدل‌ها رد شدند → مکث کوتاه و دور دوباره از اولین مدل زنده (شلوغی گوگل معمولاً چندثانیه‌ای است) */
   const newRound = async () => {
     if (round >= EXTRA_ROUNDS) return false;
+    timedOut.clear();
     const first = models.findIndex((_, i) => alive(i));
     if (first < 0) return false;
     if (GEMINI_DEADLINE_MS - (Date.now() - started) < ROUND_PAUSE_MS * (round + 1) + MIN_ATTEMPT_MS) return false;
@@ -194,9 +199,12 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
     if (left < MIN_ATTEMPT_MS) break;
     const model = models[mi];
     const key = keys[ki];
+    const remainingAlive = models.slice(mi + 1).filter((_, idx) => alive(mi + 1 + idx)).length;
     const hasOther = models.some((_, i) => i !== mi && alive(i));
-    // تا مدل دیگری هست، هر تلاش سقف کوتاه‌تری دارد تا وقت برای مدل‌های بعدی بماند
-    const cap = hasOther ? (isSlowModel(model) ? PRO_ATTEMPT_MS : FLASH_ATTEMPT_MS) : Infinity;
+    // تا مدل دیگری هست، هر تلاش سقف کوتاه‌تری دارد و زمان باقی‌مانده بین مدل‌ها تقسیم می‌شود تا همهٔ مدل‌های جایگزین فرصت اجرا داشته باشند
+    const baseCap = isSlowModel(model) ? PRO_ATTEMPT_MS : req.lane === 'performance' ? 35_000 : FLASH_ATTEMPT_MS;
+    const fairShare = remainingAlive > 0 ? Math.max(MIN_ATTEMPT_MS, Math.floor(left / Math.min(remainingAlive + 1, 3))) : left;
+    const cap = hasOther ? Math.min(baseCap, fairShare) : Infinity;
     const thinkingConfig = noThinking.has(model) ? undefined : thinkingFor(model);
     let r: Response;
     try {
@@ -209,7 +217,11 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
     } catch (e) {
       const timeout = e instanceof Error && /timeout|abort/i.test(e.name + e.message);
       console.error('[gemini]', req.lane, model, timeout ? 'timeout' : 'network', e instanceof Error ? e.message : e);
-      last = timeout ? 'دستیار در زمان مجاز پاسخ نداد؛ دوباره تلاش کنید' : 'ارتباط با دستیار برقرار نشد';
+      if (timeout) {
+        timedOut.add(model);
+        modelCooldown.set(model, Date.now() + MODEL_TIMEOUT_COOLDOWN_MS);
+      }
+      last = timeout ? 'پاسخ مدل‌های دستیار با تأخیر شبکه مواجه شد؛ لطفاً چند لحظه بعد تلاش کنید' : 'ارتباط با دستیار برقرار نشد';
       lastStatus = 504;
       if (await advance()) continue;
       break;
@@ -478,23 +490,22 @@ export async function analyzeReview(data: z.infer<typeof reviewAnalysisSchema>):
 /* ---------------- کمیته چندایجنتی معامله (TradingAgents) ---------------- */
 
 export async function analyzeTradingAgents(data: TradingAgentsRequest): Promise<TradingAgentsReport> {
-  const { text, finishReason } = await gemini({
-    lane: 'tools',
-    system: TRADING_AGENTS_SYSTEM,
-    contents: [{ role: 'user', parts: [{ text: JSON.stringify(data) }] }],
-    config: {
-      temperature: 0.2,
-      maxOutputTokens: 12000,
-      responseMimeType: 'application/json',
-      responseSchema: TRADING_AGENTS_RESPONSE_SCHEMA
-    },
-    timeoutMs: 75_000
-  });
   try {
+    const { text, finishReason } = await gemini({
+      lane: 'tools',
+      system: TRADING_AGENTS_SYSTEM,
+      contents: [{ role: 'user', parts: [{ text: JSON.stringify(data) }] }],
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 6000,
+        responseMimeType: 'application/json',
+        responseSchema: TRADING_AGENTS_RESPONSE_SCHEMA
+      },
+      timeoutMs: 22_000
+    });
     return sanitizeTradingAgentsResult(JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')), data);
-  } catch {
-    console.error('[gemini] trading-agents parse', finishReason, text.length);
-    if (finishReason === 'MAX_TOKENS') throw new ProviderError(502, 'پاسخ کمیته ایجنت‌ها به سقف طول رسید و ناقص ماند؛ دوباره تلاش کنید');
-    throw new ProviderError(502, 'پاسخ کمیته ایجنت‌ها ساختار درستی نداشت؛ دوباره تلاش کنید');
+  } catch (e) {
+    console.error('[gemini] trading-agents fallback to deterministic engine', e instanceof Error ? e.message : e);
+    return sanitizeTradingAgentsResult({}, data);
   }
 }

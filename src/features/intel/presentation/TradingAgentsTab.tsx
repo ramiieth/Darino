@@ -40,6 +40,7 @@ import {
   SENTIMENT_BAND_FA,
   TRADER_ACTION_FA,
   buildDeterministicCommitteeBaseline,
+  buildDeterministicTradingAgentsReport,
   buildIndicatorDiagnostics,
   buildPastLessonsContext,
   computeTechnicalSnapshot,
@@ -191,6 +192,8 @@ export function TradingAgentsTab({
     if (!committeeInput || busy) return;
     setBusy(true);
     setError(null);
+    let finalReport: TradingAgentsReport;
+    let generatedAt = Date.now();
     try {
       const res = await fetchJson<{ report: TradingAgentsReport; generatedAt: number }>(
         '/api/integrations?op=analyze-trading-agents',
@@ -200,39 +203,42 @@ export function TradingAgentsTab({
           timeoutMs: 115_000
         }
       );
-      setReport(res.report);
-      setReportCoin(activeCoin);
-      setStageView('debate');
-
-      const pm = res.report.riskDebate.portfolioDecision;
-      const tp = res.report.traderProposal;
-      const newEntry: TradingMemoryEntry = {
-        id: `${activeCoin}-${Date.now()}`,
-        coin: activeCoin,
-        analysisDate: committeeInput.analysisDate,
-        createdAt: res.generatedAt || Date.now(),
-        rating: pm.rating,
-        traderAction: tp.action,
-        entryPrice: tp.entryPrice ?? committeeInput.technical.close,
-        stopLoss: tp.stopLoss,
-        priceTarget: pm.priceTarget ?? tp.takeProfit,
-        holdingPeriodDays: Number(holdingDaysInput) || 14,
-        executiveSummary: pm.executiveSummary,
-        settledAt: null,
-        settledPrice: committeeInput.technical.close,
-        realizedReturnPct: 0,
-        lesson: null
-      };
-      setMemory((prev) => {
-        const next = [newEntry, ...prev].slice(0, 50);
-        saveMemory(next);
-        return next;
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'اجرای کمیته ایجنت‌ها با خطا روبه‌رو شد');
-    } finally {
-      setBusy(false);
+      finalReport = res.report;
+      generatedAt = res.generatedAt || Date.now();
+    } catch {
+      // اگر همه مدل‌ها یا ارتباط شبکه با تأخیر مواجه شد، گزارش کامل ۴ مرحله‌ای از موتور کمی بومی تولید می‌شود تا کاربر با پیام خطا متوقف نشود
+      finalReport = buildDeterministicTradingAgentsReport(committeeInput);
     }
+
+    setReport(finalReport);
+    setReportCoin(activeCoin);
+    setStageView('debate');
+
+    const pm = finalReport.riskDebate.portfolioDecision;
+    const tp = finalReport.traderProposal;
+    const newEntry: TradingMemoryEntry = {
+      id: `${activeCoin}-${Date.now()}`,
+      coin: activeCoin,
+      analysisDate: committeeInput.analysisDate,
+      createdAt: generatedAt,
+      rating: pm.rating,
+      traderAction: tp.action,
+      entryPrice: tp.entryPrice ?? committeeInput.technical.close,
+      stopLoss: tp.stopLoss,
+      priceTarget: pm.priceTarget ?? tp.takeProfit,
+      holdingPeriodDays: Number(holdingDaysInput) || 14,
+      executiveSummary: pm.executiveSummary,
+      settledAt: null,
+      settledPrice: committeeInput.technical.close,
+      realizedReturnPct: 0,
+      lesson: null
+    };
+    setMemory((prev) => {
+      const next = [newEntry, ...prev].slice(0, 50);
+      saveMemory(next);
+      return next;
+    });
+    setBusy(false);
   }
 
   function downloadHtmlReport() {
