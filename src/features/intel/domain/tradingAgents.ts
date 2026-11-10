@@ -748,6 +748,140 @@ export function buildDeterministicCommitteeBaseline(input: CommitteeMarketInput)
   };
 }
 
+/**
+ * تولید گزارش کامل و ۴ مرحله‌ای کمیته ایجنت‌ها به‌صورت کاملاً کمی و قاعده‌محور (Deterministic Multi-Agent Engine):
+ * زمانی که همهٔ مدل‌های زبانی در زنجیرهٔ پشتیبان با خطای زمان یا شلوغی مواجه شوند، این موتور بومی
+ * تمام ۴ مرحله (۴ تحلیلگر، مناظره Bull/Bear و مدیر پژوهش، معامله‌گر ATR و کمیته ۳ نفره ریسک + مدیر پرتفولیو)
+ * را مستقیماً از روی ۱۱ اندیکاتور، فاندینگ، عمق بازار و رژیم کلان می‌سازد تا کاربر هرگز با خطای تایم‌اوت متوقف نشود.
+ */
+export function buildDeterministicTradingAgentsReport(input: CommitteeMarketInput): TradingAgentsReport {
+  const base = buildDeterministicCommitteeBaseline(input);
+  const { technical: t, derivatives: d, macroRegime, topTradersConsensus, portfolio, pastLessons } = input;
+  const rows = buildIndicatorDiagnostics(t);
+  const bullRows = rows.filter((r) => r.signal === 'bullish');
+  const bearRows = rows.filter((r) => r.signal === 'bearish');
+
+  const fmt = (n: number | null | undefined, digits = 2) =>
+    n === null || n === undefined || !Number.isFinite(n)
+      ? 'نامشخص'
+      : n.toLocaleString('en-US', { maximumFractionDigits: digits });
+
+  const trendText =
+    t.trendRegime === 'bullish'
+      ? 'صعودی (بالای میانگین‌های ۵۰ و ۲۰۰ دوره‌ای)'
+      : t.trendRegime === 'bearish'
+        ? 'نزولی (زیر میانگین‌های ۵۰ و ۲۰۰ دوره‌ای)'
+        : 'نوسانی و خنثی';
+
+  const marketReport = [
+    `بررسی ${t.barsCount} کندل ۴ ساعته نشان می‌دهد قیمت فعلی ${input.coin} در سطح ${fmt(t.close, 4)} دلار در رژیم ${trendText} قرار دارد و از میان ۱۱ شاخص تکنیکال، ${bullRows.length} شاخص صعودی و ${bearRows.length} شاخص نزولی هستند.`,
+    `میانگین نمایی کوتاه‌مدت (EMA10: ${fmt(t.close10Ema, 4)})، میانگین ۵۰ دوره‌ای (SMA50: ${fmt(t.close50Sma, 4)}) و میانگین ۲۰۰ دوره‌ای (SMA200: ${fmt(t.close200Sma, 4)}) در کنار شاخص قدرت نسبی (RSI14: ${fmt(t.rsi14, 1)}) و هیستوگرام مکدی (${fmt(t.macdh, 4)}) مومنتوم فعلی را تعریف می‌کنند.`,
+    `دامنه نوسان واقعی (ATR14: ${fmt(t.atr14, 4)} معادل ${fmt(t.atrPct, 2)}٪ قیمت) مرزهای باند بولینگر (${fmt(t.bollLower, 4)} تا ${fmt(t.bollUpper, 4)}) و سطوح حمایت/مقاومت ۲۰ کندل (${fmt(t.support20, 4)} / ${fmt(t.resistance20, 4)}) را به عنوان سطوح کلیدی تصمیم‌گیری تثبیت کرده است.`
+  ].join(' ');
+
+  const fundingText =
+    d.fundingAprNow !== null
+      ? `نرخ فاندینگ سالانه فعلی ${fmt(d.fundingAprNow, 1)}٪ (میانگین ۷ روزه: ${fmt(d.fundingAvg7dApr, 1)}٪، صدک ۳۰ روزه: ${fmt(d.fundingPercentile30d, 0)}) است`
+      : 'داده نرخ فاندینگ لحظه‌ای محدود است';
+  const tradersText =
+    topTradersConsensus && topTradersConsensus.longUsd + topTradersConsensus.shortUsd > 0
+      ? ` و در میان ${topTradersConsensus.tradersCount} تریدر برتر باثبات، حجم لانگ ${fmt(topTradersConsensus.longUsd, 0)} دلار در برابر شورت ${fmt(topTradersConsensus.shortUsd, 0)} دلار ثبت شده است.`
+      : '.';
+
+  const sentimentNarrative = `${fundingText}${tradersText} برآیند تراز اندیکاتورها و ازدحام مشتقات، امتیاز احساسات را روی ${base.sentimentScore} از ۱۰ (${SENTIMENT_BAND_FA[base.sentimentBand].label}) قرار می‌دهد.`;
+
+  const macroStateFa =
+    macroRegime?.state === 'on'
+      ? 'ریسک‌پذیر (Risk-On)'
+      : macroRegime?.state === 'off'
+        ? 'محتاط و تدافعی (Risk-Off)'
+        : 'متعادل';
+  const newsMacroReport = `رژیم کلان بازار در وضعیت ${macroStateFa} قرار دارد${macroRegime?.btcAbove200 !== null && macroRegime?.btcAbove200 !== undefined ? ` (بیت‌کوین ${macroRegime.btcAbove200 ? 'بالای' : 'زیر'} میانگین ۲۰۰ روزه)` : ''}${macroRegime?.breadthPct !== null && macroRegime?.breadthPct !== undefined ? ` و پهنای صعودی بازار ${fmt(macroRegime.breadthPct, 0)}٪ است` : ''}. این آرایش کلان وزن سناریوی ${base.suggestedAction === 'Buy' ? 'ورود پله‌ای در اصلاح‌ها' : base.suggestedAction === 'Sell' ? 'کاهش ریسک و پرهیز از لانگ اهرمی' : 'صبر تا شکست معتبر سطوح'} را تقویت می‌کند.`;
+
+  const volOiRatio =
+    d.volume24hUsd && d.openInterestUsd && d.openInterestUsd > 0
+      ? (d.volume24hUsd / d.openInterestUsd).toFixed(2)
+      : null;
+  const fundamentalsReport = `حجم معاملات ۲۴ ساعته ${fmt(d.volume24hUsd, 0)} دلار و قراردادهای باز (Open Interest) معادل ${fmt(d.openInterestUsd, 0)} دلار است${volOiRatio ? ` (نسبت گردش حجم به OI: ${volOiRatio}x)` : ''}. حداکثر اهرم صرافی ${fmt(d.maxLeverage, 0)}x و اهرم امن ۷ روزه بر اساس مدل بقای دارینو ${d.safeLeverage7d ? `${d.safeLeverage7d}x` : 'بدون اهرم'} برآورد می‌شود.`;
+
+  const bullHistory = [
+    `پژوهشگر صعودی (Bull): ساختار حمایت در سطح ${fmt(t.support20, 4)} دلار (۲۰ کندل) و ${fmt(t.support50, 4)} دلار (۵۰ کندل) به همراه ${bullRows.length} سیگنال مثبت تکنیکال (${bullRows.slice(0, 4).map((r) => r.code).join('، ') || 'حفظ کف نوسانی'}) نشان‌دهنده پتانسیل حرکت به سمت هدف ${fmt(base.atrTargetLong, 4)} دلار است.`,
+    t.change24hPct !== null && t.change24hPct < 0
+      ? `اصلاح اخیر (${fmt(t.change24hPct, 2)}٪ در ۲۴ ساعت) نسبت ریسک به ریوارد ورود نزدیک حمایت و کف بولینگر (${fmt(t.bollLower, 4)}) را بهبود داده است.`
+      : `حفظ قیمت نسبت به میانگین وزنی حجم (VWMA20: ${fmt(t.vwma20, 4)}) از تداوم تقاضای فعال در بازار پشتیبانی می‌کند.`
+  ].join(' ');
+
+  const bearHistory = [
+    `پژوهشگر نزولی (Bear): مقاومت سنگین در تراز ${fmt(t.resistance20, 4)} و ${fmt(t.resistance50, 4)} دلار در کنار ${bearRows.length} سیگنال هشدار تکنیکال (${bearRows.slice(0, 4).map((r) => r.code).join('، ') || 'محدودیت شتاب'}) ریسک برگشت قیمت را بالا نگه می‌دارد.`,
+    `با توجه به سابقه بدترین ریزش ۲۴ ساعته (${fmt(d.worstCrash24hPct, 1)}٪) و نوسان ATR (${fmt(t.atrPct, 2)}٪)، هرگونه ورود بدون حد ضرر سخت‌گیرانه در سطح ۲×ATR در معرض تله نقدینگی قرار می‌گیرد.`
+  ].join(' ');
+
+  const traderAction = base.suggestedAction;
+  const entryPrice = traderAction === 'Hold' ? null : t.close;
+  const stopLoss =
+    traderAction === 'Buy' ? base.atrStopLong : traderAction === 'Sell' ? base.atrStopShort : null;
+  const takeProfit =
+    traderAction === 'Buy' ? base.atrTargetLong : traderAction === 'Sell' ? base.atrTargetShort : null;
+
+  const sizingText = base.recommendedSizeUsd
+    ? `حداکثر ${base.recommendedSizeUsd.toLocaleString('en-US')} دلار (بر مبنای ریسک ${portfolio?.maxRiskPct ?? 1}٪ سرمایه و فاصله استاپ ۲×ATR)${d.safeLeverage7d ? ` با اهرم حداکثر ${Math.min(d.safeLeverage7d, 3)}x` : ''}`
+    : `حداکثر ۱٪ کل سرمایه در معرض ریسک فاصله استاپ ۲×ATR (${fmt(stopLoss, 4)} دلار)`;
+
+  const lessonsNote =
+    pastLessons && pastLessons.length > 0
+      ? ` با لحاظ کردن سابقه تصمیم‌های قبلی در حافظه کمیته (${pastLessons[0]})، انضباط حد ضرر اولویت اول است.`
+      : '';
+
+  return {
+    analysts: {
+      marketReport,
+      sentimentReport: {
+        overallBand: base.sentimentBand,
+        overallScore: base.sentimentScore,
+        confidence: base.confidence,
+        narrative: sentimentNarrative
+      },
+      newsMacroReport,
+      fundamentalsReport
+    },
+    researchDebate: {
+      bullHistory,
+      bearHistory,
+      researchPlan: {
+        recommendation: base.suggestedRating,
+        rationale: `با داوری میان ${bullRows.length} شاخص صعودی و ${bearRows.length} شاخص نزولی، امتیاز ترکیبی ${base.sentimentScore}/10 و وضعیت فاندینگ، کفه شواهد به نفع حکم «${RATING_FA[base.suggestedRating].label}» است.`,
+        strategicActions:
+          traderAction === 'Hold'
+            ? `خودداری از ورود عجولانه در میانه رنج و انتظار برای شکست معتبر سطح ${fmt(t.resistance20, 4)} دلار یا واکنش به حمایت ${fmt(t.support20, 4)} دلار.`
+            : `اجرای پله‌ای در حوالی ${fmt(entryPrice, 4)} دلار با ثبت هم‌زمان حد ضرر ۲×ATR در ${fmt(stopLoss, 4)} دلار و هدف ${fmt(takeProfit, 4)} دلار.`
+      }
+    },
+    traderProposal: {
+      action: traderAction,
+      reasoning:
+        traderAction === 'Hold'
+          ? `به دلیل توازن نسبی نیروهای صعودی و نزولی (امتیاز ${base.sentimentScore} از ۱۰)، نسبت ریسک به ریوارد ورود فوری در قیمت ${fmt(t.close, 4)} دلار بهینه نیست و حفظ نقدینگی اولویت دارد.`
+          : `پیشنهاد ${TRADER_ACTION_FA[traderAction].label} در قیمت مرجع ${fmt(entryPrice, 4)} دلار با حد ضرر مبتنی بر ۲ برابر ATR14 (${fmt(stopLoss, 4)} دلار) و حد سود ۳.۵ برابر ATR14 (${fmt(takeProfit, 4)} دلار) با نسبت ریسک به ریوارد ۱ به ۱.۷۵ تنظیم شد.`,
+      entryPrice,
+      stopLoss,
+      takeProfit,
+      positionSizing: sizingText
+    },
+    riskDebate: {
+      aggressiveArgument: `تحلیلگر ریسک تهاجمی: نوسان ATR (${fmt(t.atrPct, 2)}٪) و نقدشوندگی ${fmt(d.volume24hUsd, 0)} دلاری فرصت مناسبی برای شکار حرکت تا تراز ${fmt(takeProfit ?? base.atrTargetLong, 4)} دلار فراهم می‌کند و تأخیر بیش‌ازحد باعث از دست رفتن نقطه بهینه ورود می‌شود.`,
+      conservativeArgument: `تحلیلگر ریسک محافظه‌کار: بدترین ریزش ۲۴ ساعته تاریخی (${fmt(d.worstCrash24hPct, 1)}٪) و موقعیت شاخص‌ها ایجاب می‌کند هیچ پوزیشنی بدون حد ضرر قطعی در ${fmt(stopLoss ?? base.atrStopLong, 4)} دلار و رعایت سقف اهرم امن باز نشود.`,
+      neutralArgument: `تحلیلگر ریسک متوازن: بهترین رویکرد، پیروی از حکم ${RATING_FA[base.suggestedRating].short} با حجم کنترل‌شده (${sizingText}) و انتقال حد ضرر به نقطه سربه‌سر پس از طی شدن ۱×ATR در جهت معامله است.`,
+      portfolioDecision: {
+        rating: base.suggestedRating,
+        executiveSummary: `حکم نهایی کمیته روی ${input.coin} در قیمت ${fmt(t.close, 4)} دلار، «${RATING_FA[base.suggestedRating].label}» با امتیاز کمی ${base.sentimentScore} از ۱۰ است. ${traderAction === 'Hold' ? `تا روشن شدن تکلیف مرزهای ${fmt(t.support20, 4)} و ${fmt(t.resistance20, 4)} دلار صبر پیشنهاد می‌شود.` : `نقطه ورود مرجع ${fmt(entryPrice, 4)} دلار، حد ضرر الزامی ${fmt(stopLoss, 4)} دلار و هدف قیمتی ${fmt(takeProfit, 4)} دلار تعیین گردید.`} این خروجی شبیه‌سازی پژوهشی کمیته ایجنت‌هاست و توصیه مالی قطعی نیست.`,
+        investmentThesis: `تز سرمایه‌گذاری بر پایه تراز ${bullRows.length} به ${bearRows.length} در ۱۱ اندیکاتور تکنیکال، رژیم روند ${trendText}، امتیاز احساسات ${base.sentimentScore}/10 و کنترل ریسک ۲×ATR شکل گرفته است.${lessonsNote} شرط ابطال این سناریو، تثبیت کندل ۴ ساعته در خلاف جهت سطح ${fmt(stopLoss ?? t.support20, 4)} دلار است.`,
+        priceTarget: takeProfit,
+        timeHorizon: '۵ تا ۱۴ روز (سوینگ ۴ ساعته)'
+      }
+    }
+  };
+}
+
 // ─── ۴) حافظه تصمیم‌ها و تسویه خودکار (معادل tradingagents/memory/log.py و settlement.py) ─
 
 export interface TradingMemoryEntry {
