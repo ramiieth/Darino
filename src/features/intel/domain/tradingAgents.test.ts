@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDeterministicCommitteeBaseline,
+  buildIndicatorDiagnostics,
   buildPastLessonsContext,
   coerceOptionalFloat,
   computeTechnicalSnapshot,
+  computeTradeGeometry,
   parseRatingFromText,
   renderCompleteReportHtml,
   settleMemoryEntries,
@@ -49,8 +51,8 @@ describe('TradingAgents Domain — coerceOptionalFloat & parseRatingFromText', (
   });
 });
 
-describe('TradingAgents Domain — ۱۱ اندیکاتور تکنیکال و پیش‌خوانش کمیته', () => {
-  it('تمام ۱۱ اندیکاتور (SMA50, SMA200, EMA10, MACD/Signal/Hist, RSI14, Boll, ATR14, VWMA20) را محاسبه می‌کند', () => {
+describe('TradingAgents Domain — ۱۱ اندیکاتور تکنیکال، ماتریس تشخیصی و هندسه R:R', () => {
+  it('تمام ۱۱ اندیکاتور (SMA50, SMA200, EMA10, MACD/Signal/Hist, RSI14, Boll, ATR14, VWMA20) و ۱۲ ردیف تشخیصی را محاسبه می‌کند', () => {
     const candles = makeCandles(240, 100, 0.4);
     const snap = computeTechnicalSnapshot(candles, 6);
     expect(snap).not.toBeNull();
@@ -67,6 +69,17 @@ describe('TradingAgents Domain — ۱۱ اندیکاتور تکنیکال و پ�
     expect(snap!.atr14).toBeGreaterThan(0);
     expect(snap!.vwma20).not.toBeNull();
     expect(snap!.trendRegime).toBe('bullish');
+
+    const rows = buildIndicatorDiagnostics(snap!);
+    expect(rows).toHaveLength(12);
+    expect(rows.some((r) => r.key === 'close_50_sma' && r.signal === 'bullish')).toBe(true);
+  });
+
+  it('هندسه معامله (فاصله حد ضرر، فاصله هدف و نسبت R:R) را دقیق محاسبه می‌کند', () => {
+    const g = computeTradeGeometry(100, 95, 112.5);
+    expect(g.stopDistancePct).toBeCloseTo(5);
+    expect(g.targetDistancePct).toBeCloseTo(12.5);
+    expect(g.riskRewardRatio).toBeCloseTo(2.5);
   });
 
   it('پیش‌خوانش کمیته استاپ مبتنی بر ۲×ATR و اندازه پوزیشن متناسب با ریسک می‌سازد', () => {

@@ -1,22 +1,33 @@
 /**
- * تب «کمیته ایجنت‌ها» (TradingAgents) در میز معامله دارینو
+ * تب «کمیته ایجنت‌ها» (TradingAgents) در میز معامله دارینو — بازطراحی مینیمال برای وب و PWA
  *
- * پیاده‌سازی ۱۰۰٪ بومی معماری چندایجنتی مخزن TauricResearch/TradingAgents:
- *   ۱) Snapshot تأییدشده ۱۱ اندیکاتور تکنیکال (SMA50/200, EMA10, MACD/Signal/Hist, RSI14, Bollinger Bands, ATR14, VWMA20)
- *   ۲) اجرای ۴ تیم تخصصی (تحلیلگران ← مناظره Bull/Bear و مدیر پژوهش ← تریدر ← کمیته ریسک ۳ نفره و مدیر پرتفولیو)
- *   ۳) حافظه تصمیم‌ها (Memory Log) با تسویه خودکار (Point-in-Time Settlement) و انتقال درس‌های قبلی به اجرای بعدی
- *   ۴) خروجی گزارش تک‌صفحه‌ای خودکفا (complete_report.html) و اتصال به برنامه معامله ژورنال
+ * معماری ۴ مرحله‌ای مخزن TauricResearch/TradingAgents:
+ *   ۱) نوار کنترل مینیمال + شیت تنظیمات سایزینگ (سازگار با هدف لمسی ۴۴ پیکسل و safe-area در PWA)
+ *   ۲) کارت کانونی پیش‌خوانش کمی + نوار دوقطبی امتیاز (۰ تا ۱۰) و هندسه استاپ/هدف مبتنی بر ATR
+ *   ۳) محیط تعاملی و تب‌بندی‌شده برای ۴ مرحله کمیته (مناظره Bull/Bear · کمیته ریسک ۳ نفره · ۴ تحلیلگر · جدول ۱۱ اندیکاتور)
+ *   ۴) شیت «حافظه تصمیم‌ها و تسویه خودکار» (Memory Log) و خروجی گزارش تک‌صفحه‌ای HTML
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Download, Sparkles, ShieldAlert, TrendingUp, TrendingDown, Scale, History, Trash2 } from 'lucide-react';
+import {
+  Bot,
+  Download,
+  History,
+  Scale,
+  Settings2,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+  Layers
+} from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
-import { Badge } from '@/shared/components/ui/Badge';
+import { Badge, StatusDot } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input, Select } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
-import { KeyValueList } from '@/shared/components/ui/FinancialValue';
+import { Sheet } from '@/shared/components/ui/Sheet';
 import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
 import { fetchJson } from '@/repositories/remoteClient';
 import { cn } from '@/shared/lib/cn';
@@ -24,16 +35,19 @@ import { toFaDigits } from '@/shared/utils/formatters';
 import { usePerpMarkets, useRiskCandles, useFundingStats, useSwing } from '../data/intelApi';
 import { assess, buildRiskModel } from '../domain/survival';
 import {
-   CONFIDENCE_FA,
+  CONFIDENCE_FA,
   RATING_FA,
   SENTIMENT_BAND_FA,
   TRADER_ACTION_FA,
   buildDeterministicCommitteeBaseline,
+  buildIndicatorDiagnostics,
   buildPastLessonsContext,
   computeTechnicalSnapshot,
+  computeTradeGeometry,
   renderCompleteReportHtml,
   settleMemoryEntries,
   type CommitteeMarketInput,
+  type IndicatorDiagnosticRow,
   type TradingAgentsReport,
   type TradingMemoryEntry
 } from '../domain/tradingAgents';
@@ -41,6 +55,8 @@ import { fmtPrice, UsdShort } from './parts';
 
 const MEMORY_STORAGE_KEY = 'darino:trading-agents:memory:v1';
 const MARKETS_LIMIT = 40;
+
+type StageView = 'debate' | 'risk' | 'analysts' | 'indicators';
 
 const pct = (v: number | null | undefined, digits = 1) =>
   v === null || v === undefined || !Number.isFinite(v)
@@ -60,7 +76,7 @@ function saveMemory(entries: TradingMemoryEntry[]): void {
   try {
     localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(entries.slice(0, 50)));
   } catch {
-    /* نادیده گرفتن خطای Quota در حالت Private */
+    /* نادیده گرفتن خطای حافظه در مرورگرهای محدود */
   }
 }
 
@@ -85,6 +101,11 @@ export function TradingAgentsTab({
   const [cashInput, setCashInput] = useState('10000');
   const [riskPctInput, setRiskPctInput] = useState('1');
   const [holdingDaysInput, setHoldingDaysInput] = useState<'5' | '14' | '30'>('14');
+  const [stageView, setStageView] = useState<StageView>('debate');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [indicatorsSheetOpen, setIndicatorsSheetOpen] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<TradingAgentsReport | null>(null);
@@ -96,7 +117,7 @@ export function TradingAgentsTab({
     return selectedMarket && !top.includes(selectedMarket) ? [selectedMarket, ...top] : top;
   }, [markets.data, selectedMarket]);
 
-  // تسویه خودکار تصمیم‌های قبلی در Memory Log به محض دریافت قیمت‌های زنده بازار (معادل settle_all_pending در TradingAgents)
+  // تسویه خودکار تصمیم‌های قبلی در Memory Log با قیمت‌های زنده بازار
   useEffect(() => {
     if (!markets.data?.length) return;
     const liveMap: Record<string, number> = {};
@@ -109,8 +130,8 @@ export function TradingAgentsTab({
     });
   }, [markets.data]);
 
-  // محاسبه ۱۱ اندیکاتور تکنیکال روی کندل‌های ۴ ساعته
   const technical = useMemo(() => (candles.data ? computeTechnicalSnapshot(candles.data, 6) : null), [candles.data]);
+  const indicatorRows = useMemo(() => (technical ? buildIndicatorDiagnostics(technical) : []), [technical]);
 
   const riskAssessment = useMemo(() => {
     if (!candles.data || !selectedMarket) return null;
@@ -181,8 +202,8 @@ export function TradingAgentsTab({
       );
       setReport(res.report);
       setReportCoin(activeCoin);
+      setStageView('debate');
 
-      // ثبت تصمیم در Memory Log محلی (معادل ~/.tradingagents/memory/trading_memory.md)
       const pm = res.report.riskDebate.portfolioDecision;
       const tp = res.report.traderProposal;
       const newEntry: TradingMemoryEntry = {
@@ -232,48 +253,201 @@ export function TradingAgentsTab({
   const activeReport = report && reportCoin === activeCoin ? report : null;
 
   return (
-    <div className="space-y-5">
-      {/* ۱) انتخاب نماد، عمق مناظره و سرمایه پایه */}
-      <Surface className="space-y-4 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="flex items-center gap-2 text-base font-extrabold text-ink">
-              <Bot className="h-5 w-5 text-accent" aria-hidden />
-              کمیته چندایجنتی معامله (TradingAgents)
-            </h3>
-            <p className="mt-1 text-xs leading-6 text-muted">
-              چهار تحلیلگر تخصصی داده و ۱۱ اندیکاتور را می‌خوانند، پژوهشگر صعودی (Bull) و نزولی (Bear) مناظره می‌کنند، معامله‌گر سطح ورود و استاپ مبتنی بر ATR می‌دهد و کمیته ریسک ۳ نفره همراه با مدیر پرتفولیو حکم نهایی را صادر می‌کنند.
-            </p>
+    <div className="space-y-4">
+      {/* ۱) نوار کنترل مینیمال — وب و PWA */}
+      <Surface className="p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-12 sm:items-end">
+          <div className="sm:col-span-5">
+            <Field label="بازار مورد بررسی">
+              <Select value={activeCoin} onChange={(e) => onChangeMarket(e.target.value)}>
+                {marketOptions.map((o) => (
+                  <option key={o.coin} value={o.coin}>
+                    {o.coin} · {fmtPrice(o.markPx)} دلار ({o.change24h !== null ? (o.change24h >= 0 ? '+' : '') + o.change24h.toFixed(1) + '%' : '—'})
+                  </option>
+                ))}
+              </Select>
+            </Field>
           </div>
-          <Badge tone="neutral">معماری ۴ مرحله‌ای</Badge>
+
+          <div className="sm:col-span-4">
+            <Field label="عمق مناظره ایجنت‌ها">
+              <SegmentedControl<string>
+                fill
+                label="عمق مناظره"
+                value={String(depth)}
+                onChange={(v) => setDepth((Number(v) as 1 | 2 | 3) || 1)}
+                options={[
+                  { value: '1', label: '۱ دور' },
+                  { value: '2', label: '۲ دور' },
+                  { value: '3', label: '۳ دور' }
+                ]}
+              />
+            </Field>
+          </div>
+
+          <div className="sm:col-span-3">
+            <Button
+              className="w-full"
+              loading={busy}
+              icon={<Sparkles />}
+              disabled={!committeeInput || busy}
+              onClick={() => void runCommittee()}
+            >
+              {busy ? 'در حال مناظره…' : 'اجرای کمیته'}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="نماد بازار">
-            <Select value={activeCoin} onChange={(e) => onChangeMarket(e.target.value)}>
-              {marketOptions.map((o) => (
-                <option key={o.coin} value={o.coin}>
-                  {o.coin} · {fmtPrice(o.markPx)}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        {/* نوار وضعیت و دکمه‌های سریع دسترسی (سایزینگ، اندیکاتورها، حافظه) */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-control bg-surface-2 px-3 py-1.5 font-semibold text-ink transition hover:bg-accent-soft hover:text-accent"
+            >
+              <Settings2 className="h-3.5 w-3.5 text-muted" aria-hidden />
+              <span>
+                سایزینگ: <bdi dir="ltr">{toFaDigits(Number(cashInput || 0).toLocaleString('en-US'))}</bdi> دلار · ریسک{' '}
+                <bdi dir="ltr">{toFaDigits(riskPctInput)}٪</bdi>
+              </span>
+            </button>
 
-          <Field label="عمق پژوهش و مناظره">
-            <SegmentedControl<string>
-              fill
-              label="عمق پژوهش"
-              value={String(depth)}
-              onChange={(v) => setDepth((Number(v) as 1 | 2 | 3) || 1)}
-              options={[
-                { value: '1', label: 'سریع (۱ دور)' },
-                { value: '2', label: 'متوسط (۲ دور)' },
-                { value: '3', label: 'عمیق (۳ دور)' }
-              ]}
+            <button
+              type="button"
+              onClick={() => setIndicatorsSheetOpen(true)}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-control bg-surface-2 px-3 py-1.5 font-semibold text-ink transition hover:bg-accent-soft hover:text-accent"
+            >
+              <Layers className="h-3.5 w-3.5 text-muted" aria-hidden />
+              <span>ماتریس ۱۱ اندیکاتور</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMemoryOpen(true)}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-control bg-surface-2 px-3 py-1.5 font-semibold text-ink transition hover:bg-accent-soft hover:text-accent"
+            >
+              <History className="h-3.5 w-3.5 text-muted" aria-hidden />
+              <span>حافظه تصمیم‌ها ({toFaDigits(memory.length)})</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onSelectCoin(activeCoin)}
+            className="font-semibold text-accent hover:underline"
+          >
+            پوزیشن برترها روی <bdi dir="ltr">{activeCoin}</bdi> ←
+          </button>
+        </div>
+
+        {busy && (
+          <div className="mt-3 rounded-field bg-accent-soft/60 px-3.5 py-2.5 text-xs text-ink" role="status">
+            <div className="flex items-center gap-2 font-bold text-accent">
+              <Bot className="h-4 w-4 animate-pulse" aria-hidden />
+              <span>در حال اجرای زنجیره ۴ مرحله‌ای TradingAgents روی {activeCoin}…</span>
+            </div>
+            <p className="mt-1 text-muted">
+              ۱. تحلیل ۱۱ اندیکاتور و فاندینگ ← ۲. مناظره پژوهشگر صعودی و نزولی ← ۳. تعیین استاپ ATR معامله‌گر ← ۴. کمیته ریسک و حکم مدیر پرتفولیو
+            </p>
+          </div>
+        )}
+
+        {error && <Notice tone="warn" className="mt-3">{error}</Notice>}
+      </Surface>
+
+      {/* ۲) کارت کانونی پیش‌خوانش کمی یا حکم نهایی کمیته */}
+      {candles.isLoading ? (
+        <ListSkeleton rows={3} />
+      ) : !technical || !committeeInput || !baseline ? (
+        <Notice tone="neutral">داده کندل کافی برای محاسبه اندیکاتورهای تکنیکال این نماد در دسترس نیست.</Notice>
+      ) : (
+        <>
+          {activeReport ? (
+            <ExecutiveVerdictHero
+              coin={activeCoin}
+              input={committeeInput}
+              report={activeReport}
+              maxLeverage={selectedMarket?.maxLeverage ?? 10}
+              onDownloadHtml={downloadHtmlReport}
             />
-          </Field>
+          ) : (
+            <LiveQuantitativePreReadCard
+              coin={activeCoin}
+              input={committeeInput}
+              baseline={baseline}
+              onOpenIndicators={() => setIndicatorsSheetOpen(true)}
+            />
+          )}
 
-          <Field label="سرمایه مبنای سایزینگ (دلار)">
+          {/* ۳) محیط تب‌بندی‌شده ۴ مرحله کمیته (وقتی گزارش آماده است) */}
+          {activeReport && (
+            <Surface className="overflow-hidden p-0">
+              {/* نوار تب‌های لمسی با پشتیبانی از اسکرول افقی نرم در PWA */}
+              <div
+                role="tablist"
+                aria-label="مراحل کمیته ایجنت‌ها"
+                className="boros-account-tabs no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-divider bg-surface-2/50 px-3 py-2"
+              >
+                {(
+                  [
+                    { id: 'debate', label: '۱. مناظره صعودی و نزولی', badge: RATING_FA[activeReport.researchDebate.researchPlan.recommendation].short },
+                    { id: 'risk', label: '۲. کمیته ریسک (۳ دیدگاه)', badge: RATING_FA[activeReport.riskDebate.portfolioDecision.rating].short },
+                    { id: 'analysts', label: '۳. گزارش ۴ تحلیلگر', badge: `${toFaDigits(activeReport.analysts.sentimentReport.overallScore)}/۱۰` },
+                    { id: 'indicators', label: '۴. ماتریس ۱۱ اندیکاتور', badge: '۱۱ شاخص' }
+                  ] as const
+                ).map((t) => {
+                  const selected = stageView === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setStageView(t.id)}
+                      className={cn(
+                        'inline-flex shrink-0 items-center gap-2 rounded-control px-3.5 py-2 text-xs font-bold transition',
+                        selected
+                          ? 'bg-card text-accent shadow-sm ring-1 ring-divider'
+                          : 'text-muted hover:bg-card/60 hover:text-ink'
+                      )}
+                    >
+                      <span>{t.label}</span>
+                      <span className={cn('rounded-full px-1.5 py-0.5 text-[10px]', selected ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-subtle')}>
+                        {t.badge}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="p-4 sm:p-5" role="tabpanel">
+                {stageView === 'debate' && <ResearchDebateView report={activeReport} />}
+                {stageView === 'risk' && <RiskCommitteeView report={activeReport} />}
+                {stageView === 'analysts' && <AnalystsTeamView report={activeReport} />}
+                {stageView === 'indicators' && (
+                  <IndicatorsMatrixView rows={indicatorRows} input={committeeInput} />
+                )}
+              </div>
+            </Surface>
+          )}
+        </>
+      )}
+
+      {/* شیت ۱: تنظیمات سایزینگ، ریسک و افق ارزیابی (موبایل/PWA و دسکتاپ) */}
+      <Sheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="تنظیمات سرمایه و مدیریت ریسک کمیته"
+        description="این مقادیر به ایجنت معامله‌گر و مدیر پرتفولیو داده می‌شوند تا حجم پوزیشن و فاصله حد ضرر را متناسب با سرمایه شما تنظیم کنند."
+        footer={
+          <Button className="w-full" onClick={() => setSettingsOpen(false)}>
+            ذخیره و بستن
+          </Button>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <Field label="سرمایه مبنای سایزینگ (دلار)" hint="حداکثر حجم پوزیشن بر اساس این عدد و فاصله ۲×ATR محاسبه می‌شود.">
             <Input
               type="number"
               inputMode="decimal"
@@ -285,7 +459,7 @@ export function TradingAgentsTab({
             />
           </Field>
 
-          <Field label="حداکثر ریسک در معامله">
+          <Field label="حداکثر ریسک مجاز در هر معامله (درصد کل سرمایه)" hint="استاندارد مدیریت ریسک حرفه‌ای بین ۰.۵٪ تا ۲٪ در هر معامله است.">
             <Input
               type="number"
               inputMode="decimal"
@@ -298,188 +472,225 @@ export function TradingAgentsTab({
               suffix="٪"
             />
           </Field>
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider pt-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-            <span>افق ارزیابی در حافظه تصمیم‌ها:</span>
+          <Field label="افق زمانی ارزیابی در حافظه تصمیم‌ها (Memory Log)">
             <SegmentedControl<'5' | '14' | '30'>
+              fill
               label="افق ارزیابی"
               value={holdingDaysInput}
               onChange={setHoldingDaysInput}
               options={[
-                { value: '5', label: '۵ روز' },
-                { value: '14', label: '۱۴ روز' },
-                { value: '30', label: '۳۰ روز' }
+                { value: '5', label: '۵ روزه' },
+                { value: '14', label: '۱۴ روزه' },
+                { value: '30', label: '۳۰ روزه' }
               ]}
             />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {activeReport && (
-              <Button variant="outline" size="sm" icon={<Download />} onClick={downloadHtmlReport}>
-                دانلود گزارش کامل HTML
-              </Button>
-            )}
-            <Button
-              loading={busy}
-              icon={<Sparkles />}
-              disabled={!committeeInput || busy}
-              onClick={() => void runCommittee()}
-            >
-              {busy ? 'در حال برگزاری مناظره ایجنت‌ها…' : `اجرای کمیته ایجنت‌ها برای ${activeCoin}`}
-            </Button>
-          </div>
+          </Field>
         </div>
+      </Sheet>
 
-        {error && <Notice tone="warn">{error}</Notice>}
-      </Surface>
+      {/* شیت ۲: ماتریس کامل ۱۱ اندیکاتور تکنیکال */}
+      <Sheet
+        open={indicatorsSheetOpen}
+        onClose={() => setIndicatorsSheetOpen(false)}
+        title={`ماتریس ۱۱ اندیکاتور تکنیکال — ${activeCoin}`}
+        description="محاسبه‌شده روی کندل‌های ۴ ساعته طبق استاندارد ماژول market_analyst در مخزن TradingAgents."
+        size="lg"
+      >
+        {committeeInput ? (
+          <IndicatorsMatrixView rows={indicatorRows} input={committeeInput} />
+        ) : (
+          <p className="py-4 text-sm text-muted">داده کندل در حال بارگذاری است…</p>
+        )}
+      </Sheet>
 
-      {/* ۲) پیش‌خوانش کمی و ۱۱ اندیکاتور تکنیکال تأییدشده (Verified Market Snapshot) */}
-      {candles.isLoading ? (
-        <ListSkeleton rows={3} />
-      ) : !technical || !committeeInput || !baseline ? (
-        <Notice tone="neutral">داده کندل کافی برای محاسبه ۱۱ اندیکاتور تکنیکال این نماد در دسترس نیست.</Notice>
-      ) : (
-        <>
-          <Surface className="space-y-4 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-2xs font-semibold text-muted">ورودی تأییدشده تیم تحلیلگران (Verified Snapshot)</p>
-                <h4 className="mt-0.5 text-sm font-extrabold text-ink">
-                  ۱۱ اندیکاتور تکنیکال، سطوح ATR و وضعیت فاندینگ <bdi dir="ltr">{activeCoin}</bdi>
-                </h4>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={SENTIMENT_BAND_FA[baseline.sentimentBand].tone}>
-                  پیش‌خوانش کمی: {SENTIMENT_BAND_FA[baseline.sentimentBand].label} ({toFaDigits(baseline.sentimentScore)} از ۱۰)
-                </Badge>
-                <Badge tone="neutral">اطمینان داده: {CONFIDENCE_FA[baseline.confidence]}</Badge>
-              </div>
+      {/* شیت ۳: حافظه تصمیم‌ها و تسویه خودکار (Memory Log) */}
+      <Sheet
+        open={memoryOpen}
+        onClose={() => setMemoryOpen(false)}
+        title="حافظه تصمیم‌ها و تسویه خودکار (Memory Log)"
+        description="هر حکم کمیته ذخیره می‌شود و با قیمت زنده بازار تسویه می‌گردد تا درس‌های قبلی به تصمیم بعدی مدیر پرتفولیو منتقل شوند."
+        size="lg"
+        footer={
+          memory.length > 0 ? (
+            <div className="flex justify-between gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Trash2 />}
+                onClick={() => {
+                  setMemory([]);
+                  saveMemory([]);
+                }}
+              >
+                پاک کردن حافظه
+              </Button>
+              <Button size="sm" onClick={() => setMemoryOpen(false)}>
+                بستن
+              </Button>
             </div>
-
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-field bg-surface-2/70 p-3">
-                <dt className="text-2xs text-muted">قیمت و تغییرات (۲۴س / ۷ر)</dt>
-                <dd className="mt-1 text-sm font-extrabold text-ink">
-                  <bdi dir="ltr">{fmtPrice(technical.close)}</bdi> دلار
-                </dd>
-                <dd className="text-2xs text-subtle">
-                  ۲۴ ساعت: <bdi dir="ltr">{pct(technical.change24hPct)}</bdi> · ۷ روز: <bdi dir="ltr">{pct(technical.change7dPct)}</bdi>
-                </dd>
-              </div>
-
-              <div className="rounded-field bg-surface-2/70 p-3">
-                <dt className="text-2xs text-muted">میانگین‌ها (EMA10 / SMA50 / SMA200)</dt>
-                <dd className="mt-1 text-xs font-bold text-ink" dir="ltr">
-                  {fmtPrice(technical.close10Ema)} / {fmtPrice(technical.close50Sma)} / {fmtPrice(technical.close200Sma)}
-                </dd>
-                <dd className="text-2xs text-subtle">
-                  روند تکنیکال: {technical.trendRegime === 'bullish' ? 'صعودی (بالای میانگین‌ها)' : technical.trendRegime === 'bearish' ? 'نزولی (زیر میانگین‌ها)' : 'خنثی / نوسانی'}
-                </dd>
-              </div>
-
-              <div className="rounded-field bg-surface-2/70 p-3">
-                <dt className="text-2xs text-muted">مومنتوم (RSI 14 و MACD Hist)</dt>
-                <dd className="mt-1 text-sm font-extrabold text-ink">
-                  RSI: <bdi dir="ltr">{technical.rsi14 !== null ? toFaDigits(technical.rsi14.toFixed(1)) : '—'}</bdi>
-                </dd>
-                <dd className="text-2xs text-subtle">
-                  هیستوگرام MACD: <bdi dir="ltr">{technical.macdh !== null ? (technical.macdh >= 0 ? '+' : '') + technical.macdh.toPrecision(3) : '—'}</bdi>
-                </dd>
-              </div>
-
-              <div className="rounded-field bg-surface-2/70 p-3">
-                <dt className="text-2xs text-muted">نوسان ATR (14) و حد ضرر ۲×ATR</dt>
-                <dd className="mt-1 text-sm font-extrabold text-ink">
-                  <bdi dir="ltr">{fmtPrice(technical.atr14)}</bdi> ({pct(technical.atrPct)})
-                </dd>
-                <dd className="text-2xs text-subtle">
-                  استاپ لانگ: <bdi dir="ltr">{fmtPrice(baseline.atrStopLong)}</bdi> · شورت: <bdi dir="ltr">{fmtPrice(baseline.atrStopShort)}</bdi>
-                </dd>
-              </div>
-            </dl>
-
-            <Disclosure summary="مشاهده جدول کامل ۱۱ اندیکاتور تکنیکال و آمار مشتقات">
-              <KeyValueList
-                dense
-                rows={[
-                  { label: 'باندهای بولینگر (۲۰، ۲σ)', value: `پایین: ${fmtPrice(technical.bollLower)} · میانه: ${fmtPrice(technical.bollMid)} · بالا: ${fmtPrice(technical.bollUpper)}` },
-                  { label: 'میانگین وزنی فعالیت (VWMA 20)', value: fmtPrice(technical.vwma20) },
-                  { label: 'حمایت و مقاومت ۲۰ کندل اخیر', value: `حمایت: ${fmtPrice(technical.support20)} · مقاومت: ${fmtPrice(technical.resistance20)}` },
-                  { label: 'حمایت و مقاومت ۵۰ کندل اخیر', value: `حمایت: ${fmtPrice(technical.support50)} · مقاومت: ${fmtPrice(technical.resistance50)}` },
-                  { label: 'نرخ فاندینگ فعلی (APR سالانه)', value: pct(committeeInput.derivatives.fundingAprNow), hint: `صدک ۳۰ روزه: ${committeeInput.derivatives.fundingPercentile30d !== null ? toFaDigits(Math.round(committeeInput.derivatives.fundingPercentile30d)) + '٪' : '—'}` },
-                  { label: 'قراردادهای باز (OI) و حجم ۲۴ ساعته', value: <span className="inline-flex gap-2"><span>OI: <UsdShort value={committeeInput.derivatives.openInterestUsd} /></span><span>· حجم: <UsdShort value={committeeInput.derivatives.volume24hUsd} /></span></span> },
-                  { label: 'حداکثر حجم پیشنهادی بر اساس ۲×ATR', value: baseline.recommendedSizeUsd ? <UsdShort value={baseline.recommendedSizeUsd} /> : '—', hint: `با ریسک ${toFaDigits(committeeInput.portfolio?.maxRiskPct ?? 1)}٪ سرمایه` }
-                ]}
-              />
-              <div className="mt-3 flex flex-wrap gap-3 text-xs">
-                <button type="button" onClick={() => onSelectCoin(activeCoin)} className="font-semibold text-accent hover:underline">
-                  مشاهده پوزیشن تریدرهای برتر روی {activeCoin} ←
-                </button>
-              </div>
-            </Disclosure>
-          </Surface>
-
-          {/* ۳) نمایش خروجی کامل ۴ مرحله‌ای پس از اجرای کمیته */}
-          {activeReport && (
-            <div className="space-y-4">
-              {/* حکم نهایی مدیر پرتفولیو */}
-              <PortfolioManagerCard
-                coin={activeCoin}
-                report={activeReport}
-                maxLeverage={selectedMarket?.maxLeverage ?? 10}
-              />
-
-              {/* پیشنهاد ایجنت معامله‌گر (Trader Agent) */}
-              <TraderProposalCard report={activeReport} />
-
-              {/* مناظره پژوهشگر صعودی و نزولی + حکم مدیر پژوهش */}
-              <ResearchDebateCard report={activeReport} />
-
-              {/* مناظره ۳ تحلیلگر ریسک (تهاجمی، محافظه‌کار، خنثی) */}
-              <RiskCommitteeCard report={activeReport} />
-
-              {/* گزارش ۴ تحلیلگر تخصصی */}
-              <AnalystsTeamCard report={activeReport} />
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ۴) حافظه تصمیم‌ها و تسویه خودکار (Memory Log & Settlement) */}
-      <MemoryLogSection
-        entries={memory}
-        onClear={() => {
-          setMemory([]);
-          saveMemory([]);
-        }}
-      />
+          ) : undefined
+        }
+      >
+        <MemoryLogList entries={memory} />
+      </Sheet>
     </div>
   );
 }
 
-// ─── اجزای نمایشی ۴ مرحله کمیته ──────────────────────────────────────────────
+// ─── ۱) کارت پیش‌خوانش کمی زنده (قبل از اجرای هوش مصنوعی) ──────────────────────
 
-function PortfolioManagerCard({
+function LiveQuantitativePreReadCard({
   coin,
-  report,
-  maxLeverage
+  input,
+  baseline,
+  onOpenIndicators
 }: {
   coin: string;
+  input: CommitteeMarketInput;
+  baseline: ReturnType<typeof buildDeterministicCommitteeBaseline>;
+  onOpenIndicators: () => void;
+}) {
+  const { technical: t, derivatives: d, macroRegime } = input;
+  const bandMeta = SENTIMENT_BAND_FA[baseline.sentimentBand];
+  const scorePct = Math.min(100, Math.max(0, baseline.sentimentScore * 10));
+  const bullCount = useMemo(
+    () => buildIndicatorDiagnostics(t).filter((r) => r.signal === 'bullish').length,
+    [t]
+  );
+  const bearCount = useMemo(
+    () => buildIndicatorDiagnostics(t).filter((r) => r.signal === 'bearish').length,
+    [t]
+  );
+
+  return (
+    <Surface variant="focal" className="p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-2xs font-semibold text-muted">پیش‌خوانش کمی زنده (محاسبه مستقیم از ۱۱ اندیکاتور و فاندینگ)</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-extrabold text-ink">
+              <bdi dir="ltr">{coin}</bdi> · <span className="num-ltr">{fmtPrice(t.close)}</span> دلار
+            </h3>
+            <Badge tone={bandMeta.tone}>{bandMeta.label}</Badge>
+            <Badge tone="neutral">اطمینان: {CONFIDENCE_FA[baseline.confidence]}</Badge>
+          </div>
+        </div>
+
+        <div className="text-end">
+          <span className="text-2xs text-muted">امتیاز ترکیبی (۰ تا ۱۰)</span>
+          <div className="mt-0.5 text-xl font-extrabold text-ink">
+            <bdi dir="ltr">{toFaDigits(baseline.sentimentScore.toFixed(1))}</bdi>
+            <span className="text-xs font-normal text-muted"> / ۱۰</span>
+          </div>
+        </div>
+      </div>
+
+      {/* نوار دوقطبی امتیاز کمی */}
+      <div className="mt-3">
+        <div dir="ltr" className="relative h-2 overflow-hidden rounded-full bg-surface-2">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all',
+              baseline.sentimentScore >= 5.6
+                ? 'bg-gain'
+                : baseline.sentimentScore <= 4.4
+                  ? 'bg-loss'
+                  : 'bg-accent'
+            )}
+            style={{ width: `${scorePct}%` }}
+          />
+        </div>
+        <div className="mt-1.5 flex items-center justify-between text-2xs text-subtle">
+          <span>تراز ۱۱ اندیکاتور: {toFaDigits(bullCount)} صعودی در برابر {toFaDigits(bearCount)} نزولی</span>
+          <span>
+            رژیم کلان: {macroRegime?.state === 'on' ? 'صعودی (Risk-On)' : macroRegime?.state === 'off' ? 'محتاط (Risk-Off)' : 'در حال سنجش'}
+          </span>
+        </div>
+      </div>
+
+      {/* ۴ متریک کلیدی در یک نگاه */}
+      <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">روند و میانگین‌ها</dt>
+          <dd className="mt-1 text-xs font-extrabold text-ink">
+            {t.trendRegime === 'bullish' ? 'صعودی (بالای SMA50/200)' : t.trendRegime === 'bearish' ? 'نزولی (زیر SMA50/200)' : 'نوسانی / خنثی'}
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle" dir="ltr">
+            SMA50: {fmtPrice(t.close50Sma)}
+          </dd>
+        </div>
+
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">مومنتوم (RSI 14 و MACD)</dt>
+          <dd className="mt-1 text-xs font-extrabold text-ink">
+            RSI: <bdi dir="ltr">{t.rsi14 !== null ? toFaDigits(t.rsi14.toFixed(1)) : '—'}</bdi>
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">
+            مکدی: {t.macdh !== null ? (t.macdh >= 0 ? 'شتاب مثبت (+)' : 'شتاب منفی (−)') : '—'}
+          </dd>
+        </div>
+
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">نوسان ATR و حد ضرر ۲×ATR</dt>
+          <dd className="mt-1 text-xs font-extrabold text-ink">
+            ATR: <bdi dir="ltr">{fmtPrice(t.atr14)}</bdi> ({pct(t.atrPct)})
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">
+            استاپ لانگ: <bdi dir="ltr">{fmtPrice(baseline.atrStopLong)}</bdi>
+          </dd>
+        </div>
+
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">حجم پیشنهادی و اهرم امن</dt>
+          <dd className="mt-1 text-xs font-extrabold text-ink">
+            {baseline.recommendedSizeUsd ? <UsdShort value={baseline.recommendedSizeUsd} /> : '—'}
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">
+            اهرم امن ۷ روزه: {d.safeLeverage7d ? `تا ${toFaDigits(d.safeLeverage7d)}x` : 'بدون اهرم'}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-3 text-xs text-muted">
+        <span>برای برگزاری مناظره کامل بین پژوهشگر صعودی، نزولی، معامله‌گر و کمیته ریسک دکمه «اجرای کمیته» را بزنید.</span>
+        <button type="button" onClick={onOpenIndicators} className="font-semibold text-accent hover:underline">
+          مشاهده جدول ۱۱ اندیکاتور ←
+        </button>
+      </div>
+    </Surface>
+  );
+}
+
+// ─── ۲) کارت کانونی حکم نهایی مدیر پرتفولیو و هندسه معامله ─────────────────────
+
+function ExecutiveVerdictHero({
+  coin,
+  input,
+  report,
+  maxLeverage,
+  onDownloadHtml
+}: {
+  coin: string;
+  input: CommitteeMarketInput;
   report: TradingAgentsReport;
   maxLeverage: number;
+  onDownloadHtml: () => void;
 }) {
   const pm = report.riskDebate.portfolioDecision;
   const tp = report.traderProposal;
   const meta = RATING_FA[pm.rating];
+  const traderMeta = TRADER_ACTION_FA[tp.action];
+  const targetPx = pm.priceTarget ?? tp.takeProfit;
+  const geometry = computeTradeGeometry(tp.entryPrice ?? input.technical.close, tp.stopLoss, targetPx);
   const side = meta.direction < 0 ? 'short' : 'long';
+  const safeLev = Math.min(input.derivatives.safeLeverage7d ?? 2, maxLeverage);
 
   return (
     <Surface
       variant="focal"
       className={cn(
-        'border-2 p-5',
+        'border-2 p-4 sm:p-5',
         meta.tone === 'gain'
           ? 'border-gain/50'
           : meta.tone === 'loss'
@@ -489,255 +700,375 @@ function PortfolioManagerCard({
               : 'border-divider'
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* ردیف عنوان و بج حکم نهایی */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-2xs font-semibold text-muted">مرحله ۴ (نهایی) · حکم مدیر پرتفولیو (Portfolio Manager)</p>
-          <h3 className="mt-1 text-lg font-extrabold text-ink">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusDot tone={meta.tone} label="حکم نهایی مدیر پرتفولیو (Portfolio Manager)" />
+            <span className="text-2xs text-subtle">· عمق مناظره: {toFaDigits(input.researchDepth)} دور</span>
+          </div>
+          <h3 className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
             <bdi dir="ltr">{coin}</bdi> — {meta.label}
           </h3>
         </div>
-        <Badge tone={meta.tone}>{meta.short}</Badge>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone={meta.tone} className="text-xs px-2.5 py-1">
+            {meta.short} ({pm.rating})
+          </Badge>
+          <Badge tone={traderMeta.tone} className="text-xs px-2.5 py-1">
+            تریدر: {traderMeta.short}
+          </Badge>
+        </div>
       </div>
 
-      <p className="mt-2 text-xs font-medium text-subtle">{meta.actionHint}</p>
+      {/* خلاصه مدیریتی */}
       <p className="mt-3 text-sm leading-7 text-ink">{pm.executiveSummary}</p>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-divider pt-4 sm:grid-cols-4">
-        <div>
-          <dt className="text-2xs text-muted">پیشنهاد معامله‌گر</dt>
-          <dd className="mt-0.5 text-sm font-extrabold text-ink">{TRADER_ACTION_FA[tp.action].label}</dd>
+      {/* نوار هندسه معامله (ورود / حد ضرر / هدف / R:R) */}
+      <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">نقطه ورود مرجع</dt>
+          <dd className="mt-1 text-sm font-extrabold text-ink" dir="ltr">
+            {fmtPrice(tp.entryPrice ?? input.technical.close)}
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">افق: {pm.timeHorizon}</dd>
         </div>
-        <div>
-          <dt className="text-2xs text-muted">نقطه ورود / حد ضرر (ATR)</dt>
-          <dd className="mt-0.5 text-sm font-extrabold text-ink" dir="ltr">
-            {fmtPrice(tp.entryPrice)} / <span className="text-negative">{fmtPrice(tp.stopLoss)}</span>
+
+        <div className="rounded-field bg-negative/5 border border-negative/20 p-3">
+          <dt className="text-2xs text-muted">حد ضرر (مبتنی بر ATR)</dt>
+          <dd className="mt-1 text-sm font-extrabold text-negative" dir="ltr">
+            {fmtPrice(tp.stopLoss)}
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">
+            فاصله: {geometry.stopDistancePct !== null ? `${toFaDigits(geometry.stopDistancePct.toFixed(1))}٪` : '—'}
           </dd>
         </div>
-        <div>
-          <dt className="text-2xs text-muted">هدف قیمتی</dt>
-          <dd className="mt-0.5 text-sm font-extrabold text-positive" dir="ltr">
-            {fmtPrice(pm.priceTarget ?? tp.takeProfit)}
+
+        <div className="rounded-field bg-gain/5 border border-gain/20 p-3">
+          <dt className="text-2xs text-muted">هدف قیمتی کمیته</dt>
+          <dd className="mt-1 text-sm font-extrabold text-positive" dir="ltr">
+            {fmtPrice(targetPx)}
+          </dd>
+          <dd className="mt-0.5 text-2xs text-subtle">
+            فاصله: {geometry.targetDistancePct !== null ? `+${toFaDigits(geometry.targetDistancePct.toFixed(1))}٪` : '—'}
           </dd>
         </div>
-        <div>
-          <dt className="text-2xs text-muted">افق زمانی پیشنهادی</dt>
-          <dd className="mt-0.5 text-sm font-extrabold text-ink">{pm.timeHorizon}</dd>
+
+        <div className="rounded-field bg-surface-2/70 p-3">
+          <dt className="text-2xs text-muted">نسبت ریسک به ریوارد (R:R)</dt>
+          <dd className="mt-1 text-sm font-extrabold text-ink" dir="ltr">
+            {geometry.riskRewardRatio !== null ? `1 : ${toFaDigits(geometry.riskRewardRatio)}` : '—'}
+          </dd>
+          <dd className="mt-0.5 truncate text-2xs text-subtle" title={tp.positionSizing}>
+            {tp.positionSizing}
+          </dd>
         </div>
       </dl>
 
-      <Disclosure summary="تز کامل سرمایه‌گذاری و شواهد تصمیم مدیر پرتفولیو" className="mt-3">
-        <p className="text-xs leading-7 text-muted whitespace-pre-wrap">{pm.investmentThesis}</p>
-      </Disclosure>
+      {/* نوار اقدام پایین کارت */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-divider pt-3 text-xs">
+        <span className="text-muted">
+          این خروجی شبیه‌سازی پژوهشی کمیته ایجنت‌هاست و توصیه مالی قطعی نیست.
+        </span>
 
-      {meta.direction !== 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-3 text-xs">
-          <span className="text-muted">این خروجی پژوهشی است و سفارش خودکار ارسال نمی‌کند.</span>
-          <Link
-            to={`/journal?tab=plan&m=${encodeURIComponent(coin)}&side=${side}&lev=${Math.min(3, maxLeverage)}`}
-            className="font-semibold text-accent underline"
-          >
-            انتقال به برنامه معامله در ژورنال ←
-          </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" icon={<Download />} onClick={onDownloadHtml}>
+            گزارش HTML
+          </Button>
+          {meta.direction !== 0 && (
+            <Link
+              to={`/journal?tab=plan&m=${encodeURIComponent(coin)}&side=${side}&lev=${safeLev}`}
+              className="inline-flex min-h-[36px] items-center rounded-control bg-accent px-3.5 py-1.5 font-bold text-on-accent transition hover:bg-brand-600"
+            >
+              ثبت در برنامه معامله ژورنال ←
+            </Link>
+          )}
         </div>
-      )}
-    </Surface>
-  );
-}
-
-function TraderProposalCard({ report }: { report: TradingAgentsReport }) {
-  const tp = report.traderProposal;
-  const meta = TRADER_ACTION_FA[tp.action];
-  return (
-    <Surface className="space-y-3 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-2xs font-semibold text-muted">مرحله ۳ · پیشنهاد اجرایی ایجنت معامله‌گر (Trader Agent)</p>
-          <h4 className="mt-0.5 text-base font-bold text-ink">{meta.label}</h4>
-        </div>
-        <Badge tone={meta.tone}>{tp.action}</Badge>
-      </div>
-      <p className="text-sm leading-7 text-muted whitespace-pre-wrap">{tp.reasoning}</p>
-      <div className="rounded-field bg-surface-2/70 px-3 py-2 text-xs leading-6 text-ink">
-        <strong>اندازه پوزیشن و مدیریت سرمایه:</strong> {tp.positionSizing}
       </div>
     </Surface>
   );
 }
 
-function ResearchDebateCard({ report }: { report: TradingAgentsReport }) {
+// ─── ۳) نماهای داخلی ۴ تب کمیته ──────────────────────────────────────────────
+
+function ResearchDebateView({ report }: { report: TradingAgentsReport }) {
   const rd = report.researchDebate;
+  const tp = report.traderProposal;
   const planMeta = RATING_FA[rd.researchPlan.recommendation];
-  return (
-    <Surface className="space-y-4 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-2xs font-semibold text-muted">مرحله ۲ · مناظره تیم پژوهشگران (Bull vs. Bear) و داوری مدیر پژوهش</p>
-          <h4 className="mt-0.5 text-base font-bold text-ink">حکم مدیر پژوهش: {planMeta.label}</h4>
-        </div>
-        <Badge tone={planMeta.tone}>{planMeta.short}</Badge>
-      </div>
 
+  return (
+    <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-card border border-gain/30 bg-gain/5 p-3.5">
-          <h5 className="flex items-center gap-1.5 text-xs font-extrabold text-positive">
-            <TrendingUp className="h-4 w-4" aria-hidden />
-            پژوهشگر صعودی (Bull Researcher)
-          </h5>
-          <p className="mt-2 text-xs leading-6 text-ink whitespace-pre-wrap">{rd.bullHistory}</p>
+        <div className="rounded-card border border-gain/25 bg-gain/5 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-positive">
+              <TrendingUp className="h-4 w-4" aria-hidden />
+              پژوهشگر صعودی (Bull Researcher)
+            </h4>
+            <Badge tone="gain">دفاع از صعود</Badge>
+          </div>
+          <p className="mt-2.5 text-xs leading-7 text-ink whitespace-pre-wrap">{rd.bullHistory}</p>
         </div>
 
-        <div className="rounded-card border border-negative/30 bg-negative/5 p-3.5">
-          <h5 className="flex items-center gap-1.5 text-xs font-extrabold text-negative">
-            <TrendingDown className="h-4 w-4" aria-hidden />
-            پژوهشگر نزولی (Bear Researcher)
-          </h5>
-          <p className="mt-2 text-xs leading-6 text-ink whitespace-pre-wrap">{rd.bearHistory}</p>
+        <div className="rounded-card border border-negative/25 bg-negative/5 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-negative">
+              <TrendingDown className="h-4 w-4" aria-hidden />
+              پژوهشگر نزولی (Bear Researcher)
+            </h4>
+            <Badge tone="loss">نقد و ریسک نزولی</Badge>
+          </div>
+          <p className="mt-2.5 text-xs leading-7 text-ink whitespace-pre-wrap">{rd.bearHistory}</p>
         </div>
       </div>
 
-      <div className="rounded-field border border-divider bg-surface-2/60 p-3.5 space-y-2">
-        <p className="text-xs font-bold text-ink">داوری مدیر پژوهش (Research Manager):</p>
-        <p className="text-xs leading-6 text-muted whitespace-pre-wrap">{rd.researchPlan.rationale}</p>
-        <p className="text-xs leading-6 text-ink">
-          <strong>دستورالعمل راهبردی برای معامله‌گر:</strong> {rd.researchPlan.strategicActions}
-        </p>
+      {/* داوری مدیر پژوهش + طرح معامله‌گر */}
+      <div className="divide-y divide-divider rounded-card bg-surface-2/70 p-4">
+        <div className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-xs font-extrabold text-ink">داوری مدیر پژوهش (Research Manager)</h4>
+            <Badge tone={planMeta.tone}>{planMeta.label}</Badge>
+          </div>
+          <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{rd.researchPlan.rationale}</p>
+          <p className="mt-1.5 text-xs leading-6 text-ink">
+            <strong>گام‌های راهبردی ابلاغی به تریدر:</strong> {rd.researchPlan.strategicActions}
+          </p>
+        </div>
+
+        <div className="pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-xs font-extrabold text-ink">پیشنهاد اجرایی ایجنت معامله‌گر (Trader Agent)</h4>
+            <Badge tone={TRADER_ACTION_FA[tp.action].tone}>{TRADER_ACTION_FA[tp.action].label}</Badge>
+          </div>
+          <p className="mt-1.5 text-xs leading-7 text-muted whitespace-pre-wrap">{tp.reasoning}</p>
+          <p className="mt-1 text-xs font-semibold text-ink">مدیریت حجم و سایزینگ: {tp.positionSizing}</p>
+        </div>
       </div>
-    </Surface>
+    </div>
   );
 }
 
-function RiskCommitteeCard({ report }: { report: TradingAgentsReport }) {
+function RiskCommitteeView({ report }: { report: TradingAgentsReport }) {
   const rk = report.riskDebate;
+  const pm = rk.portfolioDecision;
+
   return (
-    <Surface className="space-y-4 p-4 sm:p-5">
-      <div>
-        <p className="text-2xs font-semibold text-muted">مرحله ۳.۵ · مناظره سه دیدگاه کمیته مدیریت ریسک (Risk Management Team)</p>
-        <h4 className="mt-0.5 text-base font-bold text-ink">نقد پیشنهاد معامله‌گر از سه زاویه تهاجمی، محافظه‌کار و متوازن</h4>
-      </div>
-
+    <div className="space-y-4">
       <div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-field border border-divider bg-surface-2/50 p-3">
-          <h5 className="flex items-center gap-1.5 text-xs font-extrabold text-positive">
-            <TrendingUp className="h-3.5 w-3.5" aria-hidden />
+        <div className="rounded-card bg-surface-2/70 p-4">
+          <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-positive">
+            <TrendingUp className="h-4 w-4" aria-hidden />
             تحلیلگر ریسک تهاجمی (Aggressive)
-          </h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{rk.aggressiveArgument}</p>
+          </h4>
+          <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{rk.aggressiveArgument}</p>
         </div>
 
-        <div className="rounded-field border border-divider bg-surface-2/50 p-3">
-          <h5 className="flex items-center gap-1.5 text-xs font-extrabold text-warn">
-            <ShieldAlert className="h-3.5 w-3.5" aria-hidden />
+        <div className="rounded-card bg-surface-2/70 p-4">
+          <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-warn">
+            <ShieldAlert className="h-4 w-4" aria-hidden />
             تحلیلگر ریسک محافظه‌کار (Conservative)
-          </h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{rk.conservativeArgument}</p>
+          </h4>
+          <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{rk.conservativeArgument}</p>
         </div>
 
-        <div className="rounded-field border border-divider bg-surface-2/50 p-3">
-          <h5 className="flex items-center gap-1.5 text-xs font-extrabold text-accent">
-            <Scale className="h-3.5 w-3.5" aria-hidden />
+        <div className="rounded-card bg-surface-2/70 p-4">
+          <h4 className="flex items-center gap-1.5 text-xs font-extrabold text-accent">
+            <Scale className="h-4 w-4" aria-hidden />
             تحلیلگر ریسک متوازن (Neutral)
-          </h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{rk.neutralArgument}</p>
+          </h4>
+          <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{rk.neutralArgument}</p>
         </div>
       </div>
-    </Surface>
+
+      <div className="rounded-card border border-divider bg-surface-2/40 p-4">
+        <h4 className="text-xs font-extrabold text-ink">تز کامل سرمایه‌گذاری و شرط ابطال (Portfolio Manager Thesis)</h4>
+        <p className="mt-2 text-xs leading-7 text-ink whitespace-pre-wrap">{pm.investmentThesis}</p>
+      </div>
+    </div>
   );
 }
 
-function AnalystsTeamCard({ report }: { report: TradingAgentsReport }) {
+function AnalystsTeamView({ report }: { report: TradingAgentsReport }) {
   const a = report.analysts;
   const sr = a.sentimentReport;
   const bandMeta = SENTIMENT_BAND_FA[sr.overallBand];
+
   return (
-    <Surface className="space-y-3 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-2xs font-semibold text-muted">مرحله ۱ · گزارش‌های ۴ تحلیلگر تخصصی (Analyst Team)</p>
-          <h4 className="mt-0.5 text-base font-bold text-ink">تکنیکال، احساسات و فاندینگ، رژیم کلان و نقدشوندگی</h4>
+    <div className="grid gap-3 md:grid-cols-2">
+      <div className="rounded-card bg-surface-2/70 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-extrabold text-ink">۱. تحلیلگر تکنیکال بازار (Market Analyst)</h4>
+          <Badge tone="neutral">۱۱ اندیکاتور</Badge>
         </div>
-        <Badge tone={bandMeta.tone}>
-          احساسات: {bandMeta.label} ({toFaDigits(sr.overallScore)}/۱۰)
-        </Badge>
+        <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{a.marketReport}</p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-field bg-surface-2/60 p-3">
-          <h5 className="text-xs font-extrabold text-ink">۱. تحلیلگر تکنیکال بازار (۱۱ اندیکاتور)</h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{a.marketReport}</p>
+      <div className="rounded-card bg-surface-2/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-xs font-extrabold text-ink">۲. تحلیلگر احساسات و فاندینگ (Sentiment)</h4>
+          <Badge tone={bandMeta.tone}>
+            {bandMeta.label} · {toFaDigits(sr.overallScore)}/۱۰
+          </Badge>
         </div>
-
-        <div className="rounded-field bg-surface-2/60 p-3">
-          <h5 className="text-xs font-extrabold text-ink">
-            ۲. تحلیلگر احساسات و فاندینگ (اطمینان: {CONFIDENCE_FA[sr.confidence]})
-          </h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{sr.narrative}</p>
-        </div>
-
-        <div className="rounded-field bg-surface-2/60 p-3">
-          <h5 className="text-xs font-extrabold text-ink">۳. تحلیلگر رژیم بازار و اقتصاد کلان</h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{a.newsMacroReport}</p>
-        </div>
-
-        <div className="rounded-field bg-surface-2/60 p-3">
-          <h5 className="text-xs font-extrabold text-ink">۴. تحلیلگر بنیادی و ساختار نقدشوندگی</h5>
-          <p className="mt-1.5 text-xs leading-6 text-muted whitespace-pre-wrap">{a.fundamentalsReport}</p>
-        </div>
+        <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{sr.narrative}</p>
       </div>
-    </Surface>
+
+      <div className="rounded-card bg-surface-2/70 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-extrabold text-ink">۳. تحلیلگر رژیم بازار و اقتصاد کلان</h4>
+          <Badge tone="neutral">پهنای بازار</Badge>
+        </div>
+        <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{a.newsMacroReport}</p>
+      </div>
+
+      <div className="rounded-card bg-surface-2/70 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-xs font-extrabold text-ink">۴. تحلیلگر بنیادی و نقدشوندگی</h4>
+          <Badge tone="neutral">OI و حجم</Badge>
+        </div>
+        <p className="mt-2 text-xs leading-7 text-muted whitespace-pre-wrap">{a.fundamentalsReport}</p>
+      </div>
+    </div>
   );
 }
 
-function MemoryLogSection({
-  entries,
-  onClear
+function IndicatorsMatrixView({
+  rows,
+  input
 }: {
-  entries: TradingMemoryEntry[];
-  onClear: () => void;
+  rows: IndicatorDiagnosticRow[];
+  input: CommitteeMarketInput;
 }) {
-  return (
-    <Disclosure
-      summary={`حافظه تصمیم‌ها و تسویه خودکار (Memory Log)${entries.length ? ` · ${toFaDigits(entries.length)} ثبت` : ''}`}
-    >
-      <div className="space-y-3 pt-2">
-        <p className="text-xs leading-6 text-muted">
-          مشابه فایل <code dir="ltr">trading_memory.md</code> در مخزن اصلی TradingAgents، هر بار که کمیته اجرا می‌شود تصمیم آن همراه با قیمت لحظه تصمیم ذخیره می‌شود و در بازدیدهای بعدی، بازده واقعی آن نسبت به قیمت روز محاسبه و به‌عنوان «درس‌های قبلی» به مدیر پرتفولیو داده می‌شود.
-        </p>
+  const toneFor = (s: IndicatorDiagnosticRow['signal']) =>
+    s === 'bullish' ? 'gain' : s === 'bearish' ? 'loss' : 'neutral';
 
-        {entries.length === 0 ? (
-          <p className="text-xs text-subtle">هنوز تصمیمی در حافظه ثبت نشده است.</p>
-        ) : (
-          <>
-            <div className="space-y-2">
-              {entries.slice(0, 10).map((e) => {
-                const rMeta = RATING_FA[e.rating];
-                return (
-                  <div key={e.id} className="rounded-field border border-divider bg-surface-2/50 p-3 text-xs space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-extrabold text-ink">
-                        <History className="inline h-3.5 w-3.5 me-1 text-accent" aria-hidden />
-                        <bdi dir="ltr">{e.coin}</bdi> · {rMeta.short} (<bdi dir="ltr">{e.rating}</bdi>)
-                      </span>
-                      <span className="text-subtle">
-                        {e.analysisDate} · ورود: <bdi dir="ltr">{fmtPrice(e.entryPrice)}</bdi> · تغییر تا امروز:{' '}
-                        <strong className={cn(e.realizedReturnPct && e.realizedReturnPct > 0 ? 'text-positive' : e.realizedReturnPct && e.realizedReturnPct < 0 ? 'text-negative' : 'text-ink')}>
-                          <bdi dir="ltr">{pct(e.realizedReturnPct, 2)}</bdi>
-                        </strong>
-                      </span>
-                    </div>
-                    <p className="text-muted line-clamp-2">{e.executiveSummary}</p>
-                    {e.lesson && <p className="text-2xs text-subtle">{e.lesson}</p>}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-end">
-              <Button variant="ghost" size="sm" icon={<Trash2 />} onClick={onClear}>
-                پاک کردن حافظه تصمیم‌ها
-              </Button>
-            </div>
-          </>
-        )}
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+        <span>
+          تعداد کندل‌های بررسی‌شده: <strong>{toFaDigits(input.technical.barsCount)}</strong> کندل ۴ ساعته · قیمت مرجع:{' '}
+          <strong className="num-ltr text-ink">{fmtPrice(input.technical.close)}</strong> دلار
+        </span>
+        <span>
+          حمایت/مقاومت ۲۰ کندل: <strong className="num-ltr text-ink">{fmtPrice(input.technical.support20)}</strong> /{' '}
+          <strong className="num-ltr text-ink">{fmtPrice(input.technical.resistance20)}</strong>
+        </span>
       </div>
-    </Disclosure>
+
+      {/* نمایش کارتی برای موبایل/PWA و جدول فشرده برای دسکتاپ */}
+      <div className="grid gap-2 sm:hidden">
+        {rows.map((r) => (
+          <div key={r.key} className="rounded-field bg-surface-2/70 p-3 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-ink">
+                {r.nameFa} <span className="text-2xs text-subtle" dir="ltr">({r.code})</span>
+              </span>
+              <Badge tone={toneFor(r.signal)}>{r.signalFa}</Badge>
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-2xs text-muted">{r.noteFa}</span>
+              <span className="num-ltr font-extrabold text-ink">{fmtPrice(r.value)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="data-table is-compact">
+          <thead>
+            <tr>
+              <th scope="col">اندیکاتور</th>
+              <th scope="col">دسته</th>
+              <th scope="col" className="col-num">مقدار محاسبه‌شده</th>
+              <th scope="col">وضعیت</th>
+              <th scope="col">نقش در کمیته</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <th scope="row" className="font-bold text-ink">
+                  {r.nameFa} <span className="ms-1 text-2xs font-normal text-subtle" dir="ltr">({r.code})</span>
+                </th>
+                <td className="text-xs text-muted">{r.category}</td>
+                <td className="col-num num-ltr font-bold text-ink">{fmtPrice(r.value)}</td>
+                <td>
+                  <Badge tone={toneFor(r.signal)}>{r.signalFa}</Badge>
+                </td>
+                <td className="text-xs text-muted">{r.noteFa}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MemoryLogList({ entries }: { entries: TradingMemoryEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <div className="py-8 text-center text-sm text-muted">
+        هنوز تصمیمی در حافظه کمیته ثبت نشده است. با هر بار اجرای کمیته، حکم صادرشده و قیمت لحظه تصمیم در اینجا ثبت و در بازدیدهای بعدی با قیمت روز تسویه می‌شود.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5 py-2">
+      {entries.map((e) => {
+        const rMeta = RATING_FA[e.rating];
+        return (
+          <div key={e.id} className="rounded-card border border-divider bg-surface-2/60 p-3.5 text-xs space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-ink" dir="ltr">
+                  {e.coin}
+                </span>
+                <Badge tone={rMeta.tone}>
+                  {rMeta.short} ({e.rating})
+                </Badge>
+              </div>
+              <span className="text-2xs text-subtle">{e.analysisDate}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-2xs text-muted">
+              <span>
+                ورود: <strong className="num-ltr text-ink">{fmtPrice(e.entryPrice)}</strong>
+              </span>
+              {e.stopLoss && (
+                <span>
+                  حد ضرر: <strong className="num-ltr text-negative">{fmtPrice(e.stopLoss)}</strong>
+                </span>
+              )}
+              {e.priceTarget && (
+                <span>
+                  هدف: <strong className="num-ltr text-positive">{fmtPrice(e.priceTarget)}</strong>
+                </span>
+              )}
+              <span>
+                تغییر قیمت تا امروز:{' '}
+                <strong
+                  className={cn(
+                    'num-ltr',
+                    e.realizedReturnPct && e.realizedReturnPct > 0
+                      ? 'text-positive'
+                      : e.realizedReturnPct && e.realizedReturnPct < 0
+                        ? 'text-negative'
+                        : 'text-ink'
+                  )}
+                >
+                  {pct(e.realizedReturnPct, 2)}
+                </strong>
+              </span>
+            </div>
+
+            <p className="text-xs leading-6 text-ink">{e.executiveSummary}</p>
+            {e.lesson && <p className="text-2xs text-subtle border-t border-divider pt-1.5">{e.lesson}</p>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
