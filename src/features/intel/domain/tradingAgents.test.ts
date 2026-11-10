@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GLOBAL_COMMITTEE_MARKETS,
   buildDeterministicCommitteeBaseline,
   buildIndicatorDiagnostics,
   buildPastLessonsContext,
   coerceOptionalFloat,
   computeTechnicalSnapshot,
   computeTradeGeometry,
+  getMarketVisualMeta,
   parseRatingFromText,
+  rankMemoryByBm25,
   renderCompleteReportHtml,
   settleMemoryEntries,
+  synthesizeFallbackCandles,
   type CommitteeMarketInput,
   type TradingMemoryEntry
 } from './tradingAgents';
@@ -48,6 +52,45 @@ describe('TradingAgents Domain — coerceOptionalFloat & parseRatingFromText', (
     ].join('\n');
     expect(parseRatingFromText(text)).toBe('Underweight');
     expect(parseRatingFromText('No rating label here at all')).toBe('REVIEW');
+  });
+});
+
+describe('TradingAgents Domain — کاتالوگ بازارها، لوگوها و کندل پشتیبان (رمزارز، طلا، نفت، سهام، فارکس)', () => {
+  it('تمام دسته‌های رمزارز، طلا، نقره، نفت برنت/WTI، سهام بزرگ و فارکس را با لوگوی رنگی و نام فارسی پوشش می‌دهد', () => {
+    expect(GLOBAL_COMMITTEE_MARKETS.length).toBeGreaterThanOrEqual(45);
+
+    const gold = getMarketVisualMeta('xyz:GOLD');
+    expect(gold.category).toBe('commodity');
+    expect(gold.logoKey).toBe('XAU');
+    expect(gold.nameFa).toContain('طلا');
+
+    const brent = getMarketVisualMeta('xyz:BRENTOIL');
+    expect(brent.category).toBe('commodity');
+    expect(brent.logoKey).toBe('BRENTOIL');
+    expect(brent.nameFa).toContain('نفت');
+
+    const wti = getMarketVisualMeta('xyz:CL');
+    expect(wti.category).toBe('commodity');
+    expect(wti.logoKey).toBe('WTI');
+
+    const nvda = getMarketVisualMeta('xyz:NVDA');
+    expect(nvda.category).toBe('equity');
+    expect(nvda.logoKey).toBe('NVDA');
+    expect(nvda.nameFa).toContain('انویدیا');
+
+    const eur = getMarketVisualMeta('xyz:EUR');
+    expect(eur.category).toBe('fx');
+    expect(eur.logoKey).toBe('EURUSD');
+  });
+
+  it('در صورت نبود کندل زنده برای سهام یا طلا/نفت، سری کندل ۱۲۰ تایی معتبر برای ۱۱ اندیکاتور می‌سازد', () => {
+    const synth = synthesizeFallbackCandles(3985, 0.85, 'xyz:GOLD', 120);
+    expect(synth).toHaveLength(120);
+    expect(synth[synth.length - 1].c).toBeCloseTo(3985);
+    const snap = computeTechnicalSnapshot(synth, 6);
+    expect(snap).not.toBeNull();
+    expect(snap!.rsi14).not.toBeNull();
+    expect(snap!.atr14).toBeGreaterThan(0);
   });
 });
 
@@ -113,8 +156,8 @@ describe('TradingAgents Domain — ۱۱ اندیکاتور تکنیکال، ما
   });
 });
 
-describe('TradingAgents Domain — حافظه تصمیم‌ها (Memory Log) و گزارش HTML', () => {
-  it('تصمیم‌های سررسیدشده را تسویه می‌کند و درس‌های قبلی را استخراج می‌کند', () => {
+describe('TradingAgents Domain — حافظه تصمیم‌ها (BM25 + Memory Log) و گزارش HTML', () => {
+  it('تصمیم‌های سررسیدشده را تسویه می‌کند و درس‌های قبلی را با الگوریتم BM25 استخراج می‌کند', () => {
     const createdAt = Date.parse('2026-10-01T00:00:00Z');
     const now = Date.parse('2026-10-20T00:00:00Z');
     const entries: TradingMemoryEntry[] = [
@@ -129,21 +172,41 @@ describe('TradingAgents Domain — حافظه تصمیم‌ها (Memory Log) و 
         stopLoss: 2350,
         priceTarget: 2800,
         holdingPeriodDays: 14,
-        executiveSummary: 'ورود روی حمایت',
+        executiveSummary: 'ورود صعودی روی حمایت',
+        settledAt: null,
+        settledPrice: null,
+        realizedReturnPct: null,
+        lesson: null
+      },
+      {
+        id: '2',
+        coin: 'BTC',
+        analysisDate: '2026-10-02',
+        createdAt,
+        rating: 'Sell',
+        traderAction: 'Sell',
+        entryPrice: 90000,
+        stopLoss: 92000,
+        priceTarget: 85000,
+        holdingPeriodDays: 14,
+        executiveSummary: 'فشار نزولی در مقاومت',
         settledAt: null,
         settledPrice: null,
         realizedReturnPct: null,
         lesson: null
       }
     ];
-    const { updated, newlySettledCount } = settleMemoryEntries(entries, { ETH: 2750 }, now);
-    expect(newlySettledCount).toBe(1);
+    const { updated, newlySettledCount } = settleMemoryEntries(entries, { ETH: 2750, BTC: 88000 }, now);
+    expect(newlySettledCount).toBe(2);
     expect(updated[0].settledAt).toBe(now);
     expect(updated[0].realizedReturnPct).toBeCloseTo(10);
     expect(updated[0].lesson).toContain('+10%');
 
-    const lessons = buildPastLessonsContext(updated, 'ETH');
-    expect(lessons).toHaveLength(1);
+    const ranked = rankMemoryByBm25(updated, 'ETH صعودی حمایت', 2);
+    expect(ranked[0].coin).toBe('ETH');
+
+    const lessons = buildPastLessonsContext(updated, 'ETH', 2, 'صعودی حمایت');
+    expect(lessons).toHaveLength(2);
     expect(lessons[0]).toContain('ETH');
   });
 

@@ -7,10 +7,11 @@
  *      - تحلیلگر احساسات و ازدحام (SentimentBand شش‌سطحی + نمره ۰ تا ۱۰ + سطح اطمینان low/medium/high)
  *      - تحلیلگر رژیم بازار و اقتصاد کلان (وضعیت BTC نسبت به SMA200، پهنای بازار، فاندینگ ۳۰ روزه)
  *      - تحلیلگر بنیادی و ساختار نقدشوندگی (حجم ۲۴ ساعته، قراردادهای باز OI، نسبت حجم به OI و عمق بازار)
- *   ۲) تیم پژوهشگران (مناظره Bull در برابر Bear + حکم ۵ سطحی مدیر پژوهش ResearchPlan)
+ *   ۲) تیم پژوهشگران (مناظره چنددوری Bull در برابر Bear + حکم ۵ سطحی مدیر پژوهش ResearchPlan)
  *   ۳) ایجنت معامله‌گر (TraderProposal: جهت Buy/Hold/Sell، نقطه ورود، حد ضرر مبتنی بر ATR و اندازه پوزیشن)
  *   ۴) کمیته مدیریت ریسک (۳ مناظره: تهاجمی، محافظه‌کار، خنثی) + حکم نهایی ۵ سطحی مدیر پرتفولیو (PortfolioDecision)
- *   ۵) حافظه تصمیم‌ها و تسویه خودکار (Memory Log & Point-in-Time Settlement) + گزارش تک‌صفحه‌ای HTML
+ *   ۵) حافظه تصمیم‌ها با الگوریتم BM25 و تسویه خودکار (Memory Log & Point-in-Time Settlement) + گزارش تک‌صفحه‌ای HTML
+ *   ۶) کاتالوگ چنددارایی (رمزارز، طلا و نفت و کالا، سهام و شاخص، فارکس) با هویت بصری و لوگوی رنگی
  *
  * Pure — مشترک بین سرور و کلاینت؛ بدون هیچ فراخوانی شبکه یا اجرای دستور سیستمی.
  */
@@ -882,7 +883,7 @@ export function buildDeterministicTradingAgentsReport(input: CommitteeMarketInpu
   };
 }
 
-// ─── ۴) حافظه تصمیم‌ها و تسویه خودکار (معادل tradingagents/memory/log.py و settlement.py) ─
+// ─── ۴) حافظه تصمیم‌ها با الگوریتم BM25 و تسویه خودکار (معادل memory.py، log.py و settlement.py) ─
 
 export interface TradingMemoryEntry {
   id: string;
@@ -960,17 +961,323 @@ export function settleMemoryEntries(
 }
 
 /**
- * استخراج درس‌های قبلی برای همان نماد و سایر نمادها جهت تزریق به پرامپت مدیر پرتفولیو
- * (معادل `past_context` در `portfolio_manager.py`).
+ * الگوریتم BM25 برای بازیابی مشابهت موقعیت‌های قبلی بازار (معادل دقیق `FinancialSituationMemory` در `tradingagents/agents/utils/memory.py`):
+ * از پارامترهای استاندارد `k1 = 1.5` و `b = 0.75` روی توکن‌های موقعیت فعلی و حافظه استفاده می‌کند.
  */
-export function buildPastLessonsContext(entries: TradingMemoryEntry[], coin: string, maxItems = 5): string[] {
-  const withLessons = entries.filter((e) => e.lesson && e.realizedReturnPct !== null);
-  const sameCoin = withLessons.filter((e) => e.coin === coin).slice(0, 3);
-  const otherCoins = withLessons.filter((e) => e.coin !== coin).slice(0, Math.max(0, maxItems - sameCoin.length));
-  return [...sameCoin, ...otherCoins].map((e) => e.lesson!);
+export function rankMemoryByBm25(
+  entries: TradingMemoryEntry[],
+  queryText: string,
+  maxItems = 5
+): TradingMemoryEntry[] {
+  const valid = entries.filter((e) => e.lesson && e.realizedReturnPct !== null);
+  if (!valid.length) return [];
+
+  const tokenize = (s: string): string[] =>
+    s
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}_:+-]+/gu, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 2);
+
+  const queryTokens = tokenize(queryText);
+  if (!queryTokens.length) return valid.slice(0, maxItems);
+
+  const docs = valid.map((e) => tokenize(`${e.coin} ${e.rating} ${e.traderAction} ${e.executiveSummary} ${e.lesson ?? ''}`));
+  const N = docs.length;
+  const avgdl = docs.reduce((sum, d) => sum + d.length, 0) / Math.max(1, N);
+  const k1 = 1.5;
+  const b = 0.75;
+
+  const df = new Map<string, number>();
+  for (const q of new Set(queryTokens)) {
+    let count = 0;
+    for (const d of docs) if (d.includes(q)) count++;
+    df.set(q, count);
+  }
+
+  const scored = valid.map((entry, idx) => {
+    const doc = docs[idx];
+    const dl = doc.length || 1;
+    let score = entry.coin.toLowerCase() === queryTokens[0] ? 1.5 : 0;
+    for (const q of queryTokens) {
+      const nq = df.get(q) ?? 0;
+      if (nq === 0) continue;
+      let tf = 0;
+      for (const tok of doc) if (tok === q) tf++;
+      if (tf === 0) continue;
+      const idf = Math.log(1 + (N - nq + 0.5) / (nq + 0.5));
+      const num = tf * (k1 + 1);
+      const den = tf + k1 * (1 - b + b * (dl / avgdl));
+      score += idf * (num / den);
+    }
+    return { entry, score };
+  });
+
+  return scored
+    .sort((a, b) => b.score - a.score || b.entry.createdAt - a.entry.createdAt)
+    .slice(0, maxItems)
+    .map((s) => s.entry);
 }
 
-// ─── ۵) خروجی گزارش تک‌صفحه‌ای HTML (معادل tradingagents/report_html.py) ────────
+/**
+ * استخراج درس‌های قبلی با الگوریتم BM25 برای همان نماد و وضعیت فعلی بازار جهت تزریق به پرامپت مدیر پرتفولیو
+ * (معادل `past_context` و `FinancialSituationMemory.get_memories` در `portfolio_manager.py`).
+ */
+export function buildPastLessonsContext(
+  entries: TradingMemoryEntry[],
+  coin: string,
+  maxItems = 5,
+  situationHint = ''
+): string[] {
+  const ranked = rankMemoryByBm25(entries, `${coin} ${situationHint}`, maxItems);
+  return ranked.map((e) => e.lesson!);
+}
+
+// ─── ۵) کاتالوگ جامع بازارها (رمزارز، طلا و نفت و کالا، سهام و شاخص، فارکس) و هویت بصری ───
+
+export type MarketAssetCategory = 'crypto' | 'commodity' | 'equity' | 'fx';
+
+export const MARKET_CATEGORY_FA: Record<MarketAssetCategory, { label: string; short: string; tone: 'info' | 'warn' | 'gain' | 'neutral' }> = {
+  crypto: { label: 'رمزارزها', short: 'رمزارز', tone: 'info' },
+  commodity: { label: 'طلا، نفت و کالاها', short: 'طلا و کالا', tone: 'warn' },
+  equity: { label: 'سهام و شاخص‌ها', short: 'سهام و شاخص', tone: 'gain' },
+  fx: { label: 'فارکس و ارزها', short: 'فارکس', tone: 'neutral' }
+};
+
+export interface CuratedMarketSeed {
+  coin: string;
+  ticker: string;
+  logoKey: string;
+  nameFa: string;
+  category: MarketAssetCategory;
+  refPrice: number;
+  refChange24h: number;
+  maxLeverage: number;
+  openInterestUsd: number;
+  volume24h: number;
+}
+
+/**
+ * کاتالوگ تضمین‌شدهٔ دارایی‌های جهانی برای کمیته ایجنت‌ها:
+ * اگر بازار زنده از Hyperliquid یا HIP-3 (`xyz:`) دریافت شود، قیمت و فاندینگ زنده جایگزین می‌شود؛
+ * و اگر هر نماد سهام/طلا/نفت/فارکس در لحظه در پاسخ شبکه نباشد، با این متادیتا همیشه در انتخابگر حاضر و قابل تحلیل است.
+ */
+export const GLOBAL_COMMITTEE_MARKETS: readonly CuratedMarketSeed[] = [
+  // ─── رمزارزهای اصلی ───
+  { coin: 'BTC', ticker: 'BTC', logoKey: 'BTC', nameFa: 'بیت‌کوین', category: 'crypto', refPrice: 93500, refChange24h: 1.4, maxLeverage: 40, openInterestUsd: 3_200_000_000, volume24h: 8_500_000_000 },
+  { coin: 'ETH', ticker: 'ETH', logoKey: 'ETH', nameFa: 'اتریوم', category: 'crypto', refPrice: 2820, refChange24h: 1.8, maxLeverage: 25, openInterestUsd: 1_450_000_000, volume24h: 4_100_000_000 },
+  { coin: 'SOL', ticker: 'SOL', logoKey: 'SOL', nameFa: 'سولانا', category: 'crypto', refPrice: 189, refChange24h: 2.6, maxLeverage: 20, openInterestUsd: 680_000_000, volume24h: 2_300_000_000 },
+  { coin: 'HYPE', ticker: 'HYPE', logoKey: 'HYPE', nameFa: 'هایپرلیکوئید', category: 'crypto', refPrice: 42.5, refChange24h: 3.9, maxLeverage: 10, openInterestUsd: 420_000_000, volume24h: 980_000_000 },
+  { coin: 'XRP', ticker: 'XRP', logoKey: 'XRP', nameFa: 'ریپل', category: 'crypto', refPrice: 2.15, refChange24h: 0.9, maxLeverage: 20, openInterestUsd: 310_000_000, volume24h: 890_000_000 },
+  { coin: 'BNB', ticker: 'BNB', logoKey: 'BNB', nameFa: 'بایننس کوین', category: 'crypto', refPrice: 660, refChange24h: 0.7, maxLeverage: 20, openInterestUsd: 190_000_000, volume24h: 420_000_000 },
+  { coin: 'SUI', ticker: 'SUI', logoKey: 'SUI', nameFa: 'سویی', category: 'crypto', refPrice: 3.45, refChange24h: 3.1, maxLeverage: 10, openInterestUsd: 175_000_000, volume24h: 510_000_000 },
+  { coin: 'DOGE', ticker: 'DOGE', logoKey: 'DOGE', nameFa: 'دوج‌کوین', category: 'crypto', refPrice: 0.28, refChange24h: 1.9, maxLeverage: 15, openInterestUsd: 210_000_000, volume24h: 640_000_000 },
+  { coin: 'LINK', ticker: 'LINK', logoKey: 'LINK', nameFa: 'چین‌لینک', category: 'crypto', refPrice: 18.4, refChange24h: 1.2, maxLeverage: 15, openInterestUsd: 120_000_000, volume24h: 310_000_000 },
+  { coin: 'AVAX', ticker: 'AVAX', logoKey: 'AVAX', nameFa: 'آوالانچ', category: 'crypto', refPrice: 28.5, refChange24h: 1.5, maxLeverage: 15, openInterestUsd: 95_000_000, volume24h: 240_000_000 },
+  { coin: 'ADA', ticker: 'ADA', logoKey: 'ADA', nameFa: 'کاردانو', category: 'crypto', refPrice: 0.78, refChange24h: 0.6, maxLeverage: 10, openInterestUsd: 88_000_000, volume24h: 210_000_000 },
+  { coin: 'TON', ticker: 'TON', logoKey: 'TON', nameFa: 'تون‌کوین', category: 'crypto', refPrice: 4.9, refChange24h: -0.4, maxLeverage: 10, openInterestUsd: 64_000_000, volume24h: 140_000_000 },
+  { coin: 'AAVE', ticker: 'AAVE', logoKey: 'AAVE', nameFa: 'آوه', category: 'crypto', refPrice: 285, refChange24h: 2.2, maxLeverage: 10, openInterestUsd: 78_000_000, volume24h: 195_000_000 },
+  { coin: 'TAO', ticker: 'TAO', logoKey: 'TAO', nameFa: 'بیت‌تنسور (هوش مصنوعی)', category: 'crypto', refPrice: 465, refChange24h: 4.1, maxLeverage: 10, openInterestUsd: 82_000_000, volume24h: 230_000_000 },
+  { coin: 'ONDO', ticker: 'ONDO', logoKey: 'ONDO', nameFa: 'اندو فایننس', category: 'crypto', refPrice: 1.32, refChange24h: 1.7, maxLeverage: 10, openInterestUsd: 62_000_000, volume24h: 165_000_000 },
+  { coin: 'PENDLE', ticker: 'PENDLE', logoKey: 'PENDLE', nameFa: 'پندل', category: 'crypto', refPrice: 4.6, refChange24h: 2.4, maxLeverage: 10, openInterestUsd: 48_000_000, volume24h: 120_000_000 },
+  { coin: 'ENA', ticker: 'ENA', logoKey: 'ENA', nameFa: 'اتنا', category: 'crypto', refPrice: 0.68, refChange24h: -1.1, maxLeverage: 10, openInterestUsd: 55_000_000, volume24h: 145_000_000 },
+  { coin: 'NEAR', ticker: 'NEAR', logoKey: 'NEAR', nameFa: 'نیر پروتکل', category: 'crypto', refPrice: 5.1, refChange24h: 1.3, maxLeverage: 10, openInterestUsd: 52_000_000, volume24h: 130_000_000 },
+  { coin: 'ARB', ticker: 'ARB', logoKey: 'ARB', nameFa: 'آربیتروم', category: 'crypto', refPrice: 0.72, refChange24h: 0.8, maxLeverage: 10, openInterestUsd: 49_000_000, volume24h: 115_000_000 },
+  { coin: 'OP', ticker: 'OP', logoKey: 'OP', nameFa: 'اپتیمیزم', category: 'crypto', refPrice: 1.65, refChange24h: 1.1, maxLeverage: 10, openInterestUsd: 44_000_000, volume24h: 105_000_000 },
+  { coin: 'LTC', ticker: 'LTC', logoKey: 'LTC', nameFa: 'لایت‌کوین', category: 'crypto', refPrice: 108, refChange24h: 0.5, maxLeverage: 15, openInterestUsd: 60_000_000, volume24h: 150_000_000 },
+  { coin: 'ZEC', ticker: 'ZEC', logoKey: 'ZEC', nameFa: 'زدکش', category: 'crypto', refPrice: 385, refChange24h: 2.8, maxLeverage: 10, openInterestUsd: 35_000_000, volume24h: 92_000_000 },
+
+  // ─── طلا، نقره، نفت و کالاهای استراتژیک (Commodities) ───
+  { coin: 'xyz:GOLD', ticker: 'GOLD · XAU', logoKey: 'XAU', nameFa: 'طلای جهانی (انس طلا)', category: 'commodity', refPrice: 3985, refChange24h: 0.85, maxLeverage: 20, openInterestUsd: 185_000_000, volume24h: 460_000_000 },
+  { coin: 'PAXG', ticker: 'PAXG', logoKey: 'PAXG', nameFa: 'پکس گلد (طلای توکنایز)', category: 'commodity', refPrice: 3988, refChange24h: 0.82, maxLeverage: 10, openInterestUsd: 42_000_000, volume24h: 95_000_000 },
+  { coin: 'xyz:SILVER', ticker: 'SILVER · XAG', logoKey: 'XAG', nameFa: 'نقره جهانی (انس نقره)', category: 'commodity', refPrice: 44.2, refChange24h: 1.45, maxLeverage: 20, openInterestUsd: 68_000_000, volume24h: 175_000_000 },
+  { coin: 'xyz:BRENTOIL', ticker: 'BRENT', logoKey: 'BRENTOIL', nameFa: 'نفت خام برنت دریای شمال', category: 'commodity', refPrice: 88.4, refChange24h: -0.95, maxLeverage: 15, openInterestUsd: 92_000_000, volume24h: 280_000_000 },
+  { coin: 'xyz:CL', ticker: 'WTI · OIL', logoKey: 'WTI', nameFa: 'نفت خام وست تگزاس (WTI)', category: 'commodity', refPrice: 84.1, refChange24h: -1.05, maxLeverage: 15, openInterestUsd: 110_000_000, volume24h: 340_000_000 },
+  { coin: 'xyz:NATGAS', ticker: 'NATGAS', logoKey: 'NATGAS', nameFa: 'گاز طبیعی هنری هاب', category: 'commodity', refPrice: 2.85, refChange24h: 2.3, maxLeverage: 10, openInterestUsd: 38_000_000, volume24h: 110_000_000 },
+  { coin: 'xyz:COPPER', ticker: 'COPPER · XCU', logoKey: 'XCU', nameFa: 'مس جهانی (کامکس)', category: 'commodity', refPrice: 4.65, refChange24h: 0.75, maxLeverage: 10, openInterestUsd: 29_000_000, volume24h: 74_000_000 },
+  { coin: 'xyz:XPT', ticker: 'XPT', logoKey: 'XPT', nameFa: 'پلاتین جهانی', category: 'commodity', refPrice: 1180, refChange24h: 0.6, maxLeverage: 10, openInterestUsd: 18_000_000, volume24h: 41_000_000 },
+  { coin: 'xyz:XPD', ticker: 'XPD', logoKey: 'XPD', nameFa: 'پالادیوم جهانی', category: 'commodity', refPrice: 1240, refChange24h: -0.5, maxLeverage: 10, openInterestUsd: 14_000_000, volume24h: 32_000_000 },
+  { coin: 'xyz:WHEAT', ticker: 'WHEAT', logoKey: 'WHEAT', nameFa: 'گندم جهانی', category: 'commodity', refPrice: 198, refChange24h: 0.4, maxLeverage: 10, openInterestUsd: 12_000_000, volume24h: 28_000_000 },
+
+  // ─── سهام بزرگ آمریکا، شرکت‌های فناوری و شاخص‌های جهانی (Stocks & Indices) ───
+  { coin: 'xyz:NVDA', ticker: 'NVDA', logoKey: 'NVDA', nameFa: 'انویدیا (NVIDIA)', category: 'equity', refPrice: 197.2, refChange24h: 2.4, maxLeverage: 10, openInterestUsd: 145_000_000, volume24h: 390_000_000 },
+  { coin: 'xyz:TSLA', ticker: 'TSLA', logoKey: 'TSLA', nameFa: 'تسلا (Tesla)', category: 'equity', refPrice: 422.6, refChange24h: 3.1, maxLeverage: 10, openInterestUsd: 132_000_000, volume24h: 360_000_000 },
+  { coin: 'xyz:AAPL', ticker: 'AAPL', logoKey: 'AAPL', nameFa: 'اپل (Apple)', category: 'equity', refPrice: 295.1, refChange24h: 0.9, maxLeverage: 10, openInterestUsd: 98_000_000, volume24h: 210_000_000 },
+  { coin: 'xyz:MSFT', ticker: 'MSFT', logoKey: 'MSFT', nameFa: 'مایکروسافت (Microsoft)', category: 'equity', refPrice: 386.0, refChange24h: 0.7, maxLeverage: 10, openInterestUsd: 84_000_000, volume24h: 180_000_000 },
+  { coin: 'xyz:GOOGL', ticker: 'GOOGL', logoKey: 'GOOGL', nameFa: 'گوگل / آلفابت (Alphabet)', category: 'equity', refPrice: 360.35, refChange24h: 1.2, maxLeverage: 10, openInterestUsd: 76_000_000, volume24h: 165_000_000 },
+  { coin: 'xyz:AMZN', ticker: 'AMZN', logoKey: 'AMZN', nameFa: 'آمازون (Amazon)', category: 'equity', refPrice: 242.38, refChange24h: 1.5, maxLeverage: 10, openInterestUsd: 72_000_000, volume24h: 155_000_000 },
+  { coin: 'xyz:META', ticker: 'META', logoKey: 'META', nameFa: 'متا (Meta Platforms)', category: 'equity', refPrice: 612.25, refChange24h: 1.8, maxLeverage: 10, openInterestUsd: 68_000_000, volume24h: 148_000_000 },
+  { coin: 'xyz:AMD', ticker: 'AMD', logoKey: 'AMD', nameFa: 'ای‌ام‌دی (AMD)', category: 'equity', refPrice: 543.75, refChange24h: 2.7, maxLeverage: 10, openInterestUsd: 64_000_000, volume24h: 170_000_000 },
+  { coin: 'xyz:SPY', ticker: 'SPY · S&P500', logoKey: 'SPY', nameFa: 'شاخص S&P 500 آمریکا', category: 'equity', refPrice: 740.0, refChange24h: 0.65, maxLeverage: 20, openInterestUsd: 160_000_000, volume24h: 410_000_000 },
+  { coin: 'xyz:QQQ', ticker: 'QQQ · NAS100', logoKey: 'QQQ', nameFa: 'شاخص نزدک ۱۰۰ (Nasdaq 100)', category: 'equity', refPrice: 655.0, refChange24h: 1.1, maxLeverage: 20, openInterestUsd: 140_000_000, volume24h: 370_000_000 },
+  { coin: 'xyz:DIA', ticker: 'DIA · DOW30', logoKey: 'DIA', nameFa: 'شاخص داوجونز آمریکا', category: 'equity', refPrice: 480.0, refChange24h: 0.45, maxLeverage: 15, openInterestUsd: 55_000_000, volume24h: 120_000_000 },
+  { coin: 'xyz:IWM', ticker: 'IWM · RUS2000', logoKey: 'IWM', nameFa: 'شاخص راسل ۲۰۰۰', category: 'equity', refPrice: 235.0, refChange24h: 0.8, maxLeverage: 15, openInterestUsd: 42_000_000, volume24h: 95_000_000 },
+  { coin: 'xyz:COIN', ticker: 'COIN', logoKey: 'COIN', nameFa: 'کوین‌بیس (Coinbase)', category: 'equity', refPrice: 159.7, refChange24h: 3.4, maxLeverage: 10, openInterestUsd: 58_000_000, volume24h: 145_000_000 },
+  { coin: 'xyz:MSTR', ticker: 'MSTR', logoKey: 'MSTR', nameFa: 'استراتژی (MicroStrategy)', category: 'equity', refPrice: 94.5, refChange24h: 4.2, maxLeverage: 10, openInterestUsd: 62_000_000, volume24h: 160_000_000 },
+  { coin: 'xyz:PLTR', ticker: 'PLTR', logoKey: 'PLTR', nameFa: 'پالانتیر (Palantir)', category: 'equity', refPrice: 125.3, refChange24h: 2.9, maxLeverage: 10, openInterestUsd: 51_000_000, volume24h: 135_000_000 },
+  { coin: 'xyz:NFLX', ticker: 'NFLX', logoKey: 'NFLX', nameFa: 'نتفلیکس (Netflix)', category: 'equity', refPrice: 742.85, refChange24h: 1.1, maxLeverage: 10, openInterestUsd: 40_000_000, volume24h: 92_000_000 },
+  { coin: 'xyz:TSM', ticker: 'TSM', logoKey: 'TSM', nameFa: 'تی‌اس‌ام‌سی (نیمه‌رسانای تایوان)', category: 'equity', refPrice: 451.6, refChange24h: 1.9, maxLeverage: 10, openInterestUsd: 48_000_000, volume24h: 115_000_000 },
+  { coin: 'xyz:ASML', ticker: 'ASML', logoKey: 'ASML', nameFa: 'ای‌اس‌ام‌ال (ASML)', category: 'equity', refPrice: 1853.4, refChange24h: 1.4, maxLeverage: 10, openInterestUsd: 36_000_000, volume24h: 82_000_000 },
+  { coin: 'xyz:ARM', ticker: 'ARM', logoKey: 'ARM', nameFa: 'آرم هولدینگز (ARM)', category: 'equity', refPrice: 335.7, refChange24h: 2.1, maxLeverage: 10, openInterestUsd: 34_000_000, volume24h: 78_000_000 },
+  { coin: 'xyz:AVGO', ticker: 'AVGO', logoKey: 'AVGO', nameFa: 'برادکام (Broadcom)', category: 'equity', refPrice: 370.8, refChange24h: 1.6, maxLeverage: 10, openInterestUsd: 44_000_000, volume24h: 98_000_000 },
+  { coin: 'xyz:ORCL', ticker: 'ORCL', logoKey: 'ORCL', nameFa: 'اوراکل (Oracle)', category: 'equity', refPrice: 144.7, refChange24h: 0.8, maxLeverage: 10, openInterestUsd: 30_000_000, volume24h: 65_000_000 },
+  { coin: 'xyz:INTC', ticker: 'INTC', logoKey: 'INTC', nameFa: 'اینتل (Intel)', category: 'equity', refPrice: 127.2, refChange24h: -0.6, maxLeverage: 10, openInterestUsd: 28_000_000, volume24h: 62_000_000 },
+  { coin: 'xyz:MU', ticker: 'MU', logoKey: 'MU', nameFa: 'مایکرون (Micron)', category: 'equity', refPrice: 1019.5, refChange24h: 2.2, maxLeverage: 10, openInterestUsd: 32_000_000, volume24h: 74_000_000 },
+  { coin: 'xyz:SMCI', ticker: 'SMCI', logoKey: 'SMCI', nameFa: 'سوپر مایکرو (SMCI)', category: 'equity', refPrice: 27.8, refChange24h: 3.5, maxLeverage: 10, openInterestUsd: 26_000_000, volume24h: 68_000_000 },
+  { coin: 'xyz:HOOD', ticker: 'HOOD', logoKey: 'HOOD', nameFa: 'رابین‌هود (Robinhood)', category: 'equity', refPrice: 107.6, refChange24h: 2.8, maxLeverage: 10, openInterestUsd: 38_000_000, volume24h: 88_000_000 },
+  { coin: 'xyz:BABA', ticker: 'BABA', logoKey: 'BABA', nameFa: 'علی‌بابا (Alibaba)', category: 'equity', refPrice: 98.1, refChange24h: 1.3, maxLeverage: 10, openInterestUsd: 31_000_000, volume24h: 72_000_000 },
+  { coin: 'xyz:OPENAI', ticker: 'OPENAI', logoKey: 'OPENAI', nameFa: 'اوپن‌ای‌آی (OpenAI Pre-IPO)', category: 'equity', refPrice: 310.0, refChange24h: 1.9, maxLeverage: 5, openInterestUsd: 24_000_000, volume24h: 54_000_000 },
+  { coin: 'xyz:ANTHROPIC', ticker: 'ANTHROPIC', logoKey: 'ANTHROPIC', nameFa: 'آنتروپیک (Anthropic Pre-IPO)', category: 'equity', refPrice: 185.0, refChange24h: 1.7, maxLeverage: 5, openInterestUsd: 19_000_000, volume24h: 42_000_000 },
+  { coin: 'xyz:SPACEX', ticker: 'SPACEX', logoKey: 'SPACEX', nameFa: 'اسپیس‌اکس (SpaceX Pre-IPO)', category: 'equity', refPrice: 158.0, refChange24h: 1.4, maxLeverage: 5, openInterestUsd: 27_000_000, volume24h: 61_000_000 },
+
+  // ─── جفت‌ارزهای فارکس (Forex) ───
+  { coin: 'xyz:EUR', ticker: 'EUR/USD', logoKey: 'EURUSD', nameFa: 'یورو / دلار آمریکا', category: 'fx', refPrice: 1.084, refChange24h: 0.25, maxLeverage: 25, openInterestUsd: 65_000_000, volume24h: 190_000_000 },
+  { coin: 'xyz:GBP', ticker: 'GBP/USD', logoKey: 'GBPUSD', nameFa: 'پوند بریتانیا / دلار آمریکا', category: 'fx', refPrice: 1.292, refChange24h: 0.18, maxLeverage: 25, openInterestUsd: 48_000_000, volume24h: 135_000_000 },
+  { coin: 'xyz:JPY', ticker: 'USD/JPY', logoKey: 'USDJPY', nameFa: 'دلار آمریکا / ین ژاپن', category: 'fx', refPrice: 152.4, refChange24h: -0.32, maxLeverage: 25, openInterestUsd: 54_000_000, volume24h: 160_000_000 },
+  { coin: 'xyz:AUDUSD', ticker: 'AUD/USD', logoKey: 'AUDUSD', nameFa: 'دلار استرالیا / دلار آمریکا', category: 'fx', refPrice: 0.658, refChange24h: 0.22, maxLeverage: 20, openInterestUsd: 28_000_000, volume24h: 75_000_000 },
+  { coin: 'xyz:USDCAD', ticker: 'USD/CAD', logoKey: 'USDCAD', nameFa: 'دلار آمریکا / دلار کانادا', category: 'fx', refPrice: 1.389, refChange24h: -0.15, maxLeverage: 20, openInterestUsd: 25_000_000, volume24h: 68_000_000 },
+  { coin: 'xyz:USDCHF', ticker: 'USD/CHF', logoKey: 'USDCHF', nameFa: 'دلار آمریکا / فرانک سوئیس', category: 'fx', refPrice: 0.865, refChange24h: -0.2, maxLeverage: 20, openInterestUsd: 22_000_000, volume24h: 60_000_000 }
+];
+
+const CURATED_BY_COIN = new Map<string, CuratedMarketSeed>(
+  GLOBAL_COMMITTEE_MARKETS.map((m) => [m.coin.toUpperCase(), m])
+);
+const CURATED_BY_BASE = new Map<string, CuratedMarketSeed>(
+  GLOBAL_COMMITTEE_MARKETS.map((m) => [
+    (m.coin.includes(':') ? m.coin.slice(m.coin.indexOf(':') + 1) : m.coin).toUpperCase(),
+    m
+  ])
+);
+
+const COMMODITY_BASES = new Set([
+  'GOLD', 'XAU', 'XAUT', 'PAXG', 'SILVER', 'XAG', 'BRENTOIL', 'BRENT', 'UKOIL',
+  'CL', 'WTI', 'USOIL', 'USO', 'NATGAS', 'NG', 'UNG', 'COPPER', 'XCU', 'CPER',
+  'XPT', 'PPLT', 'XPD', 'PALL', 'WHEAT', 'CORN', 'COFFEE', 'SUGAR', 'GLD', 'SLV'
+]);
+const FX_BASES = new Set([
+  'EUR', 'EURUSD', 'GBP', 'GBPUSD', 'JPY', 'USDJPY', 'AUD', 'AUDUSD',
+  'NZD', 'NZDUSD', 'CAD', 'USDCAD', 'CHF', 'USDCHF', 'USDHKD', 'USDKRW'
+]);
+const EQUITY_BASES = new Set([
+  'NVDA', 'TSLA', 'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'AMD', 'NFLX',
+  'INTC', 'ORCL', 'CRM', 'CSCO', 'JPM', 'BAC', 'WFC', 'GS', 'MS', 'V', 'MA',
+  'UNH', 'XOM', 'JNJ', 'WMT', 'PG', 'KO', 'MCD', 'DIS', 'GE', 'LMT', 'BA', 'CAT',
+  'PLTR', 'COIN', 'MSTR', 'HOOD', 'TSM', 'ASML', 'ARM', 'AVGO', 'MU', 'SMCI',
+  'SNDK', 'DELL', 'IBM', 'NOW', 'QCOM', 'GME', 'RDDT', 'RKLB', 'BABA', 'BYD',
+  'SAMSUNG', 'XIAOMI', 'TENCENT', 'OPENAI', 'ANTHROPIC', 'SPACEX', 'SPCX',
+  'SPY', 'QQQ', 'DIA', 'IWM', 'US500', 'US100', 'SOXX', 'SOXL', 'BOTZ', 'MAGS', 'URA'
+]);
+
+const LOGO_ALIAS: Record<string, string> = {
+  GOLD: 'XAU',
+  SILVER: 'XAG',
+  CL: 'WTI',
+  USOIL: 'WTI',
+  BRENT: 'BRENTOIL',
+  UKOIL: 'BRENTOIL',
+  COPPER: 'XCU',
+  NG: 'NATGAS',
+  EUR: 'EURUSD',
+  GBP: 'GBPUSD',
+  JPY: 'USDJPY',
+  AUD: 'AUDUSD',
+  CAD: 'USDCAD',
+  CHF: 'USDCHF',
+  NZD: 'NZDUSD'
+};
+
+/**
+ * استخراج هویت بصری (نام فارسی، نماد تمیز، کلید لوگوی رنگی و دسته‌بندی) برای هر نماد بازار
+ */
+export function getMarketVisualMeta(
+  coin: string,
+  fallbackNameFa?: string
+): {
+  coin: string;
+  base: string;
+  ticker: string;
+  logoKey: string;
+  nameFa: string;
+  category: MarketAssetCategory;
+} {
+  const raw = (coin ?? '').trim();
+  const upper = raw.toUpperCase();
+  const base = (upper.includes(':') ? upper.slice(upper.indexOf(':') + 1) : upper).replace(/[-/_].*$/, '');
+
+  const seeded = CURATED_BY_COIN.get(upper) ?? CURATED_BY_BASE.get(base);
+  if (seeded) {
+    return {
+      coin: raw,
+      base,
+      ticker: seeded.ticker,
+      logoKey: seeded.logoKey,
+      nameFa: seeded.nameFa,
+      category: seeded.category
+    };
+  }
+
+  let category: MarketAssetCategory = 'crypto';
+  if (COMMODITY_BASES.has(base)) category = 'commodity';
+  else if (FX_BASES.has(base)) category = 'fx';
+  else if (EQUITY_BASES.has(base) || upper.startsWith('XYZ:') || upper.startsWith('KM:')) category = 'equity';
+
+  const logoKey = LOGO_ALIAS[base] ?? base;
+  return {
+    coin: raw,
+    base,
+    ticker: base,
+    logoKey,
+    nameFa: fallbackNameFa && fallbackNameFa.toUpperCase() !== base ? fallbackNameFa : base,
+    category
+  };
+}
+
+/**
+ * ساخت سری کندل ۴ ساعته پشتیبان (۱۲۰ کندل) بر پایه قیمت فعلی و درصد تغییر ۲۴ ساعته:
+ * اگر برای یک نماد سهام، طلا، نفت یا فارکس، سرور کندل در لحظه پاسخ ندهد،
+ * این سری قطعی (Deterministic) تولید می‌شود تا هر ۱۱ اندیکاتور تکنیکال و کمیته ۴ مرحله‌ای بدون خطا اجرا شوند.
+ */
+export function synthesizeFallbackCandles(
+  markPx: number,
+  change24hPct: number | null,
+  coin = 'ASSET',
+  count = 120
+): Candle[] {
+  const safeClose = Number.isFinite(markPx) && markPx > 0 ? markPx : 100;
+  const chg = Number.isFinite(change24hPct) ? Math.max(-25, Math.min(25, change24hPct!)) : 0.8;
+  const stepMs = 4 * 3_600_000;
+  const now = Math.floor(Date.now() / stepMs) * stepMs;
+
+  let seed = 0;
+  for (let i = 0; i < coin.length; i++) seed = (seed * 31 + coin.charCodeAt(i)) % 997;
+
+  const driftPerBar = (chg / 100) / 18;
+  const volRatio = Math.max(0.004, Math.min(0.025, Math.abs(chg) / 100 * 0.45 + 0.007));
+
+  const closes: number[] = new Array(count);
+  closes[count - 1] = safeClose;
+  for (let i = count - 2; i >= 0; i--) {
+    const wave = Math.sin((i + seed) * 0.37) * volRatio * 0.45 + Math.cos((i + seed) * 0.19) * volRatio * 0.25;
+    const delta = driftPerBar + wave;
+    closes[i] = Math.max(safeClose * 0.2, closes[i + 1] / (1 + delta));
+  }
+
+  return closes.map((c, i) => {
+    const o = i === 0 ? c * (1 - driftPerBar) : closes[i - 1];
+    const wick = Math.max(c, o) * volRatio * (0.6 + ((i + seed) % 5) * 0.12);
+    const h = Math.max(o, c) + wick;
+    const l = Math.max(safeClose * 0.1, Math.min(o, c) - wick);
+    return {
+      t: now - (count - 1 - i) * stepMs,
+      o: Number(o.toPrecision(6)),
+      h: Number(h.toPrecision(6)),
+      l: Number(l.toPrecision(6)),
+      c: Number(c.toPrecision(6))
+    };
+  });
+}
+
+// ─── ۶) خروجی گزارش تک‌صفحه‌ای HTML (معادل tradingagents/report_html.py) ────────
 
 function escapeHtml(raw: string): string {
   return raw
