@@ -18,6 +18,7 @@ const CalculatorsPage = lazy(() => import('@/features/calculators/presentation/C
 const HoldingsPage = lazy(() => import('@/features/custody/presentation/HoldingsPage'));
 const PerpsPage = lazy(() => import('@/features/perps/presentation/PerpsPage'));
 const TxflowPage = lazy(() => import('@/features/perps/presentation/TxflowPage'));
+const VariationalPage = lazy(() => import('@/features/perps/presentation/VariationalPage'));
 const ArcusPage = lazy(() => import('@/features/arcus/presentation/ArcusPage'));
 const ConnectedPage = lazy(() => import('@/features/connected/presentation/ConnectedPage'));
 const AssistantPage = lazy(() => import('@/features/connected/presentation/AssistantPage'));
@@ -211,6 +212,7 @@ export function App() {
           <Route path="/lighter" element={<Private label="لایتر"><PerpsPage provider="lighter" initialTab="perp" /></Private>} />
           <Route path="/lighter-robinhood" element={<Private label="لایتر رابین‌هود"><PerpsPage provider="lighter" /></Private>} />
           <Route path="/txflow" element={<Private label="تی‌اکس‌فلو"><TxflowPage /></Private>} />
+          <Route path="/variational" element={<Private label="وریشنال"><VariationalPage /></Private>} />
           <Route path="/ondo-perps" element={<Private label="اوندو پرپس"><PerpsPage provider="ondo" /></Private>} />
           <Route path="/wallets" element={<Private label="مدیریت کیف پول‌ها"><ConnectedPage /></Private>} />
           <Route path="/assistant" element={<Private label="دستیار پرتفولیو"><AssistantPage /></Private>} />

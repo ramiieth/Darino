@@ -121,7 +121,7 @@ describe('settings & analysis', () => {
   it('هر مدل یک ردیف + میانگین؛ بازهٔ کوتاه‌تر داده به Gemini می‌رسد', () => {
     const settings = mergeSettings(null);
     const ms = activeMarkets({ ...settings, enabledMarkets: ['car', 'property'] }, { neighborhoods: { kianpars: 'کیانپارس' }, cars: { '472': 'پژو 207 دستی' } });
-    expect(ms.map((m) => m.id)).toEqual(['car:472', 'car:473', 'car:761', 'car:762', 'car_avg', 'prop:kianpars', 'prop:kianabad', 'prop:golestan', 'prop:padad', 'prop_avg']);
+    expect(ms.map((m) => m.id)).toEqual(['car:472', 'car:473', 'car:761', 'car:762', 'car_avg', 'prop:kianpars', 'prop:kianabad', 'prop:golestan', 'prop:padad', 'prop:shahrak-daneshgah', 'prop_avg']);
     expect(ms[0].name).toBe('خودرو — پژو 207 دستی');
 
     const rec = (id: string, iso: string): ValueRecord => ({ id, dateTs: day(iso) + 8 * 3_600_000, usd: 1000, rateToman: 100_000, rateSource: 'manual', toman: 100_000_000, note: '', origin: 'manual', createdAt: 0, updatedAt: 0 });

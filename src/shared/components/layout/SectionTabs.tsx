@@ -66,6 +66,7 @@ export const VENUE_TABS: readonly SectionTab[] = [
   { to: '/lighter-robinhood', label: 'لایتر رابین‌هود' },
   { to: '/arcus', label: 'آرکوس' },
   { to: '/txflow', label: 'تی‌اکس‌فلو' },
+  { to: '/variational', label: 'وریشنال' },
   { to: '/ondo-perps', label: 'اوندو پرپس' }
 ];
 

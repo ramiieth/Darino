@@ -176,6 +176,7 @@ export interface CompareRow {
   name: string;
   group: MarketDef['group'];
   kind: MarketDef['kind'];
+  currency: MarketDef['currency'];
   official?: boolean;
   status: RowStatus;
   reason?: string;
@@ -211,7 +212,7 @@ export interface CompareRow {
    * خودرو و مسکن: با ارزش تومانی پرتفوی در تاریخ شروع چند دستگاه / چند مترمربع می‌شد خرید
    * و ارزش فروش همان مقدار در تاریخ پایان (= endToman).
    */
-  units?: { count: number; label: 'دستگاه' | 'مترمربع'; priceStart: number; priceEnd: number };
+  units?: { count: number; label: string; priceStart: number; priceEnd: number };
 }
 
 export interface PortfolioRow {
@@ -238,11 +239,12 @@ export function portfolioRow(start: Endpoint, end: Endpoint): PortfolioRow {
   };
 }
 
-const emptyRow = (m: { id: string; name: string; group: MarketDef['group']; kind: MarketDef['kind']; official?: boolean }, status: RowStatus, reason: string, s?: Series): CompareRow => ({
+const emptyRow = (m: { id: string; name: string; group: MarketDef['group']; kind: MarketDef['kind']; currency: MarketDef['currency']; official?: boolean }, status: RowStatus, reason: string, s?: Series): CompareRow => ({
   id: m.id,
   name: m.name,
   group: m.group,
   kind: m.kind,
+  currency: m.currency,
   official: m.official,
   status,
   reason,

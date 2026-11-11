@@ -21,7 +21,7 @@ import type { ArcusAccount, ArcusPortfolio, ArcusPosition } from '@/features/arc
 import type { LighterAccount } from './model';
 import type { KeyedSnapshot, KeyedVenue } from './keyedVenues';
 
-export type PerpVenue = 'arcus' | 'lighter-robinhood' | 'lighter-mainnet' | 'hyperliquid' | 'txflow' | 'ondo';
+export type PerpVenue = 'arcus' | 'lighter-robinhood' | 'lighter-mainnet' | 'hyperliquid' | 'txflow' | 'ondo' | 'variational';
 export type PerpStatus = 'loading' | 'ready' | 'error';
 export type PnlPeriod = 'day' | 'week' | 'month';
 export const PNL_PERIODS: readonly PnlPeriod[] = ['day', 'week', 'month'];
@@ -44,7 +44,8 @@ export const PERP_VENUE_NAME: Record<PerpVenue, string> = {
   'lighter-mainnet': 'لایتر',
   hyperliquid: 'هایپرلیکوئید',
   txflow: 'تی‌اکس‌فلو',
-  ondo: 'اوندو پرپس'
+  ondo: 'اوندو پرپس',
+  variational: 'وریشنال (Variational)'
 };
 
 export interface PerpVenueAccount {
@@ -334,12 +335,65 @@ export function fromKeyed(r: KeyedSnapshot | { venue: KeyedVenue; error: string 
   };
 }
 
+/** حساب وریشنال (Omni RFQ / Arbitrum) در مدل مشترک */
+export function fromVariational(
+  id: string,
+  label: string,
+  address: string,
+  data: { equity?: number | string | null; unrealizedPnl?: number | string | null; allTimePnl?: number | string | null; realizedPnl?: number | string | null; positions?: readonly any[] } | null | undefined,
+  status: PerpStatus,
+  stale: boolean
+): PerpVenueAccount {
+  const rawPositions = Array.isArray(data?.positions) ? data.positions : [];
+  const rows: PerpVenuePosition[] = rawPositions.flatMap((p) => {
+    const symbol = String(p.symbol || p.market || p.coin || '').replace(/[-/]USDC$/, '');
+    const size = num(p.size ?? p.amount ?? p.szi);
+    if (!symbol || size === 0 || size === null) return [];
+    const side = (p.side?.toLowerCase() === 'short' || (size && size < 0)) ? 'short' as const : 'long' as const;
+    const entry = num(p.entryPrice ?? p.entry ?? p.entryPx);
+    const mark = num(p.markPrice ?? p.mark ?? p.markPx);
+    const pnl = num(p.unrealizedPnl ?? p.pnl);
+    const liq = num(p.liquidationPrice ?? p.liquidation ?? p.liquidationPx);
+    return [{
+      symbol,
+      side,
+      size: Math.abs(size),
+      entry,
+      mark,
+      pnl,
+      liquidation: liq && liq > 0 ? liq : null
+    }];
+  });
+
+  const equity = num(data?.equity) ?? 0;
+  const unrealizedPnl = num(data?.unrealizedPnl) ?? positionsPnl(rows) ?? 0;
+  const allTimePnl = num(data?.allTimePnl) ?? 0;
+  const realizedPnl = num(data?.realizedPnl) ?? diff(allTimePnl, unrealizedPnl) ?? 0;
+
+  return {
+    id,
+    venue: 'variational',
+    label,
+    address,
+    unit: 'USDC',
+    equity,
+    unrealizedPnl,
+    allTimePnl,
+    realizedPnl,
+    periodPnl: { day: null, week: null, month: null },
+    positions: rows,
+    status,
+    stale
+  };
+}
+
 /** نام پروتکل هر صرافی در دارایی‌های کیف پول Zerion (اگر Zerion همان حساب را به‌عنوان موقعیت دیفای نشان بدهد) */
 const ZERION_PROTOCOL: Partial<Record<PerpVenue, RegExp>> = {
   hyperliquid: /hyperliquid/i,
   'lighter-mainnet': /lighter/i,
   'lighter-robinhood': /lighter/i,
-  txflow: /txflow/i
+  txflow: /txflow/i,
+  variational: /variational/i
 };
 
 export interface PerpInNetWorth {
