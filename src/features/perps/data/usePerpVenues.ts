@@ -97,7 +97,33 @@ export function useHlLikeVenues(): PerpVenueAccount[] {
   });
   const envHl = useEnvAddresses('hyperliquid', fromHoldings.filter((l) => l.venue === 'hyperliquid').map((l) => l.address));
   const envTx = useEnvAddresses('txflow', fromHoldings.filter((l) => l.venue === 'txflow').map((l) => l.address));
-  const linked = [...fromHoldings, ...envHl.map((e) => ({ ...e, venue: 'hyperliquid' as const })), ...envTx.map((e) => ({ ...e, venue: 'txflow' as const }))];
+  const envMain = useEnvAddresses('lighter-mainnet', []);
+  const envRh = useEnvAddresses('lighter-robinhood', []);
+
+  // اگر حساب تی‌اکس‌فلو اختصاصی ثبت نشده و TXFLOW_ADDRESS در env نبود،
+  // از آدرس معتبر هایپرلیکوئید، لایتر، آرکوس یا کیف پول متصل برای ساخت کارت تی‌اکس‌فلو در بخش پرپچوال استفاده می‌شود
+  const hasTxflowHolding = fromHoldings.some((l) => l.venue === 'txflow');
+  const fallbackTxAddress =
+    !hasTxflowHolding && envTx.length === 0
+      ? envHl[0]?.address ||
+        envMain[0]?.address ||
+        envRh[0]?.address ||
+        fromHoldings.find((l) => l.address && EVM.test(l.address))?.address ||
+        custody.holdings.find((h) => !h.archivedAt && h.address && EVM.test(h.address))?.address
+      : null;
+
+  const txEnvList =
+    envTx.length > 0
+      ? envTx
+      : fallbackTxAddress
+        ? [{ id: `env:txflow:${fallbackTxAddress.toLowerCase()}`, label: 'حساب تی‌اکس‌فلو', address: fallbackTxAddress }]
+        : [];
+
+  const linked = [
+    ...fromHoldings,
+    ...envHl.map((e) => ({ ...e, venue: 'hyperliquid' as const })),
+    ...txEnvList.map((e) => ({ ...e, venue: 'txflow' as const }))
+  ];
   // کیف پول‌های EVM متصل که روی تی‌اکس‌فلو حساب فعال دارند ولی جداگانه ثبت نشده‌اند (بدون نیاز به «افزودن حساب»)
   const seenTx = new Set(linked.filter((l) => l.venue === 'txflow').map((l) => l.address.toLowerCase()));
   const walletTx = [
