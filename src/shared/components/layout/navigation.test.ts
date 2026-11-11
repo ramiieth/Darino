@@ -23,7 +23,7 @@ describe('منو پس از ساده‌سازی (آبان ۱۴۰۵)', () => {
       '/desk': 'desk', '/intel': 'desk', '/traders': 'desk',
       '/funding': 'funding', '/boros': 'funding', '/carry-lab': 'funding',
       '/journal': 'journal',
-      '/lighter': 'venues', '/lighter-robinhood': 'venues', '/arcus': 'venues', '/txflow': 'venues', '/ondo-perps': 'venues',
+      '/lighter': 'venues', '/lighter-robinhood': 'venues', '/arcus': 'venues', '/txflow': 'venues', '/variational': 'venues', '/ondo-perps': 'venues',
       '/dashboard': 'dashboard', '/holdings': 'dashboard', '/performance': 'performance', '/assistant': 'assistant',
       '/calculators': 'calculators', '/simulation': 'simulation', '/simulation/compare': 'simulation',
       '/gold': 'gold', '/exchanges': 'exchanges', '/vehicle': 'vehicle', '/realestate': 'realestate', '/property-market': 'realestate',

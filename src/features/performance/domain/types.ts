@@ -137,6 +137,6 @@ export interface SavedReport {
   periodEnd: number;
   text: string;
   sources: string[];
-  model: 'gemini';
+  model: 'gemini' | 'smart-analysis' | string;
   deleted?: boolean;
 }
