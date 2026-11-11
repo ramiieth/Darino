@@ -2,6 +2,8 @@ import { LogoImage, TokenLogo } from '@/shared/components/ui/EntityLogo';
 export const PERPS_IDENTITIES = {
  lighter: {name:'لایتر رابین‌هود',symbol:'لایتر',logo:'/logos/platform-lighter.png',networks:[{name:'رابین‌هود',logo:'/logos/chain-4663.svg'}]},
  'lighter-mainnet':{name:'لایتر',symbol:'لایتر',logo:'/logos/platform-lighter.png',networks:[{name:'اتریوم (شبکهٔ واریز)',logo:'/logos/chain-1.svg'}]},
+ txflow: {name:'تی‌اکس‌فلو',symbol:'تی‌اکس‌فلو',logo:'/logos/platform-txflow.png',networks:[{name:'آربیتروم (شبکهٔ واریز)',logo:'/logos/chain-arbitrum.svg'}]},
+ hyperliquid: {name:'هایپرلیکوئید',symbol:'هایپرلیکوئید',logo:'/logos/token-hype.png',networks:[{name:'هایپر ای‌وی‌ام',logo:'/logos/chain-999.png'},{name:'آربیتروم (واریز)',logo:'/logos/chain-arbitrum.svg'}]},
  ondo: {name:'اوندو پرپس',symbol:'اوندو پرپس',logo:'/logos/platform-ondo.png',networks:[{name:'اتریوم',logo:'/logos/chain-1.svg'},{name:'آربیتروم',logo:'/logos/chain-arbitrum.svg'}]}
 } as const;
 /** Platform identity is separate from its funding networks and from token tickers. */

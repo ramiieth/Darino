@@ -113,9 +113,13 @@ export function useHlLikeVenues(): PerpVenueAccount[] {
     return fromHlLike(l.id, l.label, l.venue, l.address, q.data?.state ?? null, status, q.isError && !!q.data, { portfolio: q.data?.portfolio, ledger: q.data?.ledger });
   };
   const active = walletTx.flatMap((l, i) => {
-    const state = queries[linked.length + i].data?.state;
+    const q = queries[linked.length + i];
+    const state = q.data?.state;
+    const ledger = q.data?.ledger;
     const open = (state?.assetPositions ?? []).some((p) => Number(p.position?.szi));
-    return Number(state?.marginSummary?.accountValue ?? 0) > 0 || open ? [toAccount(l, queries[linked.length + i])] : [];
+    const hasEquity = Number(state?.marginSummary?.accountValue ?? 0) > 0;
+    const hasLedger = Array.isArray(ledger) && ledger.length > 0;
+    return hasEquity || open || hasLedger ? [toAccount(l, q)] : [];
   });
   return [...linked.map((l, i) => toAccount(l, queries[i])), ...active];
 }
