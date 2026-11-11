@@ -57,7 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: '/performance',
         label: 'عملکرد سرمایه',
         title: 'عملکرد و مقایسه سرمایه',
-        description: 'تاریخچهٔ ارزش دارایی، مقایسه با تورم، طلا، مسکن، خودرو و بازارهای جهانی، و گزارش Gemini',
+        description: 'تاریخچهٔ ارزش دارایی، مقایسه با تورم، طلا، مسکن، خودرو، سهام آمریکا و نفت، و گزارش تحلیلی هوشمند',
         icon: TrendingUp
       },
       { id: 'assistant', to: '/assistant', label: 'دستیار پرتفولیو', description: 'تحلیل پرتفولیو، بوروس و بازارهای دارینو', icon: Sparkles }
@@ -97,9 +97,9 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'venues',
         to: '/venues',
         label: 'حساب‌های صرافی',
-        description: 'موجودی، پوزیشن‌ها و تاریخچهٔ لایتر، رابین‌هود، آرکوس، تی‌اکس‌فلو و اوندو (فقط‌خواندنی)',
+        description: 'موجودی، پوزیشن‌ها و تاریخچهٔ لایتر، رابین‌هود، آرکوس، تی‌اکس‌فلو، وریشنال و اوندو (فقط‌خواندنی)',
         icon: Landmark,
-        match: ['/lighter', '/lighter-robinhood', '/arcus', '/txflow', '/ondo-perps']
+        match: ['/lighter', '/lighter-robinhood', '/arcus', '/txflow', '/variational', '/ondo-perps']
       }
     ]
   },

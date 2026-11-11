@@ -27,7 +27,7 @@ export interface MarketDef {
 }
 
 /** سری‌هایی که سرور می‌سازد */
-export const SERVER_SERIES = ['ir_gold18', 'ir_sekee', 'btc', 'eth', 'sol', 'hype', 'zec', 'gold_global', 'spx', 'ndx', 'msci_world', 'us_cpi', 'ir_cpi_wb'] as const;
+export const SERVER_SERIES = ['ir_gold18', 'ir_sekee', 'btc', 'eth', 'sol', 'hype', 'zec', 'gold_global', 'oil_crude', 'oil_brent', 'nvda', 'aapl', 'tsla', 'spx', 'ndx', 'dow_jones', 'msci_world', 'us_cpi', 'ir_cpi_wb'] as const;
 export type ServerSeriesId = (typeof SERVER_SERIES)[number];
 
 /** نماد هایپرلیکوئید هر رمزارز ثابت */
@@ -51,8 +51,14 @@ export const BASE_MARKETS: MarketDef[] = [
   { id: 'hype', name: 'هایپرلیکوئید (HYPE)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'hype' },
   { id: 'zec', name: 'زی‌کش (ZEC)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'zec' },
   { id: 'gold_global', name: 'طلای جهانی (انس)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'gold_global' },
+  { id: 'oil_crude', name: 'نفت خام تگزاس (WTI)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'oil_crude' },
+  { id: 'oil_brent', name: 'نفت خام برنت (Brent)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'oil_brent' },
+  { id: 'nvda', name: 'سهام انویدیا (NVDA)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'nvda' },
+  { id: 'aapl', name: 'سهام اپل (AAPL)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'aapl' },
+  { id: 'tsla', name: 'سهام تسلا (TSLA)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'tsla' },
   { id: 'spx', name: 'شاخص S&P 500', group: 'global', kind: 'price', currency: 'usd', seriesId: 'spx' },
   { id: 'ndx', name: 'شاخص نزدک', group: 'global', kind: 'price', currency: 'usd', seriesId: 'ndx' },
+  { id: 'dow_jones', name: 'شاخص داو جونز', group: 'global', kind: 'price', currency: 'usd', seriesId: 'dow_jones' },
   { id: 'msci_world', name: 'سهام جهانی (MSCI World)', group: 'global', kind: 'price', currency: 'usd', seriesId: 'msci_world' },
   { id: 'us_cpi', name: 'دلار با تورم آمریکا (حفظ قدرت خرید)', group: 'global', kind: 'inflation', currency: 'usd', seriesId: 'us_cpi', official: true }
 ];
@@ -67,7 +73,7 @@ export const coinMarketId = (sym: string) => `coin:${sym}`;
 
 /** پیش‌فرض‌ها فقط «انتخاب» هستند، نه داده: کدام بازارها روشن باشند و کدام محله‌ها */
 export const DEFAULT_ENABLED = [...BASE_MARKETS.map((m) => m.id), 'property'];
-export const DEFAULT_NEIGHBORHOODS = ['kianpars', 'kianabad', 'golestan', 'padad'];
+export const DEFAULT_NEIGHBORHOODS = ['kianpars', 'kianabad', 'golestan', 'padad', 'shahrak-daneshgah'];
 /** مدل‌های car.ir: ۲۰۷ دستی، ۲۰۷ اتوماتیک، تارا دنده‌ای، تارا اتوماتیک */
 export const DEFAULT_CAR_MODELS = ['472', '473', '761', '762'];
 export const DEFAULTS_VERSION = 2;
@@ -83,8 +89,14 @@ export const SOURCE_FA: Record<string, { name: string; url: string }> = {
   hype: { name: 'Hyperliquid — کندل روزانه', url: 'https://app.hyperliquid.xyz' },
   zec: { name: 'Hyperliquid — کندل روزانه', url: 'https://app.hyperliquid.xyz' },
   gold_global: { name: 'Yahoo Finance — آتی طلا (GC=F)', url: 'https://finance.yahoo.com/quote/GC=F' },
+  oil_crude: { name: 'Yahoo Finance — نفت تگزاس (CL=F)', url: 'https://finance.yahoo.com/quote/CL=F' },
+  oil_brent: { name: 'Yahoo Finance — نفت برنت (BZ=F)', url: 'https://finance.yahoo.com/quote/BZ=F' },
+  nvda: { name: 'Yahoo Finance — سهام انویدیا (NVDA)', url: 'https://finance.yahoo.com/quote/NVDA' },
+  aapl: { name: 'Yahoo Finance — سهام اپل (AAPL)', url: 'https://finance.yahoo.com/quote/AAPL' },
+  tsla: { name: 'Yahoo Finance — سهام تسلا (TSLA)', url: 'https://finance.yahoo.com/quote/TSLA' },
   spx: { name: 'Yahoo Finance — ^GSPC', url: 'https://finance.yahoo.com/quote/%5EGSPC' },
   ndx: { name: 'Yahoo Finance — ^IXIC', url: 'https://finance.yahoo.com/quote/%5EIXIC' },
+  dow_jones: { name: 'Yahoo Finance — داو جونز (^DJI)', url: 'https://finance.yahoo.com/quote/%5EDJI' },
   msci_world: { name: 'Yahoo Finance — صندوق URTH (MSCI World)', url: 'https://finance.yahoo.com/quote/URTH' },
   us_cpi: { name: 'BLS — CPI-U آمریکا (ماهانه)', url: 'https://www.bls.gov/cpi/' },
   ir_cpi_wb: { name: 'بانک جهانی — CPI ایران (سالانه، FP.CPI.TOTL)', url: 'https://data.worldbank.org/indicator/FP.CPI.TOTL?locations=IR' }

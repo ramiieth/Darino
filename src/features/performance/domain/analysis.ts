@@ -80,9 +80,22 @@ function withDataRange(row: CompareRow, s: Series | undefined, endTs: number): C
   if (!s?.points.length) return row;
   const first = s.points[0];
   const out: CompareRow = { ...row, dataFrom: first[0] };
-  const label = /^car[:_]/.test(row.id) ? 'دستگاه' : /^prop[:_]/.test(row.id) ? 'مترمربع' : null;
-  if (label && row.status === 'ok' && row.priceStart && row.priceEnd && row.startToman && row.priceStart.value > 0) {
-    out.units = { count: row.startToman / row.priceStart.value, label, priceStart: row.priceStart.value, priceEnd: row.priceEnd.value };
+  const label =
+    /^car[:_]/.test(row.id) ? 'دستگاه' :
+    /^prop[:_]/.test(row.id) ? 'مترمربع' :
+    /^(nvda|aapl|tsla)$/.test(row.id) ? 'سهم' :
+    /^oil_/.test(row.id) ? 'بشکه' :
+    row.id === 'ir_sekee' ? 'سکه' :
+    row.id === 'ir_gold18' ? 'گرم' :
+    row.id === 'gold_global' ? 'اونس' :
+    /^(spx|ndx|dow_jones|msci_world)$/.test(row.id) ? 'واحد شاخص' :
+    /^(btc|eth|sol|hype|zec|coin:)/.test(row.id) ? 'واحد' : null;
+
+  if (label && row.status === 'ok' && row.priceStart && row.priceEnd && row.priceStart.value > 0) {
+    const cap = row.currency === 'usd' ? row.startUsd : row.startToman;
+    if (cap && cap > 0) {
+      out.units = { count: cap / row.priceStart.value, label, priceStart: row.priceStart.value, priceEnd: row.priceEnd.value };
+    }
   }
   if (row.status !== 'ok' && !row.priceStart) {
     const p1 = valueAt(s, endTs);
@@ -109,7 +122,7 @@ const r0 = (v: number | null | undefined) => (v === null || v === undefined || !
 const day = (ts: number) => new Date(ts).toISOString().slice(0, 10);
 
 /** ورودی Gemini: نسبت‌ها به‌صورت کسر (0.12 = ۱۲٪)، مبالغ گرد؛ توضیحات کاربر فقط به‌عنوان متن */
-export function geminiPayload(a: PeriodAnalysis, records: ValueRecord[], years: YearlyTable[], jalali: (ts: number) => string, now: number) {
+export function geminiPayload(a: PeriodAnalysis, records: ValueRecord[], years: YearlyTable[], jalali: (ts: number) => string, now: number, walletBridge?: unknown) {
   const inf = a.inflation;
   return {
     preparedAt: day(now),
@@ -153,6 +166,7 @@ export function geminiPayload(a: PeriodAnalysis, records: ValueRecord[], years: 
     yearlyGrowth: years.map((t) => ({
       name: t.name, unit: t.unit, source: t.source,
       rows: t.rows.map((r) => ({ jalaliYearStart: r.year || 'now', date: r.at ? day(r.at) : null, value: r0(r.value), changeFromPrevious: r4(r.change) }))
-    }))
+    })),
+    walletCostBasisAndCycles: walletBridge ?? null
   };
 }

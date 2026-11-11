@@ -65,12 +65,13 @@ async function ondo(): Promise<KeyedSnapshot> {
 
 /* ---------------- آدرس‌های env ---------------- */
 
-export type AddressVenue = 'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow';
+export type AddressVenue = 'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow' | 'variational';
 const ADDRESS_ENV: Record<AddressVenue, string> = {
   hyperliquid: 'HYPERLIQUID_ADDRESS',
   'lighter-mainnet': 'LIGHTER_ADDRESS',
   'lighter-robinhood': 'LIGHTER_ROBINHOOD_ADDRESS',
-  txflow: 'TXFLOW_ADDRESS'
+  txflow: 'TXFLOW_ADDRESS',
+  variational: 'VARIATIONAL_ADDRESS'
 };
 
 /** آدرس‌های معتبر EVM هر پلتفرم از env (نامعتبرها بی‌صدا کنار می‌روند؛ حداکثر ۵ برای هر پلتفرم) */
