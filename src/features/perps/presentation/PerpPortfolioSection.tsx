@@ -74,6 +74,7 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
         size="lg"
         label={`سود/زیان ${rangeTitle(range)}`}
         value={<MoneyValue value={pnlIn(a, range)} signed tone="auto" state={state} />}
+        sub={a.venue === 'txflow' && range !== 'all' && pnlIn(a, range) === null ? 'سری دوره‌ای عمومی ندارد (از ابتدا در دسترس است)' : undefined}
       />
       <MetricGrid cols={3} className="!gap-x-4 border-t border-divider pt-3">
         <Metric size="sm" label="بسته‌شده" value={<MoneyValue value={a.realizedPnl} signed tone="auto" state={state} />} />
@@ -152,7 +153,7 @@ export function PerpPortfolioSection({ arcus }: { arcus: ConnectedPortfolio['arc
         ))}
       </div>
       <p className="text-2xs leading-5 text-muted">
-        سود/زیان از ابتدا: آرکوس = ارزش حساب − خالص واریز؛ لایتر = سود/زیان معاملات پرپ از تاریخچهٔ خود لایتر (اسپات جداست). بسته‌شده = از ابتدا − باز.
+        سود/زیان از ابتدا: آرکوس و تی‌اکس‌فلو = ارزش حساب − خالص واریز؛ لایتر = سود/زیان معاملات پرپ از تاریخچهٔ خود لایتر (اسپات جداست)؛ هایپرلیکوئید = تاریخچهٔ تجمعی صرافی. بسته‌شده = از ابتدا − باز.
         واحد حساب‌ها یو‌اس‌دی‌سی/یو‌اس‌دی‌جی است و ≈ ۱ دلار در نظر گرفته شده. این مبالغ جدا از مجموع کیف پول‌ها نمایش داده می‌شوند.
       </p>
     </section>
