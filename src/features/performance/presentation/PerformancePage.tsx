@@ -25,6 +25,7 @@ import type { ValueBreakdown, ValueRecord } from '../domain/types';
 import { usePerformanceData } from '../data/store';
 import { useMarketSeries } from '../data/useMarketSeries';
 import { useLiveValue } from '../data/useLiveValue';
+import { useWalletAndCostBridge } from '../data/useWalletAndCostBridge';
 import { RecordSheet } from './RecordSheet';
 import { OverviewTab } from './OverviewTab';
 import { RecordsTab } from './RecordsTab';
@@ -38,7 +39,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'records', label: 'سوابق ارزش دارایی' },
   { value: 'compare', label: 'مقایسه با بازارها' },
   { value: 'inflation', label: 'تورم و قدرت خرید' },
-  { value: 'report', label: 'تحلیل هوشمند Gemini' }
+  { value: 'report', label: 'تحلیل هوشمند' }
 ];
 const FIRST_YEAR = 1402;
 
@@ -48,6 +49,7 @@ export default function PerformancePage() {
   const data = usePerformanceData();
   const ops = useCustodyStore().operations;
   const live = useLiveValue();
+  const walletBridge = useWalletAndCostBridge();
   const [params, setParams] = useSearchParams();
   const tab = (TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'overview') as Tab;
   const update = useCallback(
@@ -69,9 +71,20 @@ export default function PerformancePage() {
 
   const market = useMarketSeries(records[0]?.dateTs ?? null, data.settings);
 
+  const AHVAZ_NAMES_FALLBACK: Record<string, string> = {
+    kianpars: 'کیانپارس',
+    kianabad: 'کیان‌آباد',
+    golestan: 'گلستان',
+    padad: 'پادادشهر',
+    'shahrak-daneshgah': 'شهرک دانشگاه'
+  };
+
   const names = useMemo(
     () => ({
-      neighborhoods: Object.fromEntries(market.neighborhoodOptions.map((n) => [n.key, n.name])),
+      neighborhoods: {
+        ...AHVAZ_NAMES_FALLBACK,
+        ...Object.fromEntries(market.neighborhoodOptions.map((n) => [n.key, n.name]))
+      },
       cars: Object.fromEntries(market.carOptions.map((c) => [c.modelId, c.name.trim()]))
     }),
     [market.neighborhoodOptions, market.carOptions]
@@ -106,7 +119,7 @@ export default function PerformancePage() {
     return [...out];
   }, [analysis]);
 
-  const buildPayload = useCallback(() => (analysis ? geminiPayload(analysis, records, yearly, formatJalali, Date.now()) : null), [analysis, records, yearly]);
+  const buildPayload = useCallback(() => (analysis ? geminiPayload(analysis, records, yearly, formatJalali, Date.now(), walletBridge) : null), [analysis, records, yearly, walletBridge]);
 
   // فقط معیارهای مشتق‌شده به دستیار پرتفولیو
   const ov = useMemo(() => overview(records), [records]);
@@ -159,7 +172,19 @@ export default function PerformancePage() {
             <InflationTab records={records} startId={start.id} endId={end.id} onPeriod={setPeriod} analysis={analysis} series={market.series} settings={data.settings} />
           )}
           {tab === 'report' && start && end && (
-            <ReportTab records={records} startId={start.id} endId={end.id} onPeriod={setPeriod} reports={data.reports} buildPayload={buildPayload} sources={sources} ready={!market.loading} />
+            <ReportTab
+              records={records}
+              startId={start.id}
+              endId={end.id}
+              onPeriod={setPeriod}
+              analysis={analysis}
+              market={market}
+              walletBridge={walletBridge}
+              reports={data.reports}
+              buildPayload={buildPayload}
+              sources={sources}
+              ready={!market.loading}
+            />
           )}
           {(tab === 'compare' || tab === 'inflation' || tab === 'report') && !(start && end) && (
             <Notice tone="info">برای این بخش حداقل دو سابقهٔ ارزش در تاریخ‌های مختلف لازم است.</Notice>

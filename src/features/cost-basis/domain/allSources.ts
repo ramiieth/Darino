@@ -10,7 +10,7 @@ import type { CostAsset, CostBook } from './book';
 import { PERP_VENUE_NAME, type PerpVenue, type PerpVenueAccount } from '@/features/perps/domain/perpPortfolio';
 export type BasisRow=ReturnType<typeof costSummary>['rows'][number]&{sourceLabel:string;snapshotComplete:boolean;provider:'wallet'|'arcus'|'boros'|'perp'};
 const UNIT:Record<PerpVenueAccount['unit'],{fa:string;icon:string}>={USDG:{fa:'یو اس دی جی',icon:'/logos/token-usdg.png'},USDC:{fa:'یو اس دی سی',icon:'/logos/token-usdc.png'},USDT:{fa:'تتر',icon:'/logos/token-usdt.png'}};
-const PERP_CHAIN:Partial<Record<PerpVenue,string>>={arcus:'robinhood','lighter-robinhood':'robinhood','lighter-mainnet':'ethereum',hyperliquid:'hyperliquid',txflow:'arbitrum'};
+const PERP_CHAIN:Partial<Record<PerpVenue,string>>={arcus:'robinhood','lighter-robinhood':'robinhood','lighter-mainnet':'ethereum',hyperliquid:'hyperliquid',txflow:'arbitrum',variational:'arbitrum'};
 const positive=(v:unknown):Decimal|null=>{try{if(v==null)return null;const n=new Decimal(String(v));return n.isFinite()&&n.gt(0)?n:null;}catch{return null;}};
 /**
  * Platform balances are scoped by account, never merged by ticker with wallet FIFO.

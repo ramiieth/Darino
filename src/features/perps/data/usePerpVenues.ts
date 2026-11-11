@@ -13,12 +13,12 @@ import { fetchJson } from '@/repositories/remoteClient';
 import { useCustody } from '@/features/custody/data/useCustody';
 import type { ConnectedPortfolio } from '@/features/connected/data/useConnectedPortfolio';
 import { lighterAccounts } from '../domain/model';
-import { fromArcus, fromHlLike, fromKeyed, fromLighter, type HlLikeState, type HlPortfolioSeries, type LedgerUpdate, type PerpVenueAccount } from '../domain/perpPortfolio';
+import { fromArcus, fromHlLike, fromKeyed, fromLighter, fromVariational, type HlLikeState, type HlPortfolioSeries, type LedgerUpdate, type PerpVenueAccount } from '../domain/perpPortfolio';
 import { hlClearinghouseState, hlPortfolio } from '@/features/hyperliquid/data/hyperliquidService';
 import { txflowInfo } from '@/features/calculators/data/perpMarkets';
 import { LIGHTER_PLATFORM, lighterAccountQuery, lighterPnlQuery, type LighterNetwork } from './lighterAccount';
 
-type KeyedResponse = { venues: Parameters<typeof fromKeyed>[0][]; addresses?: Partial<Record<'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow', string[]>> };
+type KeyedResponse = { venues: Parameters<typeof fromKeyed>[0][]; addresses?: Partial<Record<'hyperliquid' | 'lighter-mainnet' | 'lighter-robinhood' | 'txflow' | 'variational', string[]>> };
 
 /** یک درخواست برای حساب‌های کلیددار و آدرس‌های env؛ بدون ورود یا بدون env → خالی */
 export const keyedPerpsQuery = {
@@ -31,7 +31,7 @@ export const keyedPerpsQuery = {
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 
-const ENV_LABEL = { hyperliquid: 'حساب هایپرلیکوئید', 'lighter-mainnet': 'حساب لایتر', 'lighter-robinhood': 'حساب لایتر رابین‌هود', txflow: 'حساب تی‌اکس‌فلو' } as const;
+const ENV_LABEL = { hyperliquid: 'حساب هایپرلیکوئید', 'lighter-mainnet': 'حساب لایتر', 'lighter-robinhood': 'حساب لایتر رابین‌هود', txflow: 'حساب تی‌اکس‌فلو', variational: 'حساب وریشنال' } as const;
 
 /** آدرس‌های عمومی env یک پلتفرم که هنوز به‌عنوان حساب ثبت نشده‌اند */
 function useEnvAddresses(platform: keyof typeof ENV_LABEL, registered: readonly string[]): { id: string; label: string; address: string }[] {
@@ -161,8 +161,88 @@ export function useKeyedVenues(): PerpVenueAccount[] {
 }
 
 /** پوزیشن‌های پلتفرمی (لایتر، هایپرلیکوئید، تی‌اکس‌فلو، اوندو) برای «پوزیشن‌های واقعی» */
+
+export const VARIATIONAL_BASE = 'https://omni-client-api.prod.ap-northeast-1.variational.io';
+
+export const variationalAccountQuery = (address: string) => ({
+  queryKey: ['perp-account', 'variational', address.toLowerCase()],
+  queryFn: async () => {
+    try {
+      const res = await fetch(`${VARIATIONAL_BASE}/portfolio/positions?address=${address}`, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000)
+      });
+      if (!res.ok) {
+        return { equity: 0, unrealizedPnl: 0, allTimePnl: 0, realizedPnl: 0, positions: [] };
+      }
+      return await res.json();
+    } catch {
+      return { equity: 0, unrealizedPnl: 0, allTimePnl: 0, realizedPnl: 0, positions: [] };
+    }
+  },
+  staleTime: 30_000,
+  refetchInterval: 60_000,
+  retry: 1
+});
+
+export function useVariationalVenues(): PerpVenueAccount[] {
+  const custody = useCustody();
+  const fromHoldings = custody.holdings.flatMap((h) => {
+    if (h.kind !== 'platform' || h.archivedAt || !h.address || h.platformId !== 'variational') return [];
+    return [{ id: h.id, label: h.label, address: h.address }];
+  });
+  const envVariational = useEnvAddresses('variational', fromHoldings.map((l) => l.address));
+  const envHl = useEnvAddresses('hyperliquid', []);
+  const envTx = useEnvAddresses('txflow', []);
+  const envMain = useEnvAddresses('lighter-mainnet', []);
+  const envRh = useEnvAddresses('lighter-robinhood', []);
+
+  const hasVariationalHolding = fromHoldings.length > 0;
+  const fallbackAddress =
+    !hasVariationalHolding && envVariational.length === 0
+      ? envHl[0]?.address ||
+        envTx[0]?.address ||
+        envMain[0]?.address ||
+        envRh[0]?.address ||
+        custody.holdings.find((h) => !h.archivedAt && h.address && EVM.test(h.address))?.address
+      : null;
+
+  const varEnvList =
+    envVariational.length > 0
+      ? envVariational
+      : fallbackAddress
+        ? [{ id: `env:variational:${fallbackAddress.toLowerCase()}`, label: 'حساب وریشنال', address: fallbackAddress }]
+        : [];
+
+  const linked = [...fromHoldings, ...varEnvList];
+  const seen = new Set(linked.map((l) => l.address.toLowerCase()));
+  const walletVar = [
+    ...new Map(
+      custody.holdings
+        .filter((h) => h.kind === 'wallet' && !h.archivedAt && h.address && EVM.test(h.address) && !seen.has(h.address.toLowerCase()))
+        .map((h) => [h.address!.toLowerCase(), { id: `wallet:variational:${h.address!.toLowerCase()}`, label: `${h.label} · وریشنال`, address: h.address! }])
+    ).values()
+  ];
+
+  const queries = useQueries({ queries: [...linked, ...walletVar].map((l) => variationalAccountQuery(l.address)) });
+  const toAccount = (l: (typeof linked)[number], q: (typeof queries)[number]) => {
+    const status = q.isPending ? 'loading' : q.isError && !q.data ? 'error' : 'ready';
+    return fromVariational(l.id, l.label, l.address, q.data ?? null, status, q.isError && !!q.data);
+  };
+
+  const active = walletVar.flatMap((l, i) => {
+    const q = queries[linked.length + i];
+    const data = q.data as { equity?: number; positions?: unknown[] } | undefined;
+    const open = Array.isArray(data?.positions) && data.positions.length > 0;
+    const hasEquity = Number(data?.equity ?? 0) > 0;
+    return hasEquity || open ? [toAccount(l, q)] : [];
+  });
+
+  return [...linked.map((l, i) => toAccount(l, queries[i])), ...active];
+}
+
 export function usePlatformPerpVenues(): PerpVenueAccount[] {
-  return [...useLighterVenues(), ...useHlLikeVenues(), ...useKeyedVenues()];
+  return [...useLighterVenues(), ...useHlLikeVenues(), ...useVariationalVenues(), ...useKeyedVenues()];
 }
 
 export function arcusVenues(arcus: ConnectedPortfolio['arcus']): PerpVenueAccount[] {
