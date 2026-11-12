@@ -5,12 +5,12 @@
  *      (بدون نمایش چرخه‌های خرید و فروش گذشته یا رمزارزهای فروخته‌شده)
  *   ۲. کاتالوگ کامل و دقیق قیمت‌های مستند ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴):
  *      • مسکن اهواز: کیانپارس (۶۰ تا ۶۵ میلیون)، پادادشهر (۴۵ میلیون)، گلستان (۴۵ میلیون)، کیان‌آباد (۴۵ میلیون)، شهرک دانشگاه (۳۰ تا ۳۲ میلیون)
- *      • تمامی خودروهای بازار آزاد (صرفاً قیمت بازار آزاد؛ قیمت کارخانه به طور کامل حذف شده است):
+ *      • خودروهای منتخب بازار آزاد (صرفاً قیمت بازار آزاد؛ قیمت کارخانه به طور کامل حذف شده است):
  *        تارا (V1، V2، V4)، پژو ۲۰۷ (TU3، دنده‌ای هیدرولیک، دنده‌ای پانوراما، اتوماتیک سقف فلزی، اتوماتیک پانوراما)،
  *        ری‌را، هایما (S5، S7، 8S، 7X)، دنا پلاس (۵ دنده، ۶ سرعته، توربو اتوماتیک)، سورن پلاس (XU7P، بنزینی فول، دوگانه‌سوز)،
  *        شاهین (GL، G، اتوماتیک CVT، پلاس)، اطلس G، سهند S، ساینا (S بنزینی، دوگانه‌سوز)، کوییک (S/GX، GXR، اتوماتیک)،
  *        چانگان (CS35 تیپ ۲ و ۳، CS55 پلاس)، هیوندای النترا و ام‌جی ۵ (MG5)
- *   ۳. استخراج زندهٔ قیمت‌های فعلی تمامی خودروها و مسکن اهواز از استورهای اپ دارینو + پشتیبانی از سایر بازارهای جهانی (سهام آمریکا، نفت، طلا، شاخص‌ها و رمزارزها)
+ *   ۳. استخراج زندهٔ قیمت‌های فعلی خودروهای منتخب و مسکن اهواز از استورهای اپ دارینو + پشتیبانی از سایر بازارهای جهانی (سهام آمریکا، نفت، طلا، شاخص‌ها و رمزارزها)
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -54,7 +54,6 @@ import type { WalletAndCostBridge } from '../data/useWalletAndCostBridge';
 import {
   AHVAZ_PROPERTY_BENCHMARKS,
   HISTORICAL_CAR_BENCHMARKS,
-  extractAdditionalLiveCarsFromStore,
   resolveLiveAhvazPropertyPrice,
   resolveLiveCarMarketPrice
 } from '../domain/historicalIranBenchmarks';
@@ -81,6 +80,7 @@ export interface SimulatorItem {
   pnlToman: number;
   pnlUsd: number;
   returnPct: number;
+  returnUsdPct: number;
   vsPortfolioToman: number;
   vsPortfolioUsd: number;
   source?: string;
@@ -163,18 +163,36 @@ export function ReportTab({
   const rateStart = analysis?.start.rateToman ?? 80_000;
   const rateEnd = analysis?.end.rateToman ?? 120_000;
 
-  // ساخت فهرست کامل و یکپارچهٔ تمام بازارها (مسکن اهواز، تمامی خودروهای بازار آزاد، سهام آمریکا، نفت، طلا و رمزارزها)
-  const simulatorItems = useMemo((): SimulatorItem[] => {
-    if (!analysis) return [];
-    const startToman = analysis.portfolio.startToman ?? analysis.portfolio.startUsd * rateStart;
+  // مبنای واقعی سبد: در صورت اتصال کیف‌پول‌ها، ارزش زندهٔ فعلی (مثلاً ۲۹,۹۹۲ دلار) جایگزین آخرین سابقهٔ قدیمی می‌شود
+  const portfolioBasis = useMemo(() => {
+    if (!analysis) return null;
     const startUsd = analysis.portfolio.startUsd;
-    const endToman = analysis.portfolio.endToman ?? analysis.portfolio.endUsd * rateEnd;
-    const endUsd = analysis.portfolio.endUsd;
-    const portPnlToman = endToman - startToman;
-    const portPnlUsd = endUsd - startUsd;
+    const startToman = analysis.portfolio.startToman ?? startUsd * rateStart;
+    const liveUsd = walletBridge?.totalLiveUsd;
+    const usingLiveWallet = typeof liveUsd === 'number' && Number.isFinite(liveUsd) && liveUsd > 0;
+    const endUsd = usingLiveWallet ? liveUsd : analysis.portfolio.endUsd;
+    const endToman = usingLiveWallet ? endUsd * rateEnd : (analysis.portfolio.endToman ?? endUsd * rateEnd);
+    const returnUsd = startUsd > 0 ? endUsd / startUsd - 1 : 0;
+    const returnToman = startToman > 0 ? endToman / startToman - 1 : 0;
+    return {
+      startUsd,
+      startToman,
+      endUsd,
+      endToman,
+      pnlUsd: endUsd - startUsd,
+      pnlToman: endToman - startToman,
+      returnUsd,
+      returnToman,
+      usingLiveWallet
+    };
+  }, [analysis, walletBridge?.totalLiveUsd, rateStart, rateEnd]);
+
+  // ساخت فهرست کامل و یکپارچهٔ بازارهای منتخب (مسکن اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا، نفت، طلا و رمزارزها)
+  const simulatorItems = useMemo((): SimulatorItem[] => {
+    if (!analysis || !portfolioBasis) return [];
+    const { startToman, startUsd, pnlToman: portPnlToman, pnlUsd: portPnlUsd } = portfolioBasis;
 
     const items: SimulatorItem[] = [];
-    const matchedCarNames = new Set<string>();
 
     // ۱. پنج محلهٔ مسکن اهواز با قیمت دقیق ۱۱ دی ۱۴۰۳ و استخراج قیمت روز از اپ دارینو
     for (const nh of AHVAZ_PROPERTY_BENCHMARKS) {
@@ -206,6 +224,7 @@ export function ReportTab({
         pnlToman: pnlT,
         pnlUsd: pnlU,
         returnPct: pStart > 0 ? pEnd / pStart - 1 : 0,
+        returnUsdPct: startUsd > 0 ? valEndUsd / startUsd - 1 : 0,
         vsPortfolioToman: pnlT - portPnlToman,
         vsPortfolioUsd: pnlU - portPnlUsd,
         source: liveProp.source,
@@ -213,7 +232,7 @@ export function ReportTab({
       });
     }
 
-    // ۲. تمامی خودروهای بازار آزاد در ۱۱ دی ۱۴۰۳ (بدون قیمت کارخانه) + قیمت روز از استور بازار خودروی دارینو
+    // ۲. خودروهای منتخب بازار آزاد در ۱۱ دی ۱۴۰۳ (بدون قیمت کارخانه) + قیمت روز از استور بازار خودروی دارینو
     for (const car of HISTORICAL_CAR_BENCHMARKS) {
       const liveCar = resolveLiveCarMarketPrice(car, carSnapshots);
       const pStart = car.marketPriceDec1403;
@@ -243,45 +262,11 @@ export function ReportTab({
         pnlToman: pnlT,
         pnlUsd: pnlU,
         returnPct: pStart > 0 ? pEnd / pStart - 1 : 0,
+        returnUsdPct: startUsd > 0 ? valEndUsd / startUsd - 1 : 0,
         vsPortfolioToman: pnlT - portPnlToman,
         vsPortfolioUsd: pnlU - portPnlUsd,
         source: liveCar.source,
         isLiveFromApp: liveCar.isLive
-      });
-      matchedCarNames.add(car.name.replace(/^خودرو\s*—\s*/, '').trim());
-    }
-
-    // ۳. استخراج سایر خودروهای موجود در استور بازار خودروی اپ دارینو (که در جدول بالا نبودند)
-    const extraLiveCars = extractAdditionalLiveCarsFromStore(carSnapshots, analysis.start.dateTs, matchedCarNames);
-    for (const ex of extraLiveCars) {
-      const count = startToman > 0 ? startToman / ex.priceStart : 0;
-      const valEndToman = count * ex.priceEnd;
-      const valEndUsd = rateEnd > 0 ? valEndToman / rateEnd : 0;
-      const pnlT = valEndToman - startToman;
-      const pnlU = valEndUsd - startUsd;
-
-      items.push({
-        id: ex.id,
-        name: ex.name,
-        subLabel: `${ex.brandFa} · مدل ${toFaDigits(ex.year)} (بازار آزاد)`,
-        category: 'car',
-        categoryLabel: `خودرو (${ex.brandFa})`,
-        unitLabel: 'دستگاه',
-        currency: 'toman',
-        priceStart: ex.priceStart,
-        priceEnd: ex.priceEnd,
-        unitsCount: count,
-        startCostToman: startToman,
-        startCostUsd: startUsd,
-        endValueToman: valEndToman,
-        endValueUsd: valEndUsd,
-        pnlToman: pnlT,
-        pnlUsd: pnlU,
-        returnPct: ex.priceStart > 0 ? ex.priceEnd / ex.priceStart - 1 : 0,
-        vsPortfolioToman: pnlT - portPnlToman,
-        vsPortfolioUsd: pnlU - portPnlUsd,
-        source: ex.source,
-        isLiveFromApp: true
       });
     }
 
@@ -319,6 +304,7 @@ export function ReportTab({
           pnlToman: pnlT,
           pnlUsd: pnlU,
           returnPct: pEnd / pStart - 1,
+          returnUsdPct: startUsd > 0 ? valEndUsd / startUsd - 1 : 0,
           vsPortfolioToman: pnlT - portPnlToman,
           vsPortfolioUsd: pnlU - portPnlUsd,
           source: r.source,
@@ -328,7 +314,7 @@ export function ReportTab({
     }
 
     return items;
-  }, [analysis, rateStart, rateEnd, propSnapshots, propListings, carSnapshots]);
+  }, [analysis, portfolioBasis, rateStart, rateEnd, propSnapshots, propListings, carSnapshots]);
 
   // شبیه‌ساز تعاملی «تعداد دلخواه واحد» (مثلاً ۳ یا ۴ دستگاه خودرو یا ۱۰۰ متر ملک)
   const [activeSimId, setActiveSimId] = useState<string>('car:tara-v1-manual');
@@ -351,10 +337,14 @@ export function ReportTab({
     const pnlToman = endValueToman - startCostToman;
     const pnlUsd = endValueUsd - startCostUsd;
     const returnPct = unitPriceStart > 0 ? unitPriceEnd / unitPriceStart - 1 : 0;
+    const returnUsdPct = startCostUsd > 0 ? endValueUsd / startCostUsd - 1 : 0;
 
-    const portReturnToman = analysis?.portfolio.returnToman ?? 0;
+    const portReturnToman = portfolioBasis?.returnToman ?? 0;
+    const portReturnUsd = portfolioBasis?.returnUsd ?? 0;
     const portEquivalentProfitToman = startCostToman * portReturnToman;
+    const portEquivalentProfitUsd = startCostUsd * portReturnUsd;
     const vsPortfolioToman = pnlToman - portEquivalentProfitToman;
+    const vsPortfolioUsd = pnlUsd - portEquivalentProfitUsd;
 
     return {
       count,
@@ -367,9 +357,13 @@ export function ReportTab({
       pnlToman,
       pnlUsd,
       returnPct,
-      vsPortfolioToman
+      returnUsdPct,
+      portReturnUsd,
+      portReturnToman,
+      vsPortfolioToman,
+      vsPortfolioUsd
     };
-  }, [activeSimItem, customUnits, rateStart, rateEnd, analysis]);
+  }, [activeSimItem, customUnits, rateStart, rateEnd, portfolioBasis]);
 
   async function generate() {
     const basePayload = buildPayload();
@@ -466,7 +460,7 @@ export function ReportTab({
                   <Badge tone="brand">موتور تحلیلی دارینو</Badge>
                 </div>
                 <p className="mt-0.5 text-xs text-muted">
-                  بررسی تخصصی دارایی‌های فعلی کیف پول و بهای تمام‌شده در کنار مقایسهٔ کامل با املاک ۵ محلهٔ اهواز، تمامی خودروهای بازار آزاد، سهام آمریکا، نفت و طلا
+                  بررسی تخصصی دارایی‌های فعلی کیف پول و بهای تمام‌شده در کنار مقایسهٔ کامل با املاک ۵ محلهٔ اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا، نفت و طلا
                 </p>
               </div>
             </div>
@@ -648,7 +642,7 @@ export function ReportTab({
         </Surface>
       )}
 
-      {/* ─── بخش دوم: شبیه‌ساز تعاملی و کاتالوگ کامل املاک اهواز، تمامی خودروهای بازار آزاد، سهام آمریکا و نفت ─── */}
+      {/* ─── بخش دوم: شبیه‌ساز تعاملی و کاتالوگ کامل املاک اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا و نفت ─── */}
       {(activeLens === 'both' || activeLens === 'buyhold') && (
         <>
           {/* شبیه‌ساز تعاملی «اگر ۳ یا ۴ دستگاه خودرو یا چند متر ملک در ۱۱ دی ۱۴۰۳ خریده بودم» */}
@@ -813,18 +807,30 @@ export function ReportTab({
                     </span>
                   </div>
 
-                  <div className="rounded-xl border border-divider bg-surface-2/40 p-3.5 space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <span className="text-2xs text-muted block">مقایسه با بازدهی سبد فعلی شما:</span>
-                      <p className={cn('mt-1 font-bold leading-5', customSimResult.vsPortfolioToman <= 0 ? 'text-positive' : 'text-negative')}>
-                        {customSimResult.vsPortfolioToman <= 0
-                          ? `سبد شما ${fmtCompactFa(Math.abs(customSimResult.vsPortfolioToman))} تومان بیشتر از این خرید سود ساخته است`
-                          : `خرید این دارایی ${fmtCompactFa(customSimResult.vsPortfolioToman)} تومان بیشتر از سبد شما سود می‌داد`}
+                  <div className="rounded-xl border border-divider bg-surface-2/40 p-3.5 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <span className="text-2xs text-muted block">
+                        مقایسهٔ هم‌سرمایه با بازده سبد شما ({portfolioBasis?.usingLiveWallet ? 'موجودی زندهٔ کیف‌پول‌ها' : 'سابقهٔ پایان'}):
+                      </span>
+                      <p className={cn('font-bold leading-5', customSimResult.vsPortfolioUsd <= 0 ? 'text-positive' : 'text-negative')}>
+                        {customSimResult.vsPortfolioUsd <= 0
+                          ? `در مقیاس دلاری، بازده سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) از این دارایی (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) بهتر بوده است`
+                          : `این دارایی در مقیاس دلاری (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) از سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) جلوتر بوده است`}
                       </p>
+                      <p className="text-2xs text-subtle">
+                        تفاوت هم‌سرمایه روی {fmtCompactFa(customSimResult.startCostToman)} تومان:{' '}
+                        <b className="text-ink">{fmtCompactFa(Math.abs(customSimResult.vsPortfolioToman))} تومان</b>
+                        {' '}({customSimResult.vsPortfolioUsd <= 0 ? '+' : '-'}${faNumber(Math.round(Math.abs(customSimResult.vsPortfolioUsd)))})
+                      </p>
+                      {portfolioBasis && (
+                        <p className="text-2xs text-muted pt-1 border-t border-divider/60">
+                          سبد شما: ${faNumber(Math.round(portfolioBasis.startUsd))} ← ${faNumber(Math.round(portfolioBasis.endUsd))}
+                        </p>
+                      )}
                     </div>
                     <div>
-                      <Badge tone={customSimResult.vsPortfolioToman <= 0 ? 'gain' : 'warn'}>
-                        {customSimResult.vsPortfolioToman <= 0 ? 'عملکرد برتر سبد شما' : 'جا ماندن از این بازار'}
+                      <Badge tone={customSimResult.vsPortfolioUsd <= 0 ? 'gain' : 'warn'}>
+                        {customSimResult.vsPortfolioUsd <= 0 ? 'عملکرد برتر سبد شما' : 'جا ماندن از این بازار'}
                       </Badge>
                     </div>
                   </div>
@@ -838,7 +844,7 @@ export function ReportTab({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-ink">
-                  مقایسهٔ جامع بازارها: مسکن اهواز، تمامی خودروهای بازار آزاد، سهام آمریکا، نفت و طلا
+                  مقایسهٔ جامع بازارها: مسکن اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا، نفت و طلا
                 </h3>
                 <p className="mt-0.5 text-xs text-muted">
                   بر اساس سرمایهٔ شروع شما (<Toman v={analysis?.portfolio.startToman} /> معادل <Usd v={analysis?.portfolio.startUsd} />): چند واحد قابل خرید بود و امروز در بازار آزاد چقدر می‌ارزد؟
@@ -882,7 +888,7 @@ export function ReportTab({
             ) : (
               <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredItems.map((item) => {
-                  const portfolioAhead = item.vsPortfolioToman <= 0;
+                  const portfolioAhead = item.vsPortfolioUsd <= 0;
                   return (
                     <div
                       key={item.id}
@@ -947,7 +953,7 @@ export function ReportTab({
                         >
                           <span>{portfolioAhead ? 'برتری سبد شما:' : 'برتری این بازار:'}</span>
                           <span>
-                            {portfolioAhead ? `+${fmtCompactFa(Math.abs(item.vsPortfolioToman))}` : `-${fmtCompactFa(Math.abs(item.vsPortfolioToman))}`} تومان
+                            {portfolioAhead ? '+' : '-'}{fmtCompactFa(Math.abs(item.vsPortfolioToman))} تومان ({portfolioAhead ? '+' : '-'}${faNumber(Math.round(Math.abs(item.vsPortfolioUsd)))})
                           </span>
                         </div>
                       </div>
@@ -1045,7 +1051,7 @@ export function ReportTab({
             <Sparkles className="h-10 w-10 text-muted mx-auto opacity-40" />
             <h4 className="text-sm font-semibold text-ink">هنوز گزارش تحلیلی برای این بازه ثبت نشده است</h4>
             <p className="text-xs text-muted max-w-md mx-auto">
-              با کلیک بر روی دکمهٔ «تهیهٔ تحلیل هوشمند»، گزارش تحلیلی کامل بر اساس دارایی‌های موجود فعلی، بهای تمام‌شده، مسکن اهواز و قیمت بازار آزاد تمامی خودروها تولید می‌شود.
+              با کلیک بر روی دکمهٔ «تهیهٔ تحلیل هوشمند»، گزارش تحلیلی کامل بر اساس دارایی‌های موجود فعلی، بهای تمام‌شده، مسکن اهواز و قیمت بازار آزاد خودروهای منتخب تولید می‌شود.
             </p>
             <Button
               variant="primary"
