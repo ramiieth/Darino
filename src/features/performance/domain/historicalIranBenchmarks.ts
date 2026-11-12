@@ -1,9 +1,9 @@
 /**
- * کاتالوگ جامع قیمت‌های تاریخی مستند ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴) برای:
+ * کاتالوگ قیمت‌های تاریخی مستند ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴) صرفاً برای موارد مشخص‌شده توسط کاربر:
  *   ۱. مسکن اهواز (کیانپارس، کیان‌آباد، گلستان، پادادشهر، شهرک دانشگاه)
- *   ۲. خودروهای صفر کیلومتر بازار آزاد (صرفاً قیمت بازار آزاد؛ قیمت کارخانه به طور کامل حذف شده است)
+ *   ۲. خودروهای صفر کیلومتر منتخب در بازار آزاد (صرفاً قیمت بازار آزاد؛ قیمت کارخانه به طور کامل حذف شده است — تا ام‌جی ۵)
  *
- * و استخراج پویا و زندهٔ قیمت‌های فعلی از Snapshotهای واقعی بخش «بازار خودرو» و «بازار املاک اهواز» اپ دارینو.
+ * و استخراج پویا و زندهٔ قیمت‌های فعلی همین خودروهای منتخب و محله‌های اهواز از Snapshotهای واقعی بخش «بازار خودرو» و «بازار املاک اهواز» اپ دارینو.
  */
 import type { CarSnapshot, CarPriceRow } from '@/features/carMarket/domain/types';
 import type { PropertyMarketSnapshot, PropertyMarketListing } from '@/features/propertyMarket/domain/types';
@@ -83,16 +83,16 @@ export interface HistoricalCarDef {
 }
 
 /**
- * فهرست کامل خودروهای بازار آزاد در ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴)
- * ⚠️ صرفاً قیمت بازار آزاد؛ تمامی قیمت‌های کارخانه/نمایندگی حذف شده‌اند.
+ * فهرست دقیق خودروهای مشخص‌شده توسط کاربر در ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴) — تا ام‌جی ۵ (MG5)
+ * ⚠️ صرفاً قیمت بازار آزاد؛ تمامی قیمت‌های کارخانه/نمایندگی حذف شده‌اند و هیچ خودروی اضافه‌ای خارج از لیست کاربر وجود ندارد.
  */
 export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
-  // ─── خانواده تارا (ایران‌خودرو) ───
+  // ─── ۱. خانواده تارا (ایران‌خودرو) ───
   {
     id: 'car:tara-v1-manual',
     name: 'خودرو — تارا دستی V1',
     brandFa: 'ایران‌خودرو',
-    marketPriceDec1403: 870_000_000,
+    marketPriceDec1403: 869_500_000,
     rangeNoteDec1403: '۸۶۶ تا ۸۷۳ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
     matchPatterns: [/تارا\s*دند|تارا\s*دستی|تارا\s*V1(?!\s*پلاس)/i, /^Tara Manual$/i],
     fallbackCurrentMarket: 1_390_000_000
@@ -108,7 +108,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
   },
   {
     id: 'car:tara-v4-auto',
-    name: 'خودرو — تارا اتوماتیک V4 (فول)',
+    name: 'خودرو — تارا اتوماتیک V4',
     brandFa: 'ایران‌خودرو',
     marketPriceDec1403: 1_056_500_000,
     rangeNoteDec1403: '۱,۰۵۵ تا ۱,۰۵۸ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -116,7 +116,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_720_000_000
   },
 
-  // ─── خانواده پژو ۲۰۷ (ایران‌خودرو) ───
+  // ─── ۲. خانواده پژو ۲۰۷ (ایران‌خودرو) ───
   {
     id: 'car:207-tu3',
     name: 'خودرو — پژو ۲۰۷ موتور TU3',
@@ -128,7 +128,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
   },
   {
     id: 'car:207-manual',
-    name: 'خودرو — پژو ۲۰۷ دنده‌ای هیدرولیک (TU5)',
+    name: 'خودرو — پژو ۲۰۷ دنده‌ای هیدرولیک',
     brandFa: 'ایران‌خودرو',
     marketPriceDec1403: 801_000_000,
     rangeNoteDec1403: '۸۰۰ تا ۸۰۲ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -163,7 +163,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_660_000_000
   },
 
-  // ─── خانواده دنا، سورن، ری‌را و هایما (ایران‌خودرو) ───
+  // ─── ۳. محصولات ایران‌خودرو (ری‌را، هایما، دنا و سورن) ───
   {
     id: 'car:reera-turbo',
     name: 'خودرو — ری‌را توربو اتوماتیک',
@@ -172,6 +172,42 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     rangeNoteDec1403: '۱,۶۵۰ تا ۱,۷۰۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
     matchPatterns: [/ری\s*را|ریرا|reera/i],
     fallbackCurrentMarket: 2_650_000_000
+  },
+  {
+    id: 'car:haima-s5',
+    name: 'خودرو — هایما S5 پلاس',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 1_480_000_000,
+    rangeNoteDec1403: '۱,۴۷۰ تا ۱,۴۹۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/هایما\s*S5/i],
+    fallbackCurrentMarket: 4_500_000_000
+  },
+  {
+    id: 'car:haima-s7',
+    name: 'خودرو — هایما S7 پلاس',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 1_730_000_000,
+    rangeNoteDec1403: '۱,۷۲۰ تا ۱,۷۴۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/هایما\s*S7/i],
+    fallbackCurrentMarket: 4_950_000_000
+  },
+  {
+    id: 'car:haima-8s',
+    name: 'خودرو — هایما 8S',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 2_005_000_000,
+    rangeNoteDec1403: '۱,۹۹۰ تا ۲,۰۲۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/هایما\s*8S/i],
+    fallbackCurrentMarket: 5_800_000_000
+  },
+  {
+    id: 'car:haima-7x',
+    name: 'خودرو — هایما 7X',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 1_800_000_000,
+    rangeNoteDec1403: '۱,۷۹۰ تا ۱,۸۱۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/هایما\s*7X/i],
+    fallbackCurrentMarket: 5_200_000_000
   },
   {
     id: 'car:dena-5mt',
@@ -210,8 +246,17 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_090_000_000
   },
   {
+    id: 'car:soren-steel-rim',
+    name: 'خودرو — سمند سورن پلاس بنزینی (رینگ فولادی)',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 772_000_000,
+    rangeNoteDec1403: '۷۷۲ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/سورن.*رینگ\s*فولادی|سورن\s*پلاس\s*بنزینی/i],
+    fallbackCurrentMarket: 1_230_000_000
+  },
+  {
     id: 'car:soren-full',
-    name: 'خودرو — سمند سورن پلاس بنزینی (فول EF7)',
+    name: 'خودرو — سمند سورن پلاس بنزینی (فول)',
     brandFa: 'ایران‌خودرو',
     marketPriceDec1403: 792_000_000,
     rangeNoteDec1403: '۷۹۲ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -219,52 +264,25 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_260_000_000
   },
   {
-    id: 'car:soren-cng',
-    name: 'خودرو — سمند سورن پلاس دوگانه‌سوز',
+    id: 'car:soren-cng-small',
+    name: 'خودرو — سمند سورن پلاس دوگانه‌سوز (کپسول کوچک)',
+    brandFa: 'ایران‌خودرو',
+    marketPriceDec1403: 841_000_000,
+    rangeNoteDec1403: '۸۴۱ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/سورن.*دوگانه.*کوچک|سورن.*دوگانه/i],
+    fallbackCurrentMarket: 1_340_000_000
+  },
+  {
+    id: 'car:soren-cng-large',
+    name: 'خودرو — سمند سورن پلاس دوگانه‌سوز (کپسول بزرگ)',
     brandFa: 'ایران‌خودرو',
     marketPriceDec1403: 855_500_000,
     rangeNoteDec1403: '۸۵۴ تا ۸۵۷ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/سورن.*دوگانه/i],
+    matchPatterns: [/سورن.*دوگانه.*بزرگ|سورن.*دوگانه/i],
     fallbackCurrentMarket: 1_360_000_000
   },
-  {
-    id: 'car:haima-s5',
-    name: 'خودرو — هایما S5 پلاس',
-    brandFa: 'ایران‌خودرو',
-    marketPriceDec1403: 1_480_000_000,
-    rangeNoteDec1403: '۱,۴۷۰ تا ۱,۴۹۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/هایما\s*S5/i],
-    fallbackCurrentMarket: 4_500_000_000
-  },
-  {
-    id: 'car:haima-s7',
-    name: 'خودرو — هایما S7 پلاس / پرو',
-    brandFa: 'ایران‌خودرو',
-    marketPriceDec1403: 1_730_000_000,
-    rangeNoteDec1403: '۱,۷۲۰ تا ۱,۷۴۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/هایما\s*S7/i],
-    fallbackCurrentMarket: 4_950_000_000
-  },
-  {
-    id: 'car:haima-8s',
-    name: 'خودرو — هایما 8S',
-    brandFa: 'ایران‌خودرو',
-    marketPriceDec1403: 2_005_000_000,
-    rangeNoteDec1403: '۱,۹۹۰ تا ۲,۰۲۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/هایما\s*8S/i],
-    fallbackCurrentMarket: 5_800_000_000
-  },
-  {
-    id: 'car:haima-7x',
-    name: 'خودرو — هایما 7X',
-    brandFa: 'ایران‌خودرو',
-    marketPriceDec1403: 1_800_000_000,
-    rangeNoteDec1403: '۱,۷۹۰ تا ۱,۸۱۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/هایما\s*7X/i],
-    fallbackCurrentMarket: 5_200_000_000
-  },
 
-  // ─── محصولات سایپا (شاهین، اطلس، سهند، ساینا، کوییک، چانگان) ───
+  // ─── ۴. محصولات سایپا (شاهین، ساینا و کوییک) ───
   {
     id: 'car:shahin-gl',
     name: 'خودرو — شاهین GL (بدون سانروف)',
@@ -302,24 +320,6 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_890_000_000
   },
   {
-    id: 'car:atlas-g',
-    name: 'خودرو — اطلس G (دنده‌ای سانروف‌دار)',
-    brandFa: 'سایپا',
-    marketPriceDec1403: 586_000_000,
-    rangeNoteDec1403: '۵۸۲ تا ۵۹۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/اطلس\s*G|اطلس/i],
-    fallbackCurrentMarket: 980_000_000
-  },
-  {
-    id: 'car:sahand-s',
-    name: 'خودرو — سهند S (دنده‌ای)',
-    brandFa: 'سایپا',
-    marketPriceDec1403: 544_500_000,
-    rangeNoteDec1403: '۵۴۳ تا ۵۴۶ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/سهند\s*S|سهند/i],
-    fallbackCurrentMarket: 920_000_000
-  },
-  {
     id: 'car:saina-s',
     name: 'خودرو — ساینا S بنزینی',
     brandFa: 'سایپا',
@@ -327,6 +327,15 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     rangeNoteDec1403: '۴۷۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
     matchPatterns: [/ساینا\s*S(?!\s*دوگانه)(?!\s*اتومات)/i],
     fallbackCurrentMarket: 790_000_000
+  },
+  {
+    id: 'car:saina-glx',
+    name: 'خودرو — ساینا GLX',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 470_000_000,
+    rangeNoteDec1403: '۴۷۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/ساینا\s*GLX|ساینا\s*دند/i],
+    fallbackCurrentMarket: 785_000_000
   },
   {
     id: 'car:saina-cng',
@@ -338,13 +347,40 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 890_000_000
   },
   {
-    id: 'car:quick-s',
-    name: 'خودرو — کوییک S / GX',
+    id: 'car:saina-auto',
+    name: 'خودرو — ساینا S اتوماتیک',
     brandFa: 'سایپا',
-    marketPriceDec1403: 468_000_000,
-    rangeNoteDec1403: '۴۵۶ تا ۴۷۸ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
-    matchPatterns: [/کوییک\s*S|کوییک\s*GX(?!R)/i],
+    marketPriceDec1403: 577_000_000,
+    rangeNoteDec1403: '۵۷۷ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/ساینا.*اتومات/i],
+    fallbackCurrentMarket: 950_000_000
+  },
+  {
+    id: 'car:quick-s',
+    name: 'خودرو — کوییک S',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 463_000_000,
+    rangeNoteDec1403: '۴۵۶ تا ۴۷۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/کوییک\s*S(?!\s*R)|کوییک\s*دند/i],
+    fallbackCurrentMarket: 775_000_000
+  },
+  {
+    id: 'car:quick-r-s',
+    name: 'خودرو — کوییک R تیپ S',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 470_500_000,
+    rangeNoteDec1403: '۴۶۹ تا ۴۷۲ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/کوییک\s*R.*S|کوییک\s*R/i],
     fallbackCurrentMarket: 785_000_000
+  },
+  {
+    id: 'car:quick-gx',
+    name: 'خودرو — کوییک GX',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 476_000_000,
+    rangeNoteDec1403: '۴۷۴ تا ۴۷۸ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/کوییک\s*GX(?!R)/i],
+    fallbackCurrentMarket: 795_000_000
   },
   {
     id: 'car:quick-gxr',
@@ -365,10 +401,28 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
     fallbackCurrentMarket: 1_020_000_000
   },
 
-  // ─── خودروهای مونتاژی و وارداتی (چانگان، النترا، ام‌جی ۵) ───
+  // ─── ۵. اطلس، سهند و چانگان (سایپا) ───
+  {
+    id: 'car:atlas-g',
+    name: 'خودرو — اطلس G (دنده‌ای سانروف‌دار)',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 586_000_000,
+    rangeNoteDec1403: '۵۸۲ تا ۵۹۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/اطلس\s*G|اطلس/i],
+    fallbackCurrentMarket: 980_000_000
+  },
+  {
+    id: 'car:sahand-s',
+    name: 'خودرو — سهند S (دنده‌ای)',
+    brandFa: 'سایپا',
+    marketPriceDec1403: 544_500_000,
+    rangeNoteDec1403: '۵۴۳ تا ۵۴۶ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
+    matchPatterns: [/سهند\s*S|سهند/i],
+    fallbackCurrentMarket: 920_000_000
+  },
   {
     id: 'car:changan-cs35-t2',
-    name: 'خودرو — چانگان CS35 پلاس تیپ ۲',
+    name: 'خودرو — چانگان CS35 پلاس تیپ ۲ (۲۰۲۴)',
     brandFa: 'سایپا / وارداتی',
     marketPriceDec1403: 1_610_000_000,
     rangeNoteDec1403: '۱,۶۰۰ تا ۱,۶۲۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -377,7 +431,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
   },
   {
     id: 'car:changan-cs35-t3',
-    name: 'خودرو — چانگان CS35 پلاس تیپ ۳ فول',
+    name: 'خودرو — چانگان CS35 پلاس تیپ ۳ فول (۲۰۲۴)',
     brandFa: 'سایپا / وارداتی',
     marketPriceDec1403: 1_712_500_000,
     rangeNoteDec1403: '۱,۶۷۵ تا ۱,۷۵۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -386,16 +440,18 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
   },
   {
     id: 'car:changan-cs55',
-    name: 'خودرو — چانگان CS55 پلاس',
+    name: 'خودرو — چانگان CS55 پلاس (۲۰۲۴)',
     brandFa: 'سایپا / وارداتی',
     marketPriceDec1403: 2_345_000_000,
     rangeNoteDec1403: '۲,۳۴۵ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
     matchPatterns: [/چانگان\s*CS55|CS55/i],
     fallbackCurrentMarket: 6_450_000_000
   },
+
+  // ─── ۶. خودروهای وارداتی (هیوندای النترا و ام‌جی ۵ - تا MG5) ───
   {
     id: 'car:elantra',
-    name: 'خودرو — هیوندای النترا (وارداتی)',
+    name: 'خودرو — هیوندای النترا (۲۰۲۳/۲۰۲۴)',
     brandFa: 'کرمان‌موتور / وارداتی',
     marketPriceDec1403: 3_400_000_000,
     rangeNoteDec1403: '۳,۳۰۰ تا ۳,۵۰۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',
@@ -404,7 +460,7 @@ export const HISTORICAL_CAR_BENCHMARKS: HistoricalCarDef[] = [
   },
   {
     id: 'car:mg5',
-    name: 'خودرو — ام‌جی ۵ (MG5 وارداتی)',
+    name: 'خودرو — ام‌جی ۵ (MG5)',
     brandFa: 'فرداموتورز / وارداتی',
     marketPriceDec1403: 2_375_000_000,
     rangeNoteDec1403: '۲,۳۰۰ تا ۲,۴۵۰ میلیون تومان (بازار آزاد ۱۱ دی ۱۴۰۳)',

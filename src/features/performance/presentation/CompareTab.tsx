@@ -260,7 +260,7 @@ function MarketSetup({ open, onClose, settings, market }: { open: boolean; onClo
   );
   const sym = coin.trim().toUpperCase();
   return (
-    <Sheet open={open} onClose={onClose} title="بازارهای مقایسه" description="فقط بازارهای روشن در مقایسه و گزارش Gemini می‌آیند.">
+    <Sheet open={open} onClose={onClose} title="بازارهای مقایسه" description="فقط بازارهای روشن در مقایسه و تحلیل هوشمند می‌آیند.">
       <div className="space-y-5">
         {(['iran', 'global'] as const).map((g) => (
           <div key={g}>
