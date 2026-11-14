@@ -1,10 +1,10 @@
 /**
- * Investment calculators — twelve tools, all math in domain; UI presents only.
+ * Investment calculators — all math in domain; UI presents only.
  * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
  */
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ListChecks, ShieldHalf, Store } from 'lucide-react';
+import { BarChart3, ListChecks, ShieldHalf, Store } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { cn } from '@/shared/lib/cn';
@@ -13,20 +13,23 @@ import { DcaCalculator } from './DcaCalculator';
 import { CagrCalculator } from './CagrCalculator';
 import { XirrCalculator } from './XirrCalculator';
 import { PerpCalculator } from './PerpCalculator';
+import { CompareCalculator } from './CompareCalculator';
 import { HedgeCalculator } from './hedge/HedgeCalculator';
 import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
 import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-/**
- * دلتا نوترال و استراتژی‌های فاندینگ به «درآمد فاندینگ» (/funding) رفته‌اند و «مقایسه دارایی‌ها» به
- * «اگر خریده بودم» (/simulation/compare)؛ این صفحه فقط ماشین‌حساب‌های عمومی را نگه می‌دارد.
- */
-type CalcTab = 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
+type CalcTab = 'compare' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
 type Group = 'invest' | 'risk' | 'business';
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
+  {
+    value: 'compare',
+    label: 'مقایسه عملکرد دارایی‌ها',
+    description: 'مقایسه بازده تاریخی، ارزش سرمایه فرضی (مثلاً ۱,۰۰۰ دلار)، رشد سالانه (CAGR)، بیشترین افت (Max Drawdown) و راستی‌آزمایی ادعاهای بازار بین رمزارزها، طلا، نقره، نفت، S&P 500 و سهام بزرگ',
+    icon: <BarChart3 aria-hidden />
+  },
   { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
   { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
   { value: 'cagr', label: 'رشد سالانه', description: 'نرخ رشد سالانه مرکب بین دو ارزش، یا پیش‌بینی ارزش آینده با واریز دوره‌ای' },
@@ -53,9 +56,8 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' }
 ];
 
-/** چهار گروه به‌جای چهارده تب کنار هم */
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
-  { value: 'invest', label: 'سرمایه‌گذاری', tabs: ['pnl', 'dca', 'cagr', 'xirr', 'plan'] },
+  { value: 'invest', label: 'سرمایه‌گذاری و مقایسه دارایی‌ها', tabs: ['compare', 'pnl', 'dca', 'cagr', 'xirr', 'plan'] },
   { value: 'risk', label: 'ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
@@ -63,14 +65,11 @@ const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.v
 
 export function CalculatorsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<CalcTab>('pnl');
-  // PERP polls live market APIs — mount it only once it has been opened
+  const [tab, setTab] = useState<CalcTab>('compare');
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
-  // آپشن هم دادهٔ زندهٔ Derive می‌خواند — فقط بعد از باز شدن
   const [optionsOpened, setOptionsOpened] = useState(false);
   if (tab === 'options' && !optionsOpened) setOptionsOpened(true);
-  // «برنامهٔ من» سه صرافی را می‌خواند — فقط بعد از اولین باز شدن
   const [planOpened, setPlanOpened] = useState(false);
   if (tab === 'plan' && !planOpened) setPlanOpened(true);
   const group = groupOf(tab);
@@ -85,7 +84,7 @@ export function CalculatorsPage() {
 
   return (
     <Page>
-      <PageHeader title="ماشین‌حساب سرمایه‌گذاری" subtitle="محاسبهٔ سود، رشد و بازده سرمایه‌گذاری" />
+      <PageHeader title="ماشین‌حساب سرمایه‌گذاری" subtitle="مقایسه عملکرد دارایی‌ها، محاسبه سود، رشد سالانه و مدیریت ریسک" />
       <div className="space-y-6">
         <div className="space-y-3">
           <SegmentedControl<Group>
@@ -98,10 +97,12 @@ export function CalculatorsPage() {
           {current && <p className="text-sm text-muted">{current.description}</p>}
           {group === 'invest' && (
             <p className="text-xs leading-6 text-muted">
-              درآمد دلتا نوترال و اسکنر فاندینگ در <Link to="/funding" className="font-semibold text-accent underline">درآمد فاندینگ</Link> است؛ مقایسهٔ سرمایهٔ یکسان در چند دارایی در{' '}
-              <Link to="/simulation/compare" className="font-semibold text-accent underline">اگر خریده بودم</Link>.
+              درآمد دلتا نوترال و اسکنر فاندینگ در <Link to="/funding" className="font-semibold text-accent underline">درآمد فاندینگ</Link> است.
             </p>
           )}
+        </div>
+        <div {...panel('compare')}>
+          <CompareCalculator />
         </div>
         <div {...panel('pnl')}>
           <PnlCalculator />
