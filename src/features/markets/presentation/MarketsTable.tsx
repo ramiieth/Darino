@@ -236,8 +236,8 @@ export function MarketsTable({
                   <SortTh k="rank" sort={sort} onSort={onSort} className="w-12 !ps-5">#</SortTh>
                   <th scope="col">دارایی</th>
                   <SortTh k="price" sort={sort} onSort={onSort} num>قیمت</SortTh>
-                  <th scope="col">سقف تاریخی (ATH و ریزش)</th>
-                  <th scope="col">کانال رنج و مدت‌زمان</th>
+                  <th scope="col">سقف تاریخی و میزان ریزش</th>
+                  <th scope="col">بازه و مدت‌زمان رنج</th>
                   <SortTh k="change24h" sort={sort} onSort={onSort} num>۲۴ ساعت</SortTh>
                   <SortTh k="change7d" sort={sort} onSort={onSort} num>۷ روز</SortTh>
                   <SortTh k="change30d" sort={sort} onSort={onSort} num>۳۰ روز</SortTh>
@@ -367,29 +367,28 @@ function WatchButton({ watched, onClick, symbol }: { watched: boolean; onClick: 
   );
 }
 
-/* ---------- ATH & Range Cells ---------- */
+/* ---------- ATH & Range Cells (واضح و به فارسی روان بدون بهم‌ریختگی جهت اعداد) ---------- */
 export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
   if (!info) return <span className="text-xs text-subtle">—</span>;
   const isNearAth = info.drawdownFromAthPct >= -5;
   return (
-    <div className="space-y-0.5 text-xs">
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono font-bold text-ink" dir="ltr">
-          <MoneyValue value={info.athPrice} />
+    <div className="min-w-[180px] space-y-1 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <span className="text-[11px] text-muted">
+          سقف: <strong className="font-extrabold text-ink">{info.athPriceFa}</strong>
         </span>
         <span
-          dir="ltr"
           className={cn(
-            'rounded-full px-1.5 py-0.2 font-mono text-[11px] font-extrabold',
+            'rounded-full px-2 py-0.5 text-[11px] font-extrabold',
             isNearAth
               ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
               : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
           )}
         >
-          {toFaDigits(info.drawdownFromAthPct.toFixed(1))}٪
+          {info.drawdownClearFa}
         </span>
       </div>
-      <p className="text-[11px] text-muted">{info.elapsedSinceAthFa}</p>
+      <p className="text-[11px] text-muted">زمان سقف: {info.elapsedSinceAthFa}</p>
     </div>
   );
 }
@@ -397,13 +396,13 @@ export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null
 export function RangeDurationCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
   if (!info) return <span className="text-xs text-subtle">—</span>;
   return (
-    <div className="min-w-[155px] space-y-1 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[11px] font-bold text-ink" dir="ltr">
-          {info.rangeBandFormatted}
+    <div className="min-w-[195px] space-y-1 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <span className="text-[11px] font-bold text-ink">
+          بازه: {info.rangeBandFormatted}
         </span>
-        <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
-          {info.rangeDurationFa}
+        <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+          مدت رنج: {info.rangeDurationFa}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
@@ -545,16 +544,16 @@ function MarketDetailSheet({
                 {
                   label: 'آخرین سقف تاریخی (ATH)',
                   value: (
-                    <span className="font-mono font-bold text-ink" dir="ltr">
-                      <MoneyValue value={athRange.athPrice} /> ({athRange.elapsedSinceAthFa})
+                    <span className="text-xs font-extrabold text-ink">
+                      {athRange.athPriceFa} ({athRange.elapsedSinceAthFa})
                     </span>
                   )
                 },
                 {
-                  label: 'ریزش نسبت به ATH',
+                  label: 'میزان ریزش از سقف',
                   value: (
-                    <span className="font-mono font-extrabold text-negative" dir="ltr">
-                      {toFaDigits(athRange.drawdownFromAthPct.toFixed(1))}٪
+                    <span className="text-xs font-extrabold text-negative">
+                      {athRange.drawdownClearFa}
                     </span>
                   )
                 },
@@ -562,7 +561,7 @@ function MarketDetailSheet({
                   label: 'بازه و مدت‌زمان رنج',
                   value: (
                     <span className="text-xs font-bold text-ink">
-                      {athRange.rangeBandFormatted} · {athRange.rangeDurationFa} ({athRange.rangeStatusLabelFa})
+                      {athRange.rangeSummarySentenceFa} ({athRange.rangeStatusLabelFa})
                     </span>
                   )
                 }
@@ -596,16 +595,23 @@ const MarketCard = memo(function MarketCard({ asset, onOpen }: { asset: MarketAs
     <li>
       <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 py-3 text-start">
         <Logo src={asset.image} symbol={asset.symbol} size={36} />
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} />
           {athRange && (
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="rounded-full bg-rose-500/12 px-2 py-0.5 font-mono font-bold text-rose-600 dark:text-rose-300">
-                ATH: <MoneyValue value={athRange.athPrice} /> ({toFaDigits(athRange.drawdownFromAthPct.toFixed(1))}٪ · {athRange.elapsedSinceAthFa})
-              </span>
-              <span className="rounded-full bg-indigo-500/12 px-2 py-0.5 font-bold text-indigo-700 dark:text-indigo-300">
-                رنج {athRange.rangeBandFormatted} ({athRange.rangeDurationFa})
-              </span>
+            <div className="space-y-1 rounded-field border border-divider/60 bg-surface-2/50 px-2.5 py-1.5 text-[11px] leading-5">
+              <p className="text-ink">
+                <span className="font-bold text-muted">سقف تاریخی: </span>
+                <strong className="font-extrabold text-ink">{athRange.athPriceFa}</strong>
+                <span className="text-muted"> ({athRange.elapsedSinceAthFa}) · </span>
+                <strong className="font-extrabold text-rose-600 dark:text-rose-300">{athRange.drawdownClearFa}</strong>
+              </p>
+              <p className="text-ink">
+                <span className="font-bold text-muted">وضعیت رنج: </span>
+                <strong className="font-extrabold text-indigo-700 dark:text-indigo-300">
+                  {athRange.rangeSummarySentenceFa}
+                </strong>
+                <span className="text-muted"> ({athRange.rangeStatusLabelFa})</span>
+              </p>
             </div>
           )}
           <p className="flex flex-wrap items-center gap-x-2.5 text-2xs text-muted">

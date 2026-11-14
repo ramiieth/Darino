@@ -33,23 +33,32 @@ export interface ComputedAthAndRangeInfo {
   baseSymbol: string;
   currentPrice: number;
   athPrice: number;
+  athPriceFa: string;
   athDateIso: string;
   /** درصد ریزش نسبت به ATH (عددی منفی یا صفر، مثلاً -46.2 یعنی ۴۶.۲٪ پایین‌تر از سقف) */
   drawdownFromAthPct: number;
+  /** مقدار مطلق ریزش از سقف به صورت متن واضح فارسی (مثلاً «۴۱.۷٪ ریزش از سقف») */
+  drawdownClearFa: string;
   /** تعداد روزهای گذشته از تاریخ ATH */
   daysSinceAth: number;
-  /** متن فارسی خوش‌خوان از زمان گذشته از ATH (مثلاً «۱ سال و ۴ ماه پیش» یا «۸ ماه پیش») */
+  /** متن فارسی خوش‌خوان از زمان گذشته از ATH (مثلاً «۱ سال و ۹ ماه پیش») */
   elapsedSinceAthFa: string;
+  /** جمله کامل و روان فارسی برای وضعیت سقف تاریخی */
+  athSummarySentenceFa: string;
   /** کف کانال رنج فعلی */
   rangeLow: number;
   /** سقف کانال رنج فعلی */
   rangeHigh: number;
-  /** متن فرمت‌شده بازه رنج (مثلاً «$65,000 تا $80,000») */
+  rangeLowFa: string;
+  rangeHighFa: string;
+  /** متن فرمت‌شده بازه رنج به فارسی (مثلاً «۶۵,۰۰۰ تا ۸۰,۰۰۰ دلار») */
   rangeBandFormatted: string;
   /** تعداد روزهای حضور در این بازه رنج */
   rangeDurationDays: number;
-  /** متن فارسی مدت‌زمان رنج (مثلاً «۴ ماه و ۱۲ روز» یا «۸۵ روز») */
+  /** متن فارسی مدت‌زمان رنج (مثلاً «۵ ماه» یا «۴ ماه و ۱۲ روز») */
   rangeDurationFa: string;
+  /** جمله کامل و روان فارسی برای وضعیت رنج (مثلاً «۵ ماه در رنج ۶۵,۰۰۰ تا ۸۰,۰۰۰ دلار») */
+  rangeSummarySentenceFa: string;
   /** موقعیت قیمت فعلی داخل کانال رنج (۰٪ = کف رنج، ۱۰۰٪ = سقف رنج) */
   positionInRangePct: number;
   /** وضعیت قیمت نسبت به کانال رنج */
@@ -62,7 +71,6 @@ export function resolveBaseMarketSymbol(rawSymbol: string): string {
   const up = rawSymbol.trim().toUpperCase();
   if (DIRECT_SYMBOL_CATALOG[up]) return up;
   if (up === 'BRK.BX') return 'BRK.B';
-  // بررسی پسوندهای Ondo / xStocks / Backed
   if (up.length > 3 && up.endsWith('ON')) {
     const stripped = up.slice(0, -2);
     if (DIRECT_SYMBOL_CATALOG[stripped]) return stripped;
@@ -313,7 +321,7 @@ const DIRECT_SYMBOL_CATALOG: Record<string, AssetCycleReference> = {
     rangeLow: 3_880,
     rangeHigh: 4_090,
     rangeStartIso: '2026-07-05',
-    rangeNoteFa: 'کانال تثبیت طلا بالای ۳,۸۸۰$'
+    rangeNoteFa: 'کانال تثبیت طلا بالای ۳,۸۸۰ دلار'
   },
   XAUT: {
     athPrice: 4_125,
@@ -349,7 +357,7 @@ const DIRECT_SYMBOL_CATALOG: Record<string, AssetCycleReference> = {
     rangeLow: 78.0,
     rangeHigh: 91.5,
     rangeStartIso: '2026-05-12',
-    rangeNoteFa: 'رنج انرژی ۷۸$ تا ۹۱.۵$'
+    rangeNoteFa: 'رنج انرژی ۷۸ تا ۹۱.۵ دلار'
   },
   BRENT: {
     athPrice: 147.5,
@@ -668,8 +676,16 @@ function deterministicHash(str: string): number {
   return Math.abs(h);
 }
 
+/** فرمت خوانا و تمیز عدد دلاری به فارسی (بدون قاطی شدن علامت $ و عدد در RTL) */
+export function formatPlainPriceFa(v: number): string {
+  if (v >= 1000) return toFaDigits(Math.round(v).toLocaleString('en-US'));
+  if (v >= 10) return toFaDigits(Number(v.toFixed(2)).toLocaleString('en-US'));
+  if (v >= 0.1) return toFaDigits(v.toFixed(2));
+  return toFaDigits(v.toPrecision(3));
+}
+
 /**
- * تبدیل تعداد روزها به متن فارسی دقیق و خوش‌خوان (مثلاً «۱ سال و ۹ ماه» یا «۴ ماه و ۲۵ روز»)
+ * تبدیل تعداد روزها به متن فارسی دقیق و خوش‌خوان (مثلاً «۱ سال و ۹ ماه» یا «۵ ماه»)
  */
 export function formatDurationDaysFa(days: number): string {
   const safeDays = Math.max(1, Math.round(days));
@@ -679,7 +695,7 @@ export function formatDurationDaysFa(days: number): string {
   const totalMonths = Math.floor(safeDays / 30.4375);
   const remDays = Math.round(safeDays - totalMonths * 30.4375);
   if (totalMonths < 12) {
-    return remDays >= 5
+    return remDays >= 7
       ? `${toFaDigits(totalMonths)} ماه و ${toFaDigits(remDays)} روز`
       : `${toFaDigits(totalMonths)} ماه`;
   }
@@ -692,13 +708,7 @@ export function formatDurationDaysFa(days: number): string {
 }
 
 export function formatCompactPriceBand(low: number, high: number): string {
-  const fmtOne = (v: number) => {
-    if (v >= 1000) return `$${toFaDigits(Math.round(v).toLocaleString('en-US'))}`;
-    if (v >= 10) return `$${toFaDigits(v.toFixed(1))}`;
-    if (v >= 0.1) return `$${toFaDigits(v.toFixed(2))}`;
-    return `$${toFaDigits(v.toPrecision(3))}`;
-  };
-  return `${fmtOne(low)} تا ${fmtOne(high)}`;
+  return `${formatPlainPriceFa(low)} تا ${formatPlainPriceFa(high)} دلار`;
 }
 
 /**
@@ -726,20 +736,17 @@ export function getAssetAthAndRangeInfo(params: {
   let rangeStartIso: string;
 
   if (ref) {
-    // اگر قیمت زنده از ATH مرجع عبور کرده باشد، ATH جدید ثبت می‌شود
     athPrice = Math.max(ref.athPrice, rawPrice);
     athDateIso = rawPrice > ref.athPrice ? new Date(nowMs).toISOString().slice(0, 10) : ref.athDateIso;
     rangeLow = ref.rangeLow;
     rangeHigh = ref.rangeHigh;
     rangeStartIso = ref.rangeStartIso;
   } else {
-    // برای توکن‌های دیگر خارج از کاتالوگ مستقیم (مثلاً رتبه ۵۰ تا ۲۰۰ کریپتو یا سایر سهام Ondo/xStocks):
-    // کالیبراسیون قطعی بر اساس هش نماد و نوع بازار بدون تولید عدد تصادفی در هر رندر
     const h = deterministicHash(baseSymbol);
     const isEquityOrTokenized = params.source === 'ondo' || params.source === 'xstocks' || params.source === 'tradfi';
     const athMult = isEquityOrTokenized
-      ? 1.08 + ((h % 38) / 100) // سهام معمولاً ۸٪ تا ۴۶٪ زیر سقف تاریخی هستند
-      : 1.45 + ((h % 180) / 100); // آلت‌کوین‌ها معمولاً ۳۱٪ تا ۷۰٪ زیر سقف تاریخی هستند
+      ? 1.08 + ((h % 38) / 100)
+      : 1.45 + ((h % 180) / 100);
     athPrice = Number((rawPrice * athMult).toPrecision(4));
 
     const monthsAgo = isEquityOrTokenized ? 3 + (h % 14) : 10 + (h % 36);
@@ -758,22 +765,36 @@ export function getAssetAthAndRangeInfo(params: {
   const drawdownFromAthPct =
     athPrice > 0 ? Number((((rawPrice - athPrice) / athPrice) * 100).toFixed(1)) : 0;
 
+  const absDropPct = Math.abs(drawdownFromAthPct);
+  const athPriceFa = `${formatPlainPriceFa(athPrice)} دلار`;
+  const drawdownClearFa =
+    absDropPct < 0.2 ? 'در سقف تاریخی' : `${toFaDigits(absDropPct.toFixed(1))}٪ پایین‌تر از سقف`;
+
   const athTimeMs = Date.parse(`${athDateIso}T00:00:00Z`);
   const daysSinceAth = Number.isFinite(athTimeMs)
     ? Math.max(1, Math.round((nowMs - athTimeMs) / 86_400_000))
     : 365;
+  const elapsedSinceAthFa = `${formatDurationDaysFa(daysSinceAth)} پیش`;
 
   const rangeStartMs = Date.parse(`${rangeStartIso}T00:00:00Z`);
   const rangeDurationDays = Number.isFinite(rangeStartMs)
     ? Math.max(7, Math.round((nowMs - rangeStartMs) / 86_400_000))
     : 60;
+  const rangeDurationFa = formatDurationDaysFa(rangeDurationDays);
+
+  const rangeLowFa = formatPlainPriceFa(rangeLow);
+  const rangeHighFa = formatPlainPriceFa(rangeHigh);
+  const rangeBandFormatted = formatCompactPriceBand(rangeLow, rangeHigh);
+
+  const athSummarySentenceFa = `سقف تاریخی: ${athPriceFa} (${elapsedSinceAthFa}) · ${drawdownClearFa}`;
+  const rangeSummarySentenceFa = `${rangeDurationFa} در رنج ${rangeBandFormatted}`;
 
   const span = Math.max(1e-9, rangeHigh - rangeLow);
   const rawPos = ((rawPrice - rangeLow) / span) * 100;
   const positionInRangePct = Math.max(0, Math.min(100, Math.round(rawPos)));
 
   let rangeStatus: ComputedAthAndRangeInfo['rangeStatus'] = 'mid-range';
-  let rangeStatusLabelFa = 'میانه کانال رنج';
+  let rangeStatusLabelFa = 'وسط کانال رنج';
   if (rawPrice < rangeLow) {
     rangeStatus = 'breakdown-low';
     rangeStatusLabelFa = 'زیر کف رنج (اشباع فروش)';
@@ -782,7 +803,7 @@ export function getAssetAthAndRangeInfo(params: {
     rangeStatusLabelFa = 'شکست سقف رنج';
   } else if (positionInRangePct <= 25) {
     rangeStatus = 'near-bottom';
-    rangeStatusLabelFa = 'نزدیک کف رنج (مناسب پله خرید)';
+    rangeStatusLabelFa = 'نزدیک کف رنج (مناسب خرید)';
   } else if (positionInRangePct >= 78) {
     rangeStatus = 'near-top';
     rangeStatusLabelFa = 'نزدیک سقف رنج';
@@ -793,15 +814,21 @@ export function getAssetAthAndRangeInfo(params: {
     baseSymbol,
     currentPrice: rawPrice,
     athPrice,
+    athPriceFa,
     athDateIso,
     drawdownFromAthPct,
+    drawdownClearFa,
     daysSinceAth,
-    elapsedSinceAthFa: `${formatDurationDaysFa(daysSinceAth)} پیش`,
+    elapsedSinceAthFa,
+    athSummarySentenceFa,
     rangeLow,
     rangeHigh,
-    rangeBandFormatted: formatCompactPriceBand(rangeLow, rangeHigh),
+    rangeLowFa,
+    rangeHighFa,
+    rangeBandFormatted,
     rangeDurationDays,
-    rangeDurationFa: formatDurationDaysFa(rangeDurationDays),
+    rangeDurationFa,
+    rangeSummarySentenceFa,
     positionInRangePct,
     rangeStatus,
     rangeStatusLabelFa
