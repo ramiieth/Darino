@@ -7,7 +7,7 @@
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Bot, Compass, Flame, Gauge, ShieldCheck, Trophy } from 'lucide-react';
+import { Activity, Bot, Calendar, Compass, Flame, Gauge, ShieldCheck, Trophy } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useAuth } from '@/features/auth/authClient';
@@ -23,15 +23,17 @@ import { DerivativesTab } from './DerivativesTab';
 import { MemesTab } from './MemesTab';
 import { SafetyTab } from './SafetyTab';
 import { TradingAgentsTab } from './TradingAgentsTab';
+import { EomSetupTab } from './EomSetupTab';
 import { CoinSheet } from './CoinSheet';
 import { TokenSheet } from './TokenSheet';
 
-type Tab = 'check' | 'swing' | 'agents' | 'traders' | 'derivs' | 'memes';
-const TABS: Tab[] = ['check', 'swing', 'agents', 'traders', 'derivs', 'memes'];
+type Tab = 'check' | 'swing' | 'eom' | 'agents' | 'traders' | 'derivs' | 'memes';
+const TABS: Tab[] = ['check', 'swing', 'eom', 'agents', 'traders', 'derivs', 'memes'];
 
 const INTRO: Record<Tab, string> = {
   check: 'بازار، جهت و اهرم را بدهید تا بدانید در شرایط عادی و در یک آبشار مثل بدترین روز همین بازار چه می‌شود، و چه اهرمی معقول است. جهت قیمت را پیش‌بینی نمی‌کند.',
   swing: 'برای خریدهایی که چند روز تا یک ماه نگه می‌دارید: امروز وقت خوبی برای خرید آلت‌کوین است یا نه، و هر خرید چقدر باشد.',
+  eom: 'ستاپ پایان ماه (Hartley & Schwarz 2019): پیشنهاد ورود و خروج در روزهای پایانی ماه با ریسک شخصی، راستی‌آزمایی نرخ برد (Win Rate) و نسبت شارپ روی اوراق خزانه، طلا، سهام و رمزارز در DEXهای کم‌اسلیپیج اتریوم و پرپچوال.',
   agents: 'کمیته چندایجنتی معامله (TradingAgents): ۴ تحلیلگر تخصصی، مناظره پژوهشگر صعودی و نزولی، پیشنهاد تریدر با استاپ مبتنی بر ATR و حکم ۵ سطحی مدیر پرتفولیو همراه با حافظه تصمیم‌ها.',
   traders: 'تریدرهای هایپرلیکوئید که در ماه‌های متوالی سود کرده‌اند و افتشان کنترل‌شده است، همراه با پوزیشن‌هایی که الان دارند و اینکه روی کدام بازار هم‌نظرند. هر کدام را دنبال کنید تا باز و بسته شدن پوزیشن‌هایش را اعلان بگیرید.',
   derivs: 'کجا لانگ‌ها یا شورت‌ها شلوغ‌اند و برای پوزیشن جهت‌دار یا درآمد دلتا نوترال شما چه معنایی دارد.',
@@ -86,6 +88,7 @@ export default function IntelHubPage() {
         options={[
           { value: 'check', label: 'چک قبل از ورود', icon: <Gauge /> },
           { value: 'swing', label: 'سوینگ', icon: <Compass /> },
+          { value: 'eom', label: 'ستاپ پایان ماه (EOM)', icon: <Calendar /> },
           { value: 'agents', label: 'کمیته ایجنت‌ها', icon: <Bot /> },
           { value: 'traders', label: 'تریدرهای برتر', icon: <Trophy /> },
           { value: 'derivs', label: 'بازار مشتقات', icon: <Activity /> },
@@ -103,6 +106,7 @@ export default function IntelHubPage() {
           />
         )}
         {tab === 'swing' && <SwingTab onCheck={(c) => update({ tab: null, view: null, m: c })} />}
+        {tab === 'eom' && <EomSetupTab />}
         {tab === 'agents' && (
           <TradingAgentsTab
             market={market}
