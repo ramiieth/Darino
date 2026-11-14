@@ -8,9 +8,11 @@ import {
   PAPER_TABLE_6_BY_MONTH,
   PAPER_TABLE_7_ON_THE_RUN,
   PAPER_TABLE_8_FUTURES,
+  buildEomDcaPlan,
   buildEomTradeSignal,
   buildPaperBenchmarkStudy,
   computeRoundTripCost,
+  computeWalletSuggestedCapital,
   runEmpiricalEomStudy
 } from './eomPaper';
 import { EOM_SELECTABLE_ASSETS, buildFallbackDailySeries } from '../data/eomData';
@@ -124,5 +126,61 @@ describe('Hartley & Schwarz (2019) EOM Paper Engine & Live Backtest Verification
       expect(ticket.execution.maxRiskLossUsd).toBe(100);
       expect(ticket.exitDateIso).toBe('2026-11-30');
     }
+  });
+
+  it('computes wallet-connected suggested capital and builds validated intra-window & holder DCA plans', () => {
+    const suggested = computeWalletSuggestedCapital({
+      walletTotalUsd: 25000,
+      perpEquityUsd: 4000,
+      userRiskPct: 1,
+      stopDistancePct: 1.5,
+      isPerpVenue: false
+    });
+    expect(suggested.detectedBalanceUsd).toBe(25000);
+    expect(suggested.recommendedCapitalUsd).toBe(7500); // capped at 30% of $25k portfolio
+
+    const study = buildPaperBenchmarkStudy({
+      maturity: '10Y',
+      oneWayFeePct: 0.01,
+      oneWaySlippagePct: 0.01,
+      gasUsdPerTx: 0.35,
+      positionNotionalUsd: 7500,
+      annualFinancingPct: 0
+    });
+    const signal = buildEomTradeSignal({
+      coin: 'US10Y · TLT',
+      referencePrice: 90,
+      selectedT: 3,
+      windowStats: study.windows[2],
+      roundTripCostPct: 0.049,
+      capitalUsd: 7500,
+      userRiskPct: 1,
+      isDexSpot: true,
+      now: new Date(Date.UTC(2026, 10, 25, 14, 0, 0))
+    });
+
+    const swingDca = buildEomDcaPlan({
+      mode: 'swing-eom-dca',
+      signal,
+      capitalUsd: 7500,
+      gasUsdPerTx: 0.35,
+      now: new Date(Date.UTC(2026, 10, 25, 14, 0, 0))
+    });
+    expect(swingDca.stepsCount).toBe(3);
+    expect(swingDca.tranches.length).toBe(3);
+    expect(swingDca.riskReductionPct).toBe(28);
+    expect(swingDca.exitDateIso).toBe('2026-11-30');
+
+    const holderDca = buildEomDcaPlan({
+      mode: 'holder-monthly-dca',
+      signal,
+      capitalUsd: 7500,
+      gasUsdPerTx: 0.35,
+      now: new Date(Date.UTC(2026, 10, 25, 14, 0, 0))
+    });
+    expect(holderDca.stepsCount).toBe(2);
+    expect(holderDca.tranches[0].tLabel).toBe('T-4');
+    expect(holderDca.tranches[1].tLabel).toBe('T-3');
+    expect(holderDca.holderSavingsVsT0Usd).toBeGreaterThan(0);
   });
 });

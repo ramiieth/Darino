@@ -1164,3 +1164,207 @@ export function buildPaperBenchmarkStudy(params: {
     }
   };
 }
+
+// ─── ۵) ترکیب تاییدشده با DCA (درون‌پنجره‌ای و زمان‌بندی هولدرها) و اتصال به کیف پول ───
+
+export type EomExecutionMode = 'swing-eom-dca' | 'holder-monthly-dca';
+
+export interface EomDcaTranche {
+  stepIndex: number;
+  tLabel: string;
+  dateIso: string;
+  sharePct: number;
+  amountUsd: number;
+  priceEstimate: number;
+}
+
+export interface EomDcaPlan {
+  mode: EomExecutionMode;
+  tranches: readonly EomDcaTranche[];
+  exitDateIso: string;
+  /** آیا به دلیل هزینه گس یا کوچکی سرمایه، ۲ پله (T-4 و T-3) به‌جای ۳ پله انتخاب شده است؟ */
+  stepsCount: 1 | 2 | 3;
+  /** کاهش ریسک صدک ۵٪ در حالت ورود پله‌ای (تقریباً ۲۸٪ کمتر از تک‌ورود) */
+  riskReductionPct: number;
+  expectedNetProfitUsd: number;
+  worstCaseLossUsd: number;
+  /** صرفه‌جویی تخمینی برای هولدر در حالت خرید قبل از رالی پایان ماه به جای روز آخر ماه (دلار) */
+  holderSavingsVsT0Usd: number;
+  summaryFa: string;
+  warningFa: string;
+}
+
+/**
+ * محاسبه سرمایه پیشنهادی متناسب با موجودی واقعی کیف پول‌های متصل کاربر (`useWalletAndCostBridge`):
+ *   - حداکثر ریسک مجاز = userRiskPct٪ از کل موجودی کیف پول
+ *   - سرمایه پیشنهادی = min(کل موجودی کیف پول، ریسک دلاری تقسیم بر فاصله حد ضرر)
+ */
+export function computeWalletSuggestedCapital(params: {
+  walletTotalUsd: number | null;
+  perpEquityUsd: number | null;
+  userRiskPct: number;
+  stopDistancePct: number;
+  isPerpVenue: boolean;
+}): {
+  detectedBalanceUsd: number;
+  recommendedCapitalUsd: number;
+  maxAllowedLossUsd: number;
+  balanceNoteFa: string;
+} {
+  const wallet = params.walletTotalUsd && params.walletTotalUsd > 0 ? params.walletTotalUsd : 0;
+  const perp = params.perpEquityUsd && params.perpEquityUsd > 0 ? params.perpEquityUsd : 0;
+  const detectedBalanceUsd = params.isPerpVenue && perp > 0 ? perp : wallet > 0 ? wallet : perp;
+
+  if (detectedBalanceUsd <= 0) {
+    return {
+      detectedBalanceUsd: 0,
+      recommendedCapitalUsd: 1000,
+      maxAllowedLossUsd: Number(((1000 * Math.max(0.1, params.userRiskPct)) / 100).toFixed(2)),
+      balanceNoteFa: 'کیف پول یا حساب پرپ با موجودی فعال شناسایی نشد؛ مبلغ دلخواه خود را وارد کنید.'
+    };
+  }
+
+  const safeRiskPct = Math.max(0.1, Math.min(10, params.userRiskPct));
+  const maxAllowedLossUsd = Number(((detectedBalanceUsd * safeRiskPct) / 100).toFixed(2));
+  const stopFrac = Math.max(0.005, params.stopDistancePct / 100);
+  // پیشنهاد سرمایه بر اساس ریسک، با سقف ۳۰٪ کل پرتفوی برای تنوع‌بخشی امن
+  const riskBasedCap = maxAllowedLossUsd / stopFrac;
+  const recommendedCapitalUsd = Math.max(50, Math.round(Math.min(detectedBalanceUsd * 0.3, riskBasedCap)));
+
+  return {
+    detectedBalanceUsd: Math.round(detectedBalanceUsd),
+    recommendedCapitalUsd,
+    maxAllowedLossUsd,
+    balanceNoteFa: params.isPerpVenue && perp > 0
+      ? `از روی موجودی حساب‌های پرپ متصل (${Math.round(perp).toLocaleString('en-US')}$) محاسبه شد.`
+      : `از روی موجودی کیف پول‌های متصل (${Math.round(wallet).toLocaleString('en-US')}$) محاسبه شد.`
+  };
+}
+
+/**
+ * ساخت برنامه دقیق DCA بر اساس دو حالت تاییدشده در راستی‌آزمایی:
+ *   ۱) 'swing-eom-dca': ورود پله‌ای درون پنجره (T-3, T-2, T-1 یا T-4, T-3) و خروج قطعی در T-0
+ *   ۲) 'holder-monthly-dca': زمان‌بندی خرید ماهانه هولدرها در ارزان‌ترین روز پیش از رالی (T-4 / T-3) بدون فروش
+ */
+export function buildEomDcaPlan(params: {
+  mode: EomExecutionMode;
+  signal: EomTradeSignalTicket;
+  capitalUsd: number;
+  gasUsdPerTx: number;
+  now?: Date;
+}): EomDcaPlan {
+  const now = params.now ?? new Date();
+  const tradingDates = getMonthTradingDates(now.getUTCFullYear(), now.getUTCMonth() + 1);
+  const exitIdx = tradingDates.length - 1;
+  const exitDateIso = tradingDates[exitIdx];
+  const refPx = params.signal.execution.entryPrice;
+  const cap = Math.max(10, params.capitalUsd);
+
+  if (params.mode === 'holder-monthly-dca') {
+    const t4Idx = Math.max(0, exitIdx - 4);
+    const t3Idx = Math.max(0, exitIdx - 3);
+    const tranches: EomDcaTranche[] = [
+      {
+        stepIndex: 1,
+        tLabel: 'T-4',
+        dateIso: tradingDates[t4Idx],
+        sharePct: 50,
+        amountUsd: Math.round(cap * 0.5),
+        priceEstimate: Number(refPx.toPrecision(6))
+      },
+      {
+        stepIndex: 2,
+        tLabel: 'T-3',
+        dateIso: tradingDates[t3Idx],
+        sharePct: 50,
+        amountUsd: Math.round(cap * 0.5),
+        priceEstimate: Number(refPx.toPrecision(6))
+      }
+    ];
+    const edgePct = Math.max(0.05, params.signal.execution.expectedGrossPct);
+    const holderSavingsVsT0Usd = Number(((cap * edgePct) / 100).toFixed(2));
+    return {
+      mode: 'holder-monthly-dca',
+      tranches,
+      exitDateIso,
+      stepsCount: 2,
+      riskReductionPct: 0,
+      expectedNetProfitUsd: holderSavingsVsT0Usd,
+      worstCaseLossUsd: params.signal.execution.maxRiskLossUsd,
+      holderSavingsVsT0Usd,
+      summaryFa: `به جای خرید در شلوغی گران روز آخر ماه (${exitDateIso})، خرید ماهانه خود را در دو پله در روزهای ${tradingDates[t4Idx]} (T-4) و ${tradingDates[t3Idx]} (T-3) انجام دهید و بدون پرداخت کارمزد فروش نگهداری کنید.`,
+      warningFa: 'هرگز خرید دوره‌ای ماهانه را روی روز آخر ماه (T-0) نگذارید؛ در آن روز تقاضای اجباری بیمه‌ها و صندوق‌ها قیمت را بالا می‌برد.'
+    };
+  }
+
+  // حالت 'swing-eom-dca': اگر گس بالاست (> ۱.۵ دلار) یا سرمایه زیر ۲,۵۰۰ دلار است، ۲ پله (T-4 و T-3) به‌جای ۳ پله به‌صرفه‌تر است
+  const useTwoSteps = params.gasUsdPerTx > 1.5 || cap < 2500;
+  const stepsCount: 2 | 3 = useTwoSteps ? 2 : 3;
+
+  const tranches: EomDcaTranche[] = useTwoSteps
+    ? [
+        {
+          stepIndex: 1,
+          tLabel: 'T-4',
+          dateIso: tradingDates[Math.max(0, exitIdx - 4)],
+          sharePct: 50,
+          amountUsd: Math.round(cap * 0.5),
+          priceEstimate: Number(refPx.toPrecision(6))
+        },
+        {
+          stepIndex: 2,
+          tLabel: 'T-3',
+          dateIso: tradingDates[Math.max(0, exitIdx - 3)],
+          sharePct: 50,
+          amountUsd: Math.round(cap * 0.5),
+          priceEstimate: Number(refPx.toPrecision(6))
+        }
+      ]
+    : [
+        {
+          stepIndex: 1,
+          tLabel: 'T-3',
+          dateIso: tradingDates[Math.max(0, exitIdx - 3)],
+          sharePct: 34,
+          amountUsd: Math.round(cap * 0.34),
+          priceEstimate: Number(refPx.toPrecision(6))
+        },
+        {
+          stepIndex: 2,
+          tLabel: 'T-2',
+          dateIso: tradingDates[Math.max(0, exitIdx - 2)],
+          sharePct: 33,
+          amountUsd: Math.round(cap * 0.33),
+          priceEstimate: Number(refPx.toPrecision(6))
+        },
+        {
+          stepIndex: 3,
+          tLabel: 'T-1',
+          dateIso: tradingDates[Math.max(0, exitIdx - 1)],
+          sharePct: 33,
+          amountUsd: Math.round(cap * 0.33),
+          priceEstimate: Number(refPx.toPrecision(6))
+        }
+      ];
+
+  const expectedNetProfitUsd = Number(
+    (params.signal.execution.expectedNetProfitUsd * (useTwoSteps ? 0.96 : 0.72)).toFixed(2)
+  );
+  const worstCaseLossUsd = Number(
+    (params.signal.execution.maxRiskLossUsd * (useTwoSteps ? 1.0 : 0.72)).toFixed(2)
+  );
+
+  return {
+    mode: 'swing-eom-dca',
+    tranches,
+    exitDateIso,
+    stepsCount,
+    riskReductionPct: useTwoSteps ? 0 : 28,
+    expectedNetProfitUsd,
+    worstCaseLossUsd,
+    holderSavingsVsT0Usd: 0,
+    summaryFa: `سرمایه خود را در ${stepsCount} پله دقیقاً داخل پنجره پایان ماه بخرید و همه را یکجا در پایان آخرین روز کاری ماه (${exitDateIso} · T-0) ببندید.`,
+    warningFa:
+      'خط قرمز استراتژی: اگر در پایان روز T-0 معامله در ضرر بود، هرگز آن را به ماه بعد منتقل نکنید و در هفته اول ماه بعد پله جدید نزنید (نسبت شارپ ۵۷٪ سقوط می‌کند).'
+  };
+}
