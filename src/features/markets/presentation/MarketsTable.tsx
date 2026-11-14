@@ -2,9 +2,9 @@
  * MarketsTable — one table for every universe
  *
  *  desktop: sortable financial table (sticky header, tabular numerals)
- *           # · asset · price · 24H · 7D · 30D · market cap · watch
- *  phones:  list rows — price + 24H prominent, 7D / 30D / MCap reflowed
- *           into a quiet second line (nothing hidden), tap → detail sheet
+ *           # · asset · price · ATH & drawdown · active range & duration · 24H · 7D · 30D · market cap · watch
+ *  phones:  list rows — price + 24H prominent, ATH distance + active range band
+ *           + 7D / 30D / MCap reflowed into quiet secondary lines, tap → detail sheet
  *
  *  - Rows are memoized; list is sliced with «show more» (no full render)
  *  - Missing metric → "—" (never 0); snapshot data is labelled
@@ -29,6 +29,7 @@ import { cn } from '@/shared/lib/cn';
 import { hydrateUniverse, syncUniverse, useMarketsStore } from '../pipeline/store';
 import { useMarkets } from '../pipeline/useMarkets';
 import type { MarketAsset, MarketSource, MarketUniverse } from '../pipeline/types';
+import { getAssetAthAndRangeInfo, type ComputedAthAndRangeInfo } from '../domain/athAndRangeAnalytics';
 
 const PAGE = 50;
 
@@ -235,6 +236,8 @@ export function MarketsTable({
                   <SortTh k="rank" sort={sort} onSort={onSort} className="w-12 !ps-5">#</SortTh>
                   <th scope="col">دارایی</th>
                   <SortTh k="price" sort={sort} onSort={onSort} num>قیمت</SortTh>
+                  <th scope="col">سقف تاریخی (ATH و ریزش)</th>
+                  <th scope="col">کانال رنج و مدت‌زمان</th>
                   <SortTh k="change24h" sort={sort} onSort={onSort} num>۲۴ ساعت</SortTh>
                   <SortTh k="change7d" sort={sort} onSort={onSort} num>۷ روز</SortTh>
                   <SortTh k="change30d" sort={sort} onSort={onSort} num>۳۰ روز</SortTh>
@@ -364,6 +367,65 @@ function WatchButton({ watched, onClick, symbol }: { watched: boolean; onClick: 
   );
 }
 
+/* ---------- ATH & Range Cells ---------- */
+export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
+  if (!info) return <span className="text-xs text-subtle">—</span>;
+  const isNearAth = info.drawdownFromAthPct >= -5;
+  return (
+    <div className="space-y-0.5 text-xs">
+      <div className="flex items-center gap-1.5">
+        <span className="font-mono font-bold text-ink" dir="ltr">
+          <MoneyValue value={info.athPrice} />
+        </span>
+        <span
+          dir="ltr"
+          className={cn(
+            'rounded-full px-1.5 py-0.2 font-mono text-[11px] font-extrabold',
+            isNearAth
+              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
+          )}
+        >
+          {toFaDigits(info.drawdownFromAthPct.toFixed(1))}٪
+        </span>
+      </div>
+      <p className="text-[11px] text-muted">{info.elapsedSinceAthFa}</p>
+    </div>
+  );
+}
+
+export function RangeDurationCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
+  if (!info) return <span className="text-xs text-subtle">—</span>;
+  return (
+    <div className="min-w-[155px] space-y-1 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[11px] font-bold text-ink" dir="ltr">
+          {info.rangeBandFormatted}
+        </span>
+        <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+          {info.rangeDurationFa}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all',
+              info.rangeStatus === 'near-bottom' || info.rangeStatus === 'breakdown-low'
+                ? 'bg-emerald-500'
+                : info.rangeStatus === 'near-top' || info.rangeStatus === 'breakout-up'
+                ? 'bg-amber-500'
+                : 'bg-indigo-500'
+            )}
+            style={{ width: `${Math.max(6, Math.min(100, info.positionInRangePct))}%` }}
+          />
+        </div>
+        <span className="text-[10px] text-muted">{info.rangeStatusLabelFa}</span>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- desktop row (memoized) ---------- */
 const MarketRow = memo(function MarketRow({
   asset,
@@ -376,17 +438,35 @@ const MarketRow = memo(function MarketRow({
   watched: boolean;
   onWatch: () => void;
 }) {
+  const athRange = useMemo(
+    () =>
+      getAssetAthAndRangeInfo({
+        symbol: asset.symbol,
+        currentPrice: asset.price,
+        change30d: asset.change30d,
+        change7d: asset.change7d,
+        source: asset.source
+      }),
+    [asset.symbol, asset.price, asset.change30d, asset.change7d, asset.source]
+  );
+
   return (
     <tr>
       <td className="num-ltr !ps-5 text-xs text-subtle">{index + 1}</td>
       <td>
         <div className="flex items-center gap-3">
           <Logo src={asset.image} symbol={asset.symbol} />
-          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[16rem]" />
+          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[14rem]" />
         </div>
       </td>
       <td className="col-num font-semibold text-ink">
         <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
+      </td>
+      <td>
+        <AthDistanceCell info={athRange} />
+      </td>
+      <td>
+        <RangeDurationCell info={athRange} />
       </td>
       <td className="col-num"><PercentValue value={asset.change24h} /></td>
       <td className="col-num"><PercentValue value={asset.change7d} /></td>
@@ -413,6 +493,20 @@ function MarketDetailSheet({
   watched: boolean;
   onWatch: () => void;
 }) {
+  const athRange = useMemo(
+    () =>
+      asset
+        ? getAssetAthAndRangeInfo({
+            symbol: asset.symbol,
+            currentPrice: asset.price,
+            change30d: asset.change30d,
+            change7d: asset.change7d,
+            source: asset.source
+          })
+        : null,
+    [asset]
+  );
+
   if (!asset) return null;
   const d = assetDisplayName(asset.symbol);
   return (
@@ -446,6 +540,34 @@ function MarketDetailSheet({
       <KeyValueList
         className="mt-4"
         rows={[
+          ...(athRange
+            ? [
+                {
+                  label: 'آخرین سقف تاریخی (ATH)',
+                  value: (
+                    <span className="font-mono font-bold text-ink" dir="ltr">
+                      <MoneyValue value={athRange.athPrice} /> ({athRange.elapsedSinceAthFa})
+                    </span>
+                  )
+                },
+                {
+                  label: 'ریزش نسبت به ATH',
+                  value: (
+                    <span className="font-mono font-extrabold text-negative" dir="ltr">
+                      {toFaDigits(athRange.drawdownFromAthPct.toFixed(1))}٪
+                    </span>
+                  )
+                },
+                {
+                  label: 'بازه و مدت‌زمان رنج',
+                  value: (
+                    <span className="text-xs font-bold text-ink">
+                      {athRange.rangeBandFormatted} · {athRange.rangeDurationFa} ({athRange.rangeStatusLabelFa})
+                    </span>
+                  )
+                }
+              ]
+            : []),
           { label: 'تغییر ۷ روز', value: <PercentValue value={asset.change7d} /> },
           { label: 'تغییر ۳۰ روز', value: <PercentValue value={asset.change30d} /> },
           { label: 'ارزش بازار', value: <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact /> },
@@ -458,13 +580,35 @@ function MarketDetailSheet({
 
 /* ---------- phone row: every metric stays visible (reflow, not hide) ---------- */
 const MarketCard = memo(function MarketCard({ asset, onOpen }: { asset: MarketAsset; onOpen: () => void }) {
+  const athRange = useMemo(
+    () =>
+      getAssetAthAndRangeInfo({
+        symbol: asset.symbol,
+        currentPrice: asset.price,
+        change30d: asset.change30d,
+        change7d: asset.change7d,
+        source: asset.source
+      }),
+    [asset.symbol, asset.price, asset.change30d, asset.change7d, asset.source]
+  );
+
   return (
     <li>
-      <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 py-3 text-start">
+      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 py-3 text-start">
         <Logo src={asset.image} symbol={asset.symbol} size={36} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1">
           <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} />
-          <p className="mt-1 flex flex-wrap items-center gap-x-2.5 text-2xs text-muted">
+          {athRange && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="rounded-full bg-rose-500/12 px-2 py-0.5 font-mono font-bold text-rose-600 dark:text-rose-300">
+                ATH: <MoneyValue value={athRange.athPrice} /> ({toFaDigits(athRange.drawdownFromAthPct.toFixed(1))}٪ · {athRange.elapsedSinceAthFa})
+              </span>
+              <span className="rounded-full bg-indigo-500/12 px-2 py-0.5 font-bold text-indigo-700 dark:text-indigo-300">
+                رنج {athRange.rangeBandFormatted} ({athRange.rangeDurationFa})
+              </span>
+            </div>
+          )}
+          <p className="flex flex-wrap items-center gap-x-2.5 text-2xs text-muted">
             <span>
               ۷ روز <PercentValue value={asset.change7d} />
             </span>

@@ -17,6 +17,8 @@ import { TRADFI_ASSETS, TRADFI_NAMES, TRADFI_JUL_2026 } from '@/features/simulat
 import { referenceMarketCap, hasReferenceMarketCap } from '@/features/market/data/marketCapReference';
 import { assetSearchText } from '@/shared/i18n/assetDisplayName';
 import { toFaDigits } from '@/shared/utils/formatters';
+import { getAssetAthAndRangeInfo } from '../domain/athAndRangeAnalytics';
+import { AthDistanceCell, RangeDurationCell } from './MarketsTable';
 
 const PAGE = 30;
 
@@ -33,8 +35,7 @@ export function TradFiTable() {
   return (
     <section aria-label="بازار سنتی" className="space-y-4">
       <Notice tone="neutral" title="قیمت مرجع — نه زنده">
-        سهام، ETF، شاخص، کالا و اوراق با قیمت مرجع ژوئیه ۲۰۲۶ نمایش داده می‌شوند. داده زنده برای این بخش در دسترس نیست و
-        موارد بدون مرجع «N/A» هستند.
+        سهام، ETF، شاخص، کالا و اوراق با قیمت مرجع ژوئیه ۲۰۲۶ به همراه آخرین سقف تاریخی (ATH)، میزان ریزش از سقف و مدت‌زمان رنج قیمتی نمایش داده می‌شوند.
       </Notice>
 
       <div className="flex items-center gap-2">
@@ -54,49 +55,64 @@ export function TradFiTable() {
         <EmptyState message="نتیجه‌ای یافت نشد" hint="موردی با این جستجو پیدا نشد." />
       ) : (
         <Surface className="overflow-hidden">
-          <table className="data-table">
-            <caption className="sr-only">دارایی‌های بازار سنتی — قیمت مرجع</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="!ps-4 md:!ps-5">دارایی</th>
-                <th scope="col" className="col-num">قیمت مرجع</th>
-                <th scope="col" className="col-num hidden sm:table-cell">ارزش بازار</th>
-                <th scope="col" className="!pe-4 md:!pe-5"><span className="sr-only">وضعیت</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => {
-                const price = TRADFI_JUL_2026[a.symbol] ?? null;
-                const mcap = hasReferenceMarketCap(a.symbol) ? referenceMarketCap(a.symbol) : null;
-                return (
-                  <tr key={a.symbol}>
-                    <td className="!ps-4 md:!ps-5">
-                      <div className="flex items-center gap-3">
-                        <AssetLogo symbol={a.symbol} kind="tradfi" size={28} />
-                        <AssetName
-                          symbol={a.symbol}
-                          fallbackName={TRADFI_NAMES[a.symbol] ?? a.nameFa}
-                          className="max-w-[10rem] sm:max-w-[16rem]"
-                        />
-                      </div>
-                    </td>
-                    <td className="col-num font-semibold text-ink">
-                      {price ? <MoneyValue value={price} /> : <span className="text-subtle">N/A</span>}
-                      <span className="block text-2xs font-normal text-muted sm:hidden">
-                        {mcap ? <MoneyValue value={mcap} compact /> : '—'}
-                      </span>
-                    </td>
-                    <td className="col-num hidden text-muted sm:table-cell">
-                      {mcap ? <MoneyValue value={mcap} compact /> : <span className="text-subtle">N/A</span>}
-                    </td>
-                    <td className="!pe-4 text-end md:!pe-5">
-                      <Badge tone={price ? 'warn' : 'neutral'}>{price ? '≈ مرجع' : '—'}</Badge>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <caption className="sr-only">دارایی‌های بازار سنتی — قیمت مرجع، ATH و رنج</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="!ps-4 md:!ps-5">دارایی</th>
+                  <th scope="col" className="col-num">قیمت مرجع</th>
+                  <th scope="col">سقف تاریخی (ATH و ریزش)</th>
+                  <th scope="col">کانال رنج و مدت‌زمان</th>
+                  <th scope="col" className="col-num hidden sm:table-cell">ارزش بازار</th>
+                  <th scope="col" className="!pe-4 md:!pe-5"><span className="sr-only">وضعیت</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((a) => {
+                  const price = TRADFI_JUL_2026[a.symbol] ?? null;
+                  const mcap = hasReferenceMarketCap(a.symbol) ? referenceMarketCap(a.symbol) : null;
+                  const athRange = getAssetAthAndRangeInfo({
+                    symbol: a.symbol,
+                    currentPrice: price,
+                    source: 'tradfi'
+                  });
+                  return (
+                    <tr key={a.symbol}>
+                      <td className="!ps-4 md:!ps-5">
+                        <div className="flex items-center gap-3">
+                          <AssetLogo symbol={a.symbol} kind="tradfi" size={28} />
+                          <AssetName
+                            symbol={a.symbol}
+                            fallbackName={TRADFI_NAMES[a.symbol] ?? a.nameFa}
+                            className="max-w-[10rem] sm:max-w-[16rem]"
+                          />
+                        </div>
+                      </td>
+                      <td className="col-num font-semibold text-ink">
+                        {price ? <MoneyValue value={price} /> : <span className="text-subtle">N/A</span>}
+                        <span className="block text-2xs font-normal text-muted sm:hidden">
+                          {mcap ? <MoneyValue value={mcap} compact /> : '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <AthDistanceCell info={athRange} />
+                      </td>
+                      <td>
+                        <RangeDurationCell info={athRange} />
+                      </td>
+                      <td className="col-num hidden text-muted sm:table-cell">
+                        {mcap ? <MoneyValue value={mcap} compact /> : <span className="text-subtle">N/A</span>}
+                      </td>
+                      <td className="!pe-4 text-end md:!pe-5">
+                        <Badge tone={price ? 'warn' : 'neutral'}>{price ? '≈ مرجع' : '—'}</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {all.length > limit && (
             <div className="border-t border-divider p-2">
               <Button variant="ghost" size="sm" className="w-full text-accent" onClick={() => setLimit((l) => l + PAGE)}>
