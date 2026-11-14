@@ -2,14 +2,7 @@
  * تب و بخش «ستاپ پایان ماه (EOM Setup — Hartley & Schwarz 2019)»
  *
  * ارتقا با «DCA پله‌ای روی ریزش قیمت (Limit Dip Ladder & Anchor+Dip)»، اتصال به موجودی کیف پول‌ها
- * و نمایش فاصله از سقف تاریخی (ATH) و مدت‌زمان حضور در کانال رنج قیمتی برای هر ۱۹ بازار:
- *   ۱) ۳ حالت تاییدشده کمّی:
- *      - ترکیبی لنگر + شکار ریزش (Anchor + Dip DCA — بالاترین شارپ ۲.۰۸)
- *      - شکارچی خالص ریزش (Limit Dip Ladder — مثلاً اتریوم 1829$ و 1729$ و 1629$ — نرخ برد ۸۰.۵٪)
- *      - زمان‌بندی DCA هولدرها (خرید قبل از جهش پایان ماه بدون فروش)
- *   ۲) امکان ویرایش دستی قیمت دلاری هر پله توسط کاربر (پله ۱، پله ۲، پله ۳)
- *   ۳) جدول سناریوی تجمعی پر شدن پله‌ها (اگر فقط پله ۱ پر شود، اگر ۱ و ۲ پر شوند، اگر هر ۳ پله پر شوند)
- *   ۴) نمایش بج ATH (چند درصد زیر سقف و چند ماه/سال گذشته) و کانال رنج فعلی بازار کنار قیمت دارایی
+ * و نمایش کاملاً واضحِ سقف تاریخی (ATH)، میزان ریزش از سقف و مدت‌زمان حضور در کانال رنج قیمتی برای هر ۱۹ بازار.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -192,7 +185,6 @@ export function EomSetupTab() {
   const [gasUsdStr, setGasUsdStr] = useState<string>('0.35');
   const [financingAprStr, setFinancingAprStr] = useState<string>('0');
 
-  // قیمت‌های دلاری سفارشی کاربر برای پله ۱، ۲ و ۳ روی ریزش (مثلاً 1829$ و 1729$ و 1629$)
   const [customStep1Str, setCustomStep1Str] = useState<string>('');
   const [customStep2Str, setCustomStep2Str] = useState<string>('');
   const [customStep3Str, setCustomStep3Str] = useState<string>('');
@@ -217,7 +209,6 @@ export function EomSetupTab() {
 
   const userRiskPct = parseNum(riskPctStr, 1.0, 0.1, 10);
 
-  // اتصال مستقیم به موجودی کیف پول‌های متصل کاربر
   const walletSuggestion = useMemo(
     () =>
       computeWalletSuggestedCapital({
@@ -262,7 +253,6 @@ export function EomSetupTab() {
     return found && found.markPx > 0 ? found.markPx : selectedAsset.refPrice;
   }, [selectedAsset, marketsQuery.data]);
 
-  // اطلاعات ATH و کانال رنج برای دارایی انتخابی
   const athRangeInfo = useMemo(
     () =>
       getAssetAthAndRangeInfo({
@@ -308,7 +298,6 @@ export function EomSetupTab() {
     return study.windows.find((w) => w.t === activeT) ?? study.optimalWindow;
   }, [study, activeT]);
 
-  // محاسبه پله‌های پیش‌فرض روی ریزش هر بار که دارایی یا حالت عوض می‌شود
   const autoDefaultSteps = useMemo(() => {
     return computeDefaultDipLadderPrices({
       referencePrice: livePrice,
@@ -384,42 +373,50 @@ export function EomSetupTab() {
 
   return (
     <div className="space-y-4">
-      {/* ۱) نوار کیف پول متصل + وضعیت ATH و رنج دارایی + سوییچ ۳ حالت DCA روی ریزش */}
+      {/* ۱) نوار کیف پول متصل + وضعیت کاملاً واضح ATH و رنج دارایی + سوییچ ۳ حالت DCA روی ریزش */}
       <Surface className={cn('relative overflow-hidden border p-4 sm:p-5', groupStyle.ring)}>
         <div aria-hidden className={cn('pointer-events-none absolute inset-0 bg-gradient-to-bl opacity-85', groupStyle.gradient)} />
         <div className="relative space-y-4">
-          {/* سطر اول: هویت دارایی + بج ATH و رنج + موجودی متصل کیف پول */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          {/* سطر اول: هویت دارایی + موجودی متصل کیف پول */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
               <div className="relative shrink-0 rounded-full bg-card p-1 shadow-sm ring-2 ring-divider">
                 <MarketAssetLogo symbol={selectedAsset.logoKey} size={44} />
                 <span className="absolute -bottom-1 -end-1 rounded-full bg-card p-0.5 ring-1 ring-divider">
                   <VenueBadgeLogo venueId={venueId} label={selectedVenue.shortFa} size={18} />
                 </span>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <h3 className="text-base font-extrabold text-ink sm:text-lg">{selectedAsset.nameFa}</h3>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                  <span>
-                    <span dir="ltr" className="font-mono font-bold text-ink">
-                      {selectedAsset.symbolDisplay}
-                    </span>{' '}
-                    · قیمت فعلی:{' '}
-                    <span dir="ltr" className="font-mono font-extrabold text-ink">
-                      ${toFaDigits(livePrice.toLocaleString('en-US'))}
-                    </span>
-                  </span>
-                  {athRangeInfo && (
-                    <>
-                      <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-mono text-[11px] font-bold text-rose-600 dark:text-rose-300">
-                        ATH: ${toFaDigits(athRangeInfo.athPrice.toLocaleString('en-US'))} ({toFaDigits(athRangeInfo.drawdownFromAthPct.toFixed(1))}٪ · {athRangeInfo.elapsedSinceAthFa})
-                      </span>
-                      <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
-                        در رنج {athRangeInfo.rangeBandFormatted} به مدت {athRangeInfo.rangeDurationFa}
-                      </span>
-                    </>
-                  )}
-                </div>
+                <p className="text-xs text-muted">
+                  نماد:{' '}
+                  <strong dir="ltr" className="font-mono font-bold text-ink">
+                    {selectedAsset.symbolDisplay}
+                  </strong>{' '}
+                  · قیمت فعلی:{' '}
+                  <strong className="font-extrabold text-ink">
+                    {toFaDigits(livePrice.toLocaleString('en-US'))} دلار
+                  </strong>
+                </p>
+                {athRangeInfo && (
+                  <div className="grid gap-1.5 pt-0.5 sm:grid-cols-2">
+                    <div className="rounded-field border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs leading-5 text-ink">
+                      <span className="font-bold text-muted">آخرین سقف تاریخی (ATH): </span>
+                      <strong className="font-extrabold">{athRangeInfo.athPriceFa}</strong>
+                      <span className="text-muted"> ({athRangeInfo.elapsedSinceAthFa}) · </span>
+                      <strong className="font-extrabold text-rose-600 dark:text-rose-300">
+                        {athRangeInfo.drawdownClearFa}
+                      </strong>
+                    </div>
+                    <div className="rounded-field border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs leading-5 text-ink">
+                      <span className="font-bold text-muted">کانال رنج فعلی: </span>
+                      <strong className="font-extrabold text-indigo-700 dark:text-indigo-300">
+                        {athRangeInfo.rangeSummarySentenceFa}
+                      </strong>
+                      <span className="text-muted"> ({athRangeInfo.rangeStatusLabelFa})</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -430,10 +427,10 @@ export function EomSetupTab() {
                 <p className="text-[10px] text-muted">
                   {walletSuggestion.detectedBalanceUsd > 0 ? 'موجودی متصل کیف پول/پرپ' : 'سرمایه فرضی (بدون کیف پول متصل)'}
                 </p>
-                <p className="font-mono text-sm font-extrabold text-ink" dir="ltr">
+                <p className="text-sm font-extrabold text-ink">
                   {walletSuggestion.detectedBalanceUsd > 0
-                    ? `$${toFaDigits(walletSuggestion.detectedBalanceUsd.toLocaleString('en-US'))}`
-                    : `$${toFaDigits(capitalUsd.toLocaleString('en-US'))}`}
+                    ? `${toFaDigits(walletSuggestion.detectedBalanceUsd.toLocaleString('en-US'))} دلار`
+                    : `${toFaDigits(capitalUsd.toLocaleString('en-US'))} دلار`}
                 </p>
               </div>
               {capitalEditedByUser && walletSuggestion.detectedBalanceUsd > 0 && (
@@ -498,7 +495,7 @@ export function EomSetupTab() {
                   <Badge tone="info">برد ۸۰.۵٪</Badge>
                 </div>
                 <p className="mt-0.5 text-[11px] leading-5 text-muted">
-                  صبر برای ریزش بیشتر: هر ۳ پله لیمیت زیر قیمت فعلی (مثلاً ۱۸۲۹$ و ۱۷۲۹$ برای اتریوم) و خروج در T-0
+                  صبر برای ریزش بیشتر: هر ۳ پله لیمیت زیر قیمت فعلی (مثلاً ۱,۸۲۹ و ۱,۷۲۹ دلار برای اتریوم) و خروج در T-0
                 </p>
               </div>
             </button>
@@ -603,7 +600,7 @@ export function EomSetupTab() {
 
           {/* تنظیم سرمایه، ریسک، گس و قیمت دلاری پله‌های ریزش */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Field label="سرمایه کل ستاپ ($)">
+            <Field label="سرمایه کل ستاپ (دلار)">
               <Input
                 dir="ltr"
                 inputMode="decimal"
@@ -618,10 +615,10 @@ export function EomSetupTab() {
             <Field label="حداکثر ریسک مجاز (%)">
               <Input dir="ltr" inputMode="decimal" value={riskPctStr} onChange={(e) => setRiskPctStr(e.target.value)} suffix="%" />
             </Field>
-            <Field label="گس هر تراکنش ($)">
+            <Field label="گس هر تراکنش (دلار)">
               <Input dir="ltr" inputMode="decimal" value={gasUsdStr} onChange={(e) => setGasUsdStr(e.target.value)} suffix="$" />
             </Field>
-            <Field label="قیمت پله ۱ ($)">
+            <Field label="قیمت پله ۱ (دلار)">
               <Input
                 dir="ltr"
                 inputMode="decimal"
@@ -633,7 +630,7 @@ export function EomSetupTab() {
                 suffix="$"
               />
             </Field>
-            <Field label="قیمت پله ۲ (ریزش اول $)">
+            <Field label="قیمت پله ۲ (ریزش اول)">
               <Input
                 dir="ltr"
                 inputMode="decimal"
@@ -645,7 +642,7 @@ export function EomSetupTab() {
                 suffix="$"
               />
             </Field>
-            <Field label="قیمت پله ۳ (ریزش دوم $)">
+            <Field label="قیمت پله ۳ (ریزش دوم)">
               <div className="flex items-center gap-1">
                 <Input
                   dir="ltr"
@@ -685,11 +682,11 @@ export function EomSetupTab() {
                 <span className="text-xs font-extrabold text-sky-700 dark:text-sky-300">۱. چقدر سرمایه وارد کنید؟</span>
                 <Badge tone="info">{selectedVenue.shortFa}</Badge>
               </div>
-              <p className="font-mono text-2xl font-extrabold text-ink" dir="ltr">
-                ${toFaDigits(capitalUsd.toLocaleString('en-US'))}{' '}
+              <p className="text-2xl font-extrabold text-ink">
+                {toFaDigits(capitalUsd.toLocaleString('en-US'))} دلار{' '}
                 {selectedVenue.kind === 'perp' && (
                   <span className="text-sm font-bold text-muted">
-                    (اهرم امن: {toFaDigits(signalTicket.execution.recommendedLeverage)}x)
+                    (اهرم امن: {toFaDigits(signalTicket.execution.recommendedLeverage)} برابر)
                   </span>
                 )}
               </p>
@@ -711,7 +708,7 @@ export function EomSetupTab() {
                   شانس برد پله‌ای: {toFaDigits(dcaPlan.boostedWinRatePct)}٪ · شارپ: {toFaDigits(dcaPlan.boostedSharpe)}
                 </Badge>
               </div>
-              <div className="flex flex-wrap items-baseline gap-4">
+              <div className="flex flex-wrap items-baseline gap-5">
                 <div>
                   <span className="block text-[11px] text-muted">
                     {mode === 'holder-monthly-dca'
@@ -719,26 +716,25 @@ export function EomSetupTab() {
                       : 'سود خالص تخمینی (در صورت پر شدن ۲ پله اول)'}
                   </span>
                   <span
-                    dir="ltr"
                     className={cn(
-                      'font-mono text-xl font-extrabold',
+                      'text-xl font-extrabold',
                       dcaPlan.expectedNetProfitUsd > 0 ? 'text-positive' : 'text-negative'
                     )}
                   >
-                    {dcaPlan.expectedNetProfitUsd > 0 ? '+' : ''}${toFaDigits(dcaPlan.expectedNetProfitUsd)}
+                    {toFaDigits(dcaPlan.expectedNetProfitUsd)} دلار سود
                   </span>
                 </div>
                 <div>
-                  <span className="block text-[11px] text-muted">حداکثر ضرر در حد ضرر</span>
-                  <span dir="ltr" className="font-mono text-xl font-extrabold text-negative">
-                    -${toFaDigits(dcaPlan.worstCaseLossUsd)}
+                  <span className="block text-[11px] text-muted">حداکثر ضرر در صورت فعال شدن حد ضرر</span>
+                  <span className="text-xl font-extrabold text-negative">
+                    {toFaDigits(dcaPlan.worstCaseLossUsd)} دلار ضرر
                   </span>
                 </div>
               </div>
               <p className="text-xs text-muted">
                 میانگین خرید در صورت پر شدن همه پله‌ها:{' '}
-                <strong dir="ltr" className="font-mono text-ink">
-                  ${toFaDigits(dcaPlan.fullFillAverageEntryPrice.toLocaleString('en-US'))}
+                <strong className="font-extrabold text-ink">
+                  {toFaDigits(dcaPlan.fullFillAverageEntryPrice.toLocaleString('en-US'))} دلار
                 </strong>{' '}
                 · کاهش ریسک نسبت به تک‌ورود: {toFaDigits(dcaPlan.riskReductionPct)}٪
               </p>
@@ -762,23 +758,24 @@ export function EomSetupTab() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-extrabold text-ink">
                         {toFaDigits(tr.tLabel)} · قیمت ورود:{' '}
-                        <span dir="ltr" className="font-mono text-sm text-accent">
-                          ${toFaDigits(tr.priceEstimate.toLocaleString('en-US'))}
+                        <span className="text-sm text-accent">
+                          {toFaDigits(tr.priceEstimate.toLocaleString('en-US'))} دلار
                         </span>{' '}
                         <span
-                          dir="ltr"
                           className={cn(
-                            'rounded-full px-1.5 py-0.2 font-mono text-[10px] font-bold',
+                            'rounded-full px-2 py-0.5 text-[10px] font-bold',
                             tr.dipFromRefPct < 0
                               ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                               : 'bg-surface-2 text-muted'
                           )}
                         >
-                          {tr.dipFromRefPct === 0 ? 'قیمت فعلی' : `${toFaDigits(tr.dipFromRefPct)}٪ از قیمت فعلی`}
+                          {tr.dipFromRefPct === 0
+                            ? 'در قیمت فعلی'
+                            : `${toFaDigits(Math.abs(tr.dipFromRefPct).toFixed(1))}٪ پایین‌تر از قیمت فعلی`}
                         </span>
                       </span>
-                      <span className="font-mono font-extrabold text-ink" dir="ltr">
-                        ${toFaDigits(tr.amountUsd.toLocaleString('en-US'))} ({toFaDigits(tr.sharePct)}٪)
+                      <span className="font-extrabold text-ink">
+                        {toFaDigits(tr.amountUsd.toLocaleString('en-US'))} دلار ({toFaDigits(tr.sharePct)}٪ سرمایه)
                       </span>
                     </div>
                     <p className="text-[11px] text-muted">{tr.noteFa}</p>
@@ -805,7 +802,7 @@ export function EomSetupTab() {
                       <th className="pb-1.5">سناریوی پر شدن</th>
                       <th className="pb-1.5">سرمایه درگیر</th>
                       <th className="pb-1.5">میانگین خرید</th>
-                      <th className="pb-1.5">سود خالص ($)</th>
+                      <th className="pb-1.5">سود خالص</th>
                       <th className="pb-1.5">شانس برد</th>
                     </tr>
                   </thead>
@@ -813,16 +810,16 @@ export function EomSetupTab() {
                     {dcaPlan.scenarios.map((sc) => (
                       <tr key={sc.filledStepsCount}>
                         <td className="py-1.5 font-bold text-ink">{toFaDigits(sc.labelFa)}</td>
-                        <td className="py-1.5 font-mono" dir="ltr">
-                          ${toFaDigits(sc.deployedCapitalUsd.toLocaleString('en-US'))}
+                        <td className="py-1.5 font-bold text-ink">
+                          {toFaDigits(sc.deployedCapitalUsd.toLocaleString('en-US'))} دلار
                         </td>
-                        <td className="py-1.5 font-mono font-bold text-ink" dir="ltr">
-                          ${toFaDigits(sc.averageEntryPrice.toLocaleString('en-US'))}
+                        <td className="py-1.5 font-bold text-ink">
+                          {toFaDigits(sc.averageEntryPrice.toLocaleString('en-US'))} دلار
                         </td>
-                        <td className="py-1.5 font-mono font-extrabold text-positive" dir="ltr">
-                          +${toFaDigits(sc.expectedNetProfitUsd)} (+{toFaDigits(sc.expectedNetReturnPct)}٪)
+                        <td className="py-1.5 font-extrabold text-positive">
+                          {toFaDigits(sc.expectedNetProfitUsd)} دلار ({toFaDigits(sc.expectedNetReturnPct)}٪ سود)
                         </td>
-                        <td className="py-1.5 font-mono font-bold text-emerald-600 dark:text-emerald-300">
+                        <td className="py-1.5 font-bold text-emerald-600 dark:text-emerald-300">
                           {toFaDigits(sc.estimatedWinRatePct)}٪
                         </td>
                       </tr>
@@ -835,14 +832,14 @@ export function EomSetupTab() {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-field bg-emerald-500/10 p-2">
                     <p className="text-[10px] text-muted">هدف خروج در پایان روز T-0</p>
-                    <p className="font-mono text-sm font-extrabold text-positive" dir="ltr">
-                      ${toFaDigits(signalTicket.execution.targetPrice.toLocaleString('en-US'))} ({dcaPlan.exitDateIso})
+                    <p className="text-sm font-extrabold text-positive">
+                      {toFaDigits(signalTicket.execution.targetPrice.toLocaleString('en-US'))} دلار ({dcaPlan.exitDateIso})
                     </p>
                   </div>
                   <div className="rounded-field bg-rose-500/10 p-2">
                     <p className="text-[10px] text-muted">حد ضرر اضطراری کل پوزیشن</p>
-                    <p className="font-mono text-sm font-extrabold text-negative" dir="ltr">
-                      ${toFaDigits(signalTicket.execution.stopLossPrice.toLocaleString('en-US'))}
+                    <p className="text-sm font-extrabold text-negative">
+                      {toFaDigits(signalTicket.execution.stopLossPrice.toLocaleString('en-US'))} دلار
                     </p>
                   </div>
                 </div>
