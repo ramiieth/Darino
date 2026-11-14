@@ -58,7 +58,8 @@ export const FUNDING_TABS: readonly SectionTab[] = [
   { to: '/funding?tab=run', label: 'اجرا و پایش' },
   { to: '/funding?tab=ledger', label: 'دفتر جفت‌ها' },
   { to: '/boros', label: 'نرخ ثابت (بوروس)' },
-  { to: '/carry-lab', label: 'بک‌تست و بات' }
+  { to: '/carry-lab', label: 'بک‌تست و بات' },
+  { to: '/eom', label: 'ستاپ پایان ماه (EOM)' }
 ];
 
 export const VENUE_TABS: readonly SectionTab[] = [
