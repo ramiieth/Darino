@@ -42,7 +42,8 @@ import {
   type PriceSource,
   type ScheduleFrequency
 } from '@/features/calculators/domain';
-import type { CalculatorAsset } from '@/features/calculators/data/catalogs';
+import { assetsOfClass, type CalculatorAsset } from '@/features/calculators/data/catalogs';
+import { WalletAverageDownPanel } from './WalletAverageDownPanel';
 import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 
@@ -427,206 +428,220 @@ export function DcaCalculator() {
 
   const visibleRows = rowInputs.slice(0, showAll ? 1000 : 36);
 
+  const handleSyncFromWalletPanel = (preset: {
+    symbol: string;
+    quantity: number;
+    avgCostUsd: number;
+    newAverageCostUsd: number;
+    totalQuantityAfterNewBuy: number;
+  }) => {
+    const cryptoMatch = assetsOfClass('crypto').find((a) => a.symbol === preset.symbol);
+    if (cryptoMatch) setAsset(cryptoMatch);
+  };
+
   return (
-    <CalcShell inputs={inputs}>
-      {!asset || !result ? (
-        <ResultPlaceholder>برای شبیه‌سازی خرید دوره‌ای، یک دارایی و بازه معتبر انتخاب کنید.</ResultPlaceholder>
-      ) : (
-        <>
-          {hasPast && !series && (
-            <Notice tone="warn" title="دادهٔ تاریخی در دسترس نیست">
-              خریدهای گذشته با قیمت فعلی تقریب زده شده‌اند. می‌توانید قیمت هر خرید را در جدول دستی وارد کنید.
-            </Notice>
-          )}
-          {flatFuture && (
-            <Notice tone="info" title="قیمت آینده ثابت فرض شده است">
-              {toFaDigits(futureRows)} خرید در آینده با قیمت فعلی حساب شده‌اند. برای نتیجهٔ واقعی‌تر، در «پیش‌بینی قیمت» قیمت مورد انتظار را برای چند تاریخ وارد کنید.
-            </Notice>
-          )}
-          {result.skipped > 0 && <Notice tone="warn">{toFaDigits(result.skipped)} خرید به‌خاطر نداشتن قیمت یا مبلغ معتبر کنار گذاشته شد.</Notice>}
+    <div className="space-y-5">
+      <WalletAverageDownPanel onSelectHoldingForParent={handleSyncFromWalletPanel} />
+      <CalcShell inputs={inputs}>
+        {!asset || !result ? (
+          <ResultPlaceholder>برای شبیه‌سازی خرید دوره‌ای، یک دارایی و بازه معتبر انتخاب کنید.</ResultPlaceholder>
+        ) : (
+          <>
+            {hasPast && !series && (
+              <Notice tone="warn" title="دادهٔ تاریخی در دسترس نیست">
+                خریدهای گذشته با قیمت فعلی تقریب زده شده‌اند. می‌توانید قیمت هر خرید را در جدول دستی وارد کنید.
+              </Notice>
+            )}
+            {flatFuture && (
+              <Notice tone="info" title="قیمت آینده ثابت فرض شده است">
+                {toFaDigits(futureRows)} خرید در آینده با قیمت فعلی حساب شده‌اند. برای نتیجهٔ واقعی‌تر، در «پیش‌بینی قیمت» قیمت مورد انتظار را برای چند تاریخ وارد کنید.
+              </Notice>
+            )}
+            {result.skipped > 0 && <Notice tone="warn">{toFaDigits(result.skipped)} خرید به‌خاطر نداشتن قیمت یا مبلغ معتبر کنار گذاشته شد.</Notice>}
 
-          <ResultHero
-            label={evalMode === 'today' ? 'سود / زیان با قیمت امروز' : evalMode === 'manual' ? 'سود / زیان با قیمت دستی' : 'سود / زیان در تاریخ پایان'}
-            value={<MoneyValue value={result.profit} signed tone="auto" />}
-            sub={
+            <ResultHero
+              label={evalMode === 'today' ? 'سود / زیان با قیمت امروز' : evalMode === 'manual' ? 'سود / زیان با قیمت دستی' : 'سود / زیان در تاریخ پایان'}
+              value={<MoneyValue value={result.profit} signed tone="auto" />}
+              sub={
+                <>
+                  بازده <PercentValue value={result.returnPct} className="font-semibold" /> · بازده سالانه (XIRR){' '}
+                  <PercentValue value={result.xirrPct} className="font-semibold" />
+                </>
+              }
+            >
+              <MetricGrid cols={3}>
+                <Metric label="ارزش نهایی" value={<MoneyValue value={result.finalValue} />} sub={<>قیمت <MoneyValue value={finalPrice} /></>} />
+                <Metric label="کل سرمایه پرداخت‌شده" value={<MoneyValue value={result.totalInvested} />} sub={result.totalFees > 0 ? <>کارمزد <MoneyValue value={result.totalFees} /></> : undefined} />
+                <Metric label="میانگین قیمت تمام‌شده" value={<MoneyValue value={result.averageCost} />} sub="نقطهٔ سربه‌سر" />
+                <Metric label="تعداد خرید" value={<span className="num-ltr">{toFaDigits(result.purchaseCount)}</span>} sub={futureRows > 0 ? `${toFaDigits(futureRows)} خرید آینده` : undefined} />
+                <Metric label="واحد خریداری‌شده" value={<QuantityValue value={result.totalUnits} unit={asset.symbol} digits={4} />} />
+                <Metric label="میانگین سادهٔ قیمت‌ها" value={<MoneyValue value={result.simpleAvgPrice} />} sub="بدون وزن مبلغ" />
+              </MetricGrid>
+            </ResultHero>
+
+            {result.rows.length > 1 && (
               <>
-                بازده <PercentValue value={result.returnPct} className="font-semibold" /> · بازده سالانه (XIRR){' '}
-                <PercentValue value={result.xirrPct} className="font-semibold" />
+                <LineChartCard
+                  title="ارزش سبد در برابر سرمایه پرداخت‌شده"
+                  description="ارزش در هر تاریخ خرید با قیمت همان روز (تاریخی یا پیش‌بینی)"
+                  labels={result.rows.map((p) => fmtFaDate(p.date))}
+                  datasets={[
+                    { label: 'ارزش سبد', data: result.rows.map((p) => p.valueAtDate ?? 0), color: 'chart-1', fill: true },
+                    { label: 'سرمایه پرداخت‌شده', data: result.rows.map((p) => p.cumInvested), color: 'chart-4', dashed: true }
+                  ]}
+                />
+                <LineChartCard
+                  title="میانگین قیمت خرید در برابر قیمت بازار"
+                  labels={result.rows.map((p) => fmtFaDate(p.date))}
+                  datasets={[
+                    { label: 'قیمت خرید', data: result.rows.map((p) => p.price ?? 0), color: 'chart-3' },
+                    { label: 'میانگین قیمت تمام‌شده', data: result.rows.map((p) => p.avgCost ?? 0), color: 'chart-2' }
+                  ]}
+                />
               </>
-            }
-          >
-            <MetricGrid cols={3}>
-              <Metric label="ارزش نهایی" value={<MoneyValue value={result.finalValue} />} sub={<>قیمت <MoneyValue value={finalPrice} /></>} />
-              <Metric label="کل سرمایه پرداخت‌شده" value={<MoneyValue value={result.totalInvested} />} sub={result.totalFees > 0 ? <>کارمزد <MoneyValue value={result.totalFees} /></> : undefined} />
-              <Metric label="میانگین قیمت تمام‌شده" value={<MoneyValue value={result.averageCost} />} sub="نقطهٔ سربه‌سر" />
-              <Metric label="تعداد خرید" value={<span className="num-ltr">{toFaDigits(result.purchaseCount)}</span>} sub={futureRows > 0 ? `${toFaDigits(futureRows)} خرید آینده` : undefined} />
-              <Metric label="واحد خریداری‌شده" value={<QuantityValue value={result.totalUnits} unit={asset.symbol} digits={4} />} />
-              <Metric label="میانگین سادهٔ قیمت‌ها" value={<MoneyValue value={result.simpleAvgPrice} />} sub="بدون وزن مبلغ" />
-            </MetricGrid>
-          </ResultHero>
+            )}
 
-          {result.rows.length > 1 && (
-            <>
-              <LineChartCard
-                title="ارزش سبد در برابر سرمایه پرداخت‌شده"
-                description="ارزش در هر تاریخ خرید با قیمت همان روز (تاریخی یا پیش‌بینی)"
-                labels={result.rows.map((p) => fmtFaDate(p.date))}
-                datasets={[
-                  { label: 'ارزش سبد', data: result.rows.map((p) => p.valueAtDate ?? 0), color: 'chart-1', fill: true },
-                  { label: 'سرمایه پرداخت‌شده', data: result.rows.map((p) => p.cumInvested), color: 'chart-4', dashed: true }
-                ]}
-              />
-              <LineChartCard
-                title="میانگین قیمت خرید در برابر قیمت بازار"
-                labels={result.rows.map((p) => fmtFaDate(p.date))}
-                datasets={[
-                  { label: 'قیمت خرید', data: result.rows.map((p) => p.price ?? 0), color: 'chart-3' },
-                  { label: 'میانگین قیمت تمام‌شده', data: result.rows.map((p) => p.avgCost ?? 0), color: 'chart-2' }
-                ]}
-              />
-            </>
-          )}
-
-          <Surface className="overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 md:px-5">
-              <div>
-                <h3 className="text-sm font-bold text-ink">خریدها</h3>
-                <p className="text-2xs text-muted">مبلغ یا قیمت هر ردیف را تغییر دهید؛ تیک را بردارید تا آن خرید حذف شود.</p>
+            <Surface className="overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 md:px-5">
+                <div>
+                  <h3 className="text-sm font-bold text-ink">خریدها</h3>
+                  <p className="text-2xs text-muted">مبلغ یا قیمت هر ردیف را تغییر دهید؛ تیک را بردارید تا آن خرید حذف شود.</p>
+                </div>
+                {editedCount > 0 && (
+                  <Button variant="ghost" size="sm" className="text-accent" icon={<RotateCcw />} onClick={() => setOverrides({})}>
+                    بازگردانی {toFaDigits(editedCount)} ویرایش
+                  </Button>
+                )}
               </div>
-              {editedCount > 0 && (
-                <Button variant="ghost" size="sm" className="text-accent" icon={<RotateCcw />} onClick={() => setOverrides({})}>
-                  بازگردانی {toFaDigits(editedCount)} ویرایش
-                </Button>
-              )}
-            </div>
-            <div className="max-h-[32rem] overflow-auto">
-              <table className="data-table is-compact mt-2">
-                <caption className="sr-only">جدول خریدهای دوره‌ای قابل ویرایش</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className="!ps-4 md:!ps-5"><span className="sr-only">فعال</span></th>
-                    <th scope="col">تاریخ</th>
-                    <th scope="col">مبلغ (دلار)</th>
-                    <th scope="col">قیمت (دلار)</th>
-                    <th scope="col" className="col-num !pe-4 md:!pe-5">واحد</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.map((r) => {
-                    const o = overrides[r.key] ?? {};
-                    const extraId = r.extra ? Number(r.key.slice(1)) : null;
-                    const units = !r.off && r.price && r.price > 0 && r.amount > 0 ? r.amount / r.price : null;
-                    return (
-                      <tr key={r.key} className={cn(r.off && 'opacity-45', r.date > now && 'bg-info/5')}>
-                        <td className="!ps-4 md:!ps-5">
-                          {r.extra ? (
-                            <IconButton size="sm" aria-label="حذف خرید اضافه" onClick={() => setExtras((l) => l.filter((e) => e.id !== extraId))}>
-                              <Trash2 />
-                            </IconButton>
-                          ) : (
-                            <input
-                              type="checkbox"
-                              aria-label={`خرید ${fmtFaDate(r.date)} فعال باشد`}
-                              checked={!r.off}
-                              onChange={(e) => setOverride(r.key, { off: !e.target.checked })}
-                              className="h-4 w-4 accent-[rgb(var(--c-brand-500))]"
-                            />
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap text-xs text-muted">
-                          {fmtFaDate(r.date)}
-                          {r.extra && <span className="block text-2xs text-accent">اضافه</span>}
-                        </td>
-                        <td className="min-w-[6.5rem]">
-                          {r.extra ? (
-                            <span className="num-ltr text-xs"><AmountText text={fmtUSD(r.amount)} /></span>
-                          ) : (
-                            <input
-                              dir="ltr"
-                              inputMode="decimal"
-                              aria-label={`مبلغ خرید ${fmtFaDate(r.date)}`}
-                              value={o.amount ?? ''}
-                              placeholder={String(Number(r.autoAmount.toFixed(2)))}
-                              onChange={(e) => setOverride(r.key, { amount: e.target.value })}
-                              className={cn('h-8 w-24 rounded-control border bg-card px-2 text-xs', o.amount ? 'border-accent font-semibold' : 'border-divider')}
-                            />
-                          )}
-                        </td>
-                        <td className="min-w-[8rem]">
-                          <div className="flex items-center gap-1.5">
+              <div className="max-h-[32rem] overflow-auto">
+                <table className="data-table is-compact mt-2">
+                  <caption className="sr-only">جدول خریدهای دوره‌ای قابل ویرایش</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col" className="!ps-4 md:!ps-5"><span className="sr-only">فعال</span></th>
+                      <th scope="col">تاریخ</th>
+                      <th scope="col">مبلغ (دلار)</th>
+                      <th scope="col">قیمت (دلار)</th>
+                      <th scope="col" className="col-num !pe-4 md:!pe-5">واحد</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((r) => {
+                      const o = overrides[r.key] ?? {};
+                      const extraId = r.extra ? Number(r.key.slice(1)) : null;
+                      const units = !r.off && r.price && r.price > 0 && r.amount > 0 ? r.amount / r.price : null;
+                      return (
+                        <tr key={r.key} className={cn(r.off && 'opacity-45', r.date > now && 'bg-info/5')}>
+                          <td className="!ps-4 md:!ps-5">
                             {r.extra ? (
-                              <span className="num-ltr text-xs"><AmountText text={r.price ? fmtUSD(r.price) : '—'} /></span>
+                              <IconButton size="sm" aria-label="حذف خرید اضافه" onClick={() => setExtras((l) => l.filter((e) => e.id !== extraId))}>
+                                <Trash2 />
+                              </IconButton>
+                            ) : (
+                              <input
+                                type="checkbox"
+                                aria-label={`خرید ${fmtFaDate(r.date)} فعال باشد`}
+                                checked={!r.off}
+                                onChange={(e) => setOverride(r.key, { off: !e.target.checked })}
+                                className="h-4 w-4 accent-[rgb(var(--c-brand-500))]"
+                              />
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap text-xs text-muted">
+                            {fmtFaDate(r.date)}
+                            {r.extra && <span className="block text-2xs text-accent">اضافه</span>}
+                          </td>
+                          <td className="min-w-[6.5rem]">
+                            {r.extra ? (
+                              <span className="num-ltr text-xs"><AmountText text={fmtUSD(r.amount)} /></span>
                             ) : (
                               <input
                                 dir="ltr"
                                 inputMode="decimal"
-                                aria-label={`قیمت خرید ${fmtFaDate(r.date)}`}
-                                value={o.price ?? ''}
-                                placeholder={priceInput(r.autoPriceVal)}
-                                onChange={(e) => setOverride(r.key, { price: e.target.value })}
-                                className={cn('h-8 w-24 rounded-control border bg-card px-2 text-xs', o.price ? 'border-accent font-semibold' : 'border-divider')}
+                                aria-label={`مبلغ خرید ${fmtFaDate(r.date)}`}
+                                value={o.amount ?? ''}
+                                placeholder={String(Number(r.autoAmount.toFixed(2)))}
+                                onChange={(e) => setOverride(r.key, { amount: e.target.value })}
+                                className={cn('h-8 w-24 rounded-control border bg-card px-2 text-xs', o.amount ? 'border-accent font-semibold' : 'border-divider')}
                               />
                             )}
-                            <Badge tone={SOURCE_LABEL[r.priceSource].tone} className="shrink-0 text-2xs">
-                              {SOURCE_LABEL[r.priceSource].label}
-                            </Badge>
-                          </div>
-                        </td>
-                        <td className="col-num !pe-4 md:!pe-5">
-                          <QuantityValue value={units} digits={4} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {rowInputs.length > 36 && (
-              <button
-                type="button"
-                onClick={() => setShowAll((v) => !v)}
-                className="w-full border-t border-divider py-2.5 text-sm font-semibold text-accent hover:bg-surface-2"
-              >
-                {showAll ? 'نمایش کمتر' : `نمایش همه (${toFaDigits(rowInputs.length)})`}
-              </button>
-            )}
-          </Surface>
+                          </td>
+                          <td className="min-w-[8rem]">
+                            <div className="flex items-center gap-1.5">
+                              {r.extra ? (
+                                <span className="num-ltr text-xs"><AmountText text={r.price ? fmtUSD(r.price) : '—'} /></span>
+                              ) : (
+                                <input
+                                  dir="ltr"
+                                  inputMode="decimal"
+                                  aria-label={`قیمت خرید ${fmtFaDate(r.date)}`}
+                                  value={o.price ?? ''}
+                                  placeholder={priceInput(r.autoPriceVal)}
+                                  onChange={(e) => setOverride(r.key, { price: e.target.value })}
+                                  className={cn('h-8 w-24 rounded-control border bg-card px-2 text-xs', o.price ? 'border-accent font-semibold' : 'border-divider')}
+                                />
+                              )}
+                              <Badge tone={SOURCE_LABEL[r.priceSource].tone} className="shrink-0 text-2xs">
+                                {SOURCE_LABEL[r.priceSource].label}
+                              </Badge>
+                            </div>
+                          </td>
+                          <td className="col-num !pe-4 md:!pe-5">
+                            <QuantityValue value={units} digits={4} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {rowInputs.length > 36 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll((v) => !v)}
+                  className="w-full border-t border-divider py-2.5 text-sm font-semibold text-accent hover:bg-surface-2"
+                >
+                  {showAll ? 'نمایش کمتر' : `نمایش همه (${toFaDigits(rowInputs.length)})`}
+                </button>
+              )}
+            </Surface>
 
-          <ExportButtons
-            filename={`dca-${asset.symbol}.csv`}
-            headers={['#', 'تاریخ', 'مبلغ', 'کارمزد', 'قیمت', 'منبع قیمت', 'واحد', 'میانگین قیمت', 'ارزش در همان روز']}
-            rows={result.rows.map((p) => [p.index, new Date(p.date).toISOString().slice(0, 10), p.amount, p.fee, p.price ?? '', SOURCE_LABEL[p.priceSource].label, p.units, p.avgCost ?? '', p.valueAtDate ?? ''])}
-            pdfTitle={`گزارش خرید دوره‌ای — ${asset.symbol}`}
-            pdfSections={[
-              {
-                heading: `سرمایه‌گذاری دوره‌ای ${asset.nameFa}`,
-                table: {
-                  headers: ['موارد', 'مقدار'],
-                  rows: [
-                    ['کل سرمایه', fmtUSD(result.totalInvested)],
-                    ['تعداد خرید', String(result.purchaseCount)],
-                    ['تعداد واحد', String(result.totalUnits)],
-                    ['میانگین قیمت تمام‌شده', fmtUSD(result.averageCost)],
-                    ['قیمت ارزش‌گذاری', fmtUSD(finalPrice)],
-                    ['ارزش نهایی', fmtUSD(result.finalValue)],
-                    ['سود / زیان', fmtUSD(result.profit)],
-                    ['بازده', fmtPct(result.returnPct)],
-                    ['XIRR', fmtPct(result.xirrPct)]
-                  ]
+            <ExportButtons
+              filename={`dca-${asset.symbol}.csv`}
+              headers={['#', 'تاریخ', 'مبلغ', 'کارمزد', 'قیمت', 'منبع قیمت', 'واحد', 'میانگین قیمت', 'ارزش در همان روز']}
+              rows={result.rows.map((p) => [p.index, new Date(p.date).toISOString().slice(0, 10), p.amount, p.fee, p.price ?? '', SOURCE_LABEL[p.priceSource].label, p.units, p.avgCost ?? '', p.valueAtDate ?? ''])}
+              pdfTitle={`گزارش خرید دوره‌ای — ${asset.symbol}`}
+              pdfSections={[
+                {
+                  heading: `سرمایه‌گذاری دوره‌ای ${asset.nameFa}`,
+                  table: {
+                    headers: ['موارد', 'مقدار'],
+                    rows: [
+                      ['کل سرمایه', fmtUSD(result.totalInvested)],
+                      ['تعداد خرید', String(result.purchaseCount)],
+                      ['تعداد واحد', String(result.totalUnits)],
+                      ['میانگین قیمت تمام‌شده', fmtUSD(result.averageCost)],
+                      ['قیمت ارزش‌گذاری', fmtUSD(finalPrice)],
+                      ['ارزش نهایی', fmtUSD(result.finalValue)],
+                      ['سود / زیان', fmtUSD(result.profit)],
+                      ['بازده', fmtPct(result.returnPct)],
+                      ['XIRR', fmtPct(result.xirrPct)]
+                    ]
+                  },
+                  note: userAnchors.length ? 'قیمت‌های آینده بر اساس پیش‌بینی کاربر است و تضمینی نیست.' : undefined
                 },
-                note: userAnchors.length ? 'قیمت‌های آینده بر اساس پیش‌بینی کاربر است و تضمینی نیست.' : undefined
-              },
-              {
-                heading: 'جدول خریدها',
-                table: {
-                  headers: ['#', 'تاریخ', 'مبلغ', 'قیمت', 'منبع', 'واحد'],
-                  rows: result.rows.map((p) => [p.index, new Date(p.date).toISOString().slice(0, 10), p.amount, p.price ?? '', SOURCE_LABEL[p.priceSource].label, p.units])
+                {
+                  heading: 'جدول خریدها',
+                  table: {
+                    headers: ['#', 'تاریخ', 'مبلغ', 'قیمت', 'منبع', 'واحد'],
+                    rows: result.rows.map((p) => [p.index, new Date(p.date).toISOString().slice(0, 10), p.amount, p.fee, p.price ?? '', SOURCE_LABEL[p.priceSource].label, p.units])
+                  }
                 }
-              }
-            ]}
-          />
-        </>
-      )}
-    </CalcShell>
+              ]}
+            />
+          </>
+        )}
+      </CalcShell>
+    </div>
   );
 }

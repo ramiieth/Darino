@@ -188,16 +188,27 @@ describe('Hartley & Schwarz (2019) EOM Paper Engine, Price-Drop Limit DCA & Mark
   it('computes ATH drawdown, elapsed time since ATH, and trading range duration across Crypto, Tokenized Equities, Gold, Oil, and Bonds', () => {
     const btcInfo = getAssetAthAndRangeInfo({
       symbol: 'BTC',
-      currentPrice: 72500,
+      currentPrice: 65586,
       source: 'crypto',
       nowMs: Date.UTC(2026, 10, 15)
     });
     expect(btcInfo).not.toBeNull();
-    expect(btcInfo!.athPrice).toBe(109350);
-    expect(btcInfo!.drawdownFromAthPct).toBeLessThan(-30);
+    expect(btcInfo!.athPrice).toBe(126080);
+    expect(btcInfo!.athDateIso).toBe('2025-10-06');
+    expect(btcInfo!.drawdownFromAthPct).toBeCloseTo(-47.98, 1);
     expect(btcInfo!.rangeLow).toBe(65000);
     expect(btcInfo!.rangeHigh).toBe(80000);
     expect(btcInfo!.rangeDurationDays).toBeGreaterThan(100);
+
+    const ethInfo = getAssetAthAndRangeInfo({
+      symbol: 'ETH',
+      currentPrice: 1829.85,
+      source: 'crypto',
+      nowMs: Date.UTC(2026, 10, 15)
+    });
+    expect(ethInfo).not.toBeNull();
+    expect(ethInfo!.athPrice).toBe(4946.05);
+    expect(ethInfo!.athDateIso).toBe('2025-08-24');
 
     const nvdaTokenized = getAssetAthAndRangeInfo({
       symbol: 'NVDAON',
@@ -211,12 +222,13 @@ describe('Hartley & Schwarz (2019) EOM Paper Engine, Price-Drop Limit DCA & Mark
 
     const goldInfo = getAssetAthAndRangeInfo({
       symbol: 'PAXG',
-      currentPrice: 3989,
+      currentPrice: 3826.69,
       source: 'crypto',
       nowMs: Date.UTC(2026, 10, 15)
     });
     expect(goldInfo).not.toBeNull();
-    expect(goldInfo!.rangeLow).toBe(3880);
+    expect(goldInfo!.athPrice).toBe(5619.09);
+    expect(goldInfo!.rangeLow).toBe(3750);
 
     const oilInfo = getAssetAthAndRangeInfo({
       symbol: 'WTI',

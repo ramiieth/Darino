@@ -25,3 +25,4 @@ export * from './orderTicket';
 export * from './fundingPlanner';
 export * from './shopBreakEven';
 export * from './assetPerformanceComparison';
+export * from './walletDcaAverageSimulator';
