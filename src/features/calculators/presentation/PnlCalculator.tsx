@@ -21,7 +21,8 @@ import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { getHistoricalSeries, TIMEFRAME_LABELS, TIMEFRAME_MS } from '@/features/calculators/data/historical';
 import { calcPnl, cumulativeProfitSeries, type PnlResult } from '@/features/calculators/domain';
-import type { CalculatorAsset } from '@/features/calculators/data/catalogs';
+import { assetsOfClass, type CalculatorAsset } from '@/features/calculators/data/catalogs';
+import { WalletAverageDownPanel } from './WalletAverageDownPanel';
 import { fmtUSD, fmtPct } from '@/shared/utils/formatters';
 
 export function PnlCalculator() {
@@ -100,6 +101,19 @@ export function PnlCalculator() {
     return cumulativeProfitSeries(Number(buyPrice) || 0, Number(qty) || 0, Number(buyFee) || 0, series);
   }, [result, series, buyPrice, qty, buyFee]);
 
+  const handleSyncFromWalletPanel = (preset: {
+    symbol: string;
+    quantity: number;
+    avgCostUsd: number;
+    newAverageCostUsd: number;
+    totalQuantityAfterNewBuy: number;
+  }) => {
+    const cryptoMatch = assetsOfClass('crypto').find((a) => a.symbol === preset.symbol);
+    if (cryptoMatch) setAsset(cryptoMatch);
+    setQty(String(preset.totalQuantityAfterNewBuy));
+    setBuyPrice(String(preset.newAverageCostUsd));
+  };
+
   const inputs = (
     <>
       <AssetPicker value={asset} onChange={setAsset} />
@@ -145,123 +159,126 @@ export function PnlCalculator() {
   );
 
   return (
-    <CalcShell inputs={inputs}>
-      {!asset || !result ? (
-        <ResultPlaceholder>برای محاسبه سود و زیان، یک دارایی انتخاب کنید.</ResultPlaceholder>
-      ) : (
-        <>
-          {currentPrice === null && (
-            <Notice tone="warn">
-              {priceMode === 'target' ? 'قیمت هدف را وارد کنید.' : 'قیمت فعلی این دارایی در دسترس نیست؛ ارزش و سود «—» نمایش داده می‌شود.'}
-            </Notice>
-          )}
-          <ResultHero
-            label={priceMode === 'target' ? 'سود / زیان در قیمت هدف' : 'سود / زیان'}
-            value={<MoneyValue value={result.profit} signed tone="auto" />}
-            sub={
-              <>
-                بازده <PercentValue value={result.returnPct} className="font-semibold" /> · ارزش خالص فروش{' '}
-                <MoneyValue value={result.netValue} className="font-semibold text-ink" />
-              </>
-            }
-          >
-            <MetricGrid cols={3}>
-              <Metric label={priceMode === 'target' ? 'ارزش در قیمت هدف' : 'ارزش فعلی'} value={<MoneyValue value={result.currentValue} />} />
-              <Metric label="کل هزینه پرداخت‌شده" value={<MoneyValue value={result.totalCost} />} sub="خرید + کارمزد" />
-              <Metric
-                label="قیمت سربه‌سر"
-                value={<MoneyValue value={Number(qty) > 0 ? (result.totalCost + (Number(sellFee) || 0)) / Number(qty) : null} />}
-                sub="با کارمزد خرید و فروش"
-              />
-            </MetricGrid>
-          </ResultHero>
-
-          {scenarios.length > 0 && (
-            <Surface className="overflow-hidden">
-              <div className="px-4 pt-4 md:px-5">
-                <h3 className="text-sm font-bold text-ink">سناریوهای قیمت</h3>
-                <p className="mt-0.5 text-xs text-muted">نسبت به {priceMode === 'target' ? 'قیمت هدف' : 'قیمت فعلی'}</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="data-table is-compact mt-2">
-                  <caption className="sr-only">سناریوهای قیمت</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col" className="!ps-4 md:!ps-5">تغییر</th>
-                      <th scope="col" className="col-num">قیمت</th>
-                      <th scope="col" className="col-num">سود / زیان</th>
-                      <th scope="col" className="col-num !pe-4 md:!pe-5">بازده</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scenarios.map((sc) => (
-                      <tr key={sc.m} className={sc.m === 0 ? 'bg-surface-2' : undefined}>
-                        <td className="!ps-4 md:!ps-5"><PercentValue value={sc.m} digits={0} /></td>
-                        <td className="col-num"><MoneyValue value={sc.price} /></td>
-                        <td className="col-num"><MoneyValue value={sc.profit} signed tone="auto" /></td>
-                        <td className="col-num !pe-4 md:!pe-5"><PercentValue value={sc.returnPct} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Surface>
-          )}
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-bold text-ink">نمودار</h3>
-            <SegmentedControl
-              label="بازه نمودار"
-              size="sm"
-              value={tf}
-              onChange={setTf}
-              options={TIMEFRAME_LABELS.map((t) => ({ value: t.key, label: t.label }))}
-            />
-          </div>
-          {histLoading && <Skeleton className="h-60 w-full" />}
-          {!histLoading && histMsg && !series && <Notice tone="neutral">{histMsg}</Notice>}
-          {!histLoading && series && (
-            <>
-              <LineChartCard
-                title={`قیمت ${persianAssetName(asset.symbol)}`}
-                labels={series.map((p) => fmtFaDate(p.t))}
-                datasets={[{ label: 'قیمت', data: series.map((p) => p.price), color: 'chart-1', fill: true }]}
-              />
-              <LineChartCard
-                title="سود تجمعی"
-                description="اگر در هر نقطه از بازه فروخته می‌شد"
-                labels={profitSeries.map((p) => fmtFaDate(p.t))}
-                datasets={[{ label: 'سود', data: profitSeries.map((p) => p.value), color: 'chart-2' }]}
-              />
-            </>
-          )}
-
-          <ExportButtons
-            filename={`pnl-${asset.symbol}.csv`}
-            headers={['دارایی', 'قیمت خرید', 'قیمت فعلی', 'تعداد', 'ارزش فعلی', 'سرمایه', 'سود', 'درصد']}
-            rows={[[asset.symbol, Number(buyPrice) || 0, currentPrice ?? 'N/A', Number(qty) || 0, result.currentValue ?? 'N/A', result.totalCost, result.profit ?? 'N/A', result.returnPct ?? 'N/A']]}
-            pdfTitle={`گزارش سود و زیان — ${asset.symbol}`}
-            pdfSections={[
-              {
-                heading: `سود و زیان سرمایه‌گذاری ${asset.nameFa}`,
-                table: {
-                  headers: ['موارد', 'مقدار'],
-                  rows: [
-                    ['قیمت خرید', fmtUSD(Number(buyPrice) || 0)],
-                    ['قیمت فعلی', fmtUSD(currentPrice)],
-                    ['تعداد واحد', qty],
-                    ['ارزش فعلی', fmtUSD(result.currentValue)],
-                    ['کل سرمایه پرداخت‌شده', fmtUSD(result.totalCost)],
-                    ['سود / زیان', fmtUSD(result.profit)],
-                    ['درصد بازده', fmtPct(result.returnPct)]
-                  ]
-                },
-                note: 'محاسبات با موتور مالی و دقت ۱۲ رقم اعشار انجام شده است.'
+    <div className="space-y-5">
+      <WalletAverageDownPanel onSelectHoldingForParent={handleSyncFromWalletPanel} />
+      <CalcShell inputs={inputs}>
+        {!asset || !result ? (
+          <ResultPlaceholder>برای محاسبه سود و زیان، یک دارایی انتخاب کنید.</ResultPlaceholder>
+        ) : (
+          <>
+            {currentPrice === null && (
+              <Notice tone="warn">
+                {priceMode === 'target' ? 'قیمت هدف را وارد کنید.' : 'قیمت فعلی این دارایی در دسترس نیست؛ ارزش و سود «—» نمایش داده می‌شود.'}
+              </Notice>
+            )}
+            <ResultHero
+              label={priceMode === 'target' ? 'سود / زیان در قیمت هدف' : 'سود / زیان'}
+              value={<MoneyValue value={result.profit} signed tone="auto" />}
+              sub={
+                <>
+                  بازده <PercentValue value={result.returnPct} className="font-semibold" /> · ارزش خالص فروش{' '}
+                  <MoneyValue value={result.netValue} className="font-semibold text-ink" />
+                </>
               }
-            ]}
-          />
-        </>
-      )}
-    </CalcShell>
+            >
+              <MetricGrid cols={3}>
+                <Metric label={priceMode === 'target' ? 'ارزش در قیمت هدف' : 'ارزش فعلی'} value={<MoneyValue value={result.currentValue} />} />
+                <Metric label="کل هزینه پرداخت‌شده" value={<MoneyValue value={result.totalCost} />} sub="خرید + کارمزد" />
+                <Metric
+                  label="قیمت سربه‌سر"
+                  value={<MoneyValue value={Number(qty) > 0 ? (result.totalCost + (Number(sellFee) || 0)) / Number(qty) : null} />}
+                  sub="با کارمزد خرید و فروش"
+                />
+              </MetricGrid>
+            </ResultHero>
+
+            {scenarios.length > 0 && (
+              <Surface className="overflow-hidden">
+                <div className="px-4 pt-4 md:px-5">
+                  <h3 className="text-sm font-bold text-ink">سناریوهای قیمت</h3>
+                  <p className="mt-0.5 text-xs text-muted">نسبت به {priceMode === 'target' ? 'قیمت هدف' : 'قیمت فعلی'}</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="data-table is-compact mt-2">
+                    <caption className="sr-only">سناریوهای قیمت</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" className="!ps-4 md:!ps-5">تغییر</th>
+                        <th scope="col" className="col-num">قیمت</th>
+                        <th scope="col" className="col-num">سود / زیان</th>
+                        <th scope="col" className="col-num !pe-4 md:!pe-5">بازده</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scenarios.map((sc) => (
+                        <tr key={sc.m} className={sc.m === 0 ? 'bg-surface-2' : undefined}>
+                          <td className="!ps-4 md:!ps-5"><PercentValue value={sc.m} digits={0} /></td>
+                          <td className="col-num"><MoneyValue value={sc.price} /></td>
+                          <td className="col-num"><MoneyValue value={sc.profit} signed tone="auto" /></td>
+                          <td className="col-num !pe-4 md:!pe-5"><PercentValue value={sc.returnPct} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Surface>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-ink">نمودار</h3>
+              <SegmentedControl
+                label="بازه نمودار"
+                size="sm"
+                value={tf}
+                onChange={setTf}
+                options={TIMEFRAME_LABELS.map((t) => ({ value: t.key, label: t.label }))}
+              />
+            </div>
+            {histLoading && <Skeleton className="h-60 w-full" />}
+            {!histLoading && histMsg && !series && <Notice tone="neutral">{histMsg}</Notice>}
+            {!histLoading && series && (
+              <>
+                <LineChartCard
+                  title={`قیمت ${persianAssetName(asset.symbol)}`}
+                  labels={series.map((p) => fmtFaDate(p.t))}
+                  datasets={[{ label: 'قیمت', data: series.map((p) => p.price), color: 'chart-1', fill: true }]}
+                />
+                <LineChartCard
+                  title="سود تجمعی"
+                  description="اگر در هر نقطه از بازه فروخته می‌شد"
+                  labels={profitSeries.map((p) => fmtFaDate(p.t))}
+                  datasets={[{ label: 'سود', data: profitSeries.map((p) => p.value), color: 'chart-2' }]}
+                />
+              </>
+            )}
+
+            <ExportButtons
+              filename={`pnl-${asset.symbol}.csv`}
+              headers={['دارایی', 'قیمت خرید', 'قیمت فعلی', 'تعداد', 'ارزش فعلی', 'سرمایه', 'سود', 'درصد']}
+              rows={[[asset.symbol, Number(buyPrice) || 0, currentPrice ?? 'N/A', Number(qty) || 0, result.currentValue ?? 'N/A', result.totalCost, result.profit ?? 'N/A', result.returnPct ?? 'N/A']]}
+              pdfTitle={`گزارش سود و زیان — ${asset.symbol}`}
+              pdfSections={[
+                {
+                  heading: `سود و زیان سرمایه‌گذاری ${asset.nameFa}`,
+                  table: {
+                    headers: ['موارد', 'مقدار'],
+                    rows: [
+                      ['قیمت خرید', fmtUSD(Number(buyPrice) || 0)],
+                      ['قیمت فعلی', fmtUSD(currentPrice)],
+                      ['تعداد واحد', qty],
+                      ['ارزش فعلی', fmtUSD(result.currentValue)],
+                      ['کل سرمایه پرداخت‌شده', fmtUSD(result.totalCost)],
+                      ['سود / زیان', fmtUSD(result.profit)],
+                      ['درصد بازده', fmtPct(result.returnPct)]
+                    ]
+                  },
+                  note: 'محاسبات با موتور مالی و دقت ۱۲ رقم اعشار انجام شده است.'
+                }
+              ]}
+            />
+          </>
+        )}
+      </CalcShell>
+    </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   COIN_LLAMA_CG_KEYS_VALID
 } from '@/shared/hooks/useLlamaPriceFallback';
 import { COIN_NAMES_FA } from '@/features/simulation/domain/constants';
+import { ingestLiveCoinGeckoAthRows } from '@/features/markets/domain/athAndRangeAnalytics';
 
 export interface CryptoMarket {
   symbol: string;
@@ -52,6 +53,9 @@ interface CgMarket {
   price_change_percentage_7d_in_currency?: number | null;
   price_change_percentage_30d_in_currency?: number | null;
   price_change_percentage_60d_in_currency?: number | null;
+  ath?: number | null;
+  ath_change_percentage?: number | null;
+  ath_date?: string | null;
 }
 
 /** کش تازه (۶۰ ثانیه) — برای جلوگیری از درخواست تکراری */
@@ -118,6 +122,7 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
       const fresh = r?.price as unknown;
       // کش فقط وقتی معتبر است که واقعاً آرایه بازار باشد (ضد کش مسموم)
       if (r && Date.now() - r.fetchedAt < CACHE_MS && isCgMarketArray(fresh)) {
+        ingestLiveCoinGeckoAthRows(fresh);
         return { data: fresh, stale: false, fetchedAt: r.fetchedAt };
       }
     } catch {
@@ -127,6 +132,7 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
     try {
       // ۲) درخواست زنده
       const data = await fetchTop150Live();
+      ingestLiveCoinGeckoAthRows(data);
       const fetchedAt = Date.now();
       try {
         await cachePutPrice(FRESH_KEY, { price: data as unknown as number, source: 'live', fetchedAt });
@@ -142,6 +148,7 @@ export async function fetchTopMarketsOnce(): Promise<TopMarketsResult> {
         const r = rec.get(SNAPSHOT_KEY);
         const snapshot = r?.price as unknown;
         if (r && isCgMarketArray(snapshot) && Date.now() - r.fetchedAt < SNAPSHOT_TTL_MS) {
+          ingestLiveCoinGeckoAthRows(snapshot);
           return { data: snapshot, stale: true, fetchedAt: r.fetchedAt };
         }
       } catch {
