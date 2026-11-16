@@ -26,3 +26,5 @@ export * from './fundingPlanner';
 export * from './shopBreakEven';
 export * from './assetPerformanceComparison';
 export * from './walletDcaAverageSimulator';
+export * from './portfolioBasketDcaCommittee';
+
