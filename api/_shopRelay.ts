@@ -20,14 +20,40 @@ export interface RelayJob {
 }
 export interface RelayResult { ok: boolean; items: unknown[]; error: string | null; at: number }
 
+export interface NeshanRelayJob {
+  tool: string;
+  args: Record<string, unknown>;
+}
+export interface NeshanRelayResult {
+  ok: boolean;
+  transport?: 'neshan-mcp' | 'neshan-rest';
+  data?: Record<string, unknown> | null;
+  error?: string | null;
+  at: number;
+}
+
 const JOB = 'shoprelay:job:';
 const RES = 'shoprelay:res:';
+const NESHAN_JOB = 'neshanrelay:job:';
+const NESHAN_RES = 'neshanrelay:res:';
 const BEAT = 'shoprelay:heartbeat';
 const JOB_TTL = 2 * 60_000;
 const RESULT_TTL = 10 * 60_000;
 const ONLINE_MS = 45_000;
 const STALE_CLAIM_MS = 30_000;
 export const ALLOWED_TYPES = [0, 1, 2, 3, 5, 6, 8, 11];
+export const ALLOWED_NESHAN_TOOLS = [
+  'neshan_search',
+  'neshan_reverse_geocode',
+  'neshan_geocode',
+  'neshan_geocode_plus',
+  'neshan_get_point_by_hash',
+  'neshan_direction',
+  'neshan_distance_matrix',
+  'neshan_tsp',
+  'neshan_isochrone',
+  'neshan_traffic_analytics'
+] as const;
 const MAX_ITEMS = 160;
 const MAX_RESULT_BYTES = 800_000;
 
@@ -128,10 +154,74 @@ export async function claimJobs(now = Date.now()): Promise<{ id: string; job: Re
   return rows.map((r) => r.payload as { id: string; job: RelayJob }).map((p) => ({ id: p.id, job: p.job }));
 }
 
+const neshanJobId = (tool: string, args: Record<string, unknown>) =>
+  createHash('sha256').update(JSON.stringify([tool, args])).digest('hex').slice(0, 32);
+
+export function validNeshanJob(j: unknown): j is NeshanRelayJob {
+  const o = j as NeshanRelayJob;
+  return !!o && typeof o.tool === 'string' && (ALLOWED_NESHAN_TOOLS as readonly string[]).includes(o.tool)
+    && !!o.args && typeof o.args === 'object' && !Array.isArray(o.args);
+}
+
+/** صف کردن درخواست MCP نشان برای اجرای روی پل مک کاربر (فقط وقتی پل روشن است) */
+export async function neshanRelayCall(
+  tool: string,
+  args: Record<string, unknown>,
+  waitMs = 24_000
+): Promise<NeshanRelayResult> {
+  if (!validNeshanJob({ tool, args })) return { ok: false, error: 'ابزار مجاز نیست', at: Date.now() };
+  const id = neshanJobId(tool, args);
+  const cached = await get(NESHAN_RES + id);
+  if (cached) return cached as unknown as NeshanRelayResult;
+  if (!(await bridgeOnline())) return { ok: false, error: 'bridge-offline', at: Date.now() };
+  await put(NESHAN_JOB + id, { id, job: { tool, args }, status: 'pending', at: Date.now() }, JOB_TTL, true);
+  const until = Date.now() + waitMs;
+  while (Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 700));
+    const res = await get(NESHAN_RES + id);
+    if (res) return res as unknown as NeshanRelayResult;
+  }
+  return { ok: false, error: 'پاسخ از پل مک نشان در زمان مجاز نرسید', at: Date.now() };
+}
+
+/** دریافت کارهای در انتظار نشان برای پل مک */
+export async function claimNeshanJobs(now = Date.now()): Promise<{ id: string; job: NeshanRelayJob }[]> {
+  if (!isDbConfigured()) {
+    const out: { id: string; job: NeshanRelayJob }[] = [];
+    for (const [key, m] of memory) {
+      if (!key.startsWith(NESHAN_JOB) || m.expiresAt <= now || out.length >= 3) continue;
+      const p = m.payload;
+      if (p.status === 'pending' || (p.status === 'working' && now - Number(p.claimedAt) > STALE_CLAIM_MS)) {
+        m.payload = { ...p, status: 'working', claimedAt: now };
+        out.push({ id: String(p.id), job: p.job as NeshanRelayJob });
+      }
+    }
+    return out;
+  }
+  const rows = await db()`UPDATE "providerCache" SET "payload" = "payload" || jsonb_build_object('status','working','claimedAt',${now}::bigint)
+    WHERE "key" IN (SELECT "key" FROM "providerCache" WHERE "key" LIKE 'neshanrelay:job:%' AND "expiresAt" > ${now}
+      AND ("payload"->>'status' = 'pending' OR ("payload"->>'status' = 'working' AND ("payload"->>'claimedAt')::bigint < ${now - STALE_CLAIM_MS}))
+      ORDER BY ("payload"->>'at')::bigint LIMIT 3)
+    RETURNING "payload"`;
+  return rows.map((r) => r.payload as { id: string; job: NeshanRelayJob }).map((p) => ({ id: p.id, job: p.job }));
+}
+
 /** Store the Mac's answer for a job it claimed; size-capped, items re-validated by the parser. */
 export async function submitResult(body: Record<string, unknown>): Promise<boolean> {
   const id = typeof body.id === 'string' && /^[0-9a-f]{32}$/.test(body.id) ? body.id : null;
-  if (!id || !(await get(JOB + id))) return false;
+  if (!id) return false;
+  if (body.kind === 'neshan') {
+    if (!(await get(NESHAN_JOB + id))) return false;
+    const ok = body.ok === true;
+    const data = ok && body.data && typeof body.data === 'object' && !Array.isArray(body.data) ? (body.data as Record<string, unknown>) : null;
+    if (data && JSON.stringify(data).length > MAX_RESULT_BYTES) return false;
+    const transport = body.transport === 'neshan-rest' ? 'neshan-rest' : 'neshan-mcp';
+    const error = typeof body.error === 'string' ? body.error.slice(0, 180) : null;
+    await put(NESHAN_RES + id, { ok, transport, data, error: ok ? null : error, at: Date.now() }, ok ? 60_000 : 30_000);
+    await remove(NESHAN_JOB + id);
+    return true;
+  }
+  if (!(await get(JOB + id))) return false;
   const items = Array.isArray(body.items) ? body.items.slice(0, MAX_ITEMS) : [];
   if (JSON.stringify(items).length > MAX_RESULT_BYTES) return false;
   const ok = body.ok === true;
@@ -147,7 +237,12 @@ export async function relayEndpoint(req: IncomingMessage, res: ServerResponse): 
   if (!relayConfigured()) { json(res, 404, { error: 'not configured' }); return; }
   if (!relayAuthorized(req.headers.authorization)) { json(res, 401, { error: 'unauthorized' }); return; }
   try {
-    if (req.method === 'GET') { json(res, 200, { jobs: await claimJobs() }); return; }
+    if (req.method === 'GET') {
+      const [jobs, neshanJobs] = await Promise.all([claimJobs(), claimNeshanJobs()]);
+      const neshanKey = neshanJobs.length ? (process.env.NESHAN_API_KEY?.trim() || null) : null;
+      json(res, 200, { jobs, neshanJobs, ...(neshanKey ? { neshanKey } : {}) });
+      return;
+    }
     if (req.method === 'POST') { json(res, (await submitResult(await readBody(req))) ? 200 : 409, { ok: true }); return; }
     json(res, 405, { error: 'method' });
   } catch {
@@ -155,4 +250,4 @@ export async function relayEndpoint(req: IncomingMessage, res: ServerResponse): 
   }
 }
 
-export const _test = { memory, jobId };
+export const _test = { memory, jobId, neshanJobId };

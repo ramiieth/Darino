@@ -129,6 +129,107 @@ async function darino(cfg, method, body) {
   return r.json();
 }
 
+const NESHAN_MCP = 'https://api.neshan.org/mcp';
+const NESHAN_API = 'https://api.neshan.org';
+
+function parseNeshanMcpBody(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{')) { try { return JSON.parse(trimmed); } catch { return null; } }
+  const chunks = trimmed.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('data:'));
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const p = chunks[i].slice(5).trim();
+    if (!p || p === '[DONE]') continue;
+    try { return JSON.parse(p); } catch { /* ignore */ }
+  }
+  return null;
+}
+
+function unwrapMcpPayload(parsed) {
+  const r = parsed?.result ?? parsed;
+  if (!r || typeof r !== 'object') return null;
+  if (r.structuredContent && typeof r.structuredContent === 'object') return r.structuredContent;
+  const content = Array.isArray(r.content) ? r.content : [];
+  for (const item of content) {
+    if (item && typeof item.text === 'string') {
+      try { const j = JSON.parse(item.text); if (j && typeof j === 'object') return j; } catch { /* ignore */ }
+    }
+  }
+  const text = content.map((c) => (typeof c?.text === 'string' ? c.text : '')).filter(Boolean).join('\n');
+  return text ? { rawText: text } : (typeof r === 'object' ? r : null);
+}
+
+async function neshanMcpCall(tool, args, apiKey) {
+  const headers = {
+    'Api-Key': apiKey,
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+    'User-Agent': UA,
+    'Accept-Language': 'fa-IR,fa;q=0.9'
+  };
+  let sessionId = null;
+  try {
+    const init = await fetch(NESHAN_MCP, {
+      method: 'POST', headers,
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'darino-mac-bridge', version: '1.0.0' } } }),
+      signal: AbortSignal.timeout(10_000)
+    });
+    sessionId = init.headers.get('mcp-session-id') || init.headers.get('Mcp-Session-Id');
+  } catch { /* proceed without session */ }
+
+  const res = await fetch(NESHAN_MCP, {
+    method: 'POST',
+    headers: { ...headers, ...(sessionId ? { 'Mcp-Session-Id': sessionId } : {}) },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: tool, arguments: args } }),
+    signal: AbortSignal.timeout(14_000)
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`MCP HTTP ${res.status}`);
+  const parsed = parseNeshanMcpBody(raw);
+  if (parsed?.error) throw new Error(parsed.error.message || 'MCP error');
+  const data = unwrapMcpPayload(parsed);
+  if (!data) throw new Error('پاسخ خالی از MCP نشان');
+  return data;
+}
+
+async function neshanRestCall(tool, args, apiKey) {
+  let url = null;
+  if (tool === 'neshan_search') {
+    const q = new URLSearchParams({ term: String(args.term ?? ''), lat: String(args.lat ?? 31.3203), lng: String(args.lng ?? 48.6842) });
+    url = `${NESHAN_API}/v1/search?${q}`;
+  } else if (tool === 'neshan_direction') {
+    const q = new URLSearchParams({ type: args.vehicle === 'motorcycle' ? 'motorcycle' : 'car', origin: `${args.origin_lat},${args.origin_lng}`, destination: `${args.dest_lat},${args.dest_lng}` });
+    url = `${NESHAN_API}/v4/${args.traffic_mode === 'none' ? 'direction/no-traffic' : 'direction'}?${q}`;
+  } else if (tool === 'neshan_reverse_geocode') {
+    url = `${NESHAN_API}/v5/reverse?lat=${args.lat}&lng=${args.lng}`;
+  } else if (tool === 'neshan_geocode') {
+    url = `${NESHAN_API}/v4/geocoding?address=${encodeURIComponent(String(args.address ?? ''))}`;
+  } else if (tool === 'neshan_distance_matrix') {
+    const q = new URLSearchParams({ type: args.vehicle === 'motorcycle' ? 'motorcycle' : 'car', origins: String(args.origins ?? ''), destinations: String(args.destinations ?? '') });
+    url = `${NESHAN_API}/v1/distance-matrix?${q}`;
+  }
+  if (!url) throw new Error(`ابزار ${tool} در REST نشان پشتیبانی نمی‌شود`);
+  const res = await fetch(url, { headers: { 'Api-Key': apiKey, Accept: 'application/json', 'User-Agent': UA }, signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) throw new Error(`REST HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function runNeshanJob(job, apiKey) {
+  if (!apiKey || typeof apiKey !== 'string') return { ok: false, transport: 'neshan-mcp', data: null, error: 'کلید NESHAN_API_KEY از سرور دریافت نشد' };
+  if (!job || typeof job.tool !== 'string' || !isObj(job.args)) return { ok: false, transport: 'neshan-mcp', data: null, error: 'درخواست نامعتبر نشان' };
+  try {
+    const data = await neshanMcpCall(job.tool, job.args, apiKey);
+    return { ok: true, transport: 'neshan-mcp', data, error: null };
+  } catch (mcpErr) {
+    try {
+      const data = await neshanRestCall(job.tool, job.args, apiKey);
+      return { ok: true, transport: 'neshan-rest', data, error: null };
+    } catch (restErr) {
+      return { ok: false, transport: 'neshan-mcp', data: null, error: `${mcpErr?.message || 'MCP'} · ${restErr?.message || 'REST'}`.slice(0, 170) };
+    }
+  }
+}
+
 async function selfTest(print = false) {
   const job = { query: 'پیتزا', lat: 35.7032, lon: 51.3892, types: [0], discount: false };
   const r = await runJob(job);
@@ -141,18 +242,23 @@ async function selfTest(print = false) {
 async function main() {
   if (process.argv.includes('--test')) { process.exitCode = (await selfTest(true)) ? 0 : 1; return; }
   const cfg = loadConfig();
-  log(`پل اسنپ‌فود روشن شد → ${cfg.url}`);
+  log(`پل اسنپ‌فود و نشان روشن شد → ${cfg.url}`);
   await selfTest();
   let fastUntil = 0; let failures = 0;
   for (;;) {
     try {
-      const { jobs = [] } = await darino(cfg, 'GET');
+      const { jobs = [], neshanJobs = [], neshanKey = null } = await darino(cfg, 'GET');
       for (const { id, job } of jobs) {
         const res = await runJob(job);
         await darino(cfg, 'POST', { id, ...res });
         log(`جستجو «${String(job?.query).slice(0, 30)}» → ${res.ok ? `${res.items.length} نتیجه` : res.error}`);
       }
-      if (jobs.length) fastUntil = Date.now() + 5 * 60_000;
+      for (const { id, job } of neshanJobs) {
+        const res = await runNeshanJob(job, neshanKey);
+        await darino(cfg, 'POST', { id, kind: 'neshan', ...res });
+        log(`نشان (${job?.tool}) → ${res.ok ? res.transport : res.error}`);
+      }
+      if (jobs.length || neshanJobs.length) fastUntil = Date.now() + 5 * 60_000;
       if (failures) log('اتصال به دارینو برقرار شد'); failures = 0;
     } catch (e) {
       if (failures++ % 20 === 0) log('⚠️', e.message);

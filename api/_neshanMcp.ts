@@ -18,6 +18,7 @@
 import { z } from 'zod';
 import { geminiKeys, hasGeminiKey } from './_assistant.js';
 import { providerCacheKey, readProviderCache, writeProviderCache } from './_providerCache.js';
+import { bridgeOnline, neshanRelayCall, relayConfigured } from './_shopRelay.js';
 import {
   ACTIVE_NESHAN_TOOL_NAMES,
   MCPFARSI_NESHAN_URL,
@@ -332,6 +333,9 @@ async function fetchNeshanWithRetry(url: string | URL, init: RequestInit, timeou
 function extractNeshanErrorDetail(rawText: string): string {
   const trimmed = rawText.trim();
   if (!trimmed) return '';
+  if (/--primary-130:#471882|arvancloud|challenge-form|<html/i.test(trimmed)) {
+    return 'مسدودشده توسط فایروال ArvanCloud روی آی‌پی دیتاسنتر Vercel';
+  }
   try {
     const parsed = JSON.parse(trimmed) as { message?: string; error?: string | { message?: string }; detail?: string };
     const msg =
@@ -652,7 +656,30 @@ export async function executeNeshanTool(
     };
   }
 
-  const combinedError = [mcpError, restRes.error].filter(Boolean).join(' · ');
+  // ۳. تلاش سوم: اگر سرور نشان از دیتاسنتر Vercel مسدود شده بود، اجرای درخواست از طریق پل مک دارینو (ایران)
+  let relayError: string | undefined;
+  if (relayConfigured()) {
+    if (await bridgeOnline()) {
+      const relayRes = await neshanRelayCall(toolName, args);
+      if (relayRes.ok && relayRes.data) {
+        const tr = relayRes.transport === 'neshan-rest' ? 'neshan-rest' : 'neshan-mcp';
+        await writeProviderCache(cacheKey, { transport: tr, data: relayRes.data }, ttlMs);
+        return {
+          ok: true,
+          transport: tr,
+          data: relayRes.data,
+          durationMs: Date.now() - started
+        };
+      }
+      if (relayRes.error && relayRes.error !== 'bridge-offline') {
+        relayError = `پل مک: ${relayRes.error}`;
+      }
+    } else {
+      relayError = 'پل مک دارینو خاموش است (برای عبور از فایروال ArvanCloud پل مک را روشن کنید)';
+    }
+  }
+
+  const combinedError = [mcpError, restRes.error, relayError].filter(Boolean).join(' · ');
   return {
     ok: false,
     transport: 'neshan-mcp',
