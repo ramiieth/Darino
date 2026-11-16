@@ -23,6 +23,7 @@ import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/doma
 import { shopAsk } from './_shop.js';
 import { relayEndpoint } from './_shopRelay.js';
 import { fetchImage } from './_shopHttp.js';
+import { askNeshanAgent, getNeshanStatus, hasNeshanKey, neshanAskSchema } from './_neshanMcp.js';
 export const config={api:{bodyParser:false}};
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -53,13 +54,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
   const op = u.searchParams.get('op') ?? 'status';
-  if (op === 'status' && req.method === 'GET') { json(res,200,{ zerion: !!process.env.ZERION_API_KEY, gemini: hasGeminiKey(),quota:await zerionQuota(),webhookConfigured:!!process.env.ZERION_WEBHOOK_CERTIFICATE_PEM&&!!process.env.ZERION_WEBHOOK_WALLETS }); return; }
+  if (op === 'status' && req.method === 'GET') { json(res,200,{ zerion: !!process.env.ZERION_API_KEY, gemini: hasGeminiKey(), neshan: hasNeshanKey(), quota:await zerionQuota(),webhookConfigured:!!process.env.ZERION_WEBHOOK_CERTIFICATE_PEM&&!!process.env.ZERION_WEBHOOK_WALLETS }); return; }
+  if (op === 'neshan-status' && req.method === 'GET') { json(res,200,getNeshanStatus()); return; }
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
-  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' || op === 'analyze-review' || op === 'analyze-performance' || op === 'analyze-stable' || op === 'analyze-trading-agents' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' || op === 'analyze-review' || op === 'analyze-performance' || op === 'analyze-stable' || op === 'analyze-trading-agents' ? 4 : op === 'shop-ask' || op === 'neshan-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
+    if (req.method === 'POST' && op === 'neshan-ask') {
+      const parsed = neshanAskSchema.safeParse(await readBody(req));
+      if (!parsed.success) { json(res,400,{ error:'اطلاعات پرسش مکانی نشان کامل یا معتبر نیست' }); return; }
+      json(res,200,await askNeshanAgent(parsed.data)); return;
+    }
     if ((ALERT_OPS as readonly string[]).includes(op)) {
       if (!isDbConfigured()) { json(res,503,{ error:'پایگاه داده تنظیم نشده' }); return; }
       const [status, body] = await handleAlertsOp(neonAlertsStore(db()), op, req.method ?? 'GET', auth.userId, () => readBody(req));

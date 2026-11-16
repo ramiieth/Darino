@@ -37,6 +37,7 @@ const EomPage = lazy(() => import('@/features/intel/presentation/EomPage'));
 const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
+const IranSearchPage = lazy(() => import('@/features/intel/presentation/IranSearchPage'));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
 /** /intel و /traders (نام قبلی میز معامله) ← /desk با همان پارامترها؛ تب طلای قبلی ← صفحهٔ مستقل /gold */
@@ -91,6 +92,8 @@ export function App() {
           <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
           <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
+          <Route path="/iran-search" element={<Lazy label="جست‌وجوی مکانی و مسیریابی (نشان)"><IranSearchPage /></Lazy>} />
+          <Route path="/neshan" element={<Lazy label="جست‌وجوی مکانی و مسیریابی (نشان)"><IranSearchPage /></Lazy>} />
           <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
           <Route path="/funding" element={<Lazy label="درآمد فاندینگ"><FundingPage /></Lazy>} />
           <Route path="/venues" element={<VenuesRedirect />} />
