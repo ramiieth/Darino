@@ -19,9 +19,10 @@ import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
 import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
 import { PortfolioBasketDcaCommitteePanel } from './PortfolioBasketDcaCommitteePanel';
+import { Mt5RiskManagerCalculator } from './Mt5RiskManagerCalculator';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'basket' | 'compare' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
+type CalcTab = 'basket' | 'compare' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'mt5-risk' | 'plan' | 'cagr' | 'xirr' | 'shop';
 type Group = 'invest' | 'risk' | 'business';
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
@@ -60,12 +61,18 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
     description: 'چقدر بفروشید تا با تورم دلار، هم قفسه پر بماند و هم ارزش دلاری پول پیش حفظ شود — با اثر خرید چکی و تست بحران فروش ضعیف',
     icon: <Store aria-hidden />
   },
-  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' }
+  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' },
+  {
+    value: 'mt5-risk',
+    label: 'مدیریت ریسک (MT5)',
+    description: 'محاسبه دقیق حجم (لات)، پیش‌نمایش خطوط معامله، خروج پله‌ای، تریلینگ استاپ و پایش سقف افت روزانه — کاملاً دستی و بدون نیاز به کلید حساب MT5',
+    icon: <ShieldHalf aria-hidden />
+  }
 ];
 
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
   { value: 'invest', label: 'سرمایه‌گذاری و مقایسه دارایی‌ها', tabs: ['basket', 'compare', 'pnl', 'dca', 'cagr', 'xirr', 'plan'] },
-  { value: 'risk', label: 'ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] },
+  { value: 'risk', label: 'ریسک و آپشن', tabs: ['mt5-risk', 'hedge', 'options', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
 const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.value;
@@ -122,6 +129,9 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
         <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
+        <div {...panel('mt5-risk')}>
+          <Mt5RiskManagerCalculator />
+        </div>
         <div {...panel('hedge')}>
           <HedgeCalculator />
         </div>

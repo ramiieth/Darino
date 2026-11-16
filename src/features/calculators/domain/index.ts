@@ -27,4 +27,5 @@ export * from './shopBreakEven';
 export * from './assetPerformanceComparison';
 export * from './walletDcaAverageSimulator';
 export * from './portfolioBasketDcaCommittee';
+export * from './mt5RiskManager';
 
