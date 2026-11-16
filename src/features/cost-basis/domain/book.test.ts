@@ -50,3 +50,42 @@ it('rejects malformed old purchase rows without crashing other assets',()=>{
 it('reports the known portion separately without presenting it as the full PnL',()=>{
  const value=valueCost(book.lots,'4',3000);expect(value.pnl).toBeNull();expect(value.partialPnl).toBe(5000);expect(value.unknown).toBe('1');
 });
+it('automatically updates ETH cost basis and weighted average across 4 Uniswap swaps (including multi-hop and WETH)',()=>{
+ const ethAsset={key:'fungible:ethereum',tokenId:'ethereum',symbol:'ETH',name:'Ether',chain:'ethereum',contract:null,icon:null};
+ const initialBook:CostBook={
+  version:1,
+  asOf:1000,
+  migrationConfirmed:true,
+  legacyRetired:true,
+  lots:[{id:'current:fungible:ethereum',asset:ethAsset,quantity:'3.33',unitCost:'2820',fee:'0',at:1000,source:'current-balance-confirmed'}]
+ };
+ const usdcOut={direction:'out',symbol:'USDC',tokenId:'usdc',contract:'0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',quantity:'500',value:500,address:null,icon:null,verified:true};
+ const swaps:WalletTransaction[]=[
+  {id:'s1',hash:'0x11',chain:'ethereum',type:'trade',status:'confirmed',minedAt:new Date(2000).toISOString(),fee:1,transfers:[usdcOut,{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.2',value:500,address:null,icon:null,verified:true}]},
+  {id:'s2',hash:'0x12',chain:'ethereum',type:'trade',status:'confirmed',minedAt:new Date(3000).toISOString(),fee:1,acts:[{id:'a1',type:'trade',protocol:'Uniswap',contract:'0x1'},{id:'a2',type:'trade',protocol:'Uniswap',contract:'0x2'}],transfers:[usdcOut,{direction:'in',symbol:'WETH',tokenId:'weth',quantity:'0.2',value:500,address:null,icon:null,verified:true}]},
+  {id:'s3',hash:'0x13',chain:'base',type:'trade',status:'confirmed',minedAt:new Date(4000).toISOString(),fee:0.5,transfers:[{...usdcOut,chain:'base',contract:'0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'},{direction:'in',symbol:'ETH',tokenId:'',contract:null,quantity:'0.1',value:240,address:null,icon:null,verified:true},{direction:'in',symbol:'WETH',tokenId:'weth',quantity:'0.1',value:260,address:null,icon:null,verified:true}]},
+  {id:'s4',hash:'0x14',chain:'arbitrum',type:'trade',status:'confirmed',minedAt:new Date(5000).toISOString(),fee:0.5,transfers:[{...usdcOut,chain:'arbitrum',contract:'0xaf88d065e77c8cc2239327c5edb3a432268e5831'},{direction:'in',symbol:'ETH',tokenId:'ethereum',quantity:'0.2',value:500,address:null,icon:null,verified:true}]}
+ ];
+ const r=replayCost(initialBook,swaps);
+ expect(r.issues).toEqual([]);
+ expect(r.processed).toHaveLength(4);
+ const v=valueCost(r.lots.filter(l=>l.asset.key==='fungible:ethereum'),'4.13',3000);
+ expect(v.covered).toBe('4.13');
+ expect(v.unknown).toBe('0');
+ expect(v.basis).toBeCloseTo(11393.6,2);
+ expect(v.pnl).not.toBeNull();
+});
+it('automatically tracks swaps and cost basis for all other cryptocurrencies (SOL/WSOL, BTC/WBTC, ARB, and contract-only ERC20)',()=>{
+ const usdcOut={direction:'out',symbol:'USDC',tokenId:'usdc',contract:'0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',quantity:'1000',value:1000,address:null,icon:null,verified:true};
+ const swaps:WalletTransaction[]=[
+  {id:'sol-1',hash:'0x21',chain:'solana',type:'trade',status:'confirmed',minedAt:new Date(2000).toISOString(),fee:0.01,transfers:[{...usdcOut,chain:'solana',contract:'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',quantity:'500',value:500},{direction:'in',symbol:'WSOL',tokenId:'wsol',quantity:'2.5',value:500,address:null,icon:null,verified:true}]},
+  {id:'btc-1',hash:'0x22',chain:'arbitrum',type:'trade',status:'confirmed',minedAt:new Date(3000).toISOString(),fee:0.5,transfers:[{...usdcOut,chain:'arbitrum',contract:'0xaf88d065e77c8cc2239327c5edb3a432268e5831'},{direction:'in',symbol:'WBTC',tokenId:'wbtc',quantity:'0.01',value:1000,address:null,icon:null,verified:true}]},
+  {id:'erc-1',hash:'0x23',chain:'base',type:'trade',status:'confirmed',minedAt:new Date(4000).toISOString(),fee:0.2,transfers:[{...usdcOut,chain:'base',contract:'0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',quantity:'200',value:200},{direction:'in',symbol:'AERO',tokenId:'',contract:'0x940181a94a35a4569e4529a3cdfb74e38fd98631',quantity:'100',value:200,address:null,icon:null,verified:true}]}
+ ];
+ const r=replayCost({version:1,asOf:1000,migrationConfirmed:true,legacyRetired:true,lots:[]},swaps);
+ expect(r.issues).toEqual([]);
+ expect(r.processed).toHaveLength(3);
+ expect(valueCost(r.lots.filter(l=>l.asset.key==='fungible:solana'),'2.5',220).basis).toBeCloseTo(500.01,2);
+ expect(valueCost(r.lots.filter(l=>l.asset.key==='fungible:bitcoin'),'0.01',105000).basis).toBeCloseTo(1000.5,2);
+ expect(valueCost(r.lots.filter(l=>l.asset.key==='base:0x940181a94a35a4569e4529a3cdfb74e38fd98631'),'100',2.5).basis).toBeCloseTo(200.2,2);
+});

@@ -26,11 +26,11 @@ export async function refreshWallet(address: string, force = false): Promise<voi
   try { const data = await fetchJson<WalletSnapshot>(`/api/integrations?op=wallet&address=${encodeURIComponent(address)}${force ? '&refresh=1' : ''}`, { timeoutMs: 58000 }); if (gen === generation) {if(!isBitcoinAddress(address)&&data.retryAt)setRetry(data.retryAt);else if(!isBitcoinAddress(address)&&data.complete&&!data.stale){retryAt=0;try{localStorage.removeItem(COOLDOWN_KEY);}catch{/* Memory remains usable. */}}const previous=useConnectedStore.getState().wallets[addressKey(address)]?.data;if(!data.complete&&previous?.complete)patch(address,{data:previous,error:data.detailsError??'جزئیات کامل دریافت نشد؛ آخرین دادهٔ موفق حفظ شده است',loading:false});else {patch(address, { data, error: data.detailsError??null, loading: false });await saveWalletSnapshot(data);}} }
   catch(e) {if(gen!==generation)return;cooldown(e,address);patch(address, { error: errorText(e)+(useConnectedStore.getState().wallets[addressKey(address)]?.data?'؛ آخرین موجودی ذخیره‌شده نمایش داده می‌شود':'؛ هنوز موجودی موفقی برای این کیف پول ذخیره نشده'), loading: false }); }
 }
-export async function refreshTransactions(address: string, more = false): Promise<void> {
-  const s = useConnectedStore.getState().wallets[addressKey(address)]; if ((!isBitcoinAddress(address)&&Date.now()<retryAt) || s?.historyLoading || (more && !s?.next) || (!more&&s?.historyAt&&Date.now()-s.historyAt<3600000)) return;
+export async function refreshTransactions(address: string, more = false, force = false): Promise<void> {
+  const s = useConnectedStore.getState().wallets[addressKey(address)]; if ((!isBitcoinAddress(address)&&Date.now()<retryAt) || s?.historyLoading || (more && !s?.next) || (!more&&!force&&s?.historyAt&&Date.now()-s.historyAt<3600000)) return;
   const gen = generation; patch(address,{ historyLoading:true });
   try {
-    const data = await fetchJson<TransactionPage>(`/api/integrations?op=transactions&address=${encodeURIComponent(address)}${more ? `&next=${encodeURIComponent(s!.next!)}` : ''}`,{ timeoutMs:20000 });
+    const data = await fetchJson<TransactionPage>(`/api/integrations?op=transactions&address=${encodeURIComponent(address)}${more ? `&next=${encodeURIComponent(s!.next!)}` : ''}${force ? '&refresh=1' : ''}`,{ timeoutMs:20000 });
     if(gen !== generation) return;
     const current = useConnectedStore.getState().wallets[addressKey(address)];
     const unique = new Map((current?.history ?? []).map(r => [r.id,r])); data.rows.forEach(r => unique.set(r.id,r));

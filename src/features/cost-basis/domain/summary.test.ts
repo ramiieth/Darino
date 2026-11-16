@@ -49,4 +49,26 @@ describe('shared dashboard cost valuation', () => {
   const combined=costSummary(portfolio([wallet([{...native,quantity:'.3',value:900},{...native,chain:'base',quantity:'.35',value:1050}])]),book).rows[0];
   expect(combined.quantity.toString()).toBe('0.65');expect(combined.pnl).toBe(325);
  });
+ it('uses ETH currentBasis to auto-price new swaps for other tokens (e.g. ETH -> UNI)',()=>{
+  const currentBook:CostBook={
+   version:1,asOf:1000,migrationConfirmed:true,legacyRetired:true,lots:[],
+   currentBasis:{'fungible:ethereum':{asset,quantity:'1',total:'3000',at:1000}}
+  };
+  const uniAsset={key:'fungible:uniswap',tokenId:'uniswap',symbol:'UNI',name:'Uniswap',chain:'ethereum',contract:'0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',icon:'/logos/token-uni.png'};
+  const uniPos={...uniAsset,id:'uni',quantity:'50',price:12,value:600,type:'wallet',verified:true,spam:false,displayable:true};
+  const ethPos={...position,quantity:'0.8',value:2400};
+  const swapTx={
+   id:'uni-swap',hash:'0x99',chain:'ethereum',type:'trade',status:'confirmed',minedAt:new Date(2000).toISOString(),fee:5,
+   transfers:[
+    {direction:'out',symbol:'ETH',tokenId:'ethereum',quantity:'0.2',value:500,address:null,icon:null,verified:true},
+    {direction:'in',symbol:'UNI',tokenId:'uniswap',contract:uniAsset.contract,quantity:'50',value:500,address:null,icon:null,verified:true}
+   ]
+  };
+  const w={holding:{address:'0x'+'11'.repeat(20)},state:{data:{complete:true,positions:[ethPos,uniPos],fetchedAt:2500},history:[swapTx],historyLoaded:true,historyError:null,next:null},stale:false};
+  const res=costSummary(portfolio([w]),currentBook);
+  const uniRow=res.rows.find(r=>r.asset.key==='fungible:uniswap');
+  expect(uniRow?.status).toBe('ready');
+  expect(uniRow?.basis).toBeCloseTo(500,2);
+  expect(uniRow?.pnl).toBeCloseTo(100,2);
+ });
  });

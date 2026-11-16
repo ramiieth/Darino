@@ -15,7 +15,7 @@ import type { BasisRow } from '../domain/allSources';
 import { normalizeDecimalInput, purchaseDecimal } from './decimalInput';
 export function BasisEditor({ row, onClose }: { row: BasisRow; onClose: () => void }) {
  const openedQuantity=useRef(row.quantity.toString());const changed=openedQuantity.current!==row.quantity.toString();
- const [total,setTotal] = useState(row.current?.quantity === row.quantity.toString() ? row.current.total : row.status === 'ready' && row.basis !== null ? String(row.basis) : '');
+ const [total,setTotal] = useState(row.current?.quantity === row.quantity.toString() ? row.current.total : row.basis !== null ? String(Math.round(row.basis * 100) / 100) : '');
  const [busy,setBusy] = useState(false), [error,setError] = useState<string|null>(null);
  const [acceptCached,setAcceptCached]=useState(false);
  const parsed = purchaseDecimal(total,true);
