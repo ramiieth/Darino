@@ -14,7 +14,7 @@
  *   تنظیمات و اتصال‌ها wallets, alerts and security (setup, not daily destinations)
  * Pages inside one section share a SectionTabs bar; old URLs keep working.
  */
-import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Compass, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -177,6 +177,15 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'قیمت، محله‌ها و سناریوی دلاری',
         icon: Home,
         match: ['/property-market']
+      },
+      {
+        id: 'iran-search',
+        to: '/iran-search',
+        label: 'جست‌وجو',
+        title: 'جست‌وجوی مکانی و مسیریابی هوشمند (نشان)',
+        description: 'جست‌وجوی هوشمند صرافی‌ها، بانک‌ها، مراکز خدماتی، آدرس و مسیریابی با ترافیک لحظه‌ای نشان (MCP)',
+        icon: Compass,
+        match: ['/neshan']
       }
     ]
   },

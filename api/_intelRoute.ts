@@ -24,10 +24,13 @@ import { getGold } from './_gold.js';
 import { getIrExchanges } from './_irExchanges.js';
 import { getBenchmarks, parseExtraCoins } from './_benchmarks.js';
 import { IRX_COINS, type IrxCoin } from '../src/features/intel/domain/irExchanges.js';
+import { readBody } from './_neon.js';
+import { askNeshanAgent, fetchNeshanStaticMap, getNeshanStatus, neshanAskSchema } from './_neshanMcp.js';
 
 const CHAINS: Chain[] = ['solana', 'ethereum', 'base', 'bsc', 'arbitrum'];
 const TOKEN_MS = 30 * 60_000;
 const MEMES_MS = 3 * 60_000;
+const neshanRateLimits = new Map<string, { start: number; count: number }>();
 
 export type MemeRow = MemeToken & { safety: ReturnType<typeof listVerdict> };
 export interface MemesPayload { fetchedAt: number; list: 'trending' | 'new'; tokens: MemeRow[] }
@@ -76,13 +79,63 @@ async function loadMemes(list: 'trending' | 'new'): Promise<MemesPayload> {
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if ((req.method ?? 'GET') !== 'GET') {
+  const method = req.method ?? 'GET';
+  if (method !== 'GET' && method !== 'POST') {
     json(res, 405, { error: 'method_not_allowed' });
     return;
   }
   const params = new URL(req.url ?? '/', 'http://internal').searchParams;
   const op = params.get('op');
   try {
+    if (op === 'neshan-status' && method === 'GET') {
+      res.setHeader('Cache-Control', 'no-store');
+      json(res, 200, getNeshanStatus());
+      return;
+    }
+    if (op === 'neshan-static-map' && method === 'GET') {
+      const lat = Number(params.get('lat'));
+      const lng = Number(params.get('lng'));
+      const zoom = Number(params.get('zoom')) || 14;
+      const img = await fetchNeshanStaticMap({ lat, lng, zoom });
+      if (!img) {
+        res.statusCode = 404;
+        res.end();
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', img.contentType);
+      res.setHeader('Cache-Control', 'private, max-age=600');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.end(img.body);
+      return;
+    }
+    if (op === 'neshan-ask' && method === 'POST') {
+      res.setHeader('Cache-Control', 'no-store');
+      const clientIp = String(req.headers['x-forwarded-for'] ?? req.socket?.remoteAddress ?? 'local').split(',')[0].trim();
+      const now = Date.now();
+      const prev = neshanRateLimits.get(clientIp);
+      const entry = prev && now - prev.start < 60_000 ? prev : { start: now, count: 0 };
+      if (++entry.count > 20) {
+        res.setHeader('Retry-After', '60');
+        json(res, 429, { error: 'تعداد درخواست‌های جست‌وجوی مکانی بیش از حد مجاز است؛ یک دقیقه دیگر تلاش کنید.' });
+        return;
+      }
+      if (neshanRateLimits.size > 500) neshanRateLimits.clear();
+      neshanRateLimits.set(clientIp, entry);
+
+      const parsed = neshanAskSchema.safeParse(await readBody(req));
+      if (!parsed.success) {
+        json(res, 400, { error: 'پرسش مکانی معتبر نیست (بین ۲ تا ۶۰۰ نویسه وارد کنید).' });
+        return;
+      }
+      const answer = await askNeshanAgent(parsed.data);
+      json(res, 200, answer);
+      return;
+    }
+    if (method !== 'GET') {
+      json(res, 405, { error: 'method_not_allowed' });
+      return;
+    }
     if (op === 'token') {
       const chain = params.get('chain') as Chain;
       const raw = (params.get('address') ?? '').trim();
