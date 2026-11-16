@@ -307,32 +307,72 @@ function parseMcpResponseText(rawText: string): unknown {
   return null;
 }
 
+const NESHAN_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
+
+function neshanHeaders(apiKey: string, extra?: Record<string, string>): Record<string, string> {
+  return {
+    'User-Agent': NESHAN_UA,
+    'Accept-Language': 'fa-IR,fa;q=0.9',
+    'Api-Key': apiKey,
+    ...extra
+  };
+}
+
+async function fetchNeshanWithRetry(url: string | URL, init: RequestInit, timeoutMs = 12_000): Promise<Response> {
+  const run = () => fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  const res = await run();
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
+    await new Promise((r) => setTimeout(r, 500));
+    return run();
+  }
+  return res;
+}
+
+function extractNeshanErrorDetail(rawText: string): string {
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = JSON.parse(trimmed) as { message?: string; error?: string | { message?: string }; detail?: string };
+    const msg =
+      parsed.message ??
+      parsed.detail ??
+      (typeof parsed.error === 'string' ? parsed.error : parsed.error?.message) ??
+      '';
+    if (msg) return String(msg).slice(0, 120);
+  } catch {
+    /* غیر JSON */
+  }
+  return trimmed.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+
 let cachedMcpSessionId: string | null = null;
 
 /** دریافت یا بازیابی شناسه نشست Streamable HTTP MCP (در صورت نیاز سرور نشان) */
 async function ensureMcpSession(apiKey: string): Promise<string | null> {
   if (cachedMcpSessionId) return cachedMcpSessionId;
   try {
-    const res = await fetch(neshanMcpUrl(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'Api-Key': apiKey,
-        'Neshan-Api-Key': apiKey
+    const res = await fetchNeshanWithRetry(
+      neshanMcpUrl(),
+      {
+        method: 'POST',
+        headers: neshanHeaders(apiKey, {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream'
+        }),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `darino-init-${Date.now()}`,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'darino-web', version: '1.0.0' }
+          }
+        })
       },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: `darino-init-${Date.now()}`,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'darino-web', version: '1.0.0' }
-        }
-      }),
-      signal: AbortSignal.timeout(8_000)
-    });
+      8_000
+    );
     const sid = res.headers.get('mcp-session-id') || res.headers.get('Mcp-Session-Id');
     if (sid) cachedMcpSessionId = sid;
     return sid;
@@ -349,16 +389,14 @@ async function callOfficialMcpHttp(
 ): Promise<{ ok: boolean; data: Record<string, unknown> | null; error?: string; status?: number }> {
   try {
     const sendCall = async (sessionId: string | null) => {
-      const headers: Record<string, string> = {
+      const extra: Record<string, string> = {
         'Content-Type': 'application/json',
-        Accept: 'application/json, text/event-stream',
-        'Api-Key': apiKey,
-        'Neshan-Api-Key': apiKey
+        Accept: 'application/json, text/event-stream'
       };
-      if (sessionId) headers['Mcp-Session-Id'] = sessionId;
-      return fetch(neshanMcpUrl(), {
+      if (sessionId) extra['Mcp-Session-Id'] = sessionId;
+      return fetchNeshanWithRetry(neshanMcpUrl(), {
         method: 'POST',
-        headers,
+        headers: neshanHeaders(apiKey, extra),
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: `darino-${Date.now()}`,
@@ -367,8 +405,7 @@ async function callOfficialMcpHttp(
             name: toolName,
             arguments: args
           }
-        }),
-        signal: AbortSignal.timeout(12_000)
+        })
       });
     };
 
@@ -381,11 +418,12 @@ async function callOfficialMcpHttp(
 
     const rawText = await res.text();
     if (!res.ok) {
+      const detail = extractNeshanErrorDetail(rawText);
       return {
         ok: false,
         data: null,
         status: res.status,
-        error: `خطای سرور MCP نشان (HTTP ${res.status})`
+        error: `خطای سرور MCP نشان (HTTP ${res.status}${detail ? `: ${detail}` : ''})`
       };
     }
 
@@ -435,6 +473,14 @@ async function callNeshanRestFallback(
   args: Record<string, unknown>
 ): Promise<{ ok: boolean; data: Record<string, unknown> | null; error?: string }> {
   const base = DEFAULT_NESHAN_API_ORIGIN;
+  const readRest = async (url: URL, key: string, label: string) => {
+    const r = await fetchNeshanWithRetry(url, { headers: neshanHeaders(key, { Accept: 'application/json' }) }, 10_000);
+    if (!r.ok) {
+      const detail = extractNeshanErrorDetail(await r.text().catch(() => ''));
+      return { ok: false as const, data: null, error: `خطای وب‌سرویس ${label} نشان (${r.status}${detail ? `: ${detail}` : ''})` };
+    }
+    return { ok: true as const, data: (await r.json()) as Record<string, unknown> };
+  };
   try {
     if (toolName === 'neshan_search') {
       const key = neshanApiKey('SEARCH');
@@ -443,9 +489,7 @@ async function callNeshanRestFallback(
       u.searchParams.set('term', String(args.term ?? ''));
       u.searchParams.set('lat', String(args.lat ?? 31.3203));
       u.searchParams.set('lng', String(args.lng ?? 48.6842));
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس جستجوی نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'جستجوی');
     }
 
     if (toolName === 'neshan_reverse_geocode') {
@@ -454,9 +498,7 @@ async function callNeshanRestFallback(
       const u = new URL(`${base}/v5/reverse`);
       u.searchParams.set('lat', String(args.lat ?? 31.3203));
       u.searchParams.set('lng', String(args.lng ?? 48.6842));
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس تبدیل مختصات نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'تبدیل مختصات');
     }
 
     if (toolName === 'neshan_geocode' || toolName === 'neshan_geocode_plus') {
@@ -465,9 +507,7 @@ async function callNeshanRestFallback(
       const u = new URL(`${base}/v6/geocoding`);
       const addr = [args.province, args.city, args.address].filter(Boolean).join('، ');
       u.searchParams.set('address', addr);
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس تبدیل آدرس نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'تبدیل آدرس');
     }
 
     if (toolName === 'neshan_direction') {
@@ -482,9 +522,7 @@ async function callNeshanRestFallback(
       u.searchParams.set('destination', `${args.dest_lat},${args.dest_lng}`);
       if (args.avoid_traffic_zone) u.searchParams.set('avoidTrafficZone', 'true');
       if (args.avoid_odd_even_zone) u.searchParams.set('avoidOddEvenZone', 'true');
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس مسیریابی نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'مسیریابی');
     }
 
     if (toolName === 'neshan_distance_matrix') {
@@ -500,9 +538,7 @@ async function callNeshanRestFallback(
       u.searchParams.set('type', 'car');
       u.searchParams.set('origins', origins);
       u.searchParams.set('destinations', destinations);
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس ماتریس فاصله نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'ماتریس فاصله');
     }
 
     if (toolName === 'neshan_tsp') {
@@ -514,9 +550,7 @@ async function callNeshanRestFallback(
       const u = new URL(`${base}/v3/tsp`);
       u.searchParams.set('waypoints', waypoints);
       if (typeof args.round_trip === 'boolean') u.searchParams.set('roundTrip', String(args.round_trip));
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس TSP نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'TSP');
     }
 
     if (toolName === 'neshan_isochrone') {
@@ -526,9 +560,7 @@ async function callNeshanRestFallback(
       u.searchParams.set('location', `${args.lat},${args.lng}`);
       if (args.time != null) u.searchParams.set('time', String(args.time));
       if (args.distance != null) u.searchParams.set('distance', String(args.distance));
-      const r = await fetch(u, { headers: { 'Api-Key': key }, signal: AbortSignal.timeout(10_000) });
-      if (!r.ok) return { ok: false, data: null, error: `خطای وب‌سرویس ایزوکرون نشان (${r.status})` };
-      return { ok: true, data: (await r.json()) as Record<string, unknown> };
+      return await readRest(u, key, 'ایزوکرون');
     }
 
     return { ok: false, data: null, error: `ابزار ${toolName} نیازمند اتصال مستقیم به سرور MCP نشان است` };
