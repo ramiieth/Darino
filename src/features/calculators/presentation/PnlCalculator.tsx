@@ -21,8 +21,7 @@ import { ExportButtons } from './ExportButtons';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { getHistoricalSeries, TIMEFRAME_LABELS, TIMEFRAME_MS } from '@/features/calculators/data/historical';
 import { calcPnl, cumulativeProfitSeries, type PnlResult } from '@/features/calculators/domain';
-import { assetsOfClass, type CalculatorAsset } from '@/features/calculators/data/catalogs';
-import { WalletAverageDownPanel } from './WalletAverageDownPanel';
+import { type CalculatorAsset } from '@/features/calculators/data/catalogs';
 import { fmtUSD, fmtPct } from '@/shared/utils/formatters';
 
 export function PnlCalculator() {
@@ -101,18 +100,6 @@ export function PnlCalculator() {
     return cumulativeProfitSeries(Number(buyPrice) || 0, Number(qty) || 0, Number(buyFee) || 0, series);
   }, [result, series, buyPrice, qty, buyFee]);
 
-  const handleSyncFromWalletPanel = (preset: {
-    symbol: string;
-    quantity: number;
-    avgCostUsd: number;
-    newAverageCostUsd: number;
-    totalQuantityAfterNewBuy: number;
-  }) => {
-    const cryptoMatch = assetsOfClass('crypto').find((a) => a.symbol === preset.symbol);
-    if (cryptoMatch) setAsset(cryptoMatch);
-    setQty(String(preset.totalQuantityAfterNewBuy));
-    setBuyPrice(String(preset.newAverageCostUsd));
-  };
 
   const inputs = (
     <>
@@ -160,7 +147,6 @@ export function PnlCalculator() {
 
   return (
     <div className="space-y-5">
-      <WalletAverageDownPanel onSelectHoldingForParent={handleSyncFromWalletPanel} />
       <CalcShell inputs={inputs}>
         {!asset || !result ? (
           <ResultPlaceholder>برای محاسبه سود و زیان، یک دارایی انتخاب کنید.</ResultPlaceholder>
