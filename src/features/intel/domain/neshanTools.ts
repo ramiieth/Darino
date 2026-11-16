@@ -344,7 +344,7 @@ export const GEO_ANCHORS: readonly GeoAnchor[] = [
   { id: 'ahvaz-kianabad', nameFa: 'کیان‌آباد اهواز', cityFa: 'اهواز', lat: 31.3522, lng: 48.6789, keywords: ['کیان آباد', 'کیان‌آباد', 'کیان آباد شرقی', 'کیاناباد'] },
   { id: 'ahvaz-golestan', nameFa: 'گلستان اهواز', cityFa: 'اهواز', lat: 31.2897, lng: 48.6175, keywords: ['گلستان اهواز', 'محله گلستان', 'گلستان', 'فروردین گلستان'] },
   { id: 'ahvaz-daneshgah', nameFa: 'شهرک دانشگاه اهواز', cityFa: 'اهواز', lat: 31.3005, lng: 48.6024, keywords: ['شهرک دانشگاه', 'شهرک دانشگاه اهواز'] },
-  { id: 'ahvaz-pardis', nameFa: 'پردیس اهواز', cityFa: 'اهواز', lat: 31.2804, lng: 48.5842, keywords: ['پردیس اهواز', 'محله پردیس'] },
+  { id: 'ahvaz-pardis', nameFa: 'پردیس اهواز', cityFa: 'اهواز', lat: 31.2804, lng: 48.5842, keywords: ['پردیس اهواز', 'محله پردیس', 'پردیس'] },
   { id: 'ahvaz-zeytoon', nameFa: 'زیتون کارمندی اهواز', cityFa: 'اهواز', lat: 31.3519, lng: 48.7248, keywords: ['زیتون کارمندی', 'زیتون اهواز', 'فلکه سنگر', 'پارک زیتون'] },
   { id: 'ahvaz-amanieh', nameFa: 'امانیه اهواز', cityFa: 'اهواز', lat: 31.3258, lng: 48.6694, keywords: ['امانیه', 'امانیه اهواز', 'سقراط'] },
   { id: 'ahvaz-padad', nameFa: 'پادادشهر اهواز', cityFa: 'اهواز', lat: 31.3014, lng: 48.7042, keywords: ['پادادشهر', 'پاداد'] },
