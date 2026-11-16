@@ -35,10 +35,13 @@ import {
 } from '../src/features/intel/domain/neshanTools.js';
 
 const DEFAULT_NESHAN_API_ORIGIN = NESHAN_PLATFORM_MCP_URL.replace('platform.', 'api.').replace(/\/mcp\/?$/, '');
-const DEFAULT_NESHAN_MCP_ENDPOINT = `${DEFAULT_NESHAN_API_ORIGIN}/mcp`;
+
+export function neshanApiOrigin(): string {
+  return (process.env.NESHAN_API_ORIGIN?.trim() || DEFAULT_NESHAN_API_ORIGIN).replace(/\/+$/, '');
+}
 
 export function neshanMcpUrl(): string {
-  return process.env.NESHAN_MCP_URL?.trim() || DEFAULT_NESHAN_MCP_ENDPOINT;
+  return process.env.NESHAN_MCP_URL?.trim() || `${neshanApiOrigin()}/mcp`;
 }
 
 export function neshanApiKey(service?: 'SEARCH' | 'ROUTING' | 'GEOCODING' | 'STATIC'): string | null {
@@ -332,6 +335,9 @@ async function fetchNeshanWithRetry(url: string | URL, init: RequestInit, timeou
 function extractNeshanErrorDetail(rawText: string): string {
   const trimmed = rawText.trim();
   if (!trimmed) return '';
+  if (/--primary-130:#471882|arvancloud|challenge-form|<html/i.test(trimmed)) {
+    return 'مسدودشده توسط فایروال ArvanCloud (محدودیت آی‌پی دیتاسنتر Vercel روی api.neshan.org؛ با اجرای محلی یا تنظیم NESHAN_MCP_URL/NESHAN_API_ORIGIN رفع می‌شود)';
+  }
   try {
     const parsed = JSON.parse(trimmed) as { message?: string; error?: string | { message?: string }; detail?: string };
     const msg =
@@ -339,7 +345,7 @@ function extractNeshanErrorDetail(rawText: string): string {
       parsed.detail ??
       (typeof parsed.error === 'string' ? parsed.error : parsed.error?.message) ??
       '';
-    if (msg) return String(msg).slice(0, 120);
+    if (msg) return String(msg).slice(0, 140);
   } catch {
     /* غیر JSON */
   }
