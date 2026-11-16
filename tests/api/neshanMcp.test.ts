@@ -148,4 +148,94 @@ describe('Neshan MCP Tools Catalog & Spatial Intent Analysis', () => {
     const anchors = resolveGeoAnchors('از کیانپارس تا شهرک دانشگاه اهواز');
     expect(anchors.map((a) => a.id)).toEqual(['ahvaz-kianpars', 'ahvaz-daneshgah']);
   });
+
+  it('صفحه چالش HTML فایروال ArvanCloud روی خطای ۵۰۳ را به‌درستی تشخیص می‌دهد', async () => {
+    process.env.NESHAN_API_KEY = 'service.test-key';
+    const arvanHtml = ':root{--primary-10:#faf7ff;--primary-20:#e5d6ff;--primary-130:#471882;--primary-150:#33115d}html{height:100%}body{background:#fff}';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(arvanHtml, { status: 503 }));
+
+    const out = await askNeshanAgent({
+      query: 'نزدیک‌ترین بانک‌ها و خودپردازها به کیانپارس اهواز کجاست؟',
+      citySlug: 'ahvaz',
+      history: []
+    });
+    expect(out.places).toEqual([]);
+    expect(out.sourceMeta.liveDataVerified).toBe(false);
+    expect(out.answer).toContain('ArvanCloud');
+  });
+
+  it('در صورت مسدودشدن Vercel و روشن‌بودن پل مک، درخواست نشان را از طریق پل مک انجام می‌دهد', async () => {
+    process.env.NESHAN_API_KEY = 'service.test-key';
+    process.env.SHOP_RELAY_KEY = 'a'.repeat(64);
+    const { _test, claimJobs, claimNeshanJobs, submitResult } = await import('../../api/_shopRelay');
+    const { runNeshanJob } = await import('../../tools/snappfood-bridge/bridge.mjs');
+    _test.memory.clear();
+
+    await claimJobs();
+
+    const arvanHtml = ':root{--primary-10:#faf7ff;--primary-20:#e5d6ff;--primary-130:#471882;--primary-150:#33115d}';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith('https://api.neshan.org/mcp')) {
+        const stack = new Error().stack || '';
+        if (stack.includes('bridge.mjs')) {
+          return new Response(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: 2,
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      items: [
+                        {
+                          title: 'بانک ملت شعبه کیانپارس',
+                          address: 'اهواز، کیانپارس، خیابان ۲ شرقی',
+                          neighbourhood: 'کیانپارس',
+                          category: 'bank',
+                          location: { x: 48.6885, y: 31.3492 }
+                        }
+                      ]
+                    })
+                  }
+                ]
+              }
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json', 'Mcp-Session-Id': 'sess-1' } }
+          );
+        }
+        return new Response(arvanHtml, { status: 503 });
+      }
+      if (url.startsWith('https://api.neshan.org/v1/search')) {
+        return new Response(arvanHtml, { status: 503 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+
+    const agentPromise = askNeshanAgent({
+      query: 'نزدیک‌ترین بانک‌ها به کیانپارس اهواز کجاست؟',
+      citySlug: 'ahvaz',
+      history: []
+    });
+
+    let claimed: { id: string; job: { tool: string; args: Record<string, unknown> } }[] = [];
+    for (let i = 0; i < 60; i++) {
+      claimed = await claimNeshanJobs();
+      if (claimed.length > 0) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(claimed).toHaveLength(1);
+    const bridgeRes = await runNeshanJob(claimed[0].job, 'service.test-key');
+    expect(bridgeRes.ok).toBe(true);
+    await submitResult({ id: claimed[0].id, kind: 'neshan', ...bridgeRes });
+
+    const out = await agentPromise;
+    expect(out.sourceMeta.liveDataVerified).toBe(true);
+    expect(out.places).toHaveLength(1);
+    expect(out.places[0].title).toBe('بانک ملت شعبه کیانپارس');
+
+    delete process.env.SHOP_RELAY_KEY;
+    _test.memory.clear();
+  });
 });
