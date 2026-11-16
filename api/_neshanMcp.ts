@@ -307,12 +307,11 @@ function parseMcpResponseText(rawText: string): unknown {
   return null;
 }
 
-/** فراخوانی مستقیم سرور رسمی MCP نشان از طریق پروتکل JSON-RPC 2.0 */
-async function callOfficialMcpHttp(
-  toolName: string,
-  args: Record<string, unknown>,
-  apiKey: string
-): Promise<{ ok: boolean; data: Record<string, unknown> | null; error?: string; status?: number }> {
+let cachedMcpSessionId: string | null = null;
+
+/** دریافت یا بازیابی شناسه نشست Streamable HTTP MCP (در صورت نیاز سرور نشان) */
+async function ensureMcpSession(apiKey: string): Promise<string | null> {
+  if (cachedMcpSessionId) return cachedMcpSessionId;
   try {
     const res = await fetch(neshanMcpUrl(), {
       method: 'POST',
@@ -324,15 +323,61 @@ async function callOfficialMcpHttp(
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: `darino-${Date.now()}`,
-        method: 'tools/call',
+        id: `darino-init-${Date.now()}`,
+        method: 'initialize',
         params: {
-          name: toolName,
-          arguments: args
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'darino-web', version: '1.0.0' }
         }
       }),
-      signal: AbortSignal.timeout(12_000)
+      signal: AbortSignal.timeout(8_000)
     });
+    const sid = res.headers.get('mcp-session-id') || res.headers.get('Mcp-Session-Id');
+    if (sid) cachedMcpSessionId = sid;
+    return sid;
+  } catch {
+    return null;
+  }
+}
+
+/** فراخوانی مستقیم سرور رسمی MCP نشان از طریق پروتکل JSON-RPC 2.0 */
+async function callOfficialMcpHttp(
+  toolName: string,
+  args: Record<string, unknown>,
+  apiKey: string
+): Promise<{ ok: boolean; data: Record<string, unknown> | null; error?: string; status?: number }> {
+  try {
+    const sendCall = async (sessionId: string | null) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        'Api-Key': apiKey,
+        'Neshan-Api-Key': apiKey
+      };
+      if (sessionId) headers['Mcp-Session-Id'] = sessionId;
+      return fetch(neshanMcpUrl(), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `darino-${Date.now()}`,
+          method: 'tools/call',
+          params: {
+            name: toolName,
+            arguments: args
+          }
+        }),
+        signal: AbortSignal.timeout(12_000)
+      });
+    };
+
+    let res = await sendCall(cachedMcpSessionId);
+    if (res.status === 400 || res.status === 404) {
+      cachedMcpSessionId = null;
+      const sid = await ensureMcpSession(apiKey);
+      if (sid) res = await sendCall(sid);
+    }
 
     const rawText = await res.text();
     if (!res.ok) {
@@ -548,6 +593,7 @@ export async function executeNeshanTool(
   }
 
   // ۱. تلاش اول: سرور رسمی MCP نشان (https://api.neshan.org/mcp)
+  let mcpError: string | undefined;
   if (key) {
     const mcpRes = await callOfficialMcpHttp(toolName, args, key);
     if (mcpRes.ok && mcpRes.data) {
@@ -559,6 +605,7 @@ export async function executeNeshanTool(
         durationMs: Date.now() - started
       };
     }
+    mcpError = mcpRes.error;
   }
 
   // ۲. تلاش دوم: وب‌سرویس REST رسمی نشان (اگر کلید دسترسی سرویس دارد ولی MCP روی آن فعال نشده)
@@ -573,11 +620,12 @@ export async function executeNeshanTool(
     };
   }
 
+  const combinedError = [mcpError, restRes.error].filter(Boolean).join(' · ');
   return {
     ok: false,
     transport: 'neshan-mcp',
     data: null,
-    error: restRes.error || 'خطا در دریافت داده از سرور MCP نشان؛ دسترسی کلید API خود را بررسی کنید',
+    error: combinedError || 'خطا در دریافت داده از سرور MCP نشان؛ دسترسی کلید API خود را بررسی کنید',
     durationMs: Date.now() - started
   };
 }
