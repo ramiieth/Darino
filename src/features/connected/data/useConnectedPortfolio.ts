@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useCustody } from '@/features/custody/data/useCustody';
 import { getPref } from '@/features/custody/data/repository';
 import { accountKey, getArcusState, refreshSummary, refreshPortfolio, isStale, useArcusStoreVersion } from '@/features/arcus/data/useArcusAccount';
-import { useConnectedStore, refreshWallet, refreshWalletEvents } from './store';
+import { useConnectedStore, refreshWallet, refreshTransactions, refreshWalletEvents } from './store';
 import { addressKey } from '../domain/model';
 import { visibleWalletValue,visiblePositions } from '../domain/visibility';
 export const CONNECTED_PREF = 'zerion-wallets';
@@ -45,7 +45,7 @@ export function useConnectedPortfolio() {
   const total = known.length ? known.reduce((sum,s) => sum.plus(s.value!),new Decimal(0)).toNumber() : null;
   const partial = known.length !== sources.length || walletSources.some(s => !s.state?.data?.complete || visiblePositions(s.state.data.positions).some(p=>p.value===null));
   const stale = sources.some(s => s.stale);
-  async function refresh() { for(const h of wallets) await refreshWallet(h.address!,true); for(const h of arcus) await refreshSummary(h.arcus!); }
+  async function refresh() { for(const h of wallets) { await refreshWallet(h.address!,true); await refreshTransactions(h.address!,false,true); } for(const h of arcus) await refreshSummary(h.arcus!); }
   return { wallets:walletSources, arcus:arcusSources, total, partial, stale, loading:!custody.loaded || sources.some(s => !s.state || ('loading' in (s.state ?? {}) && (s.state as { loading:boolean }).loading)), refresh };
 }
 export type ConnectedPortfolio = ReturnType<typeof useConnectedPortfolio>;
