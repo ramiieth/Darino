@@ -15,13 +15,14 @@ import { XirrCalculator } from './XirrCalculator';
 import { PerpCalculator } from './PerpCalculator';
 import { HedgeCalculator } from './hedge/HedgeCalculator';
 import { OptionsWizard } from './options/OptionsWizard';
+import { CashSecuredPutCalculator } from './CashSecuredPutCalculator';
 import { PlanWizard } from './plan/PlanWizard';
 import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
 import { PortfolioBasketDcaCommitteePanel } from './PortfolioBasketDcaCommitteePanel';
 import { Mt5RiskManagerCalculator } from './Mt5RiskManagerCalculator';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'basket' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'mt5-risk' | 'plan' | 'compound' | 'shop';
+type CalcTab = 'basket' | 'pnl' | 'dca' | 'perp' | 'options' | 'csp' | 'hedge' | 'mt5-risk' | 'plan' | 'compound' | 'shop';
 type Group = 'invest' | 'risk' | 'business';
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
@@ -53,6 +54,11 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
   },
   { value: 'options', label: 'آپشن (Derive)', description: 'قدم به قدم: با توجه به سرمایه و نظرتان دربارهٔ بازار، یک معاملهٔ آپشن در صرافی Derive پیشنهاد می‌شود؛ همراه با بیشترین سود و زیان، سود یا زیان در هر حرکت قیمت و زمان مناسب خروج' },
   {
+    value: 'csp',
+    label: 'فروش اختیار (CSP)',
+    description: 'محاسبه و تحلیل فروش اختیار فروش با وثیقه نقدی (Cash-Secured Put)؛ بررسی پریمیوم، قیمت تمام‌شده خالص خرید، سربه‌سر، APR مرجع و سناریوهای سررسید'
+  },
+  {
     value: 'shop',
     label: 'سربه‌سر دلاری مغازه',
     description: 'چقدر بفروشید تا با تورم دلار، هم قفسه پر بماند و هم ارزش دلاری پول پیش حفظ شود — با اثر خرید چکی و تست بحران فروش ضعیف',
@@ -69,7 +75,7 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
 
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
   { value: 'invest', label: 'سرمایه‌گذاری و سبد DCA', tabs: ['basket', 'pnl', 'dca', 'compound', 'plan'] },
-  { value: 'risk', label: 'ریسک و آپشن', tabs: ['mt5-risk', 'hedge', 'options', 'perp'] },
+  { value: 'risk', label: 'ریسک و آپشن', tabs: ['mt5-risk', 'hedge', 'options', 'csp', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
 const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.value;
@@ -82,6 +88,8 @@ export function CalculatorsPage() {
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
   const [optionsOpened, setOptionsOpened] = useState(false);
   if (tab === 'options' && !optionsOpened) setOptionsOpened(true);
+  const [cspOpened, setCspOpened] = useState(false);
+  if (tab === 'csp' && !cspOpened) setCspOpened(true);
   const [planOpened, setPlanOpened] = useState(false);
   if (tab === 'plan' && !planOpened) setPlanOpened(true);
   const group = groupOf(tab);
@@ -128,6 +136,7 @@ export function CalculatorsPage() {
         </div>
         <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
         <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
+        <div {...panel('csp')}>{cspOpened && <CashSecuredPutCalculator />}</div>
         <div {...panel('mt5-risk')}>
           <Mt5RiskManagerCalculator />
         </div>
