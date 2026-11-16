@@ -18,12 +18,19 @@ import { HedgeCalculator } from './hedge/HedgeCalculator';
 import { OptionsWizard } from './options/OptionsWizard';
 import { PlanWizard } from './plan/PlanWizard';
 import { ShopBreakEvenCalculator } from './ShopBreakEvenCalculator';
+import { PortfolioBasketDcaCommitteePanel } from './PortfolioBasketDcaCommitteePanel';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'compare' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
+type CalcTab = 'basket' | 'compare' | 'pnl' | 'dca' | 'perp' | 'options' | 'hedge' | 'plan' | 'cagr' | 'xirr' | 'shop';
 type Group = 'invest' | 'risk' | 'business';
 
 const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
+  {
+    value: 'basket',
+    label: 'سبد DCA و کمیته ایجنت‌ها',
+    description: 'مدیریت پویا (افزودن، ویرایش و حذف رمزارز مثل HYPE، ETH، SOL، XAUT/PAXG و BTC)، محاسبه میانگین خرید پله‌ای (DCA) برای ۱۷,۶۸۱ USDC و ۵,۰۰۰ USDT و ارزیابی ۴ مرحله‌ای کمیته ایجنت‌ها',
+    icon: <ListChecks aria-hidden />
+  },
   {
     value: 'compare',
     label: 'مقایسه عملکرد دارایی‌ها',
@@ -57,7 +64,7 @@ const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNo
 ];
 
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
-  { value: 'invest', label: 'سرمایه‌گذاری و مقایسه دارایی‌ها', tabs: ['compare', 'pnl', 'dca', 'cagr', 'xirr', 'plan'] },
+  { value: 'invest', label: 'سرمایه‌گذاری و مقایسه دارایی‌ها', tabs: ['basket', 'compare', 'pnl', 'dca', 'cagr', 'xirr', 'plan'] },
   { value: 'risk', label: 'ریسک و آپشن', tabs: ['hedge', 'options', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
@@ -65,7 +72,7 @@ const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.v
 
 export function CalculatorsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<CalcTab>('compare');
+  const [tab, setTab] = useState<CalcTab>('basket');
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
   const [optionsOpened, setOptionsOpened] = useState(false);
@@ -84,7 +91,7 @@ export function CalculatorsPage() {
 
   return (
     <Page>
-      <PageHeader title="ماشین‌حساب سرمایه‌گذاری" subtitle="مقایسه عملکرد دارایی‌ها، محاسبه سود، رشد سالانه و مدیریت ریسک" />
+      <PageHeader title="ماشین‌حساب سرمایه‌گذاری" subtitle="مدیریت سبد پله‌ای DCA با کمیته ایجنت‌ها، مقایسه عملکرد دارایی‌ها و مدیریت ریسک" />
       <div className="space-y-6">
         <div className="space-y-3">
           <SegmentedControl<Group>
@@ -100,6 +107,9 @@ export function CalculatorsPage() {
               درآمد دلتا نوترال و اسکنر فاندینگ در <Link to="/funding" className="font-semibold text-accent underline">درآمد فاندینگ</Link> است.
             </p>
           )}
+        </div>
+        <div {...panel('basket')}>
+          <PortfolioBasketDcaCommitteePanel />
         </div>
         <div {...panel('compare')}>
           <CompareCalculator />
