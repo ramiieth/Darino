@@ -5,7 +5,29 @@ import type { ActivityLink } from '@/features/connected/domain/activity';
 import { visiblePositions, trustedToken, tokenLogo, catalogToken } from '@/features/connected/domain/visibility';
 import { assetKey, costAsset, decimalPositive, replayCost, valueCost, verifiedCash, type CostBook } from './book';
 export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | undefined, links: ActivityLink[] = [], includeCash = false) {
- const result = book ? replayCost(book, portfolio.wallets.flatMap(w => w.state?.history ?? []), links, portfolio.wallets.map(w => w.holding.address!)) : null;
+ const currentLots = book?.currentBasis
+  ? Object.values(book.currentBasis)
+     .filter((cb): cb is NonNullable<typeof cb> => validCurrentBasis(cb, cb?.asset?.key ?? ''))
+     .map((cb) => ({
+      id: 'current:' + cb.asset.key,
+      asset: cb.asset,
+      quantity: cb.quantity,
+      unitCost: new Decimal(cb.total).div(cb.quantity).toString(),
+      fee: '0',
+      at: cb.at,
+      source: 'current-balance-confirmed'
+     }))
+  : [];
+ const mergedBook = book
+  ? {
+     ...book,
+     lots: [
+      ...currentLots,
+      ...book.lots.filter((l) => !currentLots.some((c) => c.asset.key === l.asset.key))
+     ]
+    }
+  : undefined;
+ const result = mergedBook ? replayCost(mergedBook, portfolio.wallets.flatMap(w => w.state?.history ?? []), links, portfolio.wallets.map(w => w.holding.address!)) : null;
  const walletCovered = (w: ConnectedPortfolio['wallets'][number]) => !!book && !!w.state?.historyLoaded && !w.state.historyError && (!w.state.next || w.state.history.some(tx => Date.parse(tx.minedAt) <= book.asOf));
  const grouped = new Map<string, { asset: ReturnType<typeof costAsset>; quantity: Decimal; value: Decimal; priced: boolean; chains: Set<string>; sources: Set<number> }>();
  portfolio.wallets.forEach((wallet, index) => visiblePositions(wallet.state?.data?.positions ?? []).forEach(pos => {
@@ -17,7 +39,7 @@ export function costSummary(portfolio: ConnectedPortfolio, book: CostBook | unde
  const rows = [...grouped.values()].map(a => {
   const storedCurrent=book?.currentBasis?.[a.asset.key];
   const current = validCurrentBasis(storedCurrent,a.asset.key) ? storedCurrent : undefined;
-  const effectiveBook = current && book ? { ...book, asOf: current.at, lots: [{ id: 'current:'+a.asset.key, asset: current.asset, quantity: current.quantity, unitCost: new Decimal(current.total).div(current.quantity).toString(), fee: '0', at: current.at, source: 'current-balance-confirmed' }, ...book.lots.filter(l => l.asset.key !== a.asset.key)] } : book;
+  const effectiveBook = current && mergedBook ? { ...mergedBook, asOf: current.at } : mergedBook;
   const localResult = current && effectiveBook ? replayCost(effectiveBook, portfolio.wallets.flatMap(w => w.state?.history ?? []), links, portfolio.wallets.map(w => w.holding.address!)) : result;
   const holdingSources = portfolio.wallets.filter((_,index)=>a.sources.has(index));
   const sources = portfolio.wallets.filter((w, index) => a.sources.has(index) || w.state?.history.some(tx => tx.transfers.some(t => t.tokenId && `fungible:${t.tokenId}` === a.asset.key)));
