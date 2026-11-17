@@ -111,9 +111,9 @@ export async function getWallet(address: string, userId: string, force = false):
   running.set(key, work); try { return await work; } catch(e) {if(previous?.complete)return {...previous,stale:true,detailsError:e instanceof ProviderError?e.message:'ارتباط با زریون برقرار نشد',retryAt:e instanceof ProviderError&&e.retryAfter?Date.now()+e.retryAfter*1000:undefined};throw e;} finally { running.delete(key); }
 }
 /** `tradesOnly`: فقط سواپ‌ها (filter[operation_types]=trade) برای ژورنال اسپات — کم‌مصرف‌تر از کل تاریخچه */
-export async function getTransactions(address: string, next?: string, tradesOnly = false): Promise<TransactionPage> {
+export async function getTransactions(address: string, next?: string, tradesOnly = false, force = false): Promise<TransactionPage> {
   const path = next ? checkedNext(next, address, 'transactions', tradesOnly) : `/v1/wallets/${address}/transactions/?currency=usd&filter[trash]=only_non_trash&page[size]=100${tradesOnly ? '&filter[operation_types]=trade' : ''}`;
-  const r = await get(path); const link = str(obj(r.links).next);
+  const r = await get(path, Date.now() + 18000, force); const link = str(obj(r.links).next);
   return { rows: arr(r.data).map(normalizeTransaction), next: link ? checkedNext(link, address, 'transactions', tradesOnly) : null, fetchedAt: responseAt.get(r)??Date.now() };
 }
 export async function getPnl(address: string): Promise<unknown> { return await get(`/v1/wallets/${address}/pnl?currency=usd`); }
