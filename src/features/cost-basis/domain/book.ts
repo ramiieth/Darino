@@ -18,7 +18,12 @@ const WRAPPED_EQUIV:Record<string,{tokenId:string;symbol:string}>={
  WBTC:{tokenId:'bitcoin',symbol:'BTC'},
  CBBTC:{tokenId:'bitcoin',symbol:'BTC'},
  WSOL:{tokenId:'solana',symbol:'SOL'},
- WHYPE:{tokenId:'hyperliquid',symbol:'HYPE'}
+ WHYPE:{tokenId:'hyperliquid',symbol:'HYPE'},
+ WBNB:{tokenId:'binancecoin',symbol:'BNB'},
+ WAVAX:{tokenId:'avalanche-2',symbol:'AVAX'},
+ WPOL:{tokenId:'polygon-ecosystem-token',symbol:'POL'},
+ WMATIC:{tokenId:'polygon-ecosystem-token',symbol:'POL'},
+ WS:{tokenId:'sonic-3',symbol:'S'}
 };
 export function verifiedCash(chain:string,contract:string|null|undefined,token?:{verified?:boolean;tokenId?:string;symbol:string}) {
  const local=ASSETS.some(a=>a.networkId===chain&&CASH_SYMBOLS.has(a.symbol)&&((!contract&&!a.contract)||(!!contract&&!!a.contract&&(chain==='solana'?a.contract===contract:a.contract.toLowerCase()===contract.toLowerCase()))));
@@ -37,8 +42,9 @@ export const assetKey=(p:Pick<LivePosition,'chain'|'contract'|'tokenId'> & Parti
 export const costAsset=(p:LivePosition):CostAsset=>({key:assetKey(p),tokenId:p.tokenId||(!p.contract&&catalogToken(p)?.isNative?catalogToken(p)?.coingeckoId:'')||'',symbol:p.symbol,name:p.name,chain:p.chain,contract:p.contract,icon:p.icon});
 export function decimalPositive(s:string):boolean {try{return new Decimal(s).isFinite() && new Decimal(s).gt(0);}catch{return false;}}
 
-/** نرمال‌سازی کلید دارایی یک ترنسفر سواپ (شامل هم‌ارزی ETH/WETH و توکن بومی شبکه) */
+/** نرمال‌سازی کلید دارایی یک ترنسفر سواپ برای تمام رمزارزها (شامل رپدها، توکن بومی شبکه و توکن‌های قراردادی) */
 function transferAssetKey(t:TransactionTransfer,chain:string,knownAssetKeys:ReadonlySet<string>):{key:string;tokenId:string;symbol:string} | null {
+ const txChain=t.chain??chain;
  const sym=(t.symbol??'').toUpperCase();
  const wrapped=t.verified!==false?WRAPPED_EQUIV[sym]:undefined;
  if(wrapped) {
@@ -46,12 +52,19 @@ function transferAssetKey(t:TransactionTransfer,chain:string,knownAssetKeys:Read
   if(knownAssetKeys.has('fungible:eth')&&wrapped.symbol==='ETH') return {key:'fungible:eth',tokenId:'eth',symbol:'ETH'};
   return {key:`fungible:${wrapped.tokenId}`,tokenId:wrapped.tokenId,symbol:wrapped.symbol};
  }
- const cat=t.symbol?catalogToken({chain:t.chain??chain,contract:t.contract,symbol:t.symbol,tokenId:t.tokenId,verified:t.verified}):undefined;
+ const cat=t.symbol?catalogToken({chain:txChain,contract:t.contract,symbol:t.symbol,tokenId:t.tokenId,verified:t.verified}):undefined;
  const rawId=t.tokenId||(!t.contract&&cat?.isNative?cat.coingeckoId:undefined);
- if(!rawId) return null;
- if((rawId==='ethereum'||rawId==='eth')&&knownAssetKeys.has('fungible:eth')&&!knownAssetKeys.has('fungible:ethereum')) return {key:'fungible:eth',tokenId:'eth',symbol:t.symbol||'ETH'};
- if((rawId==='ethereum'||rawId==='eth')&&knownAssetKeys.has('fungible:ethereum')&&!knownAssetKeys.has('fungible:eth')) return {key:'fungible:ethereum',tokenId:'ethereum',symbol:t.symbol||'ETH'};
- return {key:`fungible:${rawId}`,tokenId:rawId,symbol:t.symbol};
+ if(rawId) {
+  if((rawId==='ethereum'||rawId==='eth')&&knownAssetKeys.has('fungible:eth')&&!knownAssetKeys.has('fungible:ethereum')) return {key:'fungible:eth',tokenId:'eth',symbol:t.symbol||'ETH'};
+  if((rawId==='ethereum'||rawId==='eth')&&knownAssetKeys.has('fungible:ethereum')&&!knownAssetKeys.has('fungible:eth')) return {key:'fungible:ethereum',tokenId:'ethereum',symbol:t.symbol||'ETH'};
+  return {key:`fungible:${rawId}`,tokenId:rawId,symbol:t.symbol};
+ }
+ if(t.contract) {
+  const normContract=txChain==='solana'?t.contract:t.contract.toLowerCase();
+  const key=`${txChain}:${normContract}`;
+  return {key,tokenId:key,symbol:t.symbol};
+ }
+ return null;
 }
 
 /** تجمیع پایه‌های ورودی یا خروجی سواپ (برای پشتیبانی از سواپ‌های چندمسیره Uniswap Universal Router) */
@@ -136,7 +149,8 @@ export function replayCost(book:CostBook, transactions:WalletTransaction[],links
   }
   const buy=incoming[0],sell=outgoing[0];
   if(!buy.tokenId||!sell.tokenId||!buy.quantity||!sell.quantity||!decimalPositive(buy.quantity)||!decimalPositive(sell.quantity)||sell.value===null||buy.value===null||!Number.isFinite(sell.value)||!Number.isFinite(buy.value)||sell.value<0||buy.value<0||tx.fee===null||!Number.isFinite(tx.fee)||tx.fee<0||sell.spam||buy.spam||sell.verified===false||buy.verified===false) {fail(key,'هویت، مقدار، ارزش تاریخی یا کارمزد نامشخص',affected);continue;}
-  const sellKey=`fungible:${sell.tokenId}`,buyKey=`fungible:${buy.tokenId}`;
+  const sellKey=sell.tokenId.includes(':')?sell.tokenId:`fungible:${sell.tokenId}`;
+  const buyKey=buy.tokenId.includes(':')?buy.tokenId:`fungible:${buy.tokenId}`;
   if(sellKey===buyKey) {
    // تبدیل مستقیم ETH <-> WETH سواپ مشمول سود/زیان نیست
    processed.push(key);continue;
