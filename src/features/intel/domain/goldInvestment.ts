@@ -89,7 +89,8 @@ export function computeMovingHorizon(
   const start = new Decimal(ref.close);
   const diff = cur.minus(start);
   const pct = diff.div(start).times(100);
-  const series = [...sorted.filter((x) => x.t >= ref!.t), { t: nowMs, close: currentPriceToman }];
+  const filtered = sorted.filter((x) => x.t >= ref!.t && x.t < nowMs);
+  const series = [...filtered, { t: nowMs, close: currentPriceToman }];
 
   return {
     days,

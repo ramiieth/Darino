@@ -17,7 +17,7 @@ import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { KeyValueList } from '@/shared/components/ui/FinancialValue';
-import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
+import { ErrorState, ListSkeleton } from '@/shared/components/ui/StateViews';
 import { jsonGet, jsonSet } from '@/shared/lib/storage';
 import { cn } from '@/shared/lib/cn';
 import { fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
@@ -42,7 +42,6 @@ import {
   GOLD_ETF_SNAPSHOT_DATE_FA,
   HISTORY_HORIZONS,
   calculateGoldEtfInvestment,
-  calculateJewelryGold,
   calculateOnlineGold,
   compareOnlineAndJewelry,
   compareWithSnapshot,
@@ -179,7 +178,7 @@ const DEFAULTS: SavedGoldState = {
 /* ---------------- توابع قالب‌بندی عددی فارسی ---------------- */
 
 const parseCleanNum = (raw: string): number => {
-  const en = raw
+  const en = String(raw ?? '')
     .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
     .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
     .replace(/,/g, '')
@@ -206,6 +205,15 @@ const fmtPct = (v: number | null | undefined, digits = 2, signed = true): string
   return `${prefix}${toFaDigits(abs)}٪`;
 };
 
+const fmtFaDate = (ts: number | null | undefined): string => {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '—';
+  try {
+    return new Date(ts).toLocaleDateString('fa-IR');
+  } catch {
+    return '—';
+  }
+};
+
 const pctRatio = (v: number, digits = 1, signed = true) => fmtPct(v * 100, digits, signed);
 const million = (toman: number) =>
   `${toFaDigits((toman / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }))} میلیون`;
@@ -218,12 +226,21 @@ const year = (t: number) => toFaDigits(new Date(t).getUTCFullYear());
 export function GoldTab() {
   const q = useGold();
   const [s, setS] = useState<SavedGoldState>(() => {
-    const saved = jsonGet<Partial<SavedGoldState>>(STORE_KEY, {});
+    const saved = jsonGet<Partial<SavedGoldState> | null>(STORE_KEY, null) ?? {};
     return {
       ...DEFAULTS,
       ...saved,
-      snapshots: saved.snapshots?.length ? saved.snapshots : DEFAULT_SNAPSHOTS,
-      onlinePlatforms: saved.onlinePlatforms?.length ? saved.onlinePlatforms : [...DEFAULT_ONLINE_PLATFORMS],
+      snapshots:
+        Array.isArray(saved.snapshots) && saved.snapshots.length > 0
+          ? saved.snapshots
+          : DEFAULT_SNAPSHOTS,
+      onlinePlatforms:
+        Array.isArray(saved.onlinePlatforms) && saved.onlinePlatforms.length > 0
+          ? saved.onlinePlatforms
+          : [...DEFAULT_ONLINE_PLATFORMS],
+      futureScenarioPrices: Array.isArray(saved.futureScenarioPrices)
+        ? saved.futureScenarioPrices
+        : [],
       etfEntries: { ...INITIAL_ETF_ENTRIES, ...(saved.etfEntries ?? {}) }
     };
   });
@@ -239,49 +256,64 @@ export function GoldTab() {
   const [cachedPayload, setCachedPayload] = useState<GoldPayload | null>(() =>
     jsonGet<GoldPayload | null>(LAST_PAYLOAD_KEY, null)
   );
-  const [cachedHistory, setCachedHistory] = useState<DayClose[]>(() =>
-    jsonGet<DayClose[]>(HISTORY_CACHE_KEY, [])
-  );
+  const [cachedHistory, setCachedHistory] = useState<DayClose[]>(() => {
+    const raw = jsonGet<DayClose[] | null>(HISTORY_CACHE_KEY, null);
+    return Array.isArray(raw) ? raw : [];
+  });
 
   useEffect(() => {
     if (q.data) {
       setCachedPayload(q.data);
       jsonSet(LAST_PAYLOAD_KEY, q.data);
-      if (q.data.history18k && q.data.history18k.length > 0) {
-        const mergedMap = new Map<number, number>();
-        for (const pt of cachedHistory) mergedMap.set(pt.t, pt.close);
-        for (const pt of q.data.history18k) mergedMap.set(pt.t, pt.close);
-        const merged = [...mergedMap.entries()]
-          .map(([t, close]) => ({ t, close }))
-          .sort((a, b) => a.t - b.t)
-          .slice(-120);
-        setCachedHistory(merged);
-        jsonSet(HISTORY_CACHE_KEY, merged);
+      if (Array.isArray(q.data.history18k) && q.data.history18k.length > 0) {
+        setCachedHistory((prev) => {
+          const mergedMap = new Map<number, number>();
+          for (const pt of prev) {
+            if (pt && Number.isFinite(pt.t) && Number.isFinite(pt.close)) {
+              mergedMap.set(pt.t, pt.close);
+            }
+          }
+          for (const pt of q.data!.history18k!) {
+            if (pt && Number.isFinite(pt.t) && Number.isFinite(pt.close)) {
+              mergedMap.set(pt.t, pt.close);
+            }
+          }
+          const merged = [...mergedMap.entries()]
+            .map(([t, close]) => ({ t, close }))
+            .sort((a, b) => a.t - b.t)
+            .slice(-120);
+          jsonSet(HISTORY_CACHE_KEY, merged);
+          return merged;
+        });
       }
     }
   }, [q.data]);
 
-  if (q.isLoading && !cachedPayload) return <ListSkeleton rows={4} />;
-  if (!q.data && !cachedPayload) {
-    return <ErrorState message="قیمت روز طلا دریافت نشد و داده ذخیره‌شده‌ای در دسترس نیست" onRetry={() => void q.refetch()} />;
-  }
-
-  const d = (q.data ?? cachedPayload)!;
+  const d: GoldPayload | null = q.data ?? cachedPayload ?? null;
+  const liveRows: PlatformRow[] = d?.rows ?? [];
   const isOfflineCached = !q.data || q.isError;
-  const isStale = isOfflineCached || Date.now() - d.fetchedAt > 10 * 60_000;
+  const isStale = !d || isOfflineCached || Date.now() - d.fetchedAt > 10 * 60_000;
 
   // قیمت مرجع هر گرم طلای ۱۸ عیار (تومان): اولویت با بازار TGJU، سپس میانه پلتفرم‌های آنلاین
-  const live18kToman =
-    d.bazaar ?? median(d.rows.map((r) => (r.buy + r.sell) / 2)) ?? null;
-  const historySeries = d.history18k?.length ? d.history18k : cachedHistory;
+  const live18kToman = useMemo(() => {
+    if (!d) return null;
+    return d.bazaar ?? median(liveRows.map((r) => (r.buy + r.sell) / 2)) ?? null;
+  }, [d, liveRows]);
 
-  // محاسبه تغییرات متحرک ۷، ۳۰ و ۶۰ روزه
+  const historySeries = useMemo(() => {
+    if (d?.history18k && d.history18k.length > 0) return d.history18k;
+    return cachedHistory;
+  }, [d, cachedHistory]);
+
+  const referenceNowMs = d?.fetchedAt ?? Date.now();
+
+  // محاسبه تغییرات متحرک ۷، ۳۰ و ۶۰ روزه (همیشه بالاتر از هر return شرطی اجرا می‌شود)
   const horizons = useMemo(
     () =>
       HISTORY_HORIZONS.map((days) =>
-        computeMovingHorizon(historySeries, live18kToman, days, d.fetchedAt)
+        computeMovingHorizon(historySeries, live18kToman, days, referenceNowMs)
       ),
-    [historySeries, live18kToman, d.fetchedAt]
+    [historySeries, live18kToman, referenceNowMs]
   );
 
   const selectedHorizon = horizons.find((h) => h.days === s.horizonDays) ?? horizons[1];
@@ -302,15 +334,25 @@ export function GoldTab() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-muted">قیمت روز هر گرم طلای ۱۸ عیار</span>
-              <Badge tone={isOfflineCached ? 'warn' : isStale ? 'neutral' : 'gain'}>
-                {isOfflineCached ? 'آخرین قیمت ذخیره‌شده' : isStale ? 'کمی قدیمی' : 'زنده · متصل'}
+              <Badge tone={!d ? 'neutral' : isOfflineCached ? 'warn' : isStale ? 'neutral' : 'gain'}>
+                {!d && q.isLoading
+                  ? 'در حال دریافت...'
+                  : !d
+                    ? 'آفلاین'
+                    : isOfflineCached
+                      ? 'آخرین قیمت ذخیره‌شده'
+                      : isStale
+                        ? 'کمی قدیمی'
+                        : 'زنده · متصل'}
               </Badge>
-              <span className="text-2xs text-subtle">
-                منبع: {d.bazaar ? 'بازار (TGJU) و ۴ پلتفرم' : 'میانه پلتفرم‌های آنلاین'} · {fmtRelativeAge(d.fetchedAt)}
-              </span>
+              {d && (
+                <span className="text-2xs text-subtle">
+                  منبع: {d.bazaar ? 'بازار (TGJU) و ۴ پلتفرم' : 'میانه پلتفرم‌های آنلاین'} · {fmtRelativeAge(d.fetchedAt)}
+                </span>
+              )}
             </div>
             <p className="mt-1.5 text-2xl font-extrabold text-ink sm:text-3xl">
-              {fmtToman(live18kToman)}
+              {live18kToman ? fmtToman(live18kToman) : q.isLoading ? 'در حال بارگذاری نرخ روز...' : '—'}
             </p>
           </div>
           <Button
@@ -394,6 +436,8 @@ export function GoldTab() {
       {s.tab === 'market' && (
         <MarketAndHistorySection
           d={d}
+          isLoading={q.isLoading}
+          onRetry={() => void q.refetch()}
           live18kToman={live18kToman}
           horizons={horizons}
           selectedHorizon={selectedHorizon}
@@ -418,7 +462,7 @@ export function GoldTab() {
           set={set}
           setS={setS}
           live18kToman={live18kToman}
-          liveRows={d.rows}
+          liveRows={liveRows}
         />
       )}
 
@@ -428,7 +472,7 @@ export function GoldTab() {
           set={set}
           setS={setS}
           live18kToman={live18kToman}
-          liveRows={d.rows}
+          liveRows={liveRows}
         />
       )}
 
@@ -438,8 +482,8 @@ export function GoldTab() {
         <FxHistoricalSection
           s={s}
           set={set}
-          liveDollarToman={d.dollarToman}
-          liveUsdtToman={d.usdtToman ?? d.dollarToman}
+          liveDollarToman={d?.dollarToman ?? null}
+          liveUsdtToman={d?.usdtToman ?? d?.dollarToman ?? null}
           gold30dPct={horizons.find((h) => h.days === 30)?.changePct ?? null}
         />
       )}
@@ -453,6 +497,8 @@ export function GoldTab() {
 
 function MarketAndHistorySection({
   d,
+  isLoading,
+  onRetry,
   live18kToman,
   horizons,
   selectedHorizon,
@@ -463,7 +509,9 @@ function MarketAndHistorySection({
   onChangeSnapshots,
   snapshotComparison
 }: {
-  d: GoldPayload;
+  d: GoldPayload | null;
+  isLoading: boolean;
+  onRetry: () => void;
   live18kToman: number | null;
   horizons: MovingHorizonChange[];
   selectedHorizon: MovingHorizonChange;
@@ -504,7 +552,7 @@ function MarketAndHistorySection({
         id,
         title: newSnapTitle.trim(),
         createdAt: Date.now(),
-        dateLabelFa: newSnapDate.trim() || new Date().toLocaleDateString('fa-IR'),
+        dateLabelFa: newSnapDate.trim() || fmtFaDate(Date.now()),
         price18kToman: px,
         note: newSnapNote.trim() || undefined
       };
@@ -522,6 +570,9 @@ function MarketAndHistorySection({
     setNewSnapPrice(String(sn.price18kToman));
     setNewSnapNote(sn.note ?? '');
   };
+
+  const coins = d?.coins ?? [];
+  const decomposition = d?.decomposition ?? [];
 
   return (
     <div className="space-y-5">
@@ -563,7 +614,7 @@ function MarketAndHistorySection({
                     {toFaDigits(h.days)} روز گذشته
                     {h.referenceTimestamp && (
                       <span className="block text-2xs font-normal text-subtle">
-                        از {new Date(h.referenceTimestamp).toLocaleDateString('fa-IR')}
+                        از {fmtFaDate(h.referenceTimestamp)}
                       </span>
                     )}
                   </td>
@@ -721,10 +772,21 @@ function MarketAndHistorySection({
       </Surface>
 
       {/* کارت‌های ارزش‌گذاری ذاتی، پلتفرم‌ها، سکه‌ها و تجزیه رشد */}
-      <ValueCard d={d} />
-      <Platforms d={d} />
-      {d.coins.length > 0 && <Coins coins={d.coins} />}
-      {d.decomposition.length > 0 && <Growth rows={d.decomposition} />}
+      {!d && isLoading && <ListSkeleton rows={3} />}
+      {!d && !isLoading && (
+        <ErrorState
+          message="نرخ زنده پلتفرم‌ها و حباب سکه در حال حاضر دریافت نشد؛ محاسبه‌گرها و صندوق‌های طلا در تب‌های بالا فعال هستند."
+          onRetry={onRetry}
+        />
+      )}
+      {d && (
+        <>
+          <ValueCard d={d} />
+          <Platforms d={d} />
+          {coins.length > 0 && <Coins coins={coins} />}
+          {decomposition.length > 0 && <Growth rows={decomposition} />}
+        </>
+      )}
     </div>
   );
 }
@@ -762,7 +824,7 @@ function InteractiveGoldChart({
     <div className="space-y-2 rounded-field border border-divider bg-surface-2/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-muted">
-          تاریخ: <b className="text-ink">{new Date(activePoint.pt.t).toLocaleDateString('fa-IR')}</b>
+          تاریخ: <b className="text-ink">{fmtFaDate(activePoint.pt.t)}</b>
         </span>
         <span className="font-extrabold text-ink">{fmtToman(activePoint.pt.close)}</span>
       </div>
@@ -1218,7 +1280,7 @@ function JewelryAndComparisonSection({
             <div className="rounded-field border border-divider bg-card p-3">
               <p className="text-2xs text-muted">مبلغ دریافتی فروش مجدد امروز</p>
               <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.resaleNetProceedsToman)}</p>
-              <p className="text-2xs text-Negative text-negative">
+              <p className="text-2xs text-negative">
                 اختلاف با خرید: {fmtToman(j.netProfitOrLossToman, true)} ({fmtPct(j.roiPct, 1)})
               </p>
             </div>
@@ -1848,7 +1910,8 @@ const VALUE_FA: Record<Valuation, { title: (p: number) => string; border: string
 };
 
 function ValueCard({ d }: { d: GoldPayload }) {
-  const v = valuation(d.premium, d.rows, d.stats, d.dollarSource);
+  const rows = d.rows ?? [];
+  const v = valuation(d.premium, rows, d.stats, d.dollarSource);
   const t = VALUE_FA[v.state];
   return (
     <Surface className={cn('border p-4 sm:p-5', t.border)}>
@@ -1928,8 +1991,9 @@ function PremiumBar({
 }
 
 function Platforms({ d }: { d: GoldPayload }) {
-  const bestSell = d.rows.reduce<PlatformRow | null>((b, r) => (!b || r.sell > b.sell ? r : b), null);
-  const vsBazaar = platformsVsBazaar(d.rows, d.bazaar);
+  const rows = d.rows ?? [];
+  const bestSell = rows.reduce<PlatformRow | null>((b, r) => (!b || r.sell > b.sell ? r : b), null);
+  const vsBazaar = platformsVsBazaar(rows, d.bazaar);
   return (
     <Surface className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1941,34 +2005,37 @@ function Platforms({ d }: { d: GoldPayload }) {
         )}
       </div>
       <ul className="mt-2 divide-y divide-divider">
-        {d.rows.map((r, i) => (
-          <li key={r.platform} className="flex items-center gap-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-center gap-1.5 font-bold text-ink">
-                {PLATFORM_FA[r.platform].name}
-                {i === 0 && <Badge tone="gain">ارزان‌ترین خرید</Badge>}
-                {bestSell?.platform === r.platform && d.rows.length > 1 && <Badge tone="info">بهترین فروش</Badge>}
-              </p>
-              <p className="text-2xs text-muted">
-                خرید {fmtToman(r.buy)} · فروش {fmtToman(r.sell)}
-                {r.buy !== r.sell && ` · اسپرد ${pctRatio(r.spread, 1, false)}`}
-              </p>
-            </div>
-            <div className="shrink-0 text-end">
-              <p className="text-sm font-bold text-ink">{Number.isFinite(r.premium) ? pctRatio(r.premium) : '—'}</p>
-              <p className="text-2xs text-subtle">حباب</p>
-            </div>
-            <a
-              href={PLATFORM_FA[r.platform].url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 text-subtle hover:text-brand"
-              aria-label={`باز کردن ${PLATFORM_FA[r.platform].name}`}
-            >
-              <ExternalLink className="h-4 w-4" aria-hidden />
-            </a>
-          </li>
-        ))}
+        {rows.map((r, i) => {
+          const meta = PLATFORM_FA[r.platform] ?? { name: String(r.platform), url: '#' };
+          return (
+            <li key={r.platform} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-1.5 font-bold text-ink">
+                  {meta.name}
+                  {i === 0 && <Badge tone="gain">ارزان‌ترین خرید</Badge>}
+                  {bestSell?.platform === r.platform && rows.length > 1 && <Badge tone="info">بهترین فروش</Badge>}
+                </p>
+                <p className="text-2xs text-muted">
+                  خرید {fmtToman(r.buy)} · فروش {fmtToman(r.sell)}
+                  {r.buy !== r.sell && ` · اسپرد ${pctRatio(r.spread, 1, false)}`}
+                </p>
+              </div>
+              <div className="shrink-0 text-end">
+                <p className="text-sm font-bold text-ink">{Number.isFinite(r.premium) ? pctRatio(r.premium) : '—'}</p>
+                <p className="text-2xs text-subtle">حباب</p>
+              </div>
+              <a
+                href={meta.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 text-subtle hover:text-brand"
+                aria-label={`باز کردن ${meta.name}`}
+              >
+                <ExternalLink className="h-4 w-4" aria-hidden />
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </Surface>
   );
@@ -1983,10 +2050,11 @@ function Coins({ coins }: { coins: CoinRow[] }) {
       <ul className="mt-3 grid gap-3 sm:grid-cols-3">
         {coins.map((c) => {
           const pos = c.stats ? percentileOf(c.premium, c.stats) : null;
+          const label = COIN_FA[c.coin] ?? String(c.coin);
           return (
             <li key={c.coin} className="rounded-field bg-surface-2/60 p-3">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="font-bold text-ink">{COIN_FA[c.coin]}</p>
+                <p className="font-bold text-ink">{label}</p>
                 <p className="text-sm font-extrabold text-ink">{pctRatio(c.premium)}</p>
               </div>
               <p className="text-2xs text-muted">{fmtToman(c.price)}</p>
@@ -2028,7 +2096,7 @@ function Growth({ rows }: { rows: Decomposition[] }) {
                     key={i}
                     className={cn('col-num', i === 0 && 'font-bold', v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '')}
                   >
-                    {pctRatio(v)}
+                    {Number.isFinite(v) ? pctRatio(v) : '—'}
                   </td>
                 ))}
               </tr>
