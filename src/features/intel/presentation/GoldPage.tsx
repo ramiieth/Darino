@@ -5,7 +5,7 @@
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { GoldTab } from './GoldTab';
 
-export default function GoldPage() {
+export function GoldPage() {
   return (
     <Page>
       <PageHeader
@@ -16,3 +16,5 @@ export default function GoldPage() {
     </Page>
   );
 }
+
+export default GoldPage;
