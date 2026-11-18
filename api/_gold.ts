@@ -25,10 +25,16 @@ const KEEP_DAYS = 1500;
 const PLATFORMS = Object.keys(PLATFORM_URL) as GoldPlatform[];
 const COINS: Coin[] = ['sekee', 'nim', 'rob'];
 
-interface Anchor { geram18: number; ons: number; dollar: number }
-interface HistorySummary { stats: PremiumStats | null; coins: Record<Coin, PremiumStats | null>; anchors: Record<'7' | '30', Anchor | null> }
+interface Anchor { geram18: number; ons: number; dollar: number; t?: number }
+interface HistorySummary {
+  stats: PremiumStats | null;
+  coins: Record<Coin, PremiumStats | null>;
+  anchors: Record<'7' | '30' | '60', Anchor | null>;
+  recent18k?: DayClose[];
+  recentDollar?: DayClose[];
+}
 
-const key = (name: string) => providerCacheKey(`gold-v2:${name}`);
+const key = (name: string) => providerCacheKey(`gold-v3:${name}`);
 
 /** GET JSON؛ ملی‌گلد پشت ArvanCloud است: بار اول کوکی و ۳۰۷ می‌دهد، با همان کوکی دوباره */
 async function getJson(url: string, timeoutMs = 8_000, referer?: string): Promise<unknown> {
@@ -68,8 +74,8 @@ async function usdtNow(): Promise<number | null> {
   return null;
 }
 
-/** آخرین مقدار تا لحظهٔ ts */
-const at = (xs: DayClose[], ts: number) => [...xs].reverse().find((x) => x.t <= ts)?.close ?? null;
+/** آخرین رکورد تا لحظهٔ ts */
+const pointAt = (xs: DayClose[], ts: number) => [...xs].reverse().find((x) => x.t <= ts) ?? null;
 
 async function loadHistory(now: number): Promise<HistorySummary> {
   const cached = await readProviderCache<HistorySummary>(key('history'));
@@ -79,13 +85,18 @@ async function loadHistory(now: number): Promise<HistorySummary> {
   );
   const anchor = (days: number): Anchor | null => {
     const ts = now - days * DAY_MS;
-    const g = at(geram18, ts), o = at(ons, ts), d = at(dollar, ts);
-    return g && o && d ? { geram18: g, ons: o, dollar: d } : null;
+    const g = pointAt(geram18, ts), o = pointAt(ons, ts), d = pointAt(dollar, ts);
+    return g && o && d ? { geram18: g.close, ons: o.close, dollar: d.close, t: g.t } : null;
   };
+  const cutoff = now - 75 * DAY_MS;
+  const recent18k = geram18.filter((x) => x.t >= cutoff).map((x) => ({ t: x.t, close: Math.round(x.close / 10) }));
+  const recentDollar = dollar.filter((x) => x.t >= cutoff).map((x) => ({ t: x.t, close: Math.round(x.close / 10) }));
   const summary: HistorySummary = {
     stats: premiumStats(premiumSeries(geram18, ons, dollar, PURE_GRAMS.geram18)),
     coins: Object.fromEntries(COINS.map((c, i) => [c, premiumStats(premiumSeries(coinRows[i], ons, dollar, PURE_GRAMS[c]))])) as Record<Coin, PremiumStats | null>,
-    anchors: { '7': anchor(7), '30': anchor(30) }
+    anchors: { '7': anchor(7), '30': anchor(30), '60': anchor(60) },
+    recent18k,
+    recentDollar
   };
   if (summary.stats) await writeProviderCache(key('history'), summary, HISTORY_MS);
   return summary;
@@ -116,7 +127,7 @@ async function build(now: number): Promise<GoldPayload> {
     return [{ coin, price, premium: price / pureValueToman(PURE_GRAMS[coin], ounceUsd, free) - 1, stats: history.coins[coin] }];
   });
 
-  const decomposition = (['7', '30'] as const).flatMap((d) => {
+  const decomposition = (['7', '30', '60'] as const).flatMap((d) => {
     const a = history.anchors[d];
     return a && geramRial && ounceUsd && dollarRial ? [decompose(Number(d), [a.geram18, geramRial], [a.ons, ounceUsd], [a.dollar, dollarRial])] : [];
   });
@@ -136,6 +147,8 @@ async function build(now: number): Promise<GoldPayload> {
     stats: history.stats,
     coins,
     decomposition,
+    history18k: history.recent18k ?? [],
+    historyDollar: history.recentDollar ?? [],
     recordedDays: recorded?.length ?? 0
   };
 }

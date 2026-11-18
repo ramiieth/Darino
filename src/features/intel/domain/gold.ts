@@ -131,6 +131,10 @@ export interface GoldPayload {
   stats: PremiumStats | null;
   coins: CoinRow[];
   decomposition: Decomposition[];
+  /** سری تاریخی واقعی طلای ۱۸ عیار (تومان) در بازه اخیر برای نمودار و تحلیل ۷/۳۰/۶۰ روزه */
+  history18k?: DayClose[];
+  /** سری تاریخی واقعی دلار آزاد (تومان) در بازه اخیر */
+  historyDollar?: DayClose[];
   /** حباب روزانه‌ای که اپ ثبت کرده */
   recordedDays: number;
 }
