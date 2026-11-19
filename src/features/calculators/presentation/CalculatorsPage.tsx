@@ -1,9 +1,11 @@
 /**
- * Investment calculators — all math in domain; UI presents only.
- * Panels stay mounted (inputs survive tab switches) and are `inert` when hidden.
+ * ماشین‌حساب سرمایه‌گذاری — ساختار یکپارچه و بدون هم‌پوشانی:
+ *   ۱) خرید پله‌ای و دوره‌ای (DCA): سبد چندارزی + کمیته ایجنت‌ها | شبیه‌ساز خرید دوره‌ای تک‌ارز
+ *   ۲) برنامهٔ من: تقسیم سرمایه + خرید پله‌ای با امکان ورود دستی قیمت + دلتا نوترال
+ *   ۳) سود و بازده: سود و زیان | رشد مرکب (CAGR) | بازده واقعی (XIRR)
  */
 import { useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { BarChart3, ListChecks, ShieldHalf, Store } from 'lucide-react';
 import { PageHeader, Page } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
@@ -22,59 +24,25 @@ import { PortfolioBasketDcaCommitteePanel } from './PortfolioBasketDcaCommitteeP
 import { Mt5RiskManagerCalculator } from './Mt5RiskManagerCalculator';
 import { DeltaVenuesProvider } from '@/features/calculators/data/deltaMarkets';
 
-type CalcTab = 'basket' | 'pnl' | 'dca' | 'perp' | 'options' | 'csp' | 'hedge' | 'mt5-risk' | 'plan' | 'compound' | 'shop';
+type CalcTab = 'dca' | 'plan' | 'returns' | 'perp' | 'options' | 'csp' | 'hedge' | 'mt5-risk' | 'shop';
 type Group = 'invest' | 'risk' | 'business';
+type DcaMode = 'basket' | 'periodic';
+type ReturnsMode = 'pnl' | 'cagr' | 'xirr';
 
-const TABS: { value: CalcTab; label: string; description: string; icon?: ReactNode }[] = [
-  {
-    value: 'basket',
-    label: 'سبد DCA و کمیته ایجنت‌ها',
-    description: 'مدیریت پویا (افزودن، ویرایش و حذف رمزارز مثل HYPE، ETH، SOL، XAUT/PAXG و BTC)، محاسبه میانگین خرید پله‌ای (DCA) برای ۱۷,۶۸۱ USDC و ۵,۰۰۰ USDT و ارزیابی ۴ مرحله‌ای کمیته ایجنت‌ها',
-    icon: <ListChecks aria-hidden />
-  },
-  { value: 'pnl', label: 'سود و زیان', description: 'ارزش امروز یک موقعیت در برابر هزینه خرید آن' },
-  { value: 'dca', label: 'خرید دوره‌ای', description: 'خرید منظم (روزانه تا سالانه) با مبلغ ثابت یا متغیر و پیش‌بینی قیمت آینده' },
-  {
-    value: 'compound',
-    label: 'رشد مرکب و بازده واقعی',
-    description: 'محاسبه نرخ رشد سالانه مرکب (CAGR) یا بازده سالانه جریان‌های نقدی با تاریخ مختلف (XIRR)',
-    icon: <BarChart3 aria-hidden />
-  },
-  {
-    value: 'plan',
-    label: 'برنامهٔ من',
-    description: 'همراه قدم به قدم: تقسیم پول بین خرید پله‌ای و دلتا نوترال، و برنامهٔ نهایی',
-    icon: <ListChecks aria-hidden />
-  },
-  {
-    value: 'hedge',
-    label: 'پوشش ریسک (هج)',
-    description: 'اگر دارایی‌ای دارید و از ریزش قیمت نگرانید: یک موقعیت فروش (Short) هم‌اندازه در بازار آتی باز می‌کنید تا زیان ریزش جبران شود. اینجا می‌بینید با و بدون پوشش، پس از هزینه‌ها چه نتیجه‌ای می‌گیرید',
-    icon: <ShieldHalf aria-hidden />
-  },
-  { value: 'options', label: 'آپشن (Derive)', description: 'قدم به قدم: با توجه به سرمایه و نظرتان دربارهٔ بازار، یک معاملهٔ آپشن در صرافی Derive پیشنهاد می‌شود؛ همراه با بیشترین سود و زیان، سود یا زیان در هر حرکت قیمت و زمان مناسب خروج' },
-  {
-    value: 'csp',
-    label: 'فروش اختیار (CSP)',
-    description: 'محاسبه و تحلیل فروش اختیار فروش با وثیقه نقدی (Cash-Secured Put)؛ بررسی پریمیوم، قیمت تمام‌شده خالص خرید، سربه‌سر، APR مرجع و سناریوهای سررسید'
-  },
-  {
-    value: 'shop',
-    label: 'سربه‌سر دلاری مغازه',
-    description: 'چقدر بفروشید تا با تورم دلار، هم قفسه پر بماند و هم ارزش دلاری پول پیش حفظ شود — با اثر خرید چکی و تست بحران فروش ضعیف',
-    icon: <Store aria-hidden />
-  },
-  { value: 'perp', label: 'پرپ (PERP)', description: 'لانگ و شورت روی بازارهای لایتر، آرکوس، کیوفکس و تی‌اکس‌فلو — قیمت لیکویید، فاندینگ و سود با مارجین و اهرم' },
-  {
-    value: 'mt5-risk',
-    label: 'مدیریت ریسک (MT5)',
-    description: 'محاسبه دقیق حجم (لات)، پیش‌نمایش خطوط معامله، خروج پله‌ای، تریلینگ استاپ و پایش سقف افت روزانه — کاملاً دستی و بدون نیاز به کلید حساب MT5',
-    icon: <ShieldHalf aria-hidden />
-  }
+const TABS: { value: CalcTab; label: string; icon?: ReactNode }[] = [
+  { value: 'dca', label: 'خرید پله‌ای و دوره‌ای (DCA)', icon: <ListChecks aria-hidden /> },
+  { value: 'plan', label: 'برنامهٔ من', icon: <ListChecks aria-hidden /> },
+  { value: 'returns', label: 'سود و بازده', icon: <BarChart3 aria-hidden /> },
+  { value: 'mt5-risk', label: 'مدیریت ریسک (MT5)', icon: <ShieldHalf aria-hidden /> },
+  { value: 'hedge', label: 'پوشش ریسک (هج)', icon: <ShieldHalf aria-hidden /> },
+  { value: 'options', label: 'آپشن (Derive)' },
+  { value: 'csp', label: 'فروش اختیار (CSP)' },
+  { value: 'perp', label: 'پرپ (PERP)' },
+  { value: 'shop', label: 'سربه‌سر مغازه', icon: <Store aria-hidden /> }
 ];
 
 const GROUPS: { value: Group; label: string; tabs: CalcTab[] }[] = [
-  { value: 'invest', label: 'سرمایه‌گذاری و سبد DCA', tabs: ['basket', 'pnl', 'dca', 'compound', 'plan'] },
+  { value: 'invest', label: 'سرمایه‌گذاری و سبد', tabs: ['dca', 'plan', 'returns'] },
   { value: 'risk', label: 'ریسک و آپشن', tabs: ['mt5-risk', 'hedge', 'options', 'csp', 'perp'] },
   { value: 'business', label: 'کسب‌وکار', tabs: ['shop'] }
 ];
@@ -82,8 +50,9 @@ const groupOf = (t: CalcTab): Group => GROUPS.find((g) => g.tabs.includes(t))!.v
 
 export function CalculatorsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<CalcTab>('basket');
-  const [compoundMode, setCompoundMode] = useState<'cagr' | 'xirr'>('cagr');
+  const [tab, setTab] = useState<CalcTab>('dca');
+  const [dcaMode, setDcaMode] = useState<DcaMode>('basket');
+  const [returnsMode, setReturnsMode] = useState<ReturnsMode>('pnl');
   const [perpOpened, setPerpOpened] = useState(false);
   if (tab === 'perp' && !perpOpened) setPerpOpened(true);
   const [optionsOpened, setOptionsOpened] = useState(false);
@@ -92,9 +61,9 @@ export function CalculatorsPage() {
   if (tab === 'csp' && !cspOpened) setCspOpened(true);
   const [planOpened, setPlanOpened] = useState(false);
   if (tab === 'plan' && !planOpened) setPlanOpened(true);
+
   const group = groupOf(tab);
   const groupTabs = GROUPS.find((g) => g.value === group)!.tabs;
-  const current = TABS.find((t) => t.value === tab);
   const hide = (visible: boolean) => ({
     className: cn(!visible && 'hidden'),
     'aria-hidden': !visible,
@@ -104,8 +73,8 @@ export function CalculatorsPage() {
 
   return (
     <Page>
-      <PageHeader title="ماشین‌حساب سرمایه‌گذاری" subtitle="مدیریت سبد پله‌ای DCA با کمیته ایجنت‌ها، بازده مرکب و مدیریت ریسک" />
-      <div className="space-y-6">
+      <PageHeader title="ماشین‌حساب" subtitle="سبد DCA، برنامهٔ شخصی خرید و محاسبهٔ سود و ریسک" />
+      <div className="space-y-5">
         <div className="space-y-3">
           <SegmentedControl<Group>
             label="گروه ماشین‌حساب‌ها"
@@ -113,36 +82,36 @@ export function CalculatorsPage() {
             onChange={(g) => setTab(GROUPS.find((x) => x.value === g)!.tabs[0])}
             options={GROUPS.map((g) => ({ value: g.value, label: g.label }))}
           />
-          {groupTabs.length > 1 && <Tabs<CalcTab> label="ماشین‌حساب‌ها" options={TABS.filter((t) => groupTabs.includes(t.value))} value={tab} onChange={setTab} />}
-          {current && <p className="text-sm text-muted">{current.description}</p>}
-          {group === 'invest' && (
-            <p className="text-xs leading-6 text-muted">
-              مقایسه عملکرد دارایی‌ها در بخش{' '}
-              <Link to="/simulation/compare" className="font-semibold text-accent underline">اگر خریده بودم (مقایسه)</Link>{' '}
-              و درآمد دلتا نوترال در{' '}
-              <Link to="/funding" className="font-semibold text-accent underline">درآمد فاندینگ</Link>{' '}
-              است.
-            </p>
+          {groupTabs.length > 1 && (
+            <Tabs<CalcTab>
+              label="ماشین‌حساب‌ها"
+              options={TABS.filter((t) => groupTabs.includes(t.value))}
+              value={tab}
+              onChange={setTab}
+            />
           )}
         </div>
-        <div {...panel('basket')}>
-          <PortfolioBasketDcaCommitteePanel />
+
+        {/* تب یکپارچه DCA: سبد چندارزی + کمیته ایجنت‌ها | شبیه‌ساز خرید دوره‌ای تک‌ارز */}
+        <div {...panel('dca')} className={cn(tab !== 'dca' && 'hidden', 'space-y-4')}>
+          <SegmentedControl<DcaMode>
+            label="حالت خرید پله‌ای و دوره‌ای"
+            size="sm"
+            value={dcaMode}
+            onChange={setDcaMode}
+            options={[
+              { value: 'basket', label: 'سبد چندارزی + کمیته ایجنت‌ها' },
+              { value: 'periodic', label: 'شبیه‌ساز خرید دوره‌ای (تک‌ارز)' }
+            ]}
+          />
+          <div {...hide(dcaMode === 'basket')}>
+            <PortfolioBasketDcaCommitteePanel />
+          </div>
+          <div {...hide(dcaMode === 'periodic')}>
+            <DcaCalculator />
+          </div>
         </div>
-        <div {...panel('pnl')}>
-          <PnlCalculator />
-        </div>
-        <div {...panel('dca')}>
-          <DcaCalculator />
-        </div>
-        <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
-        <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
-        <div {...panel('csp')}>{cspOpened && <CashSecuredPutCalculator />}</div>
-        <div {...panel('mt5-risk')}>
-          <Mt5RiskManagerCalculator />
-        </div>
-        <div {...panel('hedge')}>
-          <HedgeCalculator />
-        </div>
+
         {planOpened && (
           <DeltaVenuesProvider>
             <div {...panel('plan')}>
@@ -153,23 +122,38 @@ export function CalculatorsPage() {
             </div>
           </DeltaVenuesProvider>
         )}
-        <div {...panel('compound')} className={cn(tab !== 'compound' && 'hidden', 'space-y-4')}>
-          <SegmentedControl<'cagr' | 'xirr'>
-            label="نوع محاسبه بازده"
+
+        <div {...panel('returns')} className={cn(tab !== 'returns' && 'hidden', 'space-y-4')}>
+          <SegmentedControl<ReturnsMode>
+            label="نوع محاسبهٔ سود و بازده"
             size="sm"
-            value={compoundMode}
-            onChange={setCompoundMode}
+            value={returnsMode}
+            onChange={setReturnsMode}
             options={[
-              { value: 'cagr', label: 'رشد سالانه مرکب (CAGR)' },
-              { value: 'xirr', label: 'بازده واقعی جریان‌های نقدی (XIRR)' }
+              { value: 'pnl', label: 'سود و زیان' },
+              { value: 'cagr', label: 'رشد مرکب (CAGR)' },
+              { value: 'xirr', label: 'بازده واقعی (XIRR)' }
             ]}
           />
-          <div {...hide(compoundMode === 'cagr')}>
+          <div {...hide(returnsMode === 'pnl')}>
+            <PnlCalculator />
+          </div>
+          <div {...hide(returnsMode === 'cagr')}>
             <CagrCalculator />
           </div>
-          <div {...hide(compoundMode === 'xirr')}>
+          <div {...hide(returnsMode === 'xirr')}>
             <XirrCalculator />
           </div>
+        </div>
+
+        <div {...panel('perp')}>{perpOpened && <PerpCalculator />}</div>
+        <div {...panel('options')}>{optionsOpened && <OptionsWizard />}</div>
+        <div {...panel('csp')}>{cspOpened && <CashSecuredPutCalculator />}</div>
+        <div {...panel('mt5-risk')}>
+          <Mt5RiskManagerCalculator />
+        </div>
+        <div {...panel('hedge')}>
+          <HedgeCalculator />
         </div>
         <div {...panel('shop')}>
           <ShopBreakEvenCalculator />

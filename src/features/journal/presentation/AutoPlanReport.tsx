@@ -344,10 +344,10 @@ function SpotAutoPlans({ assets, maxRiskPct, accountSize }: { assets: SpotAsset[
                   <p className="text-[11px] text-muted">{a.avgCost !== null ? 'ورود از میانگین بهای سواپ‌ها' : 'ورود از قیمت لحظه‌ای کیف پول'}{a.value !== null ? ` · ارزش ${usd(a.value)}` : ''}</p>
                 </div>
                 <div className="ms-auto text-end">
-                  <p className={cn('num-ltr text-base font-extrabold', pnlTone(a.unrealized))}>
-                    <AmountText text={a.unrealized === null ? 'باز' : usd(a.unrealized, true)} />
+                  <p className="num-ltr text-base font-extrabold text-ink">
+                    <AmountText text={a.value !== null ? usd(a.value) : 'باز'} />
                   </p>
-                  <p className="text-[10px] text-subtle">سود/زیان باز</p>
+                  <p className="text-[10px] text-subtle">ارزش فعلی</p>
                 </div>
               </div>
               <LevelBar long stop={stop} entry={entry} target={target} exit={livePx} finalStop={null} />

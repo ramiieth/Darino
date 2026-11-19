@@ -1,13 +1,10 @@
 /**
- * میز معامله — یک جا برای تصمیم‌های پیش از معامله، بدون شلوغی:
- *   چک قبل از ورود (حکم اهرم) · سوینگ (رژیم بازار و اندازهٔ پوزیشن) · کمیته ایجنت‌ها (TradingAgents) · تریدرهای برتر (امتیاز ثبات، دنبال کردن، و پوزیشن برترها: اجماع) · بازار مشتقات (ازدحام فاندینگ) · میم‌کوین و امنیت توکن
- *   تب‌های قدیمی ?tab=positions و ?tab=safety به جای تازه‌شان می‌روند.
- * همهٔ حالت‌ها در URL (?tab= ، ?a= ، ?coin= ، ?token=) تا لینک و دکمهٔ برگشت PWA درست کار کند.
+ * میز معامله — سوینگ هوشمند (متصل به بازار)، کمیته ایجنت‌ها، ستاپ پایان ماه، تریدرها و مشتقات
  * فقط‌خواندنی: هیچ معامله، کلید خصوصی یا امضایی در کار نیست.
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Bot, Calendar, Compass, Flame, Gauge, ShieldCheck, Trophy } from 'lucide-react';
+import { Activity, Bot, Calendar, Compass, Flame, ShieldCheck, Trophy } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useAuth } from '@/features/auth/authClient';
@@ -16,7 +13,6 @@ import { useSavedTraders } from '@/features/traders/data/savedTraders';
 import { useTradersList } from '@/features/traders/data/useTraders';
 import { TradersTab } from '@/features/traders/presentation/TradersTab';
 import { TraderReportSheet } from '@/features/traders/presentation/TraderReportSheet';
-import { CheckTab } from './CheckTab';
 import { SwingTab } from './SwingTab';
 import { PositionsTab } from './PositionsTab';
 import { DerivativesTab } from './DerivativesTab';
@@ -27,39 +23,33 @@ import { EomSetupTab } from './EomSetupTab';
 import { CoinSheet } from './CoinSheet';
 import { TokenSheet } from './TokenSheet';
 
-type Tab = 'check' | 'swing' | 'eom' | 'agents' | 'traders' | 'derivs' | 'memes';
-const TABS: Tab[] = ['check', 'swing', 'eom', 'agents', 'traders', 'derivs', 'memes'];
-
-const INTRO: Record<Tab, string> = {
-  check: 'بازار، جهت و اهرم را بدهید تا بدانید در شرایط عادی و در یک آبشار مثل بدترین روز همین بازار چه می‌شود، و چه اهرمی معقول است. جهت قیمت را پیش‌بینی نمی‌کند.',
-  swing: 'برای خریدهایی که چند روز تا یک ماه نگه می‌دارید: امروز وقت خوبی برای خرید آلت‌کوین است یا نه، و هر خرید چقدر باشد.',
-  eom: 'ستاپ پایان ماه (Hartley & Schwarz 2019): پیشنهاد ورود و خروج در روزهای پایانی ماه با ریسک شخصی، راستی‌آزمایی نرخ برد (Win Rate) و نسبت شارپ روی اوراق خزانه، طلا، سهام و رمزارز در DEXهای کم‌اسلیپیج اتریوم و پرپچوال.',
-  agents: 'کمیته چندایجنتی معامله (TradingAgents): ۴ تحلیلگر تخصصی، مناظره پژوهشگر صعودی و نزولی، پیشنهاد تریدر با استاپ مبتنی بر ATR و حکم ۵ سطحی مدیر پرتفولیو همراه با حافظه تصمیم‌ها.',
-  traders: 'تریدرهای هایپرلیکوئید که در ماه‌های متوالی سود کرده‌اند و افتشان کنترل‌شده است، همراه با پوزیشن‌هایی که الان دارند و اینکه روی کدام بازار هم‌نظرند. هر کدام را دنبال کنید تا باز و بسته شدن پوزیشن‌هایش را اعلان بگیرید.',
-  derivs: 'کجا لانگ‌ها یا شورت‌ها شلوغ‌اند و برای پوزیشن جهت‌دار یا درآمد دلتا نوترال شما چه معنایی دارد.',
-  memes: 'میم‌کوین‌های سولانا با فیلترهای آزموده روی یک سال داده، فهرست انتظار با اعلان و حالت «بلیت بخت‌آزمایی» با سقف بودجه؛ و قبل از خرید هر توکن: هانی‌پات، مالیات، مینت، فریز، تمرکز هولدرها و نقدینگی.'
-};
+type Tab = 'swing' | 'agents' | 'eom' | 'traders' | 'derivs' | 'memes';
+const TABS: Tab[] = ['swing', 'agents', 'eom', 'traders', 'derivs', 'memes'];
 
 export default function IntelHubPage() {
   const [params, setParams] = useSearchParams();
-  // تب‌های قدیمی: «پوزیشن برترها» ← تریدرها، «امنیت توکن» ← میم‌کوین
+  // تب‌های قدیمی: «چک قبل از ورود» ← سوینگ، «پوزیشن برترها» ← تریدرها، «امنیت توکن» ← میم‌کوین
   const rawTab = params.get('tab');
-  const raw = (rawTab === 'positions' ? 'traders' : rawTab === 'safety' ? 'memes' : rawTab) as Tab | null;
-  const tab: Tab = raw && TABS.includes(raw) ? raw : 'check';
+  const mapped =
+    rawTab === 'positions'
+      ? 'traders'
+      : rawTab === 'safety'
+        ? 'memes'
+        : rawTab === 'check'
+          ? 'swing'
+          : rawTab;
+  const tab: Tab = mapped && (TABS as string[]).includes(mapped) ? (mapped as Tab) : 'swing';
   const traderView = rawTab === 'positions' || params.get('view') === 'consensus' ? 'consensus' : params.get('view') === 'mine' ? 'mine' : 'top';
   const memeView = rawTab === 'safety' || params.get('view') === 'safety' ? 'safety' : 'screen';
   const trader = params.get('a');
   const coin = params.get('coin');
   const token = params.get('token');
   const market = params.get('m') ?? 'BTC';
-  const side = params.get('side') === 'short' ? 'short' : 'long';
-  const lev = Number(params.get('lev')) || 10;
   const authStatus = useAuth((s) => s.status);
   const hydrate = useSavedTraders((s) => s.hydrate);
   const saved = useSavedTraders((s) => s.saved);
   const list = useTradersList();
 
-  // همگام‌سازی «آدرس‌های من» با حساب: هنگام ورود و هر بار که اپ دوباره دیده می‌شود (گوشی ↔ کامپیوتر)
   useEffect(() => {
     if (authStatus === 'unknown') return;
     const run = () => void hydrate(authStatus === 'authenticated');
@@ -79,34 +69,28 @@ export default function IntelHubPage() {
 
   return (
     <Page>
-      <PageHeader eyebrow="هایپرلیکوئید · سولانا" title="میز معامله" meta={<p className="max-w-3xl text-sm leading-7 text-muted">{INTRO[tab]}</p>} />
+      <PageHeader title="میز معامله" subtitle="پیشنهاد ورود سوینگ، کمیته ایجنت‌ها، ستاپ پایان ماه و رصد بازار" />
       <Tabs<Tab>
-        className="mb-6"
+        className="mb-5"
         label="بخش‌های میز معامله"
         value={tab}
-        onChange={(v) => update({ tab: v === 'check' ? null : v, view: null })}
+        onChange={(v) => update({ tab: v === 'swing' ? null : v, view: null })}
         options={[
-          { value: 'check', label: 'چک قبل از ورود', icon: <Gauge /> },
           { value: 'swing', label: 'سوینگ', icon: <Compass /> },
-          { value: 'eom', label: 'ستاپ پایان ماه (EOM)', icon: <Calendar /> },
           { value: 'agents', label: 'کمیته ایجنت‌ها', icon: <Bot /> },
-          { value: 'traders', label: 'تریدرهای برتر', icon: <Trophy /> },
-          { value: 'derivs', label: 'بازار مشتقات', icon: <Activity /> },
-          { value: 'memes', label: 'میم‌کوین و امنیت توکن', icon: <Flame /> }
+          { value: 'eom', label: 'ستاپ پایان ماه', icon: <Calendar /> },
+          { value: 'traders', label: 'تریدرها', icon: <Trophy /> },
+          { value: 'derivs', label: 'مشتقات', icon: <Activity /> },
+          { value: 'memes', label: 'میم‌کوین و امنیت', icon: <Flame /> }
         ]}
       />
       <div role="tabpanel">
-        {tab === 'check' && (
-          <CheckTab
-            market={market}
-            side={side}
-            leverage={lev}
-            onChange={(p) => update({ ...(p.m ? { m: p.m } : {}), ...(p.side ? { side: p.side } : {}), ...(p.lev ? { lev: String(p.lev) } : {}) })}
-            onCoin={(c) => update({ coin: c })}
+        {tab === 'swing' && (
+          <SwingTab
+            onAnalyzeWithAgents={(c) => update({ tab: 'agents', view: null, m: c })}
+            onOpenEom={() => update({ tab: 'eom', view: null })}
           />
         )}
-        {tab === 'swing' && <SwingTab onCheck={(c) => update({ tab: null, view: null, m: c })} />}
-        {tab === 'eom' && <EomSetupTab />}
         {tab === 'agents' && (
           <TradingAgentsTab
             market={market}
@@ -114,6 +98,7 @@ export default function IntelHubPage() {
             onSelectCoin={(c) => update({ coin: c })}
           />
         )}
+        {tab === 'eom' && <EomSetupTab />}
         {tab === 'traders' && (
           <TradersTab
             view={traderView}
