@@ -26,21 +26,12 @@ import { ReviewTab } from './ReviewTab';
 import { SettingsTab } from './SettingsTab';
 import { SpotTab } from './SpotTab';
 import { useLiveEquity } from './NeutralLedger';
-import { FLOW_ROLE, TradeFlow, type FlowStep } from '@/shared/components/layout/TradeFlow';
 import { fa } from './parts';
 
 type Tab = 'audit' | 'trades' | 'plan' | 'review' | 'settings';
 const TABS: Tab[] = ['audit', 'trades', 'plan', 'review', 'settings'];
 type TradesView = 'perp' | 'spot';
 const RANGES: RangeKey[] = ['30', '90', '180', 'all'];
-
-const INTRO: Record<Tab, string> = {
-  audit: 'حسابرسی = نگاه به گذشته: همهٔ معاملات بستهٔ جهت‌دار شما از حساب‌های واقعی، به سبک ارزیابی شرکت‌های Prop — کجا با یک حرفه‌ای فرق دارید، با عدد، و اول چه چیزی را درست کنید. برای سنجش یک پوزیشن قبل از باز کردن، «چک قبل از ورود» در میز معامله است.',
-  trades: 'معاملات پرپ خودکار از هایپرلیکوئید، لایتر، تی‌اکس‌فلو و آرکوس، و سواپ‌های اسپات کیف پول‌ها در DEXها می‌آیند؛ چیزی تایپ نمی‌شود. اختیاری: با یک لمس بگویید چرا وارد شدید.',
-  plan: 'برنامهٔ هر معامله خودکار از استاپ و هدفی که روی صرافی گذاشتید ساخته می‌شود: ریسک، R، جابه‌جایی استاپ و روند بازار لحظهٔ ورود.',
-  review: 'هر هفته: پایبندی، اشتباه‌ها، کار درست و حداکثر سه تعهد قابل‌سنجش که هفتهٔ بعد خودکار بررسی می‌شوند.',
-  settings: 'نقش هر حساب (جهت‌دار یا نوترال)، اندازهٔ حساب، سقف ریسک، تگ‌ها، چک‌لیست و سؤال‌های مرور.'
-};
 
 export default function JournalPage() {
   const [params] = useSearchParams();
@@ -97,53 +88,56 @@ function JournalView() {
   const noAccounts = !j.accounts.length;
   const empty = (
     <EmptyState
-      message={noAccounts ? 'هنوز حساب پرپچوالی متصل نیست' : 'هنوز معاملهٔ بسته‌شدهٔ جهت‌داری در این بازه نیست'}
-      hint={noAccounts ? 'حساب هایپرلیکوئید، لایتر، تی‌اکس‌فلو یا آرکوس را یک‌بار با آدرس عمومی اضافه کنید؛ از آن به بعد همه‌چیز خودکار است.' : 'بازه را بزرگ‌تر کنید یا نقش حساب‌ها را در تنظیمات ببینید (لایتر رابین‌هود و آرکوس پیش‌فرض نوترال‌اند).'}
-      action={noAccounts ? <Link to="/wallets"><Button>مدیریت کیف پول‌ها</Button></Link> : <Button variant="outline" onClick={() => update({ tab: 'settings' })}>تنظیمات حساب‌ها</Button>}
+      message={noAccounts ? 'حسابی متصل نیست' : 'معامله‌ای در این بازه ثبت نشده'}
+      hint={noAccounts ? 'کیف پول یا حساب معاملاتی خود را متصل کنید تا همه‌چیز خودکار ثبت شود.' : 'بازهٔ زمانی را تغییر دهید یا تنظیمات حساب‌ها را بررسی کنید.'}
+      action={noAccounts ? <Link to="/wallets"><Button size="sm">مدیریت کیف پول‌ها</Button></Link> : <Button size="sm" variant="outline" onClick={() => update({ range: 'all' })}>نمایش همهٔ زمان‌ها</Button>}
     />
   );
 
   return (
     <Page>
-      <PageHeader eyebrow="معامله · خودکار · فقط‌خواندنی" title="ژورنال معاملاتی" meta={<p className="max-w-3xl text-sm leading-7 text-muted">{INTRO[tab]}</p>} />
+      <PageHeader
+        title="ژورنال معاملاتی"
+        subtitle="حسابرسی، معاملات و برنامهٔ معاملهٔ خودکار"
+      />
       <Sources histories={j.histories} />
-      {(tab === 'audit' || tab === 'plan' || tab === 'trades' || tab === 'review') && <TradeFlow current={tab as FlowStep} className="mb-3" />}
       <Tabs
         label="بخش‌های ژورنال"
         value={tab}
         onChange={(v) => update({ tab: v === 'audit' ? null : v, view: null })}
         options={[
           { value: 'audit', label: 'حسابرسی', icon: <Scale /> },
-          { value: 'trades', label: 'معاملات', icon: <ListChecks />, badge: a ? a.all.filter((t) => t.book === 'directional' && !a.notes.get(t.id)?.whyTags.length).length || undefined : undefined },
+          { value: 'trades', label: 'معاملات', icon: <ListChecks /> },
           { value: 'plan', label: 'برنامهٔ معامله', icon: <ClipboardList /> },
           { value: 'review', label: 'مرور هفتگی', icon: <CalendarCheck /> },
           { value: 'settings', label: 'تنظیمات', icon: <Settings2 /> }
         ]}
       />
       <div className="mt-4 space-y-4" role="tabpanel">
-        {tab === 'trades' && (
-          <SegmentedControl<TradesView>
-            label="نوع معاملات"
-            value={tradesView}
-            onChange={(v) => update({ tab: 'trades', view: v === 'perp' ? null : v })}
-            options={[
-              { value: 'perp', label: 'پرپ (جهت‌دار)', icon: <ListChecks /> },
-              { value: 'spot', label: 'اسپات (سواپ‌های کیف پول)', icon: <Coins /> }
-            ]}
-          />
-        )}
-        {(tab === 'audit' || (tab === 'trades' && tradesView === 'spot')) && (
-          <ChipGroup label="بازهٔ زمانی" value={range} onChange={(v) => update({ range: v === '90' ? null : v })} options={RANGES.map((r) => ({ value: r, label: RANGE_FA[r] }))} />
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {tab === 'trades' && (
+            <SegmentedControl<TradesView>
+              label="نوع معاملات"
+              value={tradesView}
+              onChange={(v) => update({ tab: 'trades', view: v === 'perp' ? null : v })}
+              options={[
+                { value: 'perp', label: 'پرپ', icon: <ListChecks /> },
+                { value: 'spot', label: 'اسپات', icon: <Coins /> }
+              ]}
+            />
+          )}
+          {(tab === 'audit' || (tab === 'trades' && tradesView === 'spot')) && (
+            <ChipGroup label="بازهٔ زمانی" value={range} onChange={(v) => update({ range: v === '90' ? null : v })} options={RANGES.map((r) => ({ value: r, label: RANGE_FA[r] }))} />
+          )}
+        </div>
         {j.histories.some((h) => h.status === 'error') && tab !== 'settings' && (
-          <Notice tone="warn" title="تاریخچهٔ بعضی حساب‌ها دریافت نشد">{j.histories.filter((h) => h.status === 'error').map((h) => h.account.label).join('، ')} — نتیجه بدون آن‌هاست. <button type="button" className="underline" onClick={j.refetch}>تلاش دوباره</button></Notice>
+          <Notice tone="warn" title="خطا در دریافت برخی حساب‌ها">{j.histories.filter((h) => h.status === 'error').map((h) => h.account.label).join('، ')} · <button type="button" className="underline" onClick={j.refetch}>تلاش دوباره</button></Notice>
         )}
         {!a ? (
           <ListSkeleton rows={6} />
         ) : (
           <>
-            {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
-            {tab === 'audit' && <p className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-xs leading-6 text-muted">{FLOW_ROLE.audit} <Link to="/desk" className="font-semibold text-accent underline">چک قبل از ورود ←</Link></p>}
+            {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال همگام‌سازی {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
             {tab === 'audit' && d && (
               <AuditTab
                 a={d}

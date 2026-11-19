@@ -35,8 +35,9 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
   grouped.set(id,old?{...old,quantity:new Decimal(old.quantity??0).plus(position.quantity??0).toString(),value:old.value===null||position.value===null?null:new Decimal(old.value).plus(position.value).toNumber()}:{...position,id});
  }
  const positions=[...grouped.values()],networks=[...new Set(positions.map(x=>x.chain))];
- // کدام کیف پول و چرا ناقص است — قبلاً فقط «جزئیات کامل دریافت نشده» بدون نام و علت؛ کیف پولِ هنوز در حال دریافت ناقص شمرده نمی‌شود
- const incomplete=p.wallets.flatMap(w=>{const st=w.state;if(!st)return [];if(!st.data)return st.error&&!st.loading?[`${w.holding.label}: ${st.error}`]:[];return st.data.complete?[]:[`${w.holding.label}: ${st.data.detailsError??'فهرست دارایی‌ها کامل خوانده نشد'}`];});
+ const isUnsupportedSolana=(addr:string|null|undefined,msg:string|null|undefined)=>!!addr&&!addr.startsWith('0x')&&!/^bc1/i.test(addr)&&!!msg&&msg.includes('پشتیبانی نمی‌شود');
+ // کدام کیف پول و چرا ناقص است — خطای ۴۰۰ عدم پشتیبانی زریون برای برخی آدرس‌های سولانا باعث نمایش هشدار کاذب روی کل داشبورد نمی‌شود
+ const incomplete=p.wallets.flatMap(w=>{const st=w.state;if(!st)return [];if(!st.data){if(isUnsupportedSolana(w.holding.address,st.error))return [];return st.error&&!st.loading?[`${w.holding.label}: ${st.error}`]:[];}if(st.data.complete||isUnsupportedSolana(w.holding.address,st.data.detailsError))return [];return [`${w.holding.label}: ${st.data.detailsError??'فهرست دارایی‌ها کامل خوانده نشد'}`];});
  const snapshot={address:'',fetchedAt:Date.now(),total:p.total,change:null,positions:positions.filter(x=>network==='all'||x.chain===network),chains,complete:incomplete.length===0,detailsError:incomplete.length?`جزئیات بعضی کیف پول‌ها کامل نیست — ${incomplete.join(' · ')}`:undefined,unpriced:0};
  const walletValue=p.wallets.some(w=>w.value!==null)?p.wallets.reduce((s,w)=>s.plus(w.value??0),new Decimal(0)).toNumber():null;
  const realArcus=p.arcus.filter(s=>s.holding.arcus!.env==='mainnet');const arcusValue=realArcus.some(s=>s.value!==null)?realArcus.reduce((s,a)=>s.plus(a.value??0),new Decimal(0)).toNumber():null;
@@ -46,8 +47,8 @@ export function PortfolioSummary({portfolio:p}:{portfolio:ConnectedPortfolio}) {
  // آرکوس + بقیهٔ پلتفرم‌ها در یک ردیف «حساب‌های پرپچوال»
  const perpCount=realArcus.length+perp.accounts.length,perpValue=arcusValue===null&&perp.equity===null?null:new Decimal(arcusValue??0).plus(perp.equity??0).toNumber(),perpPartial=perp.partial||realArcus.some(a=>a.value===null);
  const filteredActivity=activity.rows.filter(r=>(network==='all'||r.tx?.chain===network)&&(!r.tx||visibleTransaction(r.tx)));
- const walletError=p.wallets.map(w=>w.state?.error??w.state?.data?.detailsError).find(Boolean);
- const activityError=p.wallets.map(w=>w.state?.historyError).find(Boolean);
+ const walletError=p.wallets.map(w=>{const msg=w.state?.error??w.state?.data?.detailsError;return isUnsupportedSolana(w.holding.address,msg)?undefined:msg;}).find(Boolean);
+ const activityError=p.wallets.map(w=>{const msg=w.state?.historyError;return isUnsupportedSolana(w.holding.address,msg)?undefined:msg;}).find(Boolean);
  const activityBusy=p.wallets.some(w=>!w.state?.historyLoaded&&!w.state?.historyError);
  const platformGroups=new Map<string,LivePosition[]>();
  for(const position of snapshot.positions){const id=position.type==='wallet'?'wallet':position.protocol??position.type;platformGroups.set(id,[...(platformGroups.get(id)??[]),position]);}

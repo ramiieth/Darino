@@ -94,21 +94,31 @@ export function SpotTab({ from }: { from: number }) {
 function SpotHero({ b }: { b: NonNullable<ReturnType<typeof useSpot>['book']> }) {
   const t = b.totals;
   const decided = t.wins + t.losses;
+  const openValueUsd = b.open.reduce((sum, a) => sum + (a.value ?? 0), 0);
   return (
     <Surface variant="focal" className="overflow-hidden">
       <div className="grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]">
         <div className="border-b border-divider bg-surface-2/50 p-5 md:border-b-0 md:border-e">
-          <p className="text-xs font-semibold text-muted">سود محقق اسپات</p>
-          <p className={cn('num-ltr mt-1 text-4xl font-black tracking-tight', pnlTone(t.realized))}><AmountText text={usd(t.realized, true)} /></p>
+          <p className="text-xs font-semibold text-muted">{decided > 0 ? 'سود محقق اسپات' : 'ارزش دارایی‌های باز'}</p>
+          <p className={cn('num-ltr mt-1 text-4xl font-black tracking-tight', decided > 0 ? pnlTone(t.realized) : 'text-ink')}>
+            <AmountText text={decided > 0 ? usd(t.realized, true) : usd(openValueUsd)} />
+          </p>
           <p className="mt-2 text-xs text-muted">
-            باز: <b className={cn('num-ltr', pnlTone(t.unrealized))}><AmountText text={t.unrealized === null ? '—' : usd(t.unrealized, true)} /></b>
-            {' · '}خالص پس از گاز: <b className={cn('num-ltr', pnlTone(t.realized - t.gas))}><AmountText text={usd(t.realized - t.gas, true)} /></b>
+            {decided > 0 ? (
+              <>ارزش باز: <b className="num-ltr text-ink"><AmountText text={usd(openValueUsd)} /></b> · خالص پس از گاز: <b className={cn('num-ltr', pnlTone(t.realized - t.gas))}><AmountText text={usd(t.realized - t.gas, true)} /></b></>
+            ) : (
+              <>{fa(b.open.length)} دارایی فعال · حجم سواپ‌ها: <b className="num-ltr text-ink"><AmountText text={usd(t.volume)} /></b></>
+            )}
           </p>
           {t.chains.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{t.chains.slice(0, 6).map((c) => <Badge key={c} tone="neutral">{c}</Badge>)}</div>}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4">
           <Tile icon={<Repeat />} label="سواپ‌ها" value={fa(t.swaps)} sub={`حجم ${usd(t.volume)}`} />
-          <Tile icon={<Trophy />} label="نرخ برد فروش‌ها" value={decided ? pct((t.wins / decided) * 100, 0) : '—'} sub={`${fa(t.wins)} سود · ${fa(t.losses)} زیان`} />
+          {decided > 0 ? (
+            <Tile icon={<Trophy />} label="نرخ برد فروش‌ها" value={pct((t.wins / decided) * 100, 0)} sub={`${fa(t.wins)} سود · ${fa(t.losses)} زیان`} />
+          ) : (
+            <Tile icon={<Trophy />} label="دارایی‌های باز" value={fa(b.open.length)} sub={`ارزش ${usd(openValueUsd)}`} />
+          )}
           <Tile icon={<Flame />} label="گاز" value={usd(t.gas)} sub={t.volume ? `${pct((t.gas / t.volume) * 100, 2)} حجم` : undefined} />
           <Tile icon={<Layers />} label="لغزش و کارمزد استخر" value={usd(t.swapCost)} sub={t.volume ? `${pct((t.swapCost / t.volume) * 100, 2)} حجم` : undefined} tone={t.volume && t.swapCost / t.volume > 0.01 ? 'text-negative' : undefined} />
         </div>
@@ -137,34 +147,26 @@ function TokenIcon({ symbol, icon, size = 32 }: { symbol: string; icon: string |
 }
 
 function AssetCard({ a }: { a: SpotAsset }) {
-  const total = a.realized + (a.unrealized ?? 0);
-  const unknownPart = a.qty > 0 ? a.unknownQty / a.qty : 0;
   return (
     <Surface className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2.5">
         <TokenIcon symbol={a.symbol} icon={a.icon} />
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-ink" dir="ltr">{a.symbol}</p>
-          <p className="text-[11px] text-muted">{fa(a.buysAll)} خرید · {fa(a.sellsAll)} فروش{a.buysAll + a.sellsAll > a.buys + a.sells ? ` (${fa(a.buys + a.sells)} در بازه)` : ''}</p>
+          <p className="text-[11px] text-muted">{fa(a.buysAll)} خرید · {fa(a.sellsAll)} فروش</p>
         </div>
         <div className="ms-auto text-end">
-          <p className={cn('num-ltr text-base font-extrabold', pnlTone(total))}><AmountText text={usd(total, true)} /></p>
-          <p className="text-[10px] text-subtle">محقق + باز</p>
+          <p className="num-ltr text-base font-extrabold text-ink">
+            <AmountText text={a.value !== null ? usd(a.value) : a.sellsAll > 0 ? usd(a.realized, true) : usd(a.boughtUsd)} />
+          </p>
+          <p className="text-[10px] text-subtle">{a.value !== null ? 'ارزش فعلی' : a.sellsAll > 0 ? 'سود محقق' : 'حجم خرید'}</p>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-px overflow-hidden rounded-control border border-divider bg-divider text-center">
-        <Cell label="محقق" value={usd(a.realized, true)} tone={pnlTone(a.realized)} />
-        <Cell label="باز" value={a.unrealized === null ? '—' : usd(a.unrealized, true)} tone={pnlTone(a.unrealized)} />
-        <Cell label="میانگین بها" value={a.avgCost === null ? 'نامعلوم' : `${fa(a.avgCost, a.avgCost < 1 ? 6 : 2)} دلار`} />
+        <Cell label="موجودی" value={a.qty > 0 ? fa(a.qty, a.qty < 1 ? 6 : 2) : 'تسویه'} />
+        <Cell label="حجم خرید" value={usd(a.boughtUsd)} />
+        <Cell label="حجم فروش" value={usd(a.soldUsd)} />
       </div>
-      <p className="text-[11px] text-muted">
-        خرید {usd(a.boughtUsd)} · فروش {usd(a.soldUsd)}{a.qty > 0 ? <> · موجودی <span className="num-ltr">{fa(a.qty, a.qty < 1 ? 6 : 2)}</span>{a.value !== null ? ` (${usd(a.value)})` : ''}{a.dust ? ' · خرد' : ''}</> : ' · کامل فروخته شد'}
-      </p>
-      {unknownPart > 0.01 && (
-        <p className="text-[11px] leading-5 text-subtle">
-          {unknownPart >= 0.99 ? 'کل این موجودی' : <><span className="num-ltr">{fa(a.unknownQty, a.unknownQty < 1 ? 6 : 2)}</span> از موجودی</>} از راهی جز سواپ آمده (واریز، ایردراپ یا پل)؛ بهایش معلوم نیست و در سود باز حساب نشده.
-        </p>
-      )}
     </Surface>
   );
 }
