@@ -71,24 +71,24 @@ function signTone(v: number, tone: Tone): string {
 
 /* ---------------- واحد دلار (کوچک) ---------------- */
 
-/** «۱,۲۳۴.۲۳ دلار» — عدد LTR و واژهٔ «دلار» کوچک (در RTL پس از عدد خوانده می‌شود) */
+/** «۱,۲۳۴.۲۳ دلار» — عدد LTR و واژهٔ «دلار» کوچک در همان خط (در RTL پس از عدد خوانده می‌شود و هرگز به خط پایین نمی‌شکند) */
 export function UsdText({ value, compact = false, signed = false, className, digits }: { value: number; compact?: boolean; signed?: boolean; className?: string; digits?: number }) {
   const abs = Math.abs(value);
   const sign = value > 0 ? (signed ? '+' : '') : value < 0 ? '-' : '';
-  if(digits!==undefined&&abs>0&&abs<10**-digits)return <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1',className)}><span className="text-xs">{value<0?'بیشتر از':'کمتر از'}</span><bdi dir="ltr">{sign}{toFaDigits((10**-digits).toFixed(digits))}</bdi><span className="text-[0.62em] font-medium opacity-70">دلار</span></span>;
+  if(digits!==undefined&&abs>0&&abs<10**-digits)return <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap',className)}><span className="text-xs">{value<0?'بیشتر از':'کمتر از'}</span><bdi dir="ltr">{sign}{toFaDigits((10**-digits).toFixed(digits))}</bdi><span className="text-[0.65em] font-medium opacity-70">دلار</span></span>;
   const body = digits!==undefined ? toFaDigits(abs.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits})) : signed ? (compact ? fmtCompactFa(abs) : toFaDigits(abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))) : fmtUsdNumber(abs, compact);
   const [number, ...scale] = body.split(' ');
   return (
-    <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', className)}>
       <bdi dir="ltr" className="num-ltr">{sign}{number}</bdi>
-      {scale.length > 0 && <span>{scale.join(' ')}</span>}
-      <span className="text-[0.62em] font-medium opacity-70">دلار</span>
+      {scale.length > 0 && <span className="text-[0.82em] font-medium">{scale.join(' ')}</span>}
+      <span className="text-[0.65em] font-medium opacity-70">دلار</span>
     </span>
   );
 }
 
 /**
- * مبلغ متنی ازپیش‌قالب‌شده («-۲۳,۶۰۵.۰۰ دلار»، «۱.۳ میلیون دلار») → همان نمای UsdText: جهت درست، «دلار» کوچک.
+ * مبلغ متنی ازپیش‌قالب‌شده («-۲۳,۶۰۵.۰۰ دلار»، «۱.۳ میلیون دلار») → همان نمای UsdText: جهت درست، «دلار» کوچک در همان خط.
  * اگر متن فقط یک مبلغ نباشد (مثلاً «۵۰.۰۰ دلار در ۳ معامله» یا «—»)، همان متن نمایش داده می‌شود.
  */
 const AMOUNT = /^([+-]?[۰-۹0-9][۰-۹0-9,.]*)(?: (هزار|میلیون|میلیارد|تریلیون))? دلار$/;
@@ -97,10 +97,10 @@ export function AmountText({ text, className }: { text: ReactNode; className?: s
   const m = AMOUNT.exec(stripBidi(text).trim());
   if (!m) return <>{text}</>;
   return (
-    <span dir="rtl" className={cn('persian-amount inline-flex flex-wrap items-baseline gap-1', className)}>
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', className)}>
       <bdi dir="ltr" className="num-ltr">{m[1]}</bdi>
-      {m[2] && <span>{m[2]}</span>}
-      <span className="text-[0.62em] font-medium opacity-70">دلار</span>
+      {m[2] && <span className="text-[0.82em] font-medium">{m[2]}</span>}
+      <span className="text-[0.65em] font-medium opacity-70">دلار</span>
     </span>
   );
 }

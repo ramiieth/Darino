@@ -199,3 +199,146 @@ export interface SwingPayload {
   pending: number;
   total: number;
 }
+
+// ─── اسکنر پیشنهاد ورود سوینگ (متصل به نمادهای زنده بازار + داده‌های سوینگ) ────
+
+export interface SwingMarketInput {
+  id: string;
+  symbol: string;
+  price: number | null;
+  change24h: number | null;
+  change7d: number | null;
+  change30d: number | null;
+  marketCap: number | null;
+  rank: number;
+  image: string | null;
+  rangeStatus?: 'near-bottom' | 'breakdown-low' | 'mid-range' | 'near-top' | 'breakout-up' | null;
+  drawdownFromAthPct?: number | null;
+  rangeLow?: number | null;
+}
+
+export interface SwingOpportunity {
+  id: string;
+  symbol: string;
+  image: string | null;
+  price: number;
+  change24h: number | null;
+  change7d: number | null;
+  change30d: number | null;
+  score: number;
+  verdict: 'entry' | 'accumulate' | 'watch';
+  verdictFa: string;
+  entry: number;
+  stop: number;
+  target1: number;
+  target2: number;
+  reason: string;
+  fromPerpSignal: boolean;
+}
+
+const STABLE_SYMBOLS = new Set([
+  'USDT', 'USDC', 'DAI', 'FDUSD', 'TUSD', 'USDE', 'USDS', 'PYUSD', 'FRAX', 'USDD', 'BUSD', 'LUSD', 'USD1', 'USDG', 'RLUSD', 'GHO', 'CRVUSD', 'EURC', 'USDT0'
+]);
+
+const MAJORS = new Set(['BTC', 'ETH', 'SOL', 'BNB']);
+
+/**
+ * انتخاب و رتبه‌بندی بهترین فرصت‌های ورود سوینگ از میان نمادهای زندهٔ بازار
+ * ترکیب: ناحیهٔ ارزنده (کف کانال رنج / افت سالم از سقف) + برگشت مومنتوم کوتاه‌مدت + سیگنال فاندینگ منفی پرپ
+ */
+export function pickSwingOpportunities(
+  assets: readonly SwingMarketInput[],
+  payload: SwingPayload | null,
+  limit = 6
+): SwingOpportunity[] {
+  const perpMap = new Map((payload?.candidates ?? []).map((c) => [c.coin.toUpperCase(), c]));
+  const regimeOn = payload?.regime.state === 'on';
+  const scored: SwingOpportunity[] = [];
+
+  for (const a of assets) {
+    const sym = a.symbol.toUpperCase();
+    if (!a.price || !(a.price > 0)) continue;
+    if (STABLE_SYMBOLS.has(sym) || EXCLUDE.has(sym)) continue;
+    if (a.rank > 120 && !perpMap.has(sym)) continue;
+
+    let score = 40;
+    const reasons: string[] = [];
+    const fromPerpSignal = perpMap.has(sym);
+
+    if (fromPerpSignal) {
+      score += 28;
+      reasons.push('بالای میانگین ۵۰ روزه + فاندینگ منفی');
+    }
+
+    if (a.rangeStatus === 'near-bottom' || a.rangeStatus === 'breakdown-low') {
+      score += 22;
+      reasons.push('نزدیک کف کانال رنج');
+    } else if (a.rangeStatus === 'mid-range') {
+      score += 8;
+    } else if (a.rangeStatus === 'near-top' || a.rangeStatus === 'breakout-up') {
+      score -= 10;
+    }
+
+    if (a.drawdownFromAthPct != null) {
+      if (a.drawdownFromAthPct <= -20 && a.drawdownFromAthPct >= -75) {
+        score += 12;
+        if (reasons.length < 2) reasons.push(`${Math.round(Math.abs(a.drawdownFromAthPct))}٪ زیر سقف تاریخی`);
+      } else if (a.drawdownFromAthPct > -8) {
+        score -= 8;
+      }
+    }
+
+    const c24 = a.change24h ?? 0;
+    const c7 = a.change7d ?? 0;
+    const c30 = a.change30d ?? 0;
+    if (c30 < -5 && c24 > 0.8) {
+      score += 14;
+      if (reasons.length < 2) reasons.push('نشانهٔ برگشت ۲۴ ساعته پس از اصلاح');
+    } else if (c7 > 1 && c7 < 22 && c24 > 0) {
+      score += 12;
+      if (reasons.length < 2) reasons.push('روند صعودی متعادل ۷ روزه');
+    } else if (c7 > 30) {
+      score -= 12;
+    }
+
+    if (MAJORS.has(sym)) score += 6;
+    if (!regimeOn && !MAJORS.has(sym)) score -= 6;
+
+    const finalScore = Math.max(20, Math.min(98, Math.round(score)));
+    const entry = a.price;
+    const defaultStopPct = MAJORS.has(sym) ? 0.08 : 0.11;
+    const rangeStop = a.rangeLow && a.rangeLow < entry * 0.97 && a.rangeLow > entry * 0.78 ? a.rangeLow * 0.985 : null;
+    const stop = rangeStop ?? entry * (1 - defaultStopPct);
+    const risk = Math.max(entry * 0.03, entry - stop);
+    const target1 = entry + risk * 1.5;
+    const target2 = entry + risk * 2.5;
+
+    const verdict: SwingOpportunity['verdict'] =
+      finalScore >= 72 && regimeOn ? 'entry' : finalScore >= 60 ? 'accumulate' : 'watch';
+    const verdictFa =
+      verdict === 'entry' ? 'فرصت ورود سوینگ' : verdict === 'accumulate' ? 'ناحیه ارزنده (پله‌ای)' : 'زیر نظر';
+
+    scored.push({
+      id: a.id,
+      symbol: sym,
+      image: a.image,
+      price: entry,
+      change24h: a.change24h,
+      change7d: a.change7d,
+      change30d: a.change30d,
+      score: finalScore,
+      verdict,
+      verdictFa,
+      entry,
+      stop,
+      target1,
+      target2,
+      reason: reasons.slice(0, 2).join(' · ') || 'نقدشوندگی بالا و ساختار متعادل برای سوینگ',
+      fromPerpSignal
+    });
+  }
+
+  return scored
+    .sort((a, b) => b.score - a.score || (b.change24h ?? -99) - (a.change24h ?? -99))
+    .slice(0, limit);
+}

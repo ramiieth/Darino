@@ -68,6 +68,8 @@ type SellAt = 'now' | 'up20' | 'oldAvg';
 interface Saved {
   step: number;
   coin: string;
+  /** قیمت ورود یا خرید دستی کاربر (دلار) — در صورت خالی بودن از قیمت زنده استفاده می‌شود */
+  manualPrice: string;
   reserve: string;
   invest: string;
   delta: string;
@@ -82,7 +84,7 @@ interface Saved {
   sellAt: SellAt;
 }
 const STORE_KEY = 'calc:planner:v1';
-const DEFAULTS: Saved = { step: 0, coin: 'ETH', reserve: '', invest: '', delta: '', lev: 2, holdDays: 30, pair: null, style: 'balanced', share: 75, fills: 3, sellFrac: 50, sellAt: 'now' };
+const DEFAULTS: Saved = { step: 0, coin: 'ETH', manualPrice: '', reserve: '', invest: '', delta: '', lev: 2, holdDays: 30, pair: null, style: 'balanced', share: 75, fills: 3, sellFrac: 50, sellAt: 'now' };
 
 /** تا سنت؛ خطای ممیز شناور («بیشتر از −۱» به‌جای صفر) نمایش داده نشود */
 const cents = (v: number) => Math.round(v * 100) / 100;
@@ -210,8 +212,11 @@ export function PlanWizard({
   const coin = [...allCoins.known, ...allCoins.others].find((c) => c.symbol === s.coin) ?? coins[0] ?? null;
   const venueCount = coin ? (allCoins.venues.get(coin.symbol.toUpperCase()) ?? 0) : 0;
   const nonCrypto = coin !== null && !allCoins.known.some((c) => c.symbol === coin.symbol);
-  const price = coin ? (quotesOf(coin.symbol).find((q) => q.markPrice !== null && q.markPrice > 0)?.markPrice ?? null) : null;
+  const livePrice = coin ? (quotesOf(coin.symbol).find((q) => q.markPrice !== null && q.markPrice > 0)?.markPrice ?? null) : null;
   const priceVenue = coin ? quotesOf(coin.symbol).find((q) => q.markPrice !== null && q.markPrice > 0)?.venue : undefined;
+  const parsedManualPrice = s.manualPrice.trim() ? parseNum(s.manualPrice) : null;
+  const hasManualPrice = parsedManualPrice !== null && parsedManualPrice > 0;
+  const price = hasManualPrice ? parsedManualPrice : livePrice;
 
   const v = { reserve: s.reserve.trim() === '' ? 0 : parseNum(s.reserve), invest: s.invest.trim() === '' ? 0 : parseNum(s.invest), delta: s.delta.trim() === '' ? 0 : parseNum(s.delta) };
   const moneyErrors = {
@@ -267,9 +272,8 @@ export function PlanWizard({
 
   return (
     <div ref={topRef} className="mx-auto w-full max-w-3xl scroll-mt-4 space-y-5">
-      <Surface className="p-3.5 md:p-4">
-        <p className="mb-2.5 text-2xs text-subtle">فقط سه عدد تایپ می‌کنید؛ بقیه انتخابی است. هیچ سفارشی ثبت نمی‌شود.</p>
-        <ol className="grid grid-cols-5 gap-1.5" aria-label="قدم‌ها">
+      <Surface variant="focal" className="border border-divider/80 p-4">
+        <ol className="grid grid-cols-5 gap-2" aria-label="قدم‌ها">
           {STEPS.map((t, i) => {
             const done = i < s.step;
             const here = i === s.step;
@@ -281,7 +285,7 @@ export function PlanWizard({
                   aria-current={here ? 'step' : undefined}
                   className="group flex w-full flex-col items-center gap-1.5"
                 >
-                  <span className={cn('h-1.5 w-full rounded-full transition-colors', here ? 'bg-accent' : done ? 'bg-accent/50' : 'bg-surface-2')} />
+                  <span className={cn('h-1.5 w-full rounded-full transition-colors', here ? 'bg-accent' : done ? 'bg-accent/55' : 'bg-surface-2')} />
                   <span className={cn('max-w-full truncate text-2xs font-semibold', here ? 'text-accent' : done ? 'text-ink' : 'text-subtle')}>
                     {toFaDigits(i + 1)}
                     <span className={cn(!here && 'hidden sm:inline')}>. {t}</span>
@@ -294,7 +298,7 @@ export function PlanWizard({
       </Surface>
 
       {s.step === 0 && (
-        <StepCard n={1} title="برای کدام دارایی برنامه می‌ریزید؟" sub="هر رمزارز یا سهام توکنی که دست‌کم روی یک صرافی پرپ (آرکوس، لایتر، لایتر رابین‌هود، اوندو) بازار دارد. برای دلتا نوترال دو صرافی لازم است.">
+        <StepCard n={1} title="برای کدام دارایی برنامه می‌ریزید؟" sub="دارایی را انتخاب کنید و در صورت تمایل قیمت ورود یا خرید دلخواهتان را دستی وارد کنید.">
           {loadingCoins ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
@@ -315,24 +319,48 @@ export function PlanWizard({
                 ]}
               />
               {coins.length ? (
-                <CoinPicker coins={coins} value={coin ?? coins[0]} onChange={(c) => setS((p) => ({ ...p, coin: c.symbol, pair: null }))} />
+                <CoinPicker coins={coins} value={coin ?? coins[0]} onChange={(c) => setS((p) => ({ ...p, coin: c.symbol, manualPrice: '', pair: null }))} />
               ) : (
                 <p className="text-sm text-muted">در این دسته دارایی‌ای نیست.</p>
               )}
               {coin && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-divider bg-surface-2/50 p-3.5">
-                  <span className="flex items-center gap-2.5">
-                    <CoinLogo coin={coin} size={36} />
-                    <span>
-                      <span className="block text-sm font-bold text-ink">{coin.name}</span>
-                      <span className="flex items-center gap-1.5 text-xs text-muted">
-                        قیمت <MoneyValue value={price} /> <SourceTag kind="live" />
-                        {priceVenue && <span className="text-subtle">· {DELTA_VENUE_LABELS[priceVenue]}</span>}
+                <div className="space-y-3 rounded-card border border-divider bg-surface-2/45 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="flex items-center gap-2.5">
+                      <CoinLogo coin={coin} size={38} />
+                      <span>
+                        <span className="block text-sm font-extrabold text-ink">{coin.name}</span>
+                        <span className="flex items-center gap-1.5 text-xs text-muted">
+                          قیمت مبنا: <MoneyValue value={price} className="font-bold text-ink" />
+                          {hasManualPrice ? <Badge tone="info">دستی</Badge> : <SourceTag kind="live" />}
+                          {!hasManualPrice && priceVenue && <span className="text-subtle">· {DELTA_VENUE_LABELS[priceVenue]}</span>}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                  <PriorSummary prior={prior} holding={priorHolding} symbol={coin.symbol} price={price} />
-                  <p className="w-full text-2xs text-subtle">
+                    <PriorSummary prior={prior} holding={priorHolding} symbol={coin.symbol} price={price} />
+                  </div>
+
+                  {/* ورود دستی قیمت خرید / ورود رمزارز */}
+                  <div className="flex flex-wrap items-end gap-2 border-t border-divider/70 pt-3">
+                    <Field label="قیمت ورود / خرید دستی (اختیاری — خالی = قیمت زنده)" className="min-w-[220px] flex-1">
+                      <Input
+                        dir="ltr"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        value={s.manualPrice}
+                        onChange={(e) => set('manualPrice', e.target.value)}
+                        placeholder={livePrice ? String(Math.round(livePrice * 100) / 100) : 'مثلاً 2100'}
+                        suffix="دلار"
+                      />
+                    </Field>
+                    {hasManualPrice && livePrice !== null && (
+                      <Button size="sm" variant="outline" onClick={() => set('manualPrice', '')}>
+                        برگشت به قیمت زنده
+                      </Button>
+                    )}
+                  </div>
+
+                  <p className="text-2xs text-subtle">
                     روی {toFaDigits(venueCount)} صرافی پرپ بازار دارد
                     {venueCount < 2 ? ' — برای دلتا نوترال در قدم ۳ ارزهای دیگر پیشنهاد می‌شود.' : '.'}
                     {nonCrypto && ' بیرون از فهرست رمزارزهای اپ (مثلاً سهام توکنی): خارج از ساعت بورس سقف قیمت و مارجین متفاوت است.'}
@@ -457,11 +485,29 @@ export function PlanWizard({
       )}
 
       {s.step === 3 && (
-        <StepCard n={4} title="اگر قیمت ریخت، چطور بخرید؟" sub="سفارش‌های خرید از پیش در چند قیمت پایین‌تر؛ اگر قیمت نیاید پایین، پولتان دست‌نخورده می‌ماند.">
+        <StepCard n={4} title="اگر قیمت ریخت، چطور بخرید؟" sub="پله‌های خرید بر اساس قیمت ورود انتخابی شما (دستی یا زنده) محاسبه می‌شوند.">
           {alloc.ladder + alloc.opportunity <= 0 || price === null ? (
             <p className="text-sm text-muted">سرمایهٔ سرمایه‌گذاری صفر است یا قیمت معلوم نیست؛ این قدم رد می‌شود.</p>
           ) : (
             <>
+              <div className="flex flex-wrap items-end gap-2 rounded-control border border-divider bg-surface-2/40 p-3">
+                <Field label="قیمت مبنای خرید (تایپ دستی یا قیمت زنده)" className="min-w-[200px] flex-1">
+                  <Input
+                    dir="ltr"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={s.manualPrice}
+                    onChange={(e) => set('manualPrice', e.target.value)}
+                    placeholder={livePrice ? String(Math.round(livePrice * 100) / 100) : 'قیمت ورود'}
+                    suffix="دلار"
+                  />
+                </Field>
+                {hasManualPrice && livePrice !== null && (
+                  <Button size="sm" variant="outline" onClick={() => set('manualPrice', '')}>
+                    قیمت زنده
+                  </Button>
+                )}
+              </div>
               <div role="radiogroup" aria-label="سبک خرید" className="grid gap-2.5 sm:grid-cols-3">
                 {(Object.keys(LADDER_STYLES) as LadderStyle[]).map((st) => (
                   <button

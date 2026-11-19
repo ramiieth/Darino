@@ -58,7 +58,7 @@ export function CoinSheet({ coin, onClose, onTrader }: { coin: string | null; on
               )}
               <p className="mt-3 text-xs text-muted">
                 برای مقایسه با آرکوس، لایتر و بقیهٔ صرافی‌هایتان: <Link to="/funding" className="font-semibold text-brand hover:underline">اسکنر فاندینگ</Link>
-                {' · '}قبل از ورود: <Link to={`/desk?m=${encodeURIComponent(coin)}`} className="font-semibold text-brand hover:underline">چک بقا با اهرم شما</Link>
+                {' · '}تحلیل هوشمند: <Link to={`/desk?tab=agents&m=${encodeURIComponent(coin)}`} className="font-semibold text-brand hover:underline">کمیته ایجنت‌ها</Link>
               </p>
             </>
           ) : (

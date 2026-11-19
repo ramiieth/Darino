@@ -13,6 +13,7 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/shared/lib/cn';
 import type { BookAudit } from '../domain/audit';
+import type { SpotBook } from '../domain/spot';
 import { buildAutoCritiqueLoop } from '../domain/autoAnnotate';
 import { CONFIDENCE_FA, STATUS_FA, type ScoreRow } from '../domain/scorecard';
 import { STYLE_FA } from '../domain/metrics';
@@ -31,22 +32,21 @@ const BAND_STYLE = { pass: 'border-gain/50 bg-gain/5', conditions: 'border-warn/
 function DataConfidencePanel({ a }: { a: BookAudit }) {
   const d = a.data;
   return (
-    <Surface variant="subtle" className="p-4 md:p-5">
-      <h2 className="text-sm font-bold text-ink">این حسابرسی چه چیزی را می‌تواند بگوید و چه چیزی را نه</h2>
-      <p className="mt-1 text-xs leading-6 text-muted">
-        {fa(d.trades)} معاملهٔ بستهٔ کامل · {d.from ? `${faDate(d.from)} تا ${faDate(d.to)}` : 'بدون بازه'} · سبک: {d.style ? STYLE_FA[d.style] : '—'} · <span className="text-info">{CONFIDENCE_FA[d.confidence]}</span>
-      </p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {d.coverage.map((c) => (
-          <div key={c.field} className="min-w-0">
-            <div className="flex justify-between text-xs text-muted"><span>{c.label}</span><span className="num-ltr">{pct(c.pct, 0)}</span></div>
-            <div className="mt-1 h-1.5 rounded-full bg-card" dir="ltr"><div className="h-full rounded-full bg-info/60" style={{ width: `${c.pct}%` }} /></div>
-            {c.pct < 80 && c.field !== 'size' && <p className="mt-1 text-[11px] leading-5 text-subtle">ارزیابی‌نشده: {c.disables}. {c.enable}</p>}
-          </div>
-        ))}
+    <Disclosure summary="این حسابرسی چه چیزی را می‌تواند بگوید و چه چیزی را نه">
+      <div className="space-y-3 pt-1">
+        <p className="text-xs leading-6 text-muted">
+          {fa(d.trades)} معاملهٔ بسته · {d.from ? `${faDate(d.from)} تا ${faDate(d.to)}` : 'بدون بازه'} · سبک: {d.style ? STYLE_FA[d.style] : '—'} · <span className="text-info">{CONFIDENCE_FA[d.confidence]}</span>
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {d.coverage.map((c) => (
+            <div key={c.field} className="min-w-0">
+              <div className="flex justify-between text-xs text-muted"><span>{c.label}</span><span className="num-ltr">{pct(c.pct, 0)}</span></div>
+              <div className="mt-1 h-1.5 rounded-full bg-card" dir="ltr"><div className="h-full rounded-full bg-info/60" style={{ width: `${c.pct}%` }} /></div>
+            </div>
+          ))}
+        </div>
       </div>
-      {d.notes.length > 0 && <ul className="mt-3 space-y-1 text-[11px] leading-5 text-subtle">{d.notes.map((n, i) => <li key={i}>• {n}</li>)}</ul>}
-    </Surface>
+    </Disclosure>
   );
 }
 
@@ -63,7 +63,33 @@ function Hero({ label, value, sub, tone }: { label: React.ReactNode; value: stri
 
 const toneOf = (r: ScoreRow | undefined) => (!r ? 'neutral' : r.verdict === 'meets' ? 'gain' : r.verdict === 'borderline' ? 'warn' : r.verdict === 'fails' ? 'loss' : 'neutral');
 
-export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }: { a: BookAudit; empty: React.ReactNode; tz: string; settings?: JournalSettings; reviews?: ReadonlyMap<string, WeeklyReview> }) {
+export function AuditTab({
+  a: primary,
+  fallbackAudit,
+  spotBook,
+  outsideRangeCount = 0,
+  onShowAllRange,
+  empty,
+  tz,
+  settings = DEFAULT_SETTINGS,
+  reviews
+}: {
+  a: BookAudit;
+  fallbackAudit?: BookAudit;
+  spotBook?: SpotBook | null;
+  outsideRangeCount?: number;
+  onShowAllRange?: () => void;
+  empty: React.ReactNode;
+  tz: string;
+  settings?: JournalSettings;
+  reviews?: ReadonlyMap<string, WeeklyReview>;
+}) {
+  const hasPrimary = !!(primary.core.n || primary.open.length || primary.truncated.length);
+  const usingFallbackPerp = !hasPrimary && !!fallbackAudit && !!(fallbackAudit.core.n || fallbackAudit.open.length || fallbackAudit.truncated.length);
+  const a = usingFallbackPerp ? fallbackAudit! : primary;
+  const hasPerp = hasPrimary || usingFallbackPerp;
+  const hasSpot = !!(spotBook && spotBook.totals.swaps > 0);
+
   const m = a.core;
   const b = a.behavior;
   const row = (id: string) => a.rows.find((r) => r.id === id);
@@ -99,7 +125,31 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
     });
   }, [a.trades]);
 
-  if (!m.n && !a.open.length && !a.truncated.length) return <>{empty}</>;
+  if (!hasPerp && !hasSpot) {
+    if (outsideRangeCount > 0 && onShowAllRange) {
+      return (
+        <Notice tone="info" title="معاملات جهت‌دار شما قدیمی‌تر از بازهٔ فعلی هستند">
+          در این بازه معاملهٔ بسته‌ای ثبت نشده، اما {fa(outsideRangeCount)} معاملهٔ جهت‌دار در تاریخچهٔ کامل شما وجود دارد.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش حسابرسی همهٔ زمان‌ها</button>
+        </Notice>
+      );
+    }
+    return <>{empty}</>;
+  }
+
+  if (!hasPerp && hasSpot && spotBook) {
+    return (
+      <div className="space-y-5">
+        {outsideRangeCount > 0 && onShowAllRange && (
+          <Notice tone="info">
+            {fa(outsideRangeCount)} معاملهٔ پرپ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
+            <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+          </Notice>
+        )}
+        <SpotAutoAuditPanel b={spotBook} tz={tz} reviews={reviews} />
+      </div>
+    );
+  }
 
   const perf = a.rows.filter((r) => r.cls === 'performance');
   const exec = a.rows.filter((r) => r.cls === 'behaviour');
@@ -113,6 +163,17 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
 
   return (
     <div className="space-y-6">
+      {usingFallbackPerp && (
+        <Notice tone="info" title="حسابرسی خودکار روی کل معاملات پرپ (شامل دفتر دلتا نوترال)">
+          در این بازه معاملهٔ جهت‌دار جداگانه‌ای نبود؛ برای اینکه حسابرسی و لوپ نقد بدون وقفه فعال بمانند، تمام معاملات پرپ متصل به‌صورت خودکار حسابرسی شدند.
+        </Notice>
+      )}
+      {outsideRangeCount > 0 && !hasPrimary && onShowAllRange && (
+        <Notice tone="info">
+          {fa(outsideRangeCount)} معاملهٔ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+        </Notice>
+      )}
       <DataConfidencePanel a={a} />
 
       {/* لایهٔ ۱ — حکم */}
@@ -384,7 +445,103 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
           {context.map((r) => <p key={r.id} className="text-xs text-muted">{r.term} (زمینه): {r.display} — {r.note}</p>)}
         </div>
       </Disclosure>
+      {hasSpot && spotBook && <SpotAutoAuditPanel b={spotBook} tz={tz} reviews={reviews} />}
     </div>
+  );
+}
+
+/** حسابرسی خودکار و لوپ نقد اسپات — فقط اعداد واقعی و تأییدشده (بدون سود/زیان بازِ ناقص یا کارت خالی) */
+function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; reviews?: ReadonlyMap<string, WeeklyReview> }) {
+  const [applied, setApplied] = useState(false);
+  const t = b.totals;
+  const decided = t.wins + t.losses;
+  const winRate = decided > 0 ? (t.wins / decided) * 100 : null;
+  const feeDragPct = t.volume > 0 ? ((t.gas + t.swapCost) / t.volume) * 100 : 0;
+  const openValueUsd = b.open.reduce((sum, a) => sum + (a.value ?? 0), 0);
+  const avgSwapUsd = t.swaps > 0 ? t.volume / t.swaps : 0;
+
+  const step1 = feeDragPct > 1
+    ? `هزینهٔ گاز و لغزش (${pct(feeDragPct, 2)} حجم) بالاست.`
+    : `${fa(t.swaps)} سواپ با حجم ${usd(t.volume)} و هزینهٔ کل ${usd(t.gas + t.swapCost)} ثبت شده است.`;
+  const step2 = decided > 0
+    ? `نرخ برد فروش‌ها ${pct(winRate, 0)} (${fa(t.wins)} سود · ${fa(t.losses)} زیان) و سود محقق ${usd(t.realized, true)}.`
+    : `${fa(b.open.length)} دارایی فعال به ارزش ${usd(openValueUsd)} دارید؛ هنوز فروش بسته‌ای برای محاسبهٔ نرخ برد ثبت نشده.`;
+  const step3 = feeDragPct > 1
+    ? 'سواپ‌های خرد را تجمیع کنید و لغزش را زیر ۰٫۵٪ بگذارید.'
+    : 'حد زیان و هدف ۲R هر دارایی باز را در «برنامهٔ معامله» چک کنید.';
+
+  return (
+    <Surface variant="focal" className="space-y-4 border border-accent/35 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-extrabold text-ink">حسابرسی خودکار معاملات اسپات (کیف پول‌ها)</p>
+          <p className="text-xs text-muted">{fa(t.swaps)} سواپ · {fa(b.open.length)} دارایی فعال</p>
+        </div>
+        <Badge tone="gain">لوپ نقد فعال</Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Hero label="ارزش دارایی‌های باز" value={usd(openValueUsd)} sub={`${fa(b.open.length)} دارایی`} tone="neutral" />
+        <Hero label="حجم سواپ‌ها" value={usd(t.volume)} sub={`${fa(t.swaps)} سواپ`} tone="neutral" />
+        {decided > 0 ? (
+          <Hero label="نرخ برد فروش‌ها" value={pct(winRate, 0)} sub={`سود محقق ${usd(t.realized, true)}`} tone={(winRate ?? 0) >= 50 ? 'gain' : 'warn'} />
+        ) : (
+          <Hero label="میانگین هر سواپ" value={usd(avgSwapUsd)} sub={`${fa(t.chains.length || 1)} شبکه`} tone="neutral" />
+        )}
+        <Hero label="گاز و لغزش" value={usd(t.gas + t.swapCost)} sub={`${pct(feeDragPct, 2)} حجم`} tone={feeDragPct > 1 ? 'loss' : 'gain'} />
+      </div>
+      <div className="grid gap-2.5 md:grid-cols-3">
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۱. وضعیت فعلی</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step1}</p>
+        </div>
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۲. ارزیابی آماری</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step2}</p>
+        </div>
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۳. اقدام هفتهٔ بعد</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step3}</p>
+        </div>
+      </div>
+      {reviews && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-2.5">
+          <span className="text-[11px] text-subtle">ثبت خودکار قانون لوپ نقد در مرور این هفته</span>
+          {applied ? (
+            <Badge tone="gain">✓ به مرور این هفته اضافه شد</Badge>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const wk = isoWeekKey(Date.now(), tz);
+                const base = reviews.get(wk) ?? emptyReview(wk);
+                if (!base.commitments.some((c) => c.text === step3)) {
+                  const next = [...base.commitments, { id: `spot-loop-${Date.now().toString(36)}`, text: step3, rule: { type: 'requirePlan' as const }, done: false }].slice(0, 3);
+                  void saveReview({ ...base, commitments: next }).then(() => setApplied(true));
+                } else {
+                  setApplied(true);
+                }
+              }}
+            >
+              افزودن قانون به مرور این هفته
+            </Button>
+          )}
+        </div>
+      )}
+      {b.open.length > 0 && (
+        <div className="border-t border-divider pt-3 text-xs">
+          <p className="mb-1.5 font-semibold text-ink">دارایی‌های فعال اسپات</p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {b.open.slice(0, 6).map((a) => (
+              <div key={a.asset} className="flex items-center justify-between rounded-control bg-surface-2/60 px-3 py-2">
+                <span dir="ltr" className="font-bold text-ink">{a.symbol}</span>
+                <span className="num-ltr font-semibold text-muted">{a.value !== null ? usd(a.value) : `${fa(a.qty, 4)}`}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Surface>
   );
 }
 
