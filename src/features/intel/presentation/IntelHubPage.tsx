@@ -1,10 +1,10 @@
 /**
- * میز معامله — سوینگ هوشمند (متصل به بازار)، کمیته ایجنت‌ها، ستاپ پایان ماه، تریدرها و مشتقات
+ * میز معامله — تصمیم واحد (همه چیز در یک صفحه)، سوینگ، کمیته ایجنت‌ها، ستاپ پایان ماه، تریدرها و مشتقات
  * فقط‌خواندنی: هیچ معامله، کلید خصوصی یا امضایی در کار نیست.
  */
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Activity, Bot, Calendar, Compass, Flame, ShieldCheck, Trophy } from 'lucide-react';
+import { Activity, Bot, Calendar, Compass, Flame, Layers, ShieldCheck, Trophy } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useAuth } from '@/features/auth/authClient';
@@ -13,6 +13,7 @@ import { useSavedTraders } from '@/features/traders/data/savedTraders';
 import { useTradersList } from '@/features/traders/data/useTraders';
 import { TradersTab } from '@/features/traders/presentation/TradersTab';
 import { TraderReportSheet } from '@/features/traders/presentation/TraderReportSheet';
+import { UnifiedDeskTab } from './UnifiedDeskTab';
 import { SwingTab } from './SwingTab';
 import { PositionsTab } from './PositionsTab';
 import { DerivativesTab } from './DerivativesTab';
@@ -23,12 +24,12 @@ import { EomSetupTab } from './EomSetupTab';
 import { CoinSheet } from './CoinSheet';
 import { TokenSheet } from './TokenSheet';
 
-type Tab = 'swing' | 'agents' | 'eom' | 'traders' | 'derivs' | 'memes';
-const TABS: Tab[] = ['swing', 'agents', 'eom', 'traders', 'derivs', 'memes'];
+type Tab = 'unified' | 'swing' | 'agents' | 'eom' | 'traders' | 'derivs' | 'memes';
+const TABS: Tab[] = ['unified', 'swing', 'agents', 'eom', 'traders', 'derivs', 'memes'];
 
 export default function IntelHubPage() {
   const [params, setParams] = useSearchParams();
-  // تب‌های قدیمی: «چک قبل از ورود» ← سوینگ، «پوزیشن برترها» ← تریدرها، «امنیت توکن» ← میم‌کوین
+  // تب‌های قدیمی: «چک قبل از ورود» ← تصمیم واحد، «پوزیشن برترها» ← تریدرها، «امنیت توکن» ← میم‌کوین
   const rawTab = params.get('tab');
   const mapped =
     rawTab === 'positions'
@@ -36,15 +37,15 @@ export default function IntelHubPage() {
       : rawTab === 'safety'
         ? 'memes'
         : rawTab === 'check'
-          ? 'swing'
+          ? 'unified'
           : rawTab;
-  const tab: Tab = mapped && (TABS as string[]).includes(mapped) ? (mapped as Tab) : 'swing';
+  const tab: Tab = mapped && (TABS as string[]).includes(mapped) ? (mapped as Tab) : 'unified';
   const traderView = rawTab === 'positions' || params.get('view') === 'consensus' ? 'consensus' : params.get('view') === 'mine' ? 'mine' : 'top';
   const memeView = rawTab === 'safety' || params.get('view') === 'safety' ? 'safety' : 'screen';
   const trader = params.get('a');
   const coin = params.get('coin');
   const token = params.get('token');
-  const market = params.get('m') ?? 'BTC';
+  const market = params.get('m') ?? 'ETH';
   const authStatus = useAuth((s) => s.status);
   const hydrate = useSavedTraders((s) => s.hydrate);
   const saved = useSavedTraders((s) => s.saved);
@@ -69,13 +70,14 @@ export default function IntelHubPage() {
 
   return (
     <Page>
-      <PageHeader title="میز معامله" subtitle="پیشنهاد ورود سوینگ، کمیته ایجنت‌ها، ستاپ پایان ماه و رصد بازار" />
+      <PageHeader title="میز معامله" subtitle="تصمیم واحد (کیف پول، کمیته ایجنت‌ها، سوینگ و ستاپ پایان ماه در یک صفحه)" />
       <Tabs<Tab>
         className="mb-5"
         label="بخش‌های میز معامله"
         value={tab}
-        onChange={(v) => update({ tab: v === 'swing' ? null : v, view: null })}
+        onChange={(v) => update({ tab: v === 'unified' ? null : v, view: null })}
         options={[
+          { value: 'unified', label: 'تصمیم واحد', icon: <Layers /> },
           { value: 'swing', label: 'سوینگ', icon: <Compass /> },
           { value: 'agents', label: 'کمیته ایجنت‌ها', icon: <Bot /> },
           { value: 'eom', label: 'ستاپ پایان ماه', icon: <Calendar /> },
@@ -85,6 +87,15 @@ export default function IntelHubPage() {
         ]}
       />
       <div role="tabpanel">
+        {tab === 'unified' && (
+          <UnifiedDeskTab
+            selectedMarket={market}
+            onChangeMarket={(m) => update({ m })}
+            onOpenAgents={(c) => update({ tab: 'agents', view: null, m: c })}
+            onOpenSwing={() => update({ tab: 'swing', view: null })}
+            onOpenEom={() => update({ tab: 'eom', view: null })}
+          />
+        )}
         {tab === 'swing' && (
           <SwingTab
             onAnalyzeWithAgents={(c) => update({ tab: 'agents', view: null, m: c })}
