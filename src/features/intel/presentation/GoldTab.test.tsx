@@ -83,18 +83,22 @@ describe('GoldPage & GoldTab', () => {
     expect(await screen.findByText('زنده · متصل')).toBeTruthy();
     expect(screen.getByText('تحلیل تاریخی قیمت طلای ۱۸ عیار (۷، ۳۰ و ۶۰ روز گذشته)')).toBeTruthy();
 
-    // جابه‌جایی بین هر ۵ تب ماژول طلای ایران
+    // جابه‌جایی بین هر ۴ تب ماژول طلای ایران و اطمینان از حذف بخش دلار و تتر
+    expect(screen.queryByText('دلار و تتر')).toBeNull();
+
     fireEvent.click(screen.getByText('خرید طلای آنلاین'));
     expect(screen.getByText('خرید و فروش طلای آنلاین')).toBeTruthy();
 
     fireEvent.click(screen.getByText('طلای زینتی و مقایسه'));
     expect(screen.getByText('محاسبه خرید و فروش مجدد طلای زینتی')).toBeTruthy();
 
+    // بررسی جداسازی جهت (Bidi) برای اعداد منفی و درصدها تا علامت منفی قبل از عدد و درصد بعد از آن نمایش داده شود
+    const containerText = document.body.textContent ?? '';
+    expect(containerText).toContain('\u2066-');
+    expect(containerText).toContain('٪\u2069');
+
     fireEvent.click(screen.getByText('صندوق‌های طلا'));
     expect(screen.getByText('صندوق‌های طلای بورسی')).toBeTruthy();
     expect(screen.getByText('صندوق عیار')).toBeTruthy();
-
-    fireEvent.click(screen.getByText('دلار و تتر'));
-    expect(screen.getByText('تحلیل تاریخی دلار آزاد و تتر')).toBeTruthy();
   });
 });
