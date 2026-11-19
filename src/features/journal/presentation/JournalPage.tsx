@@ -18,6 +18,7 @@ import { EmptyState, ListSkeleton, Notice } from '@/shared/components/ui/StateVi
 import { Button } from '@/shared/components/ui/Button';
 import { usePublishInsight } from '@/shared/assistant/insights';
 import { RANGE_FA, useJournal, type RangeKey } from '../data/useJournal';
+import { useSpot } from '../data/useSpot';
 import { AuditTab } from './AuditTab';
 import { TradesTab } from './TradesTab';
 import { PlanTab } from './PlanTab';
@@ -72,6 +73,7 @@ function JournalView() {
   const j = useJournal(range, liveEquity);
   // ساعت ثابت در طول جلسه تا کلید محاسبهٔ اسپات با هر رندر عوض نشود
   const spotFrom = useMemo(() => Math.floor(Date.now() / 3_600_000) * 3_600_000 - Number(range === 'all' ? 0 : range) * 86_400_000, [range]);
+  const spot = useSpot(range === 'all' ? 0 : spotFrom);
   const a = j.audit;
   const d = a?.directional;
 
@@ -142,9 +144,21 @@ function JournalView() {
           <>
             {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
             {tab === 'audit' && <p className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-xs leading-6 text-muted">{FLOW_ROLE.audit} <Link to="/desk" className="font-semibold text-accent underline">چک قبل از ورود ←</Link></p>}
-            {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} settings={j.data.settings} reviews={j.data.reviews} />}
+            {tab === 'audit' && d && (
+              <AuditTab
+                a={d}
+                fallbackAudit={a.allPerp}
+                spotBook={spot.book}
+                outsideRangeCount={a.directionalOutsideRange}
+                onShowAllRange={() => update({ range: 'all' })}
+                empty={empty}
+                tz={j.tz}
+                settings={j.data.settings}
+                reviews={j.data.reviews}
+              />
+            )}
             {tab === 'trades' && tradesView === 'perp' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} auto={a.auto} settings={j.data.settings} />}
-            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
+            {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} spotBook={spot.book} prefill={prefill} onPrefillUsed={clearPrefill} />}
             {tab === 'trades' && tradesView === 'spot' && <SpotTab from={range === 'all' ? 0 : spotFrom} />}
             {tab === 'review' && <ReviewTab trades={a.all.filter((t) => t.book === 'directional' && !t.open && !t.truncated)} notes={a.notes} links={a.links} auto={a.auto} reviews={j.data.reviews} settings={j.data.settings} tz={j.tz} accountSize={j.accountSize} />}
             {tab === 'settings' && <SettingsTab settings={j.data.settings} accounts={j.accounts} histories={j.histories} liveEquity={liveEquity} onRefetch={j.refetch} />}

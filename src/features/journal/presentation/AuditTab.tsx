@@ -13,6 +13,7 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/shared/lib/cn';
 import type { BookAudit } from '../domain/audit';
+import type { SpotBook } from '../domain/spot';
 import { buildAutoCritiqueLoop } from '../domain/autoAnnotate';
 import { CONFIDENCE_FA, STATUS_FA, type ScoreRow } from '../domain/scorecard';
 import { STYLE_FA } from '../domain/metrics';
@@ -63,7 +64,33 @@ function Hero({ label, value, sub, tone }: { label: React.ReactNode; value: stri
 
 const toneOf = (r: ScoreRow | undefined) => (!r ? 'neutral' : r.verdict === 'meets' ? 'gain' : r.verdict === 'borderline' ? 'warn' : r.verdict === 'fails' ? 'loss' : 'neutral');
 
-export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }: { a: BookAudit; empty: React.ReactNode; tz: string; settings?: JournalSettings; reviews?: ReadonlyMap<string, WeeklyReview> }) {
+export function AuditTab({
+  a: primary,
+  fallbackAudit,
+  spotBook,
+  outsideRangeCount = 0,
+  onShowAllRange,
+  empty,
+  tz,
+  settings = DEFAULT_SETTINGS,
+  reviews
+}: {
+  a: BookAudit;
+  fallbackAudit?: BookAudit;
+  spotBook?: SpotBook | null;
+  outsideRangeCount?: number;
+  onShowAllRange?: () => void;
+  empty: React.ReactNode;
+  tz: string;
+  settings?: JournalSettings;
+  reviews?: ReadonlyMap<string, WeeklyReview>;
+}) {
+  const hasPrimary = !!(primary.core.n || primary.open.length || primary.truncated.length);
+  const usingFallbackPerp = !hasPrimary && !!fallbackAudit && !!(fallbackAudit.core.n || fallbackAudit.open.length || fallbackAudit.truncated.length);
+  const a = usingFallbackPerp ? fallbackAudit! : primary;
+  const hasPerp = hasPrimary || usingFallbackPerp;
+  const hasSpot = !!(spotBook && spotBook.totals.swaps > 0);
+
   const m = a.core;
   const b = a.behavior;
   const row = (id: string) => a.rows.find((r) => r.id === id);
@@ -99,7 +126,31 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
     });
   }, [a.trades]);
 
-  if (!m.n && !a.open.length && !a.truncated.length) return <>{empty}</>;
+  if (!hasPerp && !hasSpot) {
+    if (outsideRangeCount > 0 && onShowAllRange) {
+      return (
+        <Notice tone="info" title="معاملات جهت‌دار شما قدیمی‌تر از بازهٔ فعلی هستند">
+          در این بازه معاملهٔ بسته‌ای ثبت نشده، اما {fa(outsideRangeCount)} معاملهٔ جهت‌دار در تاریخچهٔ کامل شما وجود دارد.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش حسابرسی همهٔ زمان‌ها</button>
+        </Notice>
+      );
+    }
+    return <>{empty}</>;
+  }
+
+  if (!hasPerp && hasSpot && spotBook) {
+    return (
+      <div className="space-y-5">
+        {outsideRangeCount > 0 && onShowAllRange && (
+          <Notice tone="info">
+            {fa(outsideRangeCount)} معاملهٔ پرپ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
+            <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+          </Notice>
+        )}
+        <SpotAutoAuditPanel b={spotBook} />
+      </div>
+    );
+  }
 
   const perf = a.rows.filter((r) => r.cls === 'performance');
   const exec = a.rows.filter((r) => r.cls === 'behaviour');
@@ -113,6 +164,17 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
 
   return (
     <div className="space-y-6">
+      {usingFallbackPerp && (
+        <Notice tone="info" title="حسابرسی خودکار روی کل معاملات پرپ (شامل دفتر دلتا نوترال)">
+          در این بازه معاملهٔ جهت‌دار جداگانه‌ای نبود؛ برای اینکه حسابرسی و لوپ نقد بدون وقفه فعال بمانند، تمام معاملات پرپ متصل به‌صورت خودکار حسابرسی شدند.
+        </Notice>
+      )}
+      {outsideRangeCount > 0 && !hasPrimary && onShowAllRange && (
+        <Notice tone="info">
+          {fa(outsideRangeCount)} معاملهٔ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+        </Notice>
+      )}
       <DataConfidencePanel a={a} />
 
       {/* لایهٔ ۱ — حکم */}
@@ -384,7 +446,84 @@ export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }:
           {context.map((r) => <p key={r.id} className="text-xs text-muted">{r.term} (زمینه): {r.display} — {r.note}</p>)}
         </div>
       </Disclosure>
+      {hasSpot && spotBook && <SpotAutoAuditPanel b={spotBook} />}
     </div>
+  );
+}
+
+/** حسابرسی خودکار و لوپ نقد ۳مرحله‌ای برای معاملات اسپات (سواپ‌های کیف پول‌ها در DEXها) */
+function SpotAutoAuditPanel({ b }: { b: SpotBook }) {
+  const t = b.totals;
+  const decided = t.wins + t.losses;
+  const winRate = decided > 0 ? (t.wins / decided) * 100 : null;
+  const feeDragPct = t.volume > 0 ? ((t.gas + t.swapCost) / t.volume) * 100 : 0;
+  const allAssets = [...b.open, ...b.closed];
+  const winners = [...allAssets].filter((x) => x.realized + (x.unrealized ?? 0) > 0).sort((x, y) => (y.realized + (y.unrealized ?? 0)) - (x.realized + (x.unrealized ?? 0))).slice(0, 3);
+  const losers = [...allAssets].filter((x) => x.realized + (x.unrealized ?? 0) < 0).sort((x, y) => (x.realized + (x.unrealized ?? 0)) - (y.realized + (y.unrealized ?? 0))).slice(0, 3);
+  const netTotal = t.realized + (t.unrealized ?? 0) - t.gas;
+
+  const step1 = feeDragPct > 1
+    ? `هزینهٔ گاز و لغزش استخر (${pct(feeDragPct, 2)} حجم، معادل ${usd(t.gas + t.swapCost)}) بالاست و بازده سواپ‌ها را می‌خورد.`
+    : losers[0]
+      ? `بیشترین افت در ${losers[0].symbol} (${usd(losers[0].realized + (losers[0].unrealized ?? 0), true)}) ثبت شده است.`
+      : `در ${fa(t.swaps)} سواپ با حجم ${usd(t.volume)}، سود محقق ${usd(t.realized, true)} و هزینهٔ کل ${usd(t.gas + t.swapCost)} بوده است.`;
+  const step2 = decided < 5
+    ? `فقط ${fa(decided)} فروش کامل برای سنجش نرخ برد ثبت شده؛ تا رسیدن به حداقل ۱۰ فروش، نتیجهٔ فعلی جهت‌نماست نه حکم قطعی.`
+    : `نرخ برد فروش‌ها ${pct(winRate, 0)} (${fa(t.wins)} سود در برابر ${fa(t.losses)} زیان) است${t.unrealized !== null ? ` و سود/زیان باز فعلی ${usd(t.unrealized, true)} گزارش شده است.` : '.'}`;
+  const step3 = feeDragPct > 1
+    ? 'قانون هفتهٔ بعد: از سواپ‌های خرد پرتکرار خودداری کنید و لغزش (Slippage) را زیر ۰٫۵٪ قفل کنید.'
+    : 'قانون هفتهٔ بعد: برای هر پوزیشن باز اسپات در تب «برنامهٔ معامله»، حد زیان و هدف ۲R خودکار را بررسی و رعایت کنید.';
+
+  return (
+    <Surface variant="focal" className="space-y-4 border border-accent/40 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-extrabold text-ink">حسابرسی خودکار معاملات اسپات (کیف پول‌ها)</p>
+          <p className="text-xs text-muted">{fa(t.swaps)} سواپ · {fa(b.open.length)} پوزیشن باز · {fa(b.closed.length)} تسویه‌شده · حجم {usd(t.volume)}</p>
+        </div>
+        <Badge tone={netTotal >= 0 ? 'gain' : 'loss'}>لوپ نقد اسپات فعال</Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Hero label="سود محقق" value={usd(t.realized, true)} sub={`پس از گاز ${usd(t.realized - t.gas, true)}`} tone={t.realized > 0 ? 'gain' : t.realized < 0 ? 'loss' : 'neutral'} />
+        <Hero label="سود/زیان باز" value={t.unrealized === null ? '—' : usd(t.unrealized, true)} sub={`${fa(b.open.length)} دارایی باز`} tone={(t.unrealized ?? 0) > 0 ? 'gain' : (t.unrealized ?? 0) < 0 ? 'loss' : 'neutral'} />
+        <Hero label="نرخ برد فروش‌ها" value={winRate === null ? '—' : pct(winRate, 0)} sub={`${fa(t.wins)} سود · ${fa(t.losses)} زیان`} tone={winRate === null ? 'neutral' : winRate >= 50 ? 'gain' : 'warn'} />
+        <Hero label="هزینهٔ گاز و لغزش" value={usd(t.gas + t.swapCost)} sub={`${pct(feeDragPct, 2)} حجم`} tone={feeDragPct > 1 ? 'loss' : 'gain'} />
+      </div>
+      <div className="grid gap-2.5 md:grid-cols-3">
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۱. تشخیص نشتی اسپات</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step1}</p>
+        </div>
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۲. نقد متقابل آماری</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step2}</p>
+        </div>
+        <div className="rounded-control border border-divider bg-card p-3">
+          <p className="text-xs font-bold text-ink">۳. تعهد اجرایی هفتهٔ بعد</p>
+          <p className="mt-1 text-xs leading-6 text-muted">{step3}</p>
+        </div>
+      </div>
+      {(winners.length > 0 || losers.length > 0) && (
+        <div className="grid gap-3 border-t border-divider pt-3 sm:grid-cols-2">
+          {winners.length > 0 && (
+            <div className="text-xs">
+              <p className="font-semibold text-positive">بهترین دارایی‌ها</p>
+              <ul className="mt-1 space-y-1 text-muted">
+                {winners.map((w) => <li key={w.asset} className="flex justify-between"><span dir="ltr" className="font-semibold text-ink">{w.symbol}</span><span className="num-ltr font-bold text-positive">{usd(w.realized + (w.unrealized ?? 0), true)}</span></li>)}
+              </ul>
+            </div>
+          )}
+          {losers.length > 0 && (
+            <div className="text-xs">
+              <p className="font-semibold text-negative">بیشترین افت</p>
+              <ul className="mt-1 space-y-1 text-muted">
+                {losers.map((l) => <li key={l.asset} className="flex justify-between"><span dir="ltr" className="font-semibold text-ink">{l.symbol}</span><span className="num-ltr font-bold text-negative">{usd(l.realized + (l.unrealized ?? 0), true)}</span></li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Surface>
   );
 }
 

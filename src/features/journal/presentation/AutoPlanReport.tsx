@@ -14,6 +14,7 @@ import { ChipGroup } from '@/shared/components/ui/SegmentedControl';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { Bias, ClassifiedTrade, JournalSettings, TradePlan } from '../domain/types';
+import type { SpotAsset, SpotBook } from '../domain/spot';
 import { VENUE_FA } from '../domain/types';
 import { autoReport, type AutoReport } from '../domain/autoPlan';
 import { useAutoOutlook } from '../data/useOutlook';
@@ -25,12 +26,17 @@ type Filter = 'all' | 'nostop' | 'counter' | 'moved' | 'open';
 
 const BIAS_FA: Record<Bias, string> = { bullish: 'صعودی', bearish: 'نزولی', neutral: 'خنثی' };
 
-export function AutoPlanReport({ trades, auto, settings, accountSize }: { trades: ClassifiedTrade[]; auto: Map<string, TradePlan>; settings: JournalSettings; accountSize: number | null }) {
-  // جهت‌دار با شروع معلوم + هر پوزیشن باز (حتی پای نوترال یا شروع خارج از تاریخچه) — پوزیشن زنده هیچ‌وقت جا نمی‌ماند
-  const directional = useMemo(() => trades.filter((t) => auto.has(t.id) && (t.open || (t.book === 'directional' && !t.truncated))), [trades, auto]);
-  const neutralClosed = useMemo(() => trades.filter((t) => t.book === 'neutral' && !t.open).length, [trades]);
+export function AutoPlanReport({ trades, auto, settings, accountSize, spotBook }: { trades: ClassifiedTrade[]; auto: Map<string, TradePlan>; settings: JournalSettings; accountSize: number | null; spotBook?: SpotBook | null }) {
+  // جهت‌دار با شروع معلوم + هر پوزیشن باز؛ اگر خالی بود، همهٔ معاملات پرپ (شامل نوترال) خودکار برنامه‌ریزی می‌شوند
+  const primaryDirectional = useMemo(() => trades.filter((t) => auto.has(t.id) && (t.open || (t.book === 'directional' && !t.truncated))), [trades, auto]);
+  const includeNeutralFallback = primaryDirectional.length === 0;
+  const directional = useMemo(
+    () => (includeNeutralFallback ? trades.filter((t) => auto.has(t.id) && (t.open || !t.truncated)) : primaryDirectional),
+    [includeNeutralFallback, primaryDirectional, trades, auto]
+  );
+  const spotOpen = useMemo(() => (spotBook?.open ?? []).filter((a) => (a.avgCost ?? (a.value !== null && a.qty > 0 ? a.value / a.qty : 0)) > 0), [spotBook]);
   const { plans, loading } = useAutoOutlook(directional, auto);
-  const rep = useMemo(() => autoReport(directional, plans, accountSize, settings.maxRiskPct), [directional, plans, accountSize, settings.maxRiskPct]);
+  const rep = useMemo(() => autoReport(directional, plans, accountSize, settings.maxRiskPct, includeNeutralFallback), [directional, plans, accountSize, settings.maxRiskPct, includeNeutralFallback]);
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit] = useState(20);
 
@@ -47,27 +53,37 @@ export function AutoPlanReport({ trades, auto, settings, accountSize }: { trades
     });
   }, [directional, plans, filter]);
 
-  if (!directional.length) {
-    return <Notice tone="info">پوزیشن باز یا معاملهٔ جهت‌داری از حساب‌های متصل نیامده. هر پوزیشنی که در هایپرلیکوئید، لایتر، تی‌اکس‌فلو یا آرکوس باز کنید، خودش این‌جا با استاپ و هدفش ثبت می‌شود.{neutralClosed > 0 && <> {fa(neutralClosed)} معاملهٔ بسته در دفتر «دلتا نوترال» است (نقش حساب در تنظیمات).</>}</Notice>;
+  if (!directional.length && !spotOpen.length) {
+    return <Notice tone="info">هنوز معاملهٔ پرپ یا پوزیشن باز اسپاتی در حساب‌ها و کیف پول‌های متصل پیدا نشد. به‌محض باز شدن هر معامله، برنامهٔ خودکار (استاپ، هدف ۲R و ریسک مجاز) بدون نیاز به تایپ این‌جا ساخته می‌شود.</Notice>;
   }
 
   return (
-    <div className="space-y-4">
-      <Hero rep={rep} maxRiskPct={settings.maxRiskPct} accountSize={accountSize} />
-      <Insights rep={rep} maxRiskPct={settings.maxRiskPct} />
-      <ChipGroup label="فیلتر" bleed value={filter} onChange={setFilter} options={[
-        { value: 'all', label: 'همه', badge: directional.length },
-        { value: 'open', label: 'باز', badge: directional.filter((t) => t.open).length || undefined },
-        { value: 'nostop', label: 'بدون استاپ', badge: rep.trades - rep.withStop - (rep.trades - rep.readable) || undefined },
-        { value: 'counter', label: 'خلاف روند', badge: [...plans.values()].filter((p) => p.outlook.proTrend === 'n').length || undefined },
-        { value: 'moved', label: 'استاپ جابه‌جا', badge: rep.widened + rep.tightened || undefined }
-      ]} />
-      {loading && <p className="text-xs text-muted">در حال خواندن کندل روزانه برای چشم‌انداز بازار…</p>}
-      <div className="grid gap-3 lg:grid-cols-2">
-        {list.slice(0, limit).map((t) => <PlanCard key={t.id} t={t} p={plans.get(t.id)!} accountSize={accountSize} maxRiskPct={settings.maxRiskPct} />)}
-      </div>
-      {!list.length && <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p>}
-      {list.length > limit && <Button variant="outline" onClick={() => setLimit((l) => l + 20)}>نمایش ۲۰ معاملهٔ بیشتر ({fa(list.length - limit)} باقی‌مانده)</Button>}
+    <div className="space-y-5">
+      {directional.length > 0 && (
+        <div className="space-y-4">
+          {includeNeutralFallback && (
+            <Notice tone="info" title="برنامهٔ خودکار روی همهٔ معاملات پرپ (شامل دفتر نوترال) فعال شد">
+              چون معاملهٔ جهت‌دار جداگانه‌ای ثبت نشده بود، برای همهٔ معاملات پرپ شما برنامهٔ خودکار (ورود، استاپ و هدف ۲R) ساخته شد.
+            </Notice>
+          )}
+          <Hero rep={rep} maxRiskPct={settings.maxRiskPct} accountSize={accountSize} />
+          <Insights rep={rep} maxRiskPct={settings.maxRiskPct} />
+          <ChipGroup label="فیلتر" bleed value={filter} onChange={setFilter} options={[
+            { value: 'all', label: 'همه', badge: directional.length },
+            { value: 'open', label: 'باز', badge: directional.filter((t) => t.open).length || undefined },
+            { value: 'nostop', label: 'بدون استاپ', badge: rep.trades - rep.withStop - (rep.trades - rep.readable) || undefined },
+            { value: 'counter', label: 'خلاف روند', badge: [...plans.values()].filter((p) => p.outlook.proTrend === 'n').length || undefined },
+            { value: 'moved', label: 'استاپ جابه‌جا', badge: rep.widened + rep.tightened || undefined }
+          ]} />
+          {loading && <p className="text-xs text-muted">در حال خواندن کندل روزانه برای چشم‌انداز بازار…</p>}
+          <div className="grid gap-3 lg:grid-cols-2">
+            {list.slice(0, limit).map((t) => <PlanCard key={t.id} t={t} p={plans.get(t.id)!} accountSize={accountSize} maxRiskPct={settings.maxRiskPct} />)}
+          </div>
+          {!list.length && <p className="text-sm text-muted">معامله‌ای در این فیلتر نیست.</p>}
+          {list.length > limit && <Button variant="outline" onClick={() => setLimit((l) => l + 20)}>نمایش ۲۰ معاملهٔ بیشتر ({fa(list.length - limit)} باقی‌مانده)</Button>}
+        </div>
+      )}
+      {spotOpen.length > 0 && <SpotAutoPlans assets={spotOpen} maxRiskPct={settings.maxRiskPct} accountSize={accountSize} />}
     </div>
   );
 }
@@ -298,4 +314,56 @@ function LevelBar({ long, stop, entry, target, exit, finalStop }: { long: boolea
 
 function Mark({ at, cls, dashed }: { at: number; cls: string; dashed?: boolean }) {
   return <span className={cn('absolute -top-1 h-[18px] w-0.5 -translate-x-1/2 rounded-full', cls, dashed && 'opacity-80')} style={{ left: `${at}%` }} aria-hidden />;
+}
+
+/** برنامهٔ معاملهٔ خودکار برای پوزیشن‌های باز اسپات (بدون نیاز به تایپ) */
+function SpotAutoPlans({ assets, maxRiskPct, accountSize }: { assets: SpotAsset[]; maxRiskPct: number; accountSize: number | null }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-extrabold text-ink">برنامهٔ خودکار پوزیشن‌های باز اسپات (کیف پول‌ها)</h3>
+          <p className="text-xs text-muted">ساخته‌شده خودکار از میانگین بهای خرید و قیمت لحظه‌ای (حد زیان ۸٪- و هدف ۲R معادل ۱۶٪+)</p>
+        </div>
+        <Badge tone="gain">خودکار · {fa(assets.length)} دارایی</Badge>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {assets.map((a) => {
+          const livePx = a.value !== null && a.qty > 0 ? a.value / a.qty : null;
+          const entry = a.avgCost ?? livePx ?? 0;
+          const stop = entry * 0.92;
+          const target = entry * 1.16;
+          const riskUsd = a.qty > 0 ? a.qty * (entry - stop) : null;
+          const riskPct = riskUsd !== null && accountSize ? (riskUsd / accountSize) * 100 : null;
+          return (
+            <Surface key={a.asset} className="flex flex-col gap-3 p-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="flex h-8 w-8 items-center justify-center rounded-field bg-gain/12 text-positive [&_svg]:h-4 [&_svg]:w-4"><TrendingUp /></span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-ink"><span dir="ltr">{a.symbol}</span> <span className="text-xs font-semibold text-positive">اسپات (نگهداری)</span></p>
+                  <p className="text-[11px] text-muted">{a.avgCost !== null ? 'ورود از میانگین بهای سواپ‌ها' : 'ورود از قیمت لحظه‌ای کیف پول'}{a.value !== null ? ` · ارزش ${usd(a.value)}` : ''}</p>
+                </div>
+                <div className="ms-auto text-end">
+                  <p className={cn('num-ltr text-base font-extrabold', pnlTone(a.unrealized))}>
+                    <AmountText text={a.unrealized === null ? 'باز' : usd(a.unrealized, true)} />
+                  </p>
+                  <p className="text-[10px] text-subtle">سود/زیان باز</p>
+                </div>
+              </div>
+              <LevelBar long stop={stop} entry={entry} target={target} exit={livePx} finalStop={null} />
+              <div className="flex flex-wrap gap-1.5">
+                <Badge tone="info">برنامهٔ خودکار دارینو</Badge>
+                <Badge tone="gain">هدف ۲R</Badge>
+                {riskUsd !== null && <Badge tone={riskPct !== null && riskPct > maxRiskPct ? 'loss' : 'neutral'}>ریسک استاپ {usd(riskUsd)}{riskPct !== null ? ` (${pct(riskPct, 1)})` : ''}</Badge>}
+              </div>
+              <p className="text-[11px] leading-5 text-muted">
+                استاپ خودکار: <b className="num-ltr text-negative">{fa(stop, entry < 1 ? 6 : 2)}</b> · هدف ۲R: <b className="num-ltr text-positive">{fa(target, entry < 1 ? 6 : 2)}</b>
+                {livePx !== null && <> · قیمت فعلی: <b className="num-ltr text-ink">{fa(livePx, livePx < 1 ? 6 : 2)}</b></>}
+              </p>
+            </Surface>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

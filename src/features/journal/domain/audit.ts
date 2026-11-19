@@ -60,9 +60,13 @@ export interface JournalAudit {
   notes: Map<string, TradeNote>;
   /** برنامه‌های نوشته‌شده (دستی) */
   links: Map<string, TradePlan>;
-  /** برنامهٔ خودکار هر معاملهٔ جهت‌دار بدون برنامهٔ نوشته‌شده (از سفارش‌های SL/TP صرافی + پیشنهاد ATR) */
+  /** برنامهٔ خودکار هر معامله بدون برنامهٔ نوشته‌شده (از سفارش‌های SL/TP صرافی + پیشنهاد ATR) */
   auto: Map<string, TradePlan>;
   directional: BookAudit;
+  /** حسابرسی پشتیبان روی کل معاملات پرپ (وقتی دفتر جهت‌دار خالی است، مثلاً حساب‌ها پیش‌فرض نوترال‌اند) */
+  allPerp: BookAudit;
+  /** تعداد معاملات بستهٔ جهت‌دار که خارج از بازهٔ انتخابی فعلی (قدیمی‌تر از from) هستند */
+  directionalOutsideRange: number;
   neutral: NeutralBook;
   neutralTrades: ClassifiedTrade[];
 }
@@ -105,13 +109,13 @@ function confidenceFor(closed: ClassifiedTrade[], open: number, truncated: numbe
 }
 
 export function auditBook(
-  book: BookKind,
+  book: BookKind | 'all',
   all: readonly ClassifiedTrade[],
   ctx: { tz: string; accountSize: number | null; notes: ReadonlyMap<string, TradeNote>; links: ReadonlyMap<string, TradePlan>; auto?: ReadonlyMap<string, TradePlan>; from: number; sourceNotes: string[] }
 ): BookAudit {
   // برنامهٔ نوشته‌شده بر خودکار مقدم است
   const plans = new Map<string, TradePlan>([...(ctx.auto ?? new Map()), ...ctx.links]);
-  const mine = all.filter((t) => t.book === book);
+  const mine = book === 'all' ? [...all] : all.filter((t) => t.book === book);
   const open = mine.filter((t) => t.open);
   const truncated = mine.filter((t) => !t.open && t.truncated && (t.closeTime ?? 0) >= ctx.from);
   const closed = mine.filter((t) => !t.open && !t.truncated && (t.closeTime ?? 0) >= ctx.from);
@@ -128,7 +132,7 @@ export function auditBook(
   const verdict = overallVerdict(core, rows);
   const pr = priorities(behavior.leaks);
   return {
-    book,
+    book: book === 'all' ? 'directional' : book,
     trades: closed,
     open,
     truncated,
@@ -173,10 +177,12 @@ export function runJournal(input: {
     accountSize: input.accountSize
   });
   const directional = auditBook('directional', all, { tz: input.tz, accountSize: input.accountSize, notes, links, auto, from: input.from, sourceNotes: input.sourceNotes });
+  const allPerp = auditBook('all', all, { tz: input.tz, accountSize: input.accountSize, notes, links, auto, from: input.from, sourceNotes: input.sourceNotes });
+  const directionalOutsideRange = all.filter((t) => t.book === 'directional' && !t.open && !t.truncated && (t.closeTime ?? 0) < input.from).length;
   const neutralTrades = all.filter((t) => t.book === 'neutral');
   const neutralKeys = input.accounts.filter((a) => roleOf(a.key, a.venue, input.settings.roles) === 'neutral').map((a) => a.key);
   const neutral = neutralBook({ trades: neutralTrades, fills: input.fills, funding: input.funding, accounts: input.accounts, neutralKeys, platformDaily: input.platformDaily, from: input.from, tz: input.tz, now });
-  return { all, notes, links, auto, directional, neutral, neutralTrades };
+  return { all, notes, links, auto, directional, allPerp, directionalOutsideRange, neutral, neutralTrades };
 }
 
 /**

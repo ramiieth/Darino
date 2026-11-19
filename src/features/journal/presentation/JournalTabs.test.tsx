@@ -108,4 +108,44 @@ describe('تب‌های ژورنال', () => {
     const b = render(withQuery(<BaseRatePanel symbol="BTC" direction="long" entry={100} stop={101} target={104} />));
     expect(b.container.textContent).toBe('');
   });
+
+  it('وقتی معاملهٔ جهت‌دار نیست، حسابرسی و برنامهٔ معامله خودکار روی پرپ نوترال و اسپات فعال می‌شوند', () => {
+    const fills: Fill[] = [
+      { id: `${LR.key}|0`, account: LR.key, venue: LR.venue, symbol: 'ETH', side: 'sell', px: 2000, sz: 1, time: T0, fee: 0.2, realized: null, posBefore: null },
+      { id: `${LR.key}|1`, account: LR.key, venue: LR.venue, symbol: 'ETH', side: 'buy', px: 1950, sz: 1, time: T0 + 10 * H, fee: 0.2, realized: null, posBefore: null }
+    ];
+    const trades = buildTrades(fills, [], new Set());
+    const j = runJournal({ trades, fills, funding: [], accounts: [LR], notes: new Map(), plans: [], settings: DEFAULT_SETTINGS, accountSize: 5000, platformDaily: new Map(), from: 0, tz: 'UTC', sourceNotes: [], now: T0 + 100 * H });
+    const openAsset = { asset: 'ETH', symbol: 'ETH', icon: null, qty: 2, basisQty: 2, unknownQty: 0, cost: 5000, avgCost: 2500, open: true, firstTime: T0, lastTime: T0 + H, value: 5400, realized: 0, unrealized: 400, unknownProceeds: 0, boughtUsd: 5000, soldUsd: 0, buys: 2, sells: 0, buysAll: 2, sellsAll: 0, dust: false };
+    const mockSpotBook = {
+      assets: [openAsset],
+      open: [openAsset],
+      closed: [],
+      sales: [],
+      swaps: [],
+      totals: { swaps: 2, volume: 5000, realized: 0, unrealized: 400, gas: 4, swapCost: 5, wins: 0, losses: 0, unknownProceeds: 0, chains: ['Ethereum'], protocols: [{ name: 'Uniswap', n: 2, volume: 5000 }] }
+    };
+
+    const a = render(
+      withQuery(
+        <MemoryRouter>
+          <AuditTab a={j.directional} fallbackAudit={j.allPerp} spotBook={mockSpotBook} tz="UTC" empty={<p>خالی</p>} />
+        </MemoryRouter>
+      )
+    );
+    expect(screen.queryByText('خالی')).toBeNull();
+    expect(screen.getByText('حسابرسی خودکار روی کل معاملات پرپ (شامل دفتر دلتا نوترال)')).toBeTruthy();
+    expect(screen.getByText('حسابرسی خودکار معاملات اسپات (کیف پول‌ها)')).toBeTruthy();
+    a.unmount();
+
+    render(
+      withQuery(
+        <MemoryRouter>
+          <PlanTab plans={[]} trades={j.all} links={j.links} auto={j.auto} settings={DEFAULT_SETTINGS} accounts={[LR]} accountSize={5000} spotBook={mockSpotBook} prefill={null} onPrefillUsed={() => {}} />
+        </MemoryRouter>
+      )
+    );
+    expect(screen.getByText('برنامهٔ خودکار روی همهٔ معاملات پرپ (شامل دفتر نوترال) فعال شد')).toBeTruthy();
+    expect(screen.getByText('برنامهٔ خودکار پوزیشن‌های باز اسپات (کیف پول‌ها)')).toBeTruthy();
+  });
 });

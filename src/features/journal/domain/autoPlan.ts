@@ -255,8 +255,8 @@ export function autoPlans(
     if (t.closeTime !== null) lastClose.set(k, Math.max(lastClose.get(k) ?? 0, t.closeTime));
   }
   for (const t of trades) {
-    // جهت‌دار: همه · نوترال: فقط پوزیشن باز (تا هر پوزیشن زنده در «برنامهٔ معامله» دیده شود)
-    if ((t.book !== 'directional' && !t.open) || manual.has(t.id)) continue;
+    // برای همهٔ معاملات (جهت‌دار، نوترال و پوزیشن‌های باز) که برنامهٔ دستی ندارند برنامهٔ خودکار ساخته می‌شود
+    if (manual.has(t.id)) continue;
     const lv = levelsFor(t, byAccount.get(t.account) ?? [], coverage.get(t.account), now, prevClose.get(t.id) ?? null);
     const outlook = outlookOf?.(t) ?? null;
     const suggested = buildSuggestedPlanLevels({ entry: t.entryPx, direction: t.direction, outlook, atr: null });
@@ -311,13 +311,13 @@ export interface AutoReport {
   noStopNet: number;
 }
 
-export function autoReport(trades: readonly ClassifiedTrade[], plans: ReadonlyMap<string, TradePlan>, accountSize: number | null, maxRiskPct: number): AutoReport {
+export function autoReport(trades: readonly ClassifiedTrade[], plans: ReadonlyMap<string, TradePlan>, accountSize: number | null, maxRiskPct: number, includeNeutral = false): AutoReport {
   const r: AutoReport = { trades: 0, readable: 0, withStop: 0, late: 0, widened: 0, tightened: 0, withTarget: 0, overRisk: 0, avgRiskPct: null, avgR: null, stopBreaches: 0, counterTrend: { n: 0, net: 0 }, withTrend: { n: 0, net: 0 }, noStopNet: 0 };
   const risks: number[] = [];
   const rs: number[] = [];
   for (const t of trades) {
     const p = plans.get(t.id);
-    if (!p || t.book !== 'directional') continue;
+    if (!p || (!includeNeutral && t.book !== 'directional')) continue;
     r.trades++;
     const a = p.auto;
     if (a?.stopSource !== 'unreadable') r.readable++;
