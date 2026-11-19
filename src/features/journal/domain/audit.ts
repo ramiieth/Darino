@@ -13,6 +13,7 @@ import { analyzeBehavior, type Behavior, type Leak } from './behavior';
 import { buildScorecard, confidenceOf, overallVerdict, priorities, rankRows, type Confidence, type ScoreRow, type StatusBand } from './scorecard';
 import { linkPlans, plannedRisks } from './plan';
 import { autoPlans, type OrderCoverage } from './autoPlan';
+import { buildEffectiveNotes } from './autoAnnotate';
 import { neutralBook, type DailyAccountPoint, type NeutralBook } from './neutral';
 import type { Trade } from './types';
 
@@ -55,11 +56,11 @@ export interface BookAudit {
 
 export interface JournalAudit {
   all: ClassifiedTrade[];
-  /** یادداشت‌ها + تگ نوع ورودِ برنامهٔ متصل (به‌عنوان تگ «قبل از نتیجه») */
+  /** یادداشت‌ها + تگ نوع ورودِ برنامهٔ متصل + تکمیل خودکار برای معاملات بدون یادداشت دستی */
   notes: Map<string, TradeNote>;
   /** برنامه‌های نوشته‌شده (دستی) */
   links: Map<string, TradePlan>;
-  /** برنامهٔ خودکار هر معاملهٔ جهت‌دار بدون برنامهٔ نوشته‌شده (از سفارش‌های SL/TP صرافی) */
+  /** برنامهٔ خودکار هر معاملهٔ جهت‌دار بدون برنامهٔ نوشته‌شده (از سفارش‌های SL/TP صرافی + پیشنهاد ATR) */
   auto: Map<string, TradePlan>;
   directional: BookAudit;
   neutral: NeutralBook;
@@ -89,8 +90,8 @@ function confidenceFor(closed: ClassifiedTrade[], open: number, truncated: numbe
       disables: 'سنجش رسیدن به هدف', enable: 'روی صرافی هدف (TP) بگذارید.'
     },
     {
-      field: 'why', label: 'تگ «چرا»', pct: pctOf(closed.filter((t) => (notes.get(t.id)?.whyTags.length ?? 0) > 0).length, n),
-      disables: 'سود هر نوع ورود (کشف ستاپ)', enable: 'در «معاملات» برای هر معامله تگ «چرا وارد شدم» بزنید.'
+      field: 'why', label: 'تگ «چرا» (خودکار + دستی)', pct: pctOf(closed.filter((t) => (notes.get(t.id)?.whyTags.length ?? 0) > 0).length, n),
+      disables: 'سود هر نوع ورود (کشف ستاپ)', enable: 'تگ‌های «چرا» خودکار پر می‌شوند و در «معاملات» قابل ویرایش‌اند.'
     },
     {
       field: 'balance', label: 'اندازهٔ حساب', pct: accountSize ? 100 : 0,
@@ -163,7 +164,14 @@ export function runJournal(input: {
   const all = classifyTrades(input.trades, input.settings, input.notes, now);
   const links = linkPlans(input.plans, all);
   const auto = autoPlans(all, links, input.orders ?? [], input.orderCoverage ?? new Map(), now);
-  const notes = withPlanTags(input.notes, links);
+  const allPlans = new Map<string, TradePlan>([...auto, ...links]);
+  const notes = buildEffectiveNotes({
+    trades: all,
+    manualNotes: withPlanTags(input.notes, links),
+    plans: allPlans,
+    settings: input.settings,
+    accountSize: input.accountSize
+  });
   const directional = auditBook('directional', all, { tz: input.tz, accountSize: input.accountSize, notes, links, auto, from: input.from, sourceNotes: input.sourceNotes });
   const neutralTrades = all.filter((t) => t.book === 'neutral');
   const neutralKeys = input.accounts.filter((a) => roleOf(a.key, a.venue, input.settings.roles) === 'neutral').map((a) => a.key);

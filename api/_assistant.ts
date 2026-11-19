@@ -26,20 +26,28 @@ export async function analyze(data: z.infer<typeof analysisSchema>): Promise<str
 /* ---------------- فراخوان مشترک Gemini ---------------- */
 
 /**
- * مدل‌های جایگزین وقتی مدل اول شلوغ (۵۰۳)، کند یا ناموجود (۴۰۴) است — فقط Flash نسل ۳.
- * اگر فهرست مدل‌های فعال از گوگل گرفته شود، به‌جای این حدس‌ها همان فهرست واقعی (جدیدترین اول) استفاده می‌شود؛
- * gemini-flash-latest (آخرین Flash گوگل) همیشه پشتیبان نهایی است.
+ * مدل‌های جایگزین وقتی مدل اول شلوغ (۵۰۳)، کند یا ناموجود (۴۰۴) است:
+ * از جدیدترین مدل‌ها (نسل ۳ و ۲.۵) به ترتیب تا gemini-flash-latest.
+ * اگر فهرست مدل‌های فعال از گوگل گرفته شود، به‌جای حدس‌ها همان فهرست واقعی (جدیدترین اول) استفاده می‌شود.
  */
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-flash-latest'];
+const FALLBACK_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-flash-latest'
+];
 /**
- * مدل اول هر بخش؛ پیش‌فرض همه Flash (GEMINI_MODEL). در صورت نیاز با
+ * مدل اول هر بخش؛ پیش‌فرض آخرین مدل پرچمدار (GEMINI_MODEL). در صورت نیاز با
  * GEMINI_MODEL_CHAT / _PERFORMANCE / _REVIEW / _TOOLS برای یک بخش عوض می‌شود.
  */
 const LANE_MODEL_ENV: Record<GeminiLane, string> = { chat: 'GEMINI_MODEL_CHAT', performance: 'GEMINI_MODEL_PERFORMANCE', review: 'GEMINI_MODEL_REVIEW', tools: 'GEMINI_MODEL_TOOLS' };
 const LANE_MODEL_DEFAULT: Partial<Record<GeminiLane, string>> = {};
-/** مدل اول پیش‌فرض: Gemini 4 Argon (جدیدترین و قوی‌ترین؛ فقط کلید پولی). اگر جواب نداد → زنجیرهٔ Flash */
+/** مدل اول پیش‌فرض: Gemini 4 Argon (جدیدترین و قوی‌ترین؛ فقط کلید پولی). اگر جواب نداد → زنجیرهٔ مدل‌های بعدی */
 const DEFAULT_MODEL = 'gemini-4-argon';
-/** سقف زمان یک تلاش با مدل سنگین (Argon/Pro) وقتی Flash پشتیبان هست — تا بلافاصله مدل‌های بعدی امتحان شوند */
+/** سقف زمان یک تلاش با مدل سنگین (Argon/Pro) وقتی مدل‌های پشتیبان هستند — تا بلافاصله مدل‌های بعدی امتحان شوند */
 const PRO_ATTEMPT_MS = 20_000;
 const isSlowModel = (m: string) => /pro|argon/i.test(m);
 /** سیاست ارز کل اپ در همهٔ پاسخ‌ها */
@@ -58,10 +66,10 @@ function thinkingFor(model: string) {
   return /^gemini-3[.-]/.test(model) ? { thinkingLevel: 'low' } : /^gemini-2\.5-flash(?:-lite)?$/.test(model) ? { thinkingBudget: 0 } : /^gemini-flash(-lite)?-latest$/.test(model) ? { thinkingBudget: 0 } : undefined;
 }
 
-/* ---------------- کشف خودکار مدل‌های Flash فعال برای همین کلید ---------------- */
+/* ---------------- کشف خودکار مدل‌های فعال برای همین کلید ---------------- */
 
-/** فقط Flash اصلی نسل‌دار (مثل gemini-3.8-flash)؛ lite / image / tts / live / preview کنار می‌روند */
-const FLASH_RE = /^gemini-(\d+(?:\.\d+)?)-flash$/;
+/** مدل‌های اصلی نسل‌دار (Pro و Flash، مثل gemini-3.8-flash یا gemini-2.5-pro)؛ image / tts / live / embedding کنار می‌روند */
+const FLASH_RE = /^gemini-(\d+(?:\.\d+)?)-(flash|pro)$/;
 const DISCOVERY_TTL_MS = 6 * 60 * 60_000;
 const DISCOVERY_FAIL_TTL_MS = 5 * 60_000;
 let flashCache: { at: number; ttl: number; models: string[] } | undefined;
@@ -69,7 +77,7 @@ let flashCache: { at: number; ttl: number; models: string[] } | undefined;
 export const _resetGeminiDiscovery = () => { flashCache = undefined; modelCooldown.clear(); };
 
 /**
- * فهرست Flashهایی که همین کلید واقعاً به آن‌ها دسترسی دارد، جدیدترین اول (از ListModels گوگل).
+ * فهرست مدل‌های تولید متنی که همین کلید واقعاً به آن‌ها دسترسی دارد، جدیدترین اول (از ListModels گوگل).
  * فقط وقتی مدل اول جواب نداد صدا زده می‌شود (مسیر عادی بدون تأخیر) و ۶ ساعت کش می‌شود.
  */
 async function discoverFlash(key: string): Promise<string[]> {
@@ -83,7 +91,13 @@ async function discoverFlash(key: string): Promise<string[]> {
         .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
         .map((m) => (m.name ?? '').replace(/^models\//, ''))
         .filter((n) => FLASH_RE.test(n))
-        .sort((a, b) => Number(FLASH_RE.exec(b)![1]) - Number(FLASH_RE.exec(a)![1]));
+        .sort((a, b) => {
+          const ma = FLASH_RE.exec(a)!;
+          const mb = FLASH_RE.exec(b)!;
+          const diff = Number(mb[1]) - Number(ma[1]);
+          if (diff !== 0) return diff;
+          return (mb[2] === 'pro' ? 1 : 0) - (ma[2] === 'pro' ? 1 : 0);
+        });
     }
   } catch (e) {
     console.error('[gemini] discovery', e instanceof Error ? e.message : e);
@@ -134,7 +148,7 @@ export const hasGeminiKey = () => geminiKeys('chat').length > 0;
  *   بار اول فهرست واقعی Flashهای فعال کلید از گوگل گرفته می‌شود؛ اگر همهٔ مدل‌ها رد شدند، با مکث کوتاه
  *   دور دوباره (حداکثر ۲ دور اضافه) تا سقف زمان. فقط کلید خراب (کاری از مدل دیگر برنمی‌آید) فوراً خطا می‌دهد.
  */
-async function gemini(req: { lane: GeminiLane; system: string; contents: unknown[]; config: Record<string, unknown>; timeoutMs?: number }): Promise<{ text: string; finishReason: string | undefined }> {
+async function gemini(req: { lane: GeminiLane; system: string; contents: unknown[]; config: Record<string, unknown>; timeoutMs?: number; validate?: (text: string) => boolean }): Promise<{ text: string; finishReason: string | undefined; model: string }> {
   const keys = geminiKeys(req.lane);
   if (!keys.length) throw new ProviderError(503, 'کلید دستیار Gemini هنوز در سرور تنظیم نشده است');
   let ki = 0;
@@ -230,11 +244,11 @@ async function gemini(req: { lane: GeminiLane; system: string; contents: unknown
       const body = (await r.json()) as GeminiBody;
       const c = body.candidates?.[0];
       const text = c?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? '').join('').trim() ?? '';
-      if (text) return { text, finishReason: c?.finishReason };
-      console.error('[gemini]', req.lane, model, 'empty', c?.finishReason, body.promptFeedback?.blockReason);
+      if (text && (!req.validate || req.validate(text))) return { text, finishReason: c?.finishReason, model };
+      console.error('[gemini]', req.lane, model, text ? 'invalid-output' : 'empty', c?.finishReason, body.promptFeedback?.blockReason);
       last = body.promptFeedback?.blockReason || c?.finishReason === 'SAFETY' ? 'دستیار به این درخواست پاسخ نداد (فیلتر ایمنی Gemini)' : c?.finishReason === 'MAX_TOKENS' ? 'پاسخ دستیار قبل از نوشتن به سقف طول رسید' : 'پاسخ قابل نمایش از دستیار دریافت نشد';
       lastStatus = 502;
-      // پاسخ خالی/فیلترشده → مدل دیگر شاید پاسخ دهد
+      // پاسخ خالی/فیلترشده/ساختار ناقص → بلافاصله مدل بعدی در زنجیره امتحان شود
       if (await advance()) continue;
       break;
     }
@@ -468,22 +482,180 @@ export function sanitizeReview(raw: unknown, input: z.infer<typeof reviewAnalysi
   };
 }
 
-/** تکمیل خودکار مرور هفتگی با Gemini (خروجی ساخت‌یافتهٔ JSON) */
-export async function analyzeReview(data: z.infer<typeof reviewAnalysisSchema>): Promise<ReviewResult> {
-  const { text, finishReason } = await gemini({ lane: 'review',
-    system: REVIEW_SYSTEM,
-    contents: [{ role: 'user', parts: [{ text: JSON.stringify(data) }] }],
-    // تفکر مدل هم از همین سقف خرج می‌کند؛ با ۴۰۰۰ پاسخ فارسی (خلاصه + یادداشت‌ها + همهٔ سؤال‌ها) وسط JSON قطع می‌شد
-    config: { temperature: 0.3, maxOutputTokens: 12000, responseMimeType: 'application/json', responseSchema: REVIEW_RESPONSE_SCHEMA },
-    timeoutMs: 60_000
-  });
-  try {
-    return sanitizeReview(JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')), data);
-  } catch {
-    console.error('[gemini] review parse', finishReason, text.length);
-    if (finishReason === 'MAX_TOKENS') throw new ProviderError(502, 'پاسخ دستیار به سقف طول رسید و ناقص ماند؛ دوباره تلاش کنید');
-    throw new ProviderError(502, 'پاسخ دستیار ساختار درستی نداشت؛ دوباره تلاش کنید');
+/**
+ * موتور قطعی پشتیبان مرور هفتگی: اگر هیچ‌کدام از مدل‌های Gemini پاسخ ندهند
+ * (مثلاً نبود کلید، اتمام سهمیه یا قطعی موقت)، از روی اعداد واقعی هفته مرور کامل می‌سازد تا هرگز خطا ندهد.
+ */
+export function buildDeterministicReview(data: z.infer<typeof reviewAnalysisSchema>): ReviewResult {
+  const s = data.stats as Record<string, unknown>;
+  const nTrades = typeof s.trades === 'number' ? s.trades : data.trades.length;
+  const netPnl = typeof s.netPnlUsd === 'number' ? s.netPnlUsd : 0;
+  const winRate = typeof s.winRatePct === 'number' ? s.winRatePct : null;
+  const offRules = typeof s.offRulesCount === 'number' ? s.offRulesCount : 0;
+  const spot = data.spot as Record<string, unknown> | null | undefined;
+  const spotSwaps = spot && typeof spot.swaps === 'number' ? spot.swaps : 0;
+
+  const fmtUsd = (v: number) => `${v >= 0 ? '+' : '-'}${Math.abs(Math.round(v * 100) / 100).toLocaleString('en-US')} دلار`;
+  const pickAllowed = (candidates: string[], allowed: string[]) =>
+    candidates.filter((c) => allowed.includes(c)).slice(0, 3);
+
+  let noStopCount = 0;
+  let movedWiderCount = 0;
+  let liquidatedCount = 0;
+  let overRiskCount = 0;
+  let goodStopCount = 0;
+  let worstTrade: { symbol: string; net: number } | null = null;
+  let bestTrade: { symbol: string; net: number } | null = null;
+
+  for (const t of data.trades) {
+    const pnl = typeof t.netPnlUsd === 'number' ? t.netPnlUsd : 0;
+    const sym = typeof t.symbol === 'string' ? t.symbol : 'معامله';
+    if (!worstTrade || pnl < worstTrade.net) worstTrade = { symbol: sym, net: pnl };
+    if (!bestTrade || pnl > bestTrade.net) bestTrade = { symbol: sym, net: pnl };
+    if (t.stop === 'none') noStopCount++;
+    if (t.stop === 'exchange' && t.stopMoved !== 'wider') goodStopCount++;
+    if (t.stopMoved === 'wider') movedWiderCount++;
+    if (t.liquidated === true) liquidatedCount++;
+    if (typeof t.riskPct === 'number' && data.maxRiskPct && t.riskPct > data.maxRiskPct * 1.05) overRiskCount++;
   }
+
+  const mistakeCandidates: string[] = [];
+  if (noStopCount > 0 || offRules > 0) mistakeCandidates.push('خارج از برنامه');
+  if (movedWiderCount > 0) mistakeCandidates.push('جابه‌جاکردن استاپ');
+  if (overRiskCount > 0 || liquidatedCount > 0) mistakeCandidates.push('حجم زیاد');
+  const mistakeTags = pickAllowed(mistakeCandidates, data.mistakeTags);
+
+  const goodCandidates: string[] = [];
+  if (goodStopCount > 0) goodCandidates.push('رعایت استاپ');
+  if (overRiskCount === 0 && nTrades > 0) goodCandidates.push('اندازهٔ درست');
+  if (offRules === 0 && nTrades > 0) goodCandidates.push('فقط ستاپ‌های برنامه');
+  const goodTags = pickAllowed(goodCandidates, data.goodTags);
+
+  const summaryLines: string[] = [];
+  if (nTrades > 0) {
+    summaryLines.push(
+      `در هفتهٔ ${data.week}، مجموعاً ${nTrades} معاملهٔ جهت‌دار بسته با سود خالص ${fmtUsd(netPnl)}${winRate !== null ? ` و نرخ برد ${Math.round(winRate)}٪` : ''} ثبت شد.`
+    );
+  }
+  if (spotSwaps > 0) {
+    const spotPnl = typeof spot?.realizedPnlUsd === 'number' ? spot.realizedPnlUsd : null;
+    summaryLines.push(`در بخش اسپات نیز ${spotSwaps} سواپ ثبت شده است${spotPnl !== null ? ` (سود تحقق‌یافته: ${fmtUsd(spotPnl)})` : ''}.`);
+  }
+  if (noStopCount > 0) {
+    summaryLines.push(`مهم‌ترین نقطهٔ قابل اصلاح: ${noStopCount} معامله بدون استاپ روی صرافی انجام شده است.`);
+  } else if (movedWiderCount > 0) {
+    summaryLines.push(`در ${movedWiderCount} معامله استاپ دورتر برده شده که ریسک واقعی را از برنامه بالاتر برده است.`);
+  } else if (goodStopCount > 0) {
+    summaryLines.push(`نقطهٔ قوت اصلی این هفته رعایت استاپ روی صرافی در ${goodStopCount} معامله بوده است.`);
+  }
+  if (worstTrade && worstTrade.net < 0) {
+    summaryLines.push(`پرهزینه‌ترین معاملهٔ هفته روی ${worstTrade.symbol} با نتیجهٔ ${fmtUsd(worstTrade.net)} ثبت شده است.`);
+  }
+  summaryLines.push('اولویت هفتهٔ آینده: ثبت استاپ هم‌زمان با ورود و پایبندی به سقف ریسک هر معامله.');
+
+  const mistakeNote =
+    worstTrade && worstTrade.net < 0
+      ? `پرهزینه‌ترین نتیجه روی ${worstTrade.symbol} (${fmtUsd(worstTrade.net)}) بود${noStopCount > 0 ? ` و ${noStopCount} معامله بدون استاپ روی صرافی باز شد` : ''}.`
+      : 'اشتباه پرهزینهٔ برجسته‌ای در اعداد این هفته ثبت نشد.';
+
+  const goodNote =
+    bestTrade && bestTrade.net > 0
+      ? `بهترین اجرا روی ${bestTrade.symbol} با سود ${fmtUsd(bestTrade.net)} بود${goodStopCount > 0 ? ` و در ${goodStopCount} معامله استاپ روی صرافی رعایت شد` : ''}.`
+      : 'ادامهٔ ثبت خودکار معاملات و بررسی هفتگی خودش یک برد فرایندی مهم است.';
+
+  const answers = data.questions.map((q) => ({
+    id: q.id,
+    text: /اشتباه|هزینه/i.test(q.title)
+      ? mistakeNote
+      : /رد|نگرفته/i.test(q.title)
+        ? 'پرهیز از ورودهای عجولانه بدون استاپ و بدون برنامه مهم‌ترین تصمیم کنترلی در هفتهٔ آینده است.'
+        : summaryLines[0] ?? 'بررسی بر اساس اعداد ثبت‌شدهٔ هفته انجام شد.'
+  }));
+
+  const commitments: ReviewResult['commitments'] = [];
+  const brokenPrev = data.previousCommitments.find((c) => c.status === 'broken');
+  if (brokenPrev) {
+    commitments.push({ type: 'requirePlan', text: `تکرار تعهد شکسته‌شدهٔ هفتهٔ قبل: ${brokenPrev.text}`.slice(0, 180) });
+  }
+  if (noStopCount > 0) {
+    commitments.push({ type: 'requirePlan', text: 'هیچ معامله‌ای بدون استاپ مشخص روی صرافی باز نشود.' });
+  }
+  if (overRiskCount > 0 || !commitments.length) {
+    commitments.push({
+      type: 'maxRiskPct',
+      pct: data.maxRiskPct ?? 1,
+      text: `سقف ریسک هر معامله حداکثر ${data.maxRiskPct ?? 1}٪ سرمایه بماند.`
+    });
+  }
+  if (commitments.length < 2 && nTrades >= 8) {
+    commitments.push({ type: 'maxTradesPerDay', n: 3, text: 'حداکثر ۳ معاملهٔ جهت‌دار در هر روز.' });
+  }
+
+  return sanitizeReview(
+    {
+      summary: summaryLines.join('\n'),
+      mistakeTags,
+      mistakeNote,
+      goodTags,
+      goodNote,
+      answers,
+      commitments: commitments.slice(0, 3)
+    },
+    data
+  );
+}
+
+/**
+ * تکمیل خودکار مرور هفتگی با آخرین مدل Gemini → در صورت خطا/تایم‌اوت/JSON ناقص بلافاصله مدل بعدی
+ * → و اگر هیچ‌کدام از مدل‌های AI پاسخ ندادند، موتور تحلیلی قطعی (هرگز خطا نمی‌دهد).
+ */
+export async function analyzeReviewWithMeta(
+  data: z.infer<typeof reviewAnalysisSchema>
+): Promise<{ review: ReviewResult; model: string; provider: 'gemini' | 'fallback' }> {
+  let parsedResult: ReviewResult | null = null;
+  try {
+    const { model } = await gemini({
+      lane: 'review',
+      system: REVIEW_SYSTEM,
+      contents: [{ role: 'user', parts: [{ text: JSON.stringify(data) }] }],
+      config: {
+        temperature: 0.3,
+        maxOutputTokens: 12000,
+        responseMimeType: 'application/json',
+        responseSchema: REVIEW_RESPONSE_SCHEMA
+      },
+      timeoutMs: 60_000,
+      validate: (rawText) => {
+        try {
+          const candidate = sanitizeReview(
+            JSON.parse(rawText.replace(/^```(?:json)?\s*|\s*```$/g, '')),
+            data
+          );
+          if (!candidate.summary) return false;
+          parsedResult = candidate;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    });
+    if (parsedResult) {
+      return { review: parsedResult, model, provider: 'gemini' };
+    }
+  } catch (e) {
+    console.error('[gemini] review fallback to deterministic engine', e instanceof Error ? e.message : e);
+  }
+  return {
+    review: buildDeterministicReview(data),
+    model: 'local-analytics',
+    provider: 'fallback'
+  };
+}
+
+/** تکمیل خودکار مرور هفتگی (سازگار با فراخوانی‌های مستقیم) */
+export async function analyzeReview(data: z.infer<typeof reviewAnalysisSchema>): Promise<ReviewResult> {
+  const { review } = await analyzeReviewWithMeta(data);
+  return review;
 }
 
 /* ---------------- کمیته چندایجنتی معامله (TradingAgents) ---------------- */

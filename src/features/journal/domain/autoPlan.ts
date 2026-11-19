@@ -170,6 +170,66 @@ export function autoOutlook(daily: readonly Candle[], at: number, direction: 'lo
   };
 }
 
+/**
+ * محاسبهٔ میانگین دامنهٔ واقعی (ATR ۱۴ روزه) از کندل‌های روزانهٔ بسته‌شده قبل از `at`.
+ */
+export function dailyAtr(daily: readonly Candle[], at: number, period = 14): number | null {
+  const closed = daily.filter((c) => c.t + DAY <= at);
+  if (closed.length < period + 1) return null;
+  const slice = closed.slice(-(period + 1));
+  let sum = 0;
+  for (let i = 1; i < slice.length; i++) {
+    const cur = slice[i];
+    const prevC = slice[i - 1].c;
+    const tr = Math.max(cur.h - cur.l, Math.abs(cur.h - prevC), Math.abs(cur.l - prevC));
+    sum += tr;
+  }
+  const atr = sum / period;
+  return Number.isFinite(atr) && atr > 0 ? atr : null;
+}
+
+/**
+ * پیشنهاد خودکار برنامهٔ معامله (استاپ، هدف ۲R و دلایل ورود/استاپ/هدف)
+ * برای زمانی که کاربر برنامهٔ دستی ننوشته یا روی صرافی استاپ/هدف نگذاشته است.
+ */
+export function buildSuggestedPlanLevels(input: {
+  entry: number | null;
+  direction: 'long' | 'short';
+  outlook: MarketOutlook | null;
+  atr: number | null;
+}): NonNullable<AutoPlanMeta['suggested']> | undefined {
+  const { entry, direction, outlook, atr } = input;
+  if (entry === null || !(entry > 0)) return undefined;
+  const long = direction === 'long';
+  const useAtr = atr !== null && atr > 0 && atr < entry * 0.4;
+  // فاصلهٔ استاپ: ۱.۵ برابر ATR روزانه (در صورت نبود کندل: ۲.۵٪ از قیمت ورود)
+  const dist = useAtr ? atr * 1.5 : entry * 0.025;
+  const stop = Math.max(entry * 0.01, long ? entry - dist : entry + dist);
+  const target = long ? entry + dist * 2 : Math.max(entry * 0.01, entry - dist * 2);
+
+  const sideFa = long ? 'لانگ' : 'شورت';
+  const trendText =
+    outlook?.proTrend === 'y'
+      ? 'هم‌جهت با روند روزانه'
+      : outlook?.proTrend === 'n'
+        ? 'خلاف روند روزانه (نیازمند حد زیان سخت‌گیرانه‌تر)'
+        : 'در وضعیت خنثی/بدون روند قطعی';
+  const envText =
+    outlook?.env === 'trend' ? 'محیط روند' : outlook?.env === 'range' ? 'محیط رنج' : 'محیط نامشخص';
+
+  return {
+    stop,
+    target,
+    atr: useAtr ? atr : null,
+    source: useAtr ? 'atr' : 'pct',
+    entryWhy: `ورود ${sideFa} خودکار · ${trendText} (${envText})`,
+    stopWhy: useAtr
+      ? 'استاپ پیشنهادی خودکار بر پایهٔ ۱٫۵ برابر نوسان واقعی روزانه (ATR14)'
+      : 'استاپ پیشنهادی خودکار بر پایهٔ ۲٫۵٪ فاصله از قیمت ورود (نوسان استاندارد)',
+    targetWhy: 'هدف پیشنهادی خودکار با نسبت سود به ریسک ۲R'
+  };
+}
+
 /* ---------------- ساخت برنامه‌های خودکار ---------------- */
 
 /**
@@ -199,6 +259,7 @@ export function autoPlans(
     if ((t.book !== 'directional' && !t.open) || manual.has(t.id)) continue;
     const lv = levelsFor(t, byAccount.get(t.account) ?? [], coverage.get(t.account), now, prevClose.get(t.id) ?? null);
     const outlook = outlookOf?.(t) ?? null;
+    const suggested = buildSuggestedPlanLevels({ entry: t.entryPx, direction: t.direction, outlook, atr: null });
     out.set(t.id, {
       id: `auto:${t.id}`,
       createdAt: t.openTime,
@@ -212,9 +273,9 @@ export function autoPlans(
       size: t.maxSize,
       leverage: null,
       setupTags: [],
-      entryWhy: '',
-      stopWhy: '',
-      targetWhy: '',
+      entryWhy: suggested?.entryWhy ?? '',
+      stopWhy: lv.stop !== null ? 'استاپ ثبت‌شده روی خود صرافی' : suggested?.stopWhy ?? '',
+      targetWhy: lv.target !== null ? 'هدف (TP) ثبت‌شده روی خود صرافی' : suggested?.targetWhy ?? '',
       confluences: [],
       reasonsAgainst: [],
       outlook: outlook ?? emptyOutlook(),
@@ -223,7 +284,7 @@ export function autoPlans(
       validHours: 0,
       notes: '',
       source: 'auto',
-      auto: { ...lv.meta, outlookAuto: !!outlook }
+      auto: { ...lv.meta, outlookAuto: !!outlook, suggested }
     });
   }
   return out;

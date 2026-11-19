@@ -16,7 +16,7 @@ import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getLighterOrders, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
-import { analyze, analysisSchema, hasGeminiKey, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReview, analyzeTradingAgents, optionsAnalysisSchema, reviewAnalysisSchema, tradingAgentsRequestSchema } from './_assistant.js';
+import { analyze, analysisSchema, hasGeminiKey, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReviewWithMeta, analyzeTradingAgents, optionsAnalysisSchema, reviewAnalysisSchema, tradingAgentsRequestSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
@@ -89,7 +89,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (req.method === 'POST' && op === 'analyze-review') {
       const parsed = reviewAnalysisSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات مرور هفتگی کامل یا معتبر نیست' }); return; }
-      json(res,200,{ review: await analyzeReview(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
+      const out = await analyzeReviewWithMeta(parsed.data);
+      json(res,200,{ review: out.review, model: out.model, provider: out.provider, generatedAt:Date.now() }); return;
     }
     if (req.method === 'POST' && op === 'analyze-trading-agents') {
       const parsed = tradingAgentsRequestSchema.safeParse(await readBody(req));
