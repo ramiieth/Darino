@@ -1,12 +1,11 @@
 /**
  * داشبورد یکپارچه «طلای ایران»
  *
- * شامل ۵ بخش تمیز و مرتبط به هم (با استفاده از نرخ زنده و ذخیره‌شده مشترک):
+ * شامل ۴ بخش تمیز و مرتبط به هم (با استفاده از نرخ زنده و ذخیره‌شده مشترک):
  * ۱. بازار و روند (قیمت روز طلای ۱۸ عیار، پلتفرم‌ها، سکه‌ها، تحلیل تاریخی ۷/۳۰/۶۰ روزه + نمودار تعاملی، اسنپ‌شات مستقل)
  * ۲. طلای آنلاین (ملی‌گلد و پلتفرم‌ها + افزودن پلتفرم سفارشی، محاسبه خرید، فروش، هزینه نگهداری و سربه‌سر)
  * ۳. طلای زینتی و مقایسه (محاسبه فاکتور خرید مصنوعات، فروش مجدد بدون اجرت/مالیات/سنگ، مقایسه با طلای آنلاین و سناریوی آینده)
  * ۴. صندوق‌های طلای بورسی (۶ صندوق با مرجع ثابت ۱۰ مرداد ۱۴۰۵ + ماشین‌حساب سرمایه‌گذاری با کارمزد ۰.۱۲٪)
- * ۵. دلار و تتر (تحلیل تاریخی دلار آزاد و تتر و مقایسه بازده با طلا)
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, Plus, RefreshCw, Trash2 } from 'lucide-react';
@@ -47,7 +46,6 @@ import {
   compareWithSnapshot,
   computeMovingHorizon,
   evaluateFutureGoldScenarios,
-  evaluateFxHistorical,
   evaluateGoldEtfCard,
   type GoldSnapshot,
   type HistoryHorizonDays,
@@ -64,7 +62,7 @@ const STORE_KEY = 'darino:iran-gold-suite:v1';
 const LAST_PAYLOAD_KEY = 'darino:iran-gold-last-payload:v1';
 const HISTORY_CACHE_KEY = 'darino:iran-gold-history18k:v1';
 
-type SectionTab = 'market' | 'online' | 'jewelry' | 'etf' | 'fx';
+type SectionTab = 'market' | 'online' | 'jewelry' | 'etf';
 
 interface EtfUserEntry {
   currentPrice: string;
@@ -110,12 +108,6 @@ interface SavedGoldState {
   etfBuyPrice: string;
   etfCurrentPrice: string;
   etfFuturePrice: string;
-  /* تحلیل تاریخی دلار و تتر */
-  fxRefDateLabel: string;
-  fxRefDollar: string;
-  fxRefUsdt: string;
-  fxCurrentDollarManual: string;
-  fxCurrentUsdtManual: string;
 }
 
 const DEFAULT_SNAPSHOTS: GoldSnapshot[] = [
@@ -167,12 +159,7 @@ const DEFAULTS: SavedGoldState = {
   etfIntegerOnly: true,
   etfBuyPrice: '52105',
   etfCurrentPrice: '',
-  etfFuturePrice: '65000',
-  fxRefDateLabel: '۱۰ مرداد ۱۴۰۵',
-  fxRefDollar: '60000',
-  fxRefUsdt: '60500',
-  fxCurrentDollarManual: '',
-  fxCurrentUsdtManual: ''
+  etfFuturePrice: '65000'
 };
 
 /* ---------------- توابع قالب‌بندی عددی فارسی ---------------- */
@@ -187,12 +174,17 @@ const parseCleanNum = (raw: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** نشانه‌های جداسازی جهت یونیکد برای نمایش صحیح علامت منفی/مثبت و درصد در متن راست‌به‌چپ */
+const RLI = '\u2067';
+const LRI = '\u2066';
+const PDI = '\u2069';
+
 const fmtToman = (v: number | null | undefined, signed = false): string => {
   if (v == null || !Number.isFinite(v)) return '—';
   const r = Math.round(v);
   const abs = Math.abs(r).toLocaleString('en-US');
-  const prefix = r > 0 && signed ? '+' : r < 0 ? '−' : '';
-  return `${prefix}${toFaDigits(abs)} تومان`;
+  const prefix = r > 0 && signed ? '+' : r < 0 ? '-' : '';
+  return `${RLI}${LRI}${prefix}${toFaDigits(abs)}${PDI} تومان${PDI}`;
 };
 
 const fmtPct = (v: number | null | undefined, digits = 2, signed = true): string => {
@@ -201,8 +193,8 @@ const fmtPct = (v: number | null | undefined, digits = 2, signed = true): string
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
   });
-  const prefix = v > 0 && signed ? '+' : v < 0 ? '−' : '';
-  return `${prefix}${toFaDigits(abs)}٪`;
+  const prefix = v > 0 && signed ? '+' : v < 0 ? '-' : '';
+  return `${LRI}${prefix}${toFaDigits(abs)}٪${PDI}`;
 };
 
 const fmtFaDate = (ts: number | null | undefined): string => {
@@ -215,8 +207,11 @@ const fmtFaDate = (ts: number | null | undefined): string => {
 };
 
 const pctRatio = (v: number, digits = 1, signed = true) => fmtPct(v * 100, digits, signed);
-const million = (toman: number) =>
-  `${toFaDigits((toman / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }))} میلیون`;
+const million = (toman: number) => {
+  const sign = toman < 0 ? '-' : '';
+  const num = toFaDigits((Math.abs(toman) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 }));
+  return `${RLI}${LRI}${sign}${num}${PDI} میلیون${PDI}`;
+};
 const year = (t: number) => toFaDigits(new Date(t).getUTCFullYear());
 
 /* ============================================================
@@ -227,9 +222,13 @@ export function GoldTab() {
   const q = useGold();
   const [s, setS] = useState<SavedGoldState>(() => {
     const saved = jsonGet<Partial<SavedGoldState> | null>(STORE_KEY, null) ?? {};
+    const validTabs: SectionTab[] = ['market', 'online', 'jewelry', 'etf'];
+    const safeTab: SectionTab =
+      saved.tab && validTabs.includes(saved.tab as SectionTab) ? (saved.tab as SectionTab) : 'market';
     return {
       ...DEFAULTS,
       ...saved,
+      tab: safeTab,
       snapshots:
         Array.isArray(saved.snapshots) && saved.snapshots.length > 0
           ? saved.snapshots
@@ -419,7 +418,7 @@ export function GoldTab() {
         </div>
       </Surface>
 
-      {/* ناوبری بخش‌های ۵گانه ماژول طلای ایران */}
+      {/* ناوبری بخش‌های ۴گانه ماژول طلای ایران */}
       <SegmentedControl<SectionTab>
         label="بخش‌های طلای ایران"
         value={s.tab}
@@ -428,8 +427,7 @@ export function GoldTab() {
           { value: 'market', label: 'بازار، تاریخچه و اسنپ‌شات' },
           { value: 'online', label: 'خرید طلای آنلاین' },
           { value: 'jewelry', label: 'طلای زینتی و مقایسه' },
-          { value: 'etf', label: 'صندوق‌های طلا' },
-          { value: 'fx', label: 'دلار و تتر' }
+          { value: 'etf', label: 'صندوق‌های طلا' }
         ]}
       />
 
@@ -477,16 +475,6 @@ export function GoldTab() {
       )}
 
       {s.tab === 'etf' && <GoldEtfSection s={s} set={set} setS={setS} />}
-
-      {s.tab === 'fx' && (
-        <FxHistoricalSection
-          s={s}
-          set={set}
-          liveDollarToman={d?.dollarToman ?? null}
-          liveUsdtToman={d?.usdtToman ?? d?.dollarToman ?? null}
-          gold30dPct={horizons.find((h) => h.days === 30)?.changePct ?? null}
-        />
-      )}
     </div>
   );
 }
@@ -620,12 +608,12 @@ function MarketAndHistorySection({
                   </td>
                   {h.available ? (
                     <>
-                      <td className="col-num">{fmtToman(h.startPriceToman)}</td>
-                      <td className="col-num font-semibold">{fmtToman(h.currentPriceToman)}</td>
-                      <td className={cn('col-num font-bold', (h.changeToman ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
+                      <td className="col-num whitespace-nowrap">{fmtToman(h.startPriceToman)}</td>
+                      <td className="col-num whitespace-nowrap font-semibold">{fmtToman(h.currentPriceToman)}</td>
+                      <td className={cn('col-num whitespace-nowrap font-bold', (h.changeToman ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
                         {fmtToman(h.changeToman, true)}
                       </td>
-                      <td className={cn('col-num font-bold', (h.changePct ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
+                      <td className={cn('col-num whitespace-nowrap font-bold', (h.changePct ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
                         {fmtPct(h.changePct)}
                       </td>
                     </>
@@ -1387,37 +1375,37 @@ function JewelryAndComparisonSection({
               <tbody>
                 <tr>
                   <td>ارزش طلای خام</td>
-                  <td className="col-num">{fmtToman(cmp.online.baseGoldValueToman)}</td>
-                  <td className="col-num">{fmtToman(cmp.jewelry.rawGoldValueToman)}</td>
+                  <td className="col-num whitespace-nowrap">{fmtToman(cmp.online.baseGoldValueToman)}</td>
+                  <td className="col-num whitespace-nowrap">{fmtToman(cmp.jewelry.rawGoldValueToman)}</td>
                 </tr>
                 <tr>
                   <td>مجموع اجرت، سود، مالیات و کارمزد خرید</td>
-                  <td className="col-num">{fmtToman(cmp.online.buyFeeToman + cmp.online.extraBuyCostsToman)}</td>
-                  <td className="col-num text-warn font-semibold">{fmtToman(cmp.jewelry.totalOverheadToman)}</td>
+                  <td className="col-num whitespace-nowrap">{fmtToman(cmp.online.buyFeeToman + cmp.online.extraBuyCostsToman)}</td>
+                  <td className="col-num whitespace-nowrap text-warn font-semibold">{fmtToman(cmp.jewelry.totalOverheadToman)}</td>
                 </tr>
                 <tr>
                   <td className="font-bold text-ink">مبلغ کل پرداختی در زمان خرید</td>
-                  <td className="col-num font-bold">{fmtToman(cmp.online.totalBuyCostToman)}</td>
-                  <td className="col-num font-bold">{fmtToman(cmp.jewelry.totalBuyInvoiceToman)}</td>
+                  <td className="col-num whitespace-nowrap font-bold">{fmtToman(cmp.online.totalBuyCostToman)}</td>
+                  <td className="col-num whitespace-nowrap font-bold">{fmtToman(cmp.jewelry.totalBuyInvoiceToman)}</td>
                 </tr>
                 <tr>
                   <td className="font-bold text-ink">مبلغ خالص دریافتی هنگام فروش مجدد</td>
-                  <td className="col-num font-bold">{fmtToman(cmp.online.netSellProceedsToman)}</td>
-                  <td className="col-num font-bold">{fmtToman(cmp.jewelry.resaleNetProceedsToman)}</td>
+                  <td className="col-num whitespace-nowrap font-bold">{fmtToman(cmp.online.netSellProceedsToman)}</td>
+                  <td className="col-num whitespace-nowrap font-bold">{fmtToman(cmp.jewelry.resaleNetProceedsToman)}</td>
                 </tr>
                 <tr>
                   <td>سود یا زیان خالص در قیمت امروز</td>
-                  <td className={cn('col-num font-bold', cmp.online.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', cmp.online.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(cmp.online.netProfitToman, true)} ({fmtPct(cmp.online.roiPct, 1)})
                   </td>
-                  <td className={cn('col-num font-bold', cmp.jewelry.netProfitOrLossToman >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', cmp.jewelry.netProfitOrLossToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(cmp.jewelry.netProfitOrLossToman, true)} ({fmtPct(cmp.jewelry.roiPct, 1)})
                   </td>
                 </tr>
                 <tr>
                   <td>رشد لازم قیمت طلا برای رسیدن به سربه‌سر</td>
-                  <td className="col-num">{fmtPct(cmp.onlineRequiredGrowthPctToBreakEven, 1)}</td>
-                  <td className="col-num font-semibold text-warn">{fmtPct(cmp.jewelryRequiredGrowthPctToBreakEven, 1)}</td>
+                  <td className="col-num whitespace-nowrap">{fmtPct(cmp.onlineRequiredGrowthPctToBreakEven, 1)}</td>
+                  <td className="col-num whitespace-nowrap font-semibold text-warn">{fmtPct(cmp.jewelryRequiredGrowthPctToBreakEven, 1)}</td>
                 </tr>
               </tbody>
             </table>
@@ -1477,20 +1465,20 @@ function JewelryAndComparisonSection({
             <tbody>
               {scenarioRows.map((r) => (
                 <tr key={r.future18kPriceToman}>
-                  <td className="font-bold text-ink">{fmtToman(r.future18kPriceToman)}</td>
-                  <td className={cn('col-num', r.changeVsCurrentPct >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className="whitespace-nowrap font-bold text-ink">{fmtToman(r.future18kPriceToman)}</td>
+                  <td className={cn('col-num whitespace-nowrap', r.changeVsCurrentPct >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtPct(r.changeVsCurrentPct, 1)}
                   </td>
-                  <td className={cn('col-num font-bold', r.onlineNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', r.onlineNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(r.onlineNetProfitToman, true)}
                   </td>
-                  <td className={cn('col-num font-bold', r.onlineRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', r.onlineRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtPct(r.onlineRoiPct, 1)}
                   </td>
-                  <td className={cn('col-num font-bold', r.jewelryNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', r.jewelryNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(r.jewelryNetProfitToman, true)}
                   </td>
-                  <td className={cn('col-num font-bold', r.jewelryRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
+                  <td className={cn('col-num whitespace-nowrap font-bold', r.jewelryRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtPct(r.jewelryRoiPct, 1)}
                   </td>
                 </tr>
@@ -1783,110 +1771,6 @@ function GoldEtfSection({
 }
 
 /* ============================================================
-   بخش ۵: تحلیل تاریخی دلار آزاد و تتر
-   ============================================================ */
-
-function FxHistoricalSection({
-  s,
-  set,
-  liveDollarToman,
-  liveUsdtToman,
-  gold30dPct
-}: {
-  s: SavedGoldState;
-  set: <K extends keyof SavedGoldState>(k: K, v: SavedGoldState[K]) => void;
-  liveDollarToman: number | null;
-  liveUsdtToman: number | null;
-  gold30dPct: number | null;
-}) {
-  const curDollar = parseCleanNum(s.fxCurrentDollarManual) || liveDollarToman || 0;
-  const curUsdt = parseCleanNum(s.fxCurrentUsdtManual) || liveUsdtToman || curDollar;
-
-  const fx = useMemo(
-    () =>
-      evaluateFxHistorical({
-        referenceDateLabelFa: s.fxRefDateLabel,
-        referenceDollarToman: parseCleanNum(s.fxRefDollar),
-        referenceUsdtToman: parseCleanNum(s.fxRefUsdt),
-        currentDollarToman: curDollar,
-        currentUsdtToman: curUsdt,
-        goldGrowthPctInSamePeriod: gold30dPct
-      }),
-    [s.fxRefDateLabel, s.fxRefDollar, s.fxRefUsdt, curDollar, curUsdt, gold30dPct]
-  );
-
-  return (
-    <Surface className="p-4 sm:p-5 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-ink">تحلیل تاریخی دلار آزاد و تتر</h3>
-        <span className="text-2xs text-subtle">مقایسه نرخ مرجع ثبت‌شده با نرخ روز و اسپرد تتر</span>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="عنوان / تاریخ مرجع">
-          <Input value={s.fxRefDateLabel} onChange={(e) => set('fxRefDateLabel', e.target.value)} />
-        </Field>
-        <Field label="دلار آزاد در تاریخ مرجع (تومان)">
-          <Input dir="ltr" inputMode="numeric" value={s.fxRefDollar} onChange={(e) => set('fxRefDollar', e.target.value)} />
-        </Field>
-        <Field label="تتر در تاریخ مرجع (تومان)">
-          <Input dir="ltr" inputMode="numeric" value={s.fxRefUsdt} onChange={(e) => set('fxRefUsdt', e.target.value)} />
-        </Field>
-        <Field label="دلار آزاد فعلی (تومان)">
-          <Input
-            dir="ltr"
-            inputMode="numeric"
-            value={s.fxCurrentDollarManual}
-            onChange={(e) => set('fxCurrentDollarManual', e.target.value)}
-            placeholder={liveDollarToman ? String(Math.round(liveDollarToman)) : 'ورود دستی'}
-          />
-        </Field>
-        <Field label="تتر فعلی (تومان)">
-          <Input
-            dir="ltr"
-            inputMode="numeric"
-            value={s.fxCurrentUsdtManual}
-            onChange={(e) => set('fxCurrentUsdtManual', e.target.value)}
-            placeholder={liveUsdtToman ? String(Math.round(liveUsdtToman)) : 'ورود دستی'}
-          />
-        </Field>
-      </div>
-
-      {fx.valid && (
-        <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-          <div className="rounded-field border border-divider bg-card p-3">
-            <p className="text-2xs text-muted">تغییر دلار آزاد نسبت به مرجع</p>
-            <p className={cn('mt-1 text-sm font-extrabold', fx.dollarChangePct >= 0 ? 'text-positive' : 'text-negative')}>
-              {fmtPct(fx.dollarChangePct)}
-            </p>
-            <p className="text-2xs text-subtle">{fmtToman(fx.dollarDiffToman, true)}</p>
-          </div>
-          <div className="rounded-field border border-divider bg-card p-3">
-            <p className="text-2xs text-muted">تغییر تتر نسبت به مرجع</p>
-            <p className={cn('mt-1 text-sm font-extrabold', fx.usdtChangePct >= 0 ? 'text-positive' : 'text-negative')}>
-              {fmtPct(fx.usdtChangePct)}
-            </p>
-            <p className="text-2xs text-subtle">{fmtToman(fx.usdtDiffToman, true)}</p>
-          </div>
-          <div className="rounded-field border border-divider bg-card p-3">
-            <p className="text-2xs text-muted">اختلاف (اسپرد) تتر با دلار آزاد</p>
-            <p className="mt-1 text-sm font-extrabold text-ink">{fmtPct(fx.currentUsdtSpreadPct)}</p>
-            <p className="text-2xs text-subtle">در تاریخ مرجع: {fmtPct(fx.referenceUsdtSpreadPct)}</p>
-          </div>
-          <div className="rounded-field border border-accent/30 bg-accent-soft/20 p-3">
-            <p className="text-2xs font-semibold text-accent">عملکرد طلا نسبت به دلار</p>
-            <p className="mt-1 text-sm font-extrabold text-ink">
-              {fx.goldOutperformanceVsDollarPct !== null ? fmtPct(fx.goldOutperformanceVsDollarPct) : '—'}
-            </p>
-            <p className="text-2xs text-subtle">سهم رشد انس جهانی و حباب</p>
-          </div>
-        </div>
-      )}
-    </Surface>
-  );
-}
-
-/* ============================================================
    کامپوننت‌های موجود ارزش‌گذاری، پلتفرم‌ها، سکه‌ها و تجزیه رشد
    ============================================================ */
 
@@ -1970,7 +1854,7 @@ function PremiumBar({
         <p className="text-2xs font-semibold text-muted">
           {stats
             ? `بازهٔ متعادل تاریخی (از ${year(stats.since)}): بین ${pctRatio(stats.p10)} تا ${pctRatio(stats.p90)} · میانه ${pctRatio(stats.p50)}`
-            : `محدودهٔ هزینهٔ رفت‌وبرگشت: ±${pctRatio(high, 1, false)}`}
+            : `محدودهٔ هزینهٔ رفت‌وبرگشت: ${LRI}±${pctRatio(high, 1, false)}${PDI}`}
         </p>
       )}
       <div dir="ltr" className="relative mt-2.5 h-2 rounded-full bg-surface-2" role="img" aria-label={`حباب ${pctRatio(now)}`}>
@@ -2094,7 +1978,7 @@ function Growth({ rows }: { rows: Decomposition[] }) {
                 {[r.iran, r.ounce, r.dollar, r.premium].map((v, i) => (
                   <td
                     key={i}
-                    className={cn('col-num', i === 0 && 'font-bold', v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '')}
+                    className={cn('col-num whitespace-nowrap', i === 0 && 'font-bold', v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '')}
                   >
                     {Number.isFinite(v) ? pctRatio(v) : '—'}
                   </td>
