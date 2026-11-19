@@ -142,7 +142,7 @@ function JournalView() {
           <>
             {j.loading && tab !== 'settings' && <p className="text-xs text-muted">در حال دریافت تاریخچه از {fa(j.histories.filter((h) => h.status === 'loading').length)} حساب…</p>}
             {tab === 'audit' && <p className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-xs leading-6 text-muted">{FLOW_ROLE.audit} <Link to="/desk" className="font-semibold text-accent underline">چک قبل از ورود ←</Link></p>}
-            {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} />}
+            {tab === 'audit' && d && <AuditTab a={d} empty={empty} tz={j.tz} settings={j.data.settings} reviews={j.data.reviews} />}
             {tab === 'trades' && tradesView === 'perp' && <TradesTab trades={directionalTrades} notes={a.notes} links={a.links} auto={a.auto} settings={j.data.settings} />}
             {tab === 'plan' && <PlanTab plans={j.data.plans} trades={a.all} links={a.links} auto={a.auto} settings={j.data.settings} accounts={j.accounts} accountSize={j.accountSize} prefill={prefill} onPrefillUsed={clearPrefill} />}
             {tab === 'trades' && tradesView === 'spot' && <SpotTab from={range === 'all' ? 0 : spotFrom} />}

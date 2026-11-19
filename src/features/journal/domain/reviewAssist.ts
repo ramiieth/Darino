@@ -1,5 +1,5 @@
 /**
- * تکمیل خودکار مرور هفتگی با دستیار (Gemini، سمت سرور) — بخش خالص: ساخت ورودی و ادغام پاسخ
+ * تکمیل خودکار مرور هفتگی با دستیار (Gemini، سمت سرور) — بخش خالص: ساخت ورودی، ادغام پاسخ و پشتیبان قطعی
  *
  *   تگ، یادداشت و «چرا وارد شدم» اختیاری‌اند: بدون آن‌ها هم مرور از روی اعداد معاملات (پرپ و اسپات) کامل می‌شود.
  *   ورودی فقط آمار مشتق‌شده است: نماد، جهت، سود خالص، R، ریسک، مدت، ساعت ورود، تگ‌ها و منبع استاپ.
@@ -131,7 +131,6 @@ export function reviewPayload(input: {
       };
     }),
     previousCommitments: input.checks.slice(0, 3).map(({ c, res }) => ({ text: (c.text || RULE_FA[c.rule.type]).slice(0, 200), rule: c.rule.type, status: res.status, detail: res.detail.slice(0, 200) })),
-    // سرور هر تگ را تا ۶۰ نویسه می‌پذیرد؛ تگ بلندتر کل درخواست را رد می‌کرد
     mistakeTags: settings.mistakeTags.slice(0, 60).map((t) => t.slice(0, 60)),
     goodTags: settings.goodTags.slice(0, 60).map((t) => t.slice(0, 60)),
     whyTags: settings.whyTags.slice(0, 60).map((t) => t.slice(0, 60)),
@@ -157,7 +156,12 @@ function toRule(c: ReviewSuggestion['commitments'][number]): CommitmentRule | nu
 }
 
 /** پاسخ دستیار → مرور؛ فقط خالی‌ها پر می‌شوند (نوشتهٔ کاربر دست نمی‌خورد) */
-export function mergeSuggestion(r: WeeklyReview, s: ReviewSuggestion, now = Date.now()): WeeklyReview {
+export function mergeSuggestion(
+  r: WeeklyReview,
+  s: ReviewSuggestion,
+  now = Date.now(),
+  meta?: { model?: string; provider?: 'gemini' | 'fallback' }
+): WeeklyReview {
   const answers = { ...r.answers };
   for (const a of s.answers) if (!answers[a.id]?.trim()) answers[a.id] = a.text;
   const commitments = r.commitments.length ? r.commitments : s.commitments.flatMap((c, i): Commitment[] => {
@@ -173,6 +177,107 @@ export function mergeSuggestion(r: WeeklyReview, s: ReviewSuggestion, now = Date
     answers,
     commitments,
     aiSummary: s.summary,
-    aiAt: now
+    aiAt: now,
+    ...(meta?.model ? { aiModel: meta.model } : {}),
+    ...(meta?.provider ? { aiProvider: meta.provider } : {})
+  };
+}
+
+/**
+ * پشتیبان قطعی سمت کلاینت برای مرور هفتگی:
+ * حتی اگر شبکه یا سرور در لحظه در دسترس نبود، مرور هفتگی از روی اعداد واقعی هفته بدون خطا ساخته می‌شود.
+ */
+export function buildLocalReviewSuggestion(payload: ReviewPayload): ReviewSuggestion {
+  const s = payload.stats as Record<string, unknown>;
+  const nTrades = typeof s.trades === 'number' ? s.trades : payload.trades.length;
+  const netPnl = typeof s.netPnlUsd === 'number' ? s.netPnlUsd : 0;
+  const winRate = typeof s.winRatePct === 'number' ? s.winRatePct : null;
+  const offRules = typeof s.offRulesCount === 'number' ? s.offRulesCount : 0;
+  const spot = payload.spot as Record<string, unknown> | null;
+  const spotSwaps = spot && typeof spot.swaps === 'number' ? spot.swaps : 0;
+
+  const fmtUsd = (v: number) => `${v >= 0 ? '+' : '-'}${Math.abs(Math.round(v * 100) / 100).toLocaleString('en-US')} دلار`;
+  const pickAllowed = (candidates: string[], allowed: string[]) =>
+    candidates.filter((c) => allowed.includes(c)).slice(0, 3);
+
+  let noStopCount = 0;
+  let movedWiderCount = 0;
+  let overRiskCount = 0;
+  let goodStopCount = 0;
+  let worstTrade: { symbol: string; net: number } | null = null;
+  let bestTrade: { symbol: string; net: number } | null = null;
+
+  for (const t of payload.trades) {
+    const pnl = typeof t.netPnlUsd === 'number' ? t.netPnlUsd : 0;
+    const sym = typeof t.symbol === 'string' ? t.symbol : 'معامله';
+    if (!worstTrade || pnl < worstTrade.net) worstTrade = { symbol: sym, net: pnl };
+    if (!bestTrade || pnl > bestTrade.net) bestTrade = { symbol: sym, net: pnl };
+    if (t.stop === 'none') noStopCount++;
+    if (t.stop === 'exchange' && t.stopMoved !== 'wider') goodStopCount++;
+    if (t.stopMoved === 'wider') movedWiderCount++;
+    if (typeof t.riskPct === 'number' && payload.maxRiskPct && t.riskPct > payload.maxRiskPct * 1.05) overRiskCount++;
+  }
+
+  const mistakeCandidates: string[] = [];
+  if (noStopCount > 0 || offRules > 0) mistakeCandidates.push('خارج از برنامه');
+  if (movedWiderCount > 0) mistakeCandidates.push('جابه‌جاکردن استاپ');
+  if (overRiskCount > 0) mistakeCandidates.push('حجم زیاد');
+  const mistakeTags = pickAllowed(mistakeCandidates, payload.mistakeTags);
+
+  const goodCandidates: string[] = [];
+  if (goodStopCount > 0) goodCandidates.push('رعایت استاپ');
+  if (overRiskCount === 0 && nTrades > 0) goodCandidates.push('اندازهٔ درست');
+  if (offRules === 0 && nTrades > 0) goodCandidates.push('فقط ستاپ‌های برنامه');
+  const goodTags = pickAllowed(goodCandidates, payload.goodTags);
+
+  const lines: string[] = [];
+  if (nTrades > 0) {
+    lines.push(
+      `در هفتهٔ ${payload.week}، ${nTrades} معاملهٔ جهت‌دار بسته با سود خالص ${fmtUsd(netPnl)}${winRate !== null ? ` و نرخ برد ${Math.round(winRate)}٪` : ''} ثبت شد.`
+    );
+  }
+  if (spotSwaps > 0) {
+    lines.push(`در بخش اسپات نیز ${spotSwaps} سواپ در همین هفته ثبت شده است.`);
+  }
+  if (noStopCount > 0) {
+    lines.push(`اولویت اصلی: ${noStopCount} معامله بدون استاپ روی صرافی باز شده است؛ برای هفتهٔ بعد استاپ را هم‌زمان با ورود ثبت کنید.`);
+  } else if (movedWiderCount > 0) {
+    lines.push(`در ${movedWiderCount} معامله استاپ دورتر برده شده است؛ استاپ اولیه را تغییر ندهید.`);
+  } else {
+    lines.push('نظم ریسک و ثبت استاپ را در هفتهٔ آینده حفظ کنید.');
+  }
+
+  const mistakeNote =
+    worstTrade && worstTrade.net < 0
+      ? `پرهزینه‌ترین معاملهٔ هفته روی ${worstTrade.symbol} (${fmtUsd(worstTrade.net)}) بود.`
+      : 'اشتباه پرهزینهٔ برجسته‌ای در اعداد این هفته ثبت نشد.';
+  const goodNote =
+    bestTrade && bestTrade.net > 0
+      ? `بهترین معاملهٔ هفته روی ${bestTrade.symbol} (${fmtUsd(bestTrade.net)}) بود.`
+      : 'ثبت خودکار معاملات و پیگیری مرور هفتگی ادامه دارد.';
+
+  const answers = payload.questions.map((q) => ({
+    id: q.id,
+    text: /اشتباه|هزینه/i.test(q.title) ? mistakeNote : lines[0] ?? 'بر اساس اعداد ثبت‌شدهٔ هفته تکمیل شد.'
+  }));
+
+  const commitments: ReviewSuggestion['commitments'] = [];
+  if (noStopCount > 0) {
+    commitments.push({ type: 'requirePlan', text: 'هیچ معامله‌ای بدون استاپ مشخص روی صرافی باز نشود.' });
+  }
+  commitments.push({
+    type: 'maxRiskPct',
+    pct: payload.maxRiskPct ?? 1,
+    text: `سقف ریسک هر معامله حداکثر ${payload.maxRiskPct ?? 1}٪ سرمایه بماند.`
+  });
+
+  return {
+    summary: lines.join('\n'),
+    mistakeTags,
+    mistakeNote,
+    goodTags,
+    goodNote,
+    answers,
+    commitments: commitments.slice(0, 3)
   };
 }

@@ -13,10 +13,14 @@ import { Notice } from '@/shared/components/ui/StateViews';
 import { Button } from '@/shared/components/ui/Button';
 import { cn } from '@/shared/lib/cn';
 import type { BookAudit } from '../domain/audit';
+import { buildAutoCritiqueLoop } from '../domain/autoAnnotate';
 import { CONFIDENCE_FA, STATUS_FA, type ScoreRow } from '../domain/scorecard';
 import { STYLE_FA } from '../domain/metrics';
-import { VENUE_FA } from '../domain/types';
-import { dayKey } from '../domain/time';
+import { DEFAULT_SETTINGS } from '../domain/defaults';
+import { emptyReview } from '../domain/review';
+import { saveReview } from '../data/journalStore';
+import { VENUE_FA, type JournalSettings, type WeeklyReview } from '../domain/types';
+import { dayKey, isoWeekKey } from '../domain/time';
 import { ChartBlock, ClassBadge, duration, fa, faDate, faDateTime, pct, pnlTone, ScoreRowView, Term, usd, VerdictBadge } from './parts';
 import { Bars, EquityChart } from './charts';
 import { ExcursionPanel } from './ExcursionPanel';
@@ -59,11 +63,13 @@ function Hero({ label, value, sub, tone }: { label: React.ReactNode; value: stri
 
 const toneOf = (r: ScoreRow | undefined) => (!r ? 'neutral' : r.verdict === 'meets' ? 'gain' : r.verdict === 'borderline' ? 'warn' : r.verdict === 'fails' ? 'loss' : 'neutral');
 
-export function AuditTab({ a, empty, tz }: { a: BookAudit; empty: React.ReactNode; tz: string }) {
+export function AuditTab({ a, empty, tz, settings = DEFAULT_SETTINGS, reviews }: { a: BookAudit; empty: React.ReactNode; tz: string; settings?: JournalSettings; reviews?: ReadonlyMap<string, WeeklyReview> }) {
   const m = a.core;
   const b = a.behavior;
   const row = (id: string) => a.rows.find((r) => r.id === id);
   const [showAllTrades, setShowAllTrades] = useState(false);
+  const [loopApplied, setLoopApplied] = useState(false);
+  const critique = useMemo(() => buildAutoCritiqueLoop(a, settings), [a, settings]);
 
   const eq = useMemo(() => ({ labels: m.equity.map((p) => faDate(p.t)), equity: m.equity.map((p) => p.equity), drawdown: m.equity.map((p) => p.drawdown) }), [m.equity]);
   const hist = useMemo(() => {
@@ -152,6 +158,49 @@ export function AuditTab({ a, empty, tz }: { a: BookAudit; empty: React.ReactNod
           </div>
         </Disclosure>
       </Surface>
+
+      {/* لوپ نقد کمّی خودکار (تشخیص ← نقد متقابل آماری ← تعهد اجرایی) */}
+      {critique.active && (
+        <Surface variant="focal" className="space-y-3 border border-accent/40 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold text-accent">لوپ نقد خودکار معاملات (فعال)</p>
+              <p className="text-[11px] text-muted">حسابرسی خودکار از معاملات واقعی + اعتبارسنجی آماری + تبدیل مستقیم به قانون هفتهٔ بعد</p>
+            </div>
+            <Badge tone="info">{critique.confidenceLabel}</Badge>
+          </div>
+          <div className="grid gap-2.5 md:grid-cols-3">
+            {critique.steps.map((st) => (
+              <div key={st.stage} className="rounded-control border border-divider bg-card p-3">
+                <p className="text-xs font-bold text-ink">{st.title}</p>
+                <p className="mt-1 text-xs leading-6 text-muted">{st.body}</p>
+              </div>
+            ))}
+          </div>
+          {reviews && critique.proposedCommitments.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-2.5">
+              <span className="text-[11px] text-subtle">قوانین استخراج‌شده از لوپ نقد را مستقیم به تعهدهای مرور این هفته اضافه کنید تا هفتهٔ بعد خودکار سنجیده شوند.</span>
+              {loopApplied ? (
+                <Badge tone="gain">✓ به تعهدهای مرور این هفته اضافه شد</Badge>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const wk = isoWeekKey(Date.now(), tz);
+                    const base = reviews.get(wk) ?? emptyReview(wk);
+                    const existingTexts = new Set(base.commitments.map((c) => c.text));
+                    const merged = [...base.commitments, ...critique.proposedCommitments.filter((c) => !existingTexts.has(c.text))].slice(0, 3);
+                    void saveReview({ ...base, commitments: merged }).then(() => setLoopApplied(true));
+                  }}
+                >
+                  افزودن خودکار قوانین به مرور این هفته
+                </Button>
+              )}
+            </div>
+          )}
+        </Surface>
+      )}
 
       {/* اول این را درست کن */}
       {a.first ? (

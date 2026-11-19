@@ -17,6 +17,7 @@ import type { Bias, ClassifiedTrade, JournalSettings, TradePlan } from '../domai
 import { VENUE_FA } from '../domain/types';
 import { autoReport, type AutoReport } from '../domain/autoPlan';
 import { useAutoOutlook } from '../data/useOutlook';
+import { savePlan } from '../data/journalStore';
 import { fa, faDateTime, pct, pnlTone, usd } from './parts';
 import { AmountText } from '@/shared/components/ui/FinancialValue';
 
@@ -152,13 +153,40 @@ function Insights({ rep, maxRiskPct }: { rep: AutoReport; maxRiskPct: number }) 
 /* ---------------- کارت هر معامله ---------------- */
 
 function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: TradePlan; accountSize: number | null; maxRiskPct: number }) {
+  const [saved, setSaved] = useState(false);
   const a = p.auto;
+  const sug = a?.suggested;
   const long = t.direction === 'long';
+  const effectiveStop = p.stop ?? sug?.stop ?? null;
+  const effectiveTarget = p.target ?? sug?.target ?? null;
   const riskUsd = p.stop !== null && p.entry !== null ? t.maxSize * Math.abs(p.entry - p.stop) : null;
   const riskPct = riskUsd !== null && accountSize ? (riskUsd / accountSize) * 100 : null;
   const rTarget = p.stop !== null && p.target !== null && p.entry !== null && p.entry !== p.stop ? Math.abs(p.target - p.entry) / Math.abs(p.entry - p.stop) : null;
   const R = !t.open && riskUsd ? t.netPnl / riskUsd : null;
   const o = p.outlook;
+  const needsSuggestedLevels = (p.stop === null || p.target === null) && !!sug;
+  const suggestedSizeUsd =
+    accountSize && p.entry && sug && Math.abs(p.entry - sug.stop) > 0
+      ? ((accountSize * maxRiskPct) / 100) / (Math.abs(p.entry - sug.stop) / p.entry)
+      : null;
+
+  async function adoptAutoPlan() {
+    const now = Date.now();
+    await savePlan({
+      ...p,
+      id: `p${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      stop: effectiveStop,
+      target: effectiveTarget,
+      setupTags: o.proTrend === 'y' ? ['هم‌جهت با روند'] : o.proTrend === 'n' ? ['خلاف روند'] : [],
+      source: undefined,
+      auto: undefined,
+      status: 'taken',
+      linkedTradeId: t.id,
+      updatedAt: now
+    });
+    setSaved(true);
+  }
+
   return (
     <Surface className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -174,11 +202,11 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
         </div>
       </div>
 
-      <LevelBar long={long} stop={p.stop} entry={p.entry} target={p.target} exit={t.open ? null : t.exitPx} finalStop={a?.finalStop ?? null} />
+      <LevelBar long={long} stop={effectiveStop} entry={p.entry} target={effectiveTarget} exit={t.open ? null : t.exitPx} finalStop={a?.finalStop ?? null} />
 
       <div className="flex flex-wrap gap-1.5">
         {a?.stopSource === 'exchange' && <Badge tone="gain"><ShieldCheck />استاپ روی صرافی</Badge>}
-        {a?.stopSource === 'none' && <Badge tone="loss"><ShieldAlert />بدون استاپ</Badge>}
+        {a?.stopSource === 'none' && <Badge tone="loss"><ShieldAlert />بدون استاپ روی صرافی</Badge>}
         {a?.stopSource === 'unreadable' && <Badge tone="neutral"><ShieldQuestion />استاپ خوانده نمی‌شود</Badge>}
         {rTarget !== null && <Badge tone="info">هدف {fa(rTarget, 1)}R</Badge>}
         {riskPct !== null && <Badge tone={riskPct > maxRiskPct ? 'loss' : 'neutral'}>ریسک {pct(riskPct, 2)} حساب</Badge>}
@@ -187,6 +215,26 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
         {a?.stopMoved === 'wider' && <Badge tone="loss">استاپ دورتر شد</Badge>}
         {a?.stopMoved === 'tighter' && <Badge tone="gain">استاپ به سمت سود رفت</Badge>}
       </div>
+
+      {needsSuggestedLevels && sug && (
+        <div className="rounded-control border border-accent/30 bg-accent-soft/20 p-2.5 text-[11px] leading-5">
+          <p className="font-bold text-accent">برنامهٔ پیشنهادی خودکار ({sug.source === 'atr' ? 'بر پایهٔ نوسان واقعی ATR14' : 'بر پایهٔ فاصلهٔ استاندارد ۲٫۵٪'}):</p>
+          <p className="mt-1 text-ink">
+            استاپ پیشنهادی: <b className="num-ltr text-negative">{fa(sug.stop, 5)}</b> · هدف ۲R: <b className="num-ltr text-positive">{fa(sug.target, 5)}</b>
+            {suggestedSizeUsd !== null && <> · حجم مجاز ({pct(maxRiskPct, 1)} ریسک): <b className="num-ltr">{usd(suggestedSizeUsd)}</b></>}
+          </p>
+          <p className="mt-0.5 text-muted">{sug.entryWhy}</p>
+          {t.open && (
+            <div className="mt-2">
+              {saved ? (
+                <span className="font-semibold text-positive">✓ به‌عنوان برنامهٔ رسمی این پوزیشن ثبت شد</span>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => void adoptAutoPlan()}>تأیید و ثبت خودکار به‌عنوان برنامهٔ من</Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {a?.outlookAuto ? (
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-control border border-divider bg-divider text-center">

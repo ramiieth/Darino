@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { fetchJson } from '@/repositories/remoteClient';
-import { mergeSuggestion, reviewPayload, spotWeek, type ReviewSuggestion } from '../domain/reviewAssist';
+import { buildLocalReviewSuggestion, mergeSuggestion, reviewPayload, spotWeek, type ReviewSuggestion } from '../domain/reviewAssist';
 import { useSpot } from '../data/useSpot';
 import { Link } from 'react-router-dom';
 import { Surface } from '@/shared/components/ui/GlassCard';
@@ -101,8 +101,8 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
   }, [reviews, byWeek, notes, links, risks]);
   const patterns = useMemo(() => crossWeekPatterns(allStats.filter((s) => s.n > 0), reviews, broken), [allStats, reviews, broken]);
 
-  // ---------- تکمیل خودکار با دستیار ----------
-  const [ai, setAi] = useState<{ week: string; status: 'loading' | 'error'; error?: string } | null>(null);
+  // ---------- تکمیل خودکار با دستیار (آخرین مدل AI ← مدل‌های بعدی ← پشتیبان تحلیلی بدون خطا) ----------
+  const [ai, setAi] = useState<{ week: string; status: 'loading' } | null>(null);
   const latest = useRef(r);
   latest.current = r;
   const tried = useRef(new Set<string>());
@@ -110,15 +110,20 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
   const runAi = useCallback(async () => {
     const w = week;
     setAi({ week: w, status: 'loading' });
+    const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz, spot: wSpot });
     try {
-      const body = reviewPayload({ week: w, stats, trades: wTrades, notes, plans: allPlans, checks, settings, accountSize, tz, spot: wSpot });
-      const res = await fetchJson<{ review: ReviewSuggestion }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 120_000 });
+      const res = await fetchJson<{ review: ReviewSuggestion; model?: string; provider?: 'gemini' | 'fallback' }>('/api/integrations?op=analyze-review', { method: 'POST', body, timeoutMs: 120_000 });
       if (latest.current.week !== w) { setAi(null); return; }
-      await saveReview(mergeSuggestion(latest.current, res.review));
+      await saveReview(mergeSuggestion(latest.current, res.review, Date.now(), { model: res.model, provider: res.provider }));
       setDraft(null);
       setAi(null);
-    } catch (e) {
-      setAi({ week: w, status: 'error', error: e instanceof Error ? e.message : 'دستیار پاسخ نداد' });
+    } catch {
+      // لایهٔ اطمینان دوم: حتی در قطعی کامل شبکه/سرور، مرور هفتگی از روی اعداد واقعی بدون خطا کامل می‌شود
+      if (latest.current.week !== w) { setAi(null); return; }
+      const local = buildLocalReviewSuggestion(body);
+      await saveReview(mergeSuggestion(latest.current, local, Date.now(), { model: 'local-analytics', provider: 'fallback' }));
+      setDraft(null);
+      setAi(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [week, wTrades, notes, allPlans, settings, accountSize, tz, wSpot]);
@@ -195,16 +200,12 @@ export function ReviewTab({ trades, notes, links, auto, reviews, settings, tz, a
             <div className="flex flex-wrap items-center gap-2">
               <Sparkles className="h-4 w-4 text-accent" />
               <h3 className="text-sm font-bold text-ink">جمع‌بندی منتور (دستیار)</h3>
+              {r.aiProvider === 'gemini' && r.aiModel && <Badge tone="info" className="num-ltr">{r.aiModel}</Badge>}
+              {r.aiProvider === 'fallback' && <Badge tone="neutral">تحلیل خودکار از اعداد واقعی</Badge>}
               {r.aiAt && <span className="text-[11px] text-subtle">· {faDateTime(r.aiAt)}</span>}
               <Button size="sm" variant="ghost" className="ms-auto" icon={<RefreshCw />} disabled={aiBusy || !hasActivity} onClick={() => void runAi()}>{r.aiAt ? 'به‌روزرسانی' : 'تکمیل خودکار'}</Button>
             </div>
             {aiBusy ? <p className="text-xs text-muted">دستیار در حال مرور معاملات این هفته است…</p>
-              : ai?.week === week && ai.status === 'error' ? (
-                <Notice tone="warn">
-                  {ai.error}{' '}
-                  <button type="button" className="underline" onClick={() => void runAi()}>تلاش دوباره</button>
-                </Notice>
-              )
               : r.aiSummary ? <p className="whitespace-pre-line text-sm leading-7 text-ink">{r.aiSummary}</p>
               : <p className="text-xs text-muted">{hasActivity ? 'با باز شدن هفته‌ای که معامله دارد، اشتباه‌ها، قوت‌ها، پاسخ سؤال‌ها و تعهدهای هفتهٔ بعد خودکار پیشنهاد و ذخیره می‌شوند؛ تگ و یادداشت لازم نیست.' : spot.loading ? 'در حال خواندن سواپ‌های اسپات…' : 'معاملهٔ بسته‌ای (پرپ یا اسپات) در این هفته نیست.'}</p>}
             {spotSwaps > 0 && <p className="text-[11px] text-subtle">اسپات این هفته هم در مرور است: {fa(spotSwaps)} سواپ.</p>}
