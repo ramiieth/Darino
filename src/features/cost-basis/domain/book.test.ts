@@ -75,3 +75,35 @@ it('automatically updates ETH cost basis and weighted average across 4 Uniswap s
  expect(v.basis).toBeCloseTo(11393.6,2);
  expect(v.pnl).not.toBeNull();
 });
+it('automatically updates ETH cost basis & average buy price for Arbitrum Uniswap v4 execute swaps',()=>{
+ const ethAsset={key:'fungible:ethereum',tokenId:'ethereum',symbol:'ETH',name:'Ether',chain:'ethereum',contract:null,icon:null};
+ const initialBook:CostBook={
+  version:1,
+  asOf:1000,
+  migrationConfirmed:true,
+  legacyRetired:true,
+  lots:[{id:'current:fungible:ethereum',asset:ethAsset,quantity:'1',unitCost:'2500',fee:'0',at:1000,source:'current-balance-confirmed'}]
+ };
+ const v4Swap:WalletTransaction={
+  id:'v4-arb-1',
+  hash:'0xabc4',
+  chain:'arbitrum',
+  type:'execute',
+  protocol:'Uniswap v4',
+  status:'confirmed',
+  minedAt:new Date(5000).toISOString(),
+  fee:null,
+  transfers:[
+   {direction:'out',symbol:'USDC',tokenId:'usd-coin',chain:'arbitrum',contract:'0xaf88d065e77c8cc2239327c5edb3a432268e5831',quantity:'196.88643',value:null,address:null,icon:null,verified:true},
+   {direction:'in',symbol:'ETH',tokenId:'ethereum',chain:'arbitrum',contract:null,quantity:'0.11087572',value:196.58,address:null,icon:null,verified:true}
+  ]
+ };
+ const r=replayCost(initialBook,[v4Swap]);
+ expect(r.issues).toEqual([]);
+ expect(r.processed).toHaveLength(1);
+ const v=valueCost(r.lots.filter(l=>l.asset.key==='fungible:ethereum'),'1.11087572',1773);
+ expect(v.covered).toBe('1.11087572');
+ expect(v.unknown).toBe('0');
+ expect(v.basis).toBeCloseTo(2696.88643,2);
+ expect(v.basis / 1.11087572).toBeCloseTo(2427.71,1);
+});

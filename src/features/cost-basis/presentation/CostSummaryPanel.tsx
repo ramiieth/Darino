@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { BasisEditor } from './BasisEditor';
 import { Button } from '@/shared/components/ui/Button';
 import { useCustodyStore, getPref } from '@/features/custody/data/repository';
@@ -42,7 +43,7 @@ export function CostSummaryPanel({ portfolio, links }: { portfolio: ConnectedPor
   return <div className="flex flex-col gap-1" title={estimate&&at?`برآورد بر پایهٔ آخرین دریافت: ${new Date(at).toLocaleString('fa-IR')}`:undefined}><MoneyValue digits={2} value={value} signed tone="auto" state={row.stale?'stale':'ready'}/><PercentValue value={row.basis!==null&&row.basis>0?value/row.basis*100:null} className="text-xs"/>{estimate&&<span className="text-[10px] text-muted">{row.stale?'برآورد ذخیره‌شده':'برآورد موجودی فعلی'}</span>}{row.valuation.unknown !== '0' && <span className="text-[10px] text-muted">فقط بخش دارای بهای خرید</span>}</div>;
  };
  return <Surface as="section" aria-labelledby="dashboard-cost-title" className="cost-summary min-w-0 p-4 md:p-5">
-  <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="dashboard-cost-title" className="text-base font-bold">بهای خرید و سود و زیان</h2><span className="text-xs text-muted">کیف پول · پرپچوال · بوروس</span></div>
+  <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 id="dashboard-cost-title" className="text-base font-bold">بهای خرید و سود و زیان</h2><div className="flex items-center gap-2"><span className="text-xs text-muted">کیف پول · پرپچوال · بوروس</span><Button size="sm" variant="ghost" icon={<RefreshCw className="h-3.5 w-3.5"/>} loading={portfolio.loading} onClick={()=>void portfolio.refresh()}>به‌روزرسانی میانگین</Button></div></div>
   {boros.error&&<Notice tone="warn">بوروس: {boros.error}</Notice>}
   {boros.loading&&!boros.data&&<p className="text-xs text-muted mb-3">در حال دریافت موجودی بوروس…</p>}
   {!rows.length ? <p className="text-sm text-muted">دارایی قابل محاسبه‌ای موجود نیست.</p> : <>
