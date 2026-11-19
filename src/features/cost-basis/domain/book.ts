@@ -54,23 +54,36 @@ function transferAssetKey(t:TransactionTransfer,chain:string,knownAssetKeys:Read
  return {key:`fungible:${rawId}`,tokenId:rawId,symbol:t.symbol};
 }
 
-/** تجمیع پایه‌های ورودی یا خروجی سواپ (برای پشتیبانی از سواپ‌های چندمسیره Uniswap Universal Router) */
+const L2_CHAINS=new Set(['arbitrum','base','optimism','polygon','linea','scroll','zksync-era','avalanche','bsc','gnosis','zora','unichain']);
+
+/** برآورد ارزش دلاری پایهٔ سواپ وقتی ارائه‌دهنده value را خالی بگذارد ولی price یا استیبل‌کوین معتبر موجود باشد */
+function resolveTransferUsdValue(t:TransactionTransfer,chain:string):number | null {
+ if(t.value!==null&&Number.isFinite(t.value)&&t.value>=0) return t.value;
+ if(t.quantity&&decimalPositive(t.quantity)) {
+  if(t.price!==null&&t.price!==undefined&&Number.isFinite(t.price)&&t.price>=0) return new Decimal(t.quantity).times(t.price).toNumber();
+  if(verifiedCash(t.chain??chain,t.contract,t)) return new Decimal(t.quantity).toNumber();
+ }
+ return null;
+}
+
+/** تجمیع پایه‌های ورودی یا خروجی سواپ (برای پشتیبانی از سواپ‌های چندمسیره Uniswap v4 / Universal Router) */
 function aggregateSwapLegs(transfers:readonly TransactionTransfer[],chain:string,knownAssetKeys:ReadonlySet<string>):TransactionTransfer[] | null {
  const valid=transfers.filter(t=>!t.spam&&t.verified!==false&&t.quantity&&decimalPositive(t.quantity));
  if(!valid.length) return null;
  const byKey=new Map<string,TransactionTransfer>();
  for(const t of valid) {
   const resolved=transferAssetKey(t,chain,knownAssetKeys);
-  if(!resolved||t.value===null||!Number.isFinite(t.value)||t.value<0) return null;
+  const legValue=resolveTransferUsdValue(t,chain);
+  if(!resolved||legValue===null) return null;
   const prev=byKey.get(resolved.key);
   if(prev) {
    byKey.set(resolved.key,{
     ...prev,
     quantity:new Decimal(prev.quantity!).plus(t.quantity!).toString(),
-    value:new Decimal(prev.value!).plus(t.value).toNumber()
+    value:new Decimal(prev.value!).plus(legValue).toNumber()
    });
   } else {
-   byKey.set(resolved.key,{...t,tokenId:resolved.tokenId,symbol:resolved.symbol});
+   byKey.set(resolved.key,{...t,tokenId:resolved.tokenId,symbol:resolved.symbol,value:legValue});
   }
  }
  return [...byKey.values()];
@@ -127,15 +140,19 @@ export function replayCost(book:CostBook, transactions:WalletTransaction[],links
    for(const l of open){if(left.lte(0))break;const take=Decimal.min(left,l.quantity),received=take.times(buy.quantity).div(sell.quantity);l.quantity=new Decimal(l.quantity).minus(take).toString();left=left.minus(take);added.push({...l,id:key+':'+l.id,asset:{...l.asset,chain:buy.chain??l.asset.chain,contract:buy.contract??null},quantity:received.toString(),unitCost:take.times(l.unitCost).div(received).toString(),source:key});}
    lots.push(...added);processed.push(key);continue;
   }
-  if(tx.type!=='trade') continue;
   const rawIn=tx.transfers.filter(t=>t.direction==='in'),rawOut=tx.transfers.filter(t=>t.direction==='out');
+  const isExplicitSwap=tx.type==='trade'||tx.type==='swap'||(tx.acts?.some(a=>a.type==='trade'||a.type==='swap')??false);
+  const isExecuteSwap=tx.type==='execute'&&rawIn.length>0&&rawOut.length>0;
+  if(!isExplicitSwap&&!isExecuteSwap) continue;
   const incoming=aggregateSwapLegs(rawIn,tx.chain,knownAssetKeys),outgoing=aggregateSwapLegs(rawOut,tx.chain,knownAssetKeys);
   if(!incoming||!outgoing||incoming.length!==1||outgoing.length!==1) {
+   if(isExecuteSwap&&!isExplicitSwap) continue;
    if(rawIn.length!==1||rawOut.length!==1) {fail(key,'مبادلهٔ چندمرحله‌ای؛ نیازمند بررسی',affected);continue;}
    fail(key,'هویت، مقدار، ارزش تاریخی یا کارمزد نامشخص',affected);continue;
   }
   const buy=incoming[0],sell=outgoing[0];
-  if(!buy.tokenId||!sell.tokenId||!buy.quantity||!sell.quantity||!decimalPositive(buy.quantity)||!decimalPositive(sell.quantity)||sell.value===null||buy.value===null||!Number.isFinite(sell.value)||!Number.isFinite(buy.value)||sell.value<0||buy.value<0||tx.fee===null||!Number.isFinite(tx.fee)||tx.fee<0||sell.spam||buy.spam||sell.verified===false||buy.verified===false) {fail(key,'هویت، مقدار، ارزش تاریخی یا کارمزد نامشخص',affected);continue;}
+  const feeUsd=tx.fee!==null&&Number.isFinite(tx.fee)&&tx.fee>=0?tx.fee:(L2_CHAINS.has(tx.chain.toLowerCase())?0:null);
+  if(!buy.tokenId||!sell.tokenId||!buy.quantity||!sell.quantity||!decimalPositive(buy.quantity)||!decimalPositive(sell.quantity)||sell.value===null||buy.value===null||!Number.isFinite(sell.value)||!Number.isFinite(buy.value)||sell.value<0||buy.value<0||feeUsd===null||sell.spam||buy.spam||sell.verified===false||buy.verified===false) {fail(key,'هویت، مقدار، ارزش تاریخی یا کارمزد نامشخص',affected);continue;}
   const sellKey=`fungible:${sell.tokenId}`,buyKey=`fungible:${buy.tokenId}`;
   if(sellKey===buyKey) {
    // تبدیل مستقیم ETH <-> WETH سواپ مشمول سود/زیان نیست
@@ -148,9 +165,9 @@ export function replayCost(book:CostBook, transactions:WalletTransaction[],links
   let left=new Decimal(sell.quantity),basis=new Decimal(0);
   if(sellCash) basis=new Decimal(sell.value);
   else for(const l of open) {if(left.lte(0))break;const qty=Decimal.min(left,l.quantity);basis=basis.plus(qty.times(l.unitCost));l.quantity=new Decimal(l.quantity).minus(qty).toString();left=left.minus(qty);}
-  if(!sellCash) realized=realized.plus(new Decimal(buy.value).minus(basis).minus(tx.fee));
+  if(!sellCash) realized=realized.plus(new Decimal(buy.value).minus(basis).minus(feeUsd));
   if(!buyCash) {
-   lots.push({id:key,asset:{key:buyKey,tokenId:buy.tokenId,symbol:buy.symbol,name:buy.name||buy.symbol,chain:buy.chain??tx.chain,contract:buy.contract??null,icon:buy.icon},quantity:buy.quantity,unitCost:new Decimal(sellCash?sell.value:buy.value).plus(sellCash?tx.fee:0).div(buy.quantity).toString(),fee:String(tx.fee),at:Date.parse(tx.minedAt),source:key});
+   lots.push({id:key,asset:{key:buyKey,tokenId:buy.tokenId,symbol:buy.symbol,name:buy.name||buy.symbol,chain:buy.chain??tx.chain,contract:buy.contract??null,icon:buy.icon},quantity:buy.quantity,unitCost:new Decimal(sellCash?sell.value:buy.value).plus(sellCash?feeUsd:0).div(buy.quantity).toString(),fee:String(feeUsd),at:Date.parse(tx.minedAt),source:key});
    knownAssetKeys.add(buyKey);
   }
   processed.push(key);
