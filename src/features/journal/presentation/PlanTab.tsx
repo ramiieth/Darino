@@ -17,6 +17,7 @@ import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Notice } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import type { Bias, ClassifiedTrade, Direction, JournalAccount, JournalSettings, NewsItem, TradePlan, YesNo } from '../domain/types';
+import type { SpotBook } from '../domain/spot';
 import { AutoPlanReport } from './AutoPlanReport';
 import { BaseRatePanel } from './BaseRatePanel';
 import { calcPlan, newPlan } from '../domain/plan';
@@ -313,7 +314,7 @@ function Cell({ label, value, sub, strong, tone }: { label: string; value: strin
   );
 }
 
-export function PlanTab({ plans, trades, links, auto, settings, accounts, accountSize, prefill, onPrefillUsed }: {
+export function PlanTab({ plans, trades, links, auto, settings, accounts, accountSize, spotBook, prefill, onPrefillUsed }: {
   plans: TradePlan[];
   trades: ClassifiedTrade[];
   links: Map<string, TradePlan>;
@@ -321,6 +322,7 @@ export function PlanTab({ plans, trades, links, auto, settings, accounts, accoun
   settings: JournalSettings;
   accounts: JournalAccount[];
   accountSize: number | null;
+  spotBook?: SpotBook | null;
   prefill: { symbol: string; direction: 'long' | 'short'; leverage: number | null } | null;
   onPrefillUsed: () => void;
 }) {
@@ -343,13 +345,13 @@ export function PlanTab({ plans, trades, links, auto, settings, accounts, accoun
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl label="نوع برنامه" value={view} onChange={setView} options={[
-          { value: 'auto', label: 'خودکار از صرافی' },
+          { value: 'auto', label: 'برنامهٔ خودکار' },
           { value: 'written', label: `قبل از ورود${plans.length ? ` (${fa(plans.length)})` : ''}` }
         ]} />
         {view === 'written' && <Button icon={<Plus />} className="ms-auto" onClick={() => setEditing(newPlan(Date.now()))}>برنامهٔ تازه</Button>}
       </div>
       {view === 'auto' ? (
-        <AutoPlanReport trades={trades} auto={auto} settings={settings} accountSize={accountSize} />
+        <AutoPlanReport trades={trades} auto={auto} settings={settings} accountSize={accountSize} spotBook={spotBook} />
       ) : (
         <>
           <p className="text-sm leading-7 text-muted">اختیاری: اگر قبل از ورود برنامه بنویسید، همان بر برنامهٔ خودکار مقدم است و نوع ورودش «قبل از نتیجه» در تحلیل ستاپ شمرده می‌شود. بدون آن هم همه‌چیز خودکار ثبت می‌شود.</p>
