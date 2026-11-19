@@ -11,7 +11,7 @@
  *  - Data comes only from the central pipeline (no fetch in render)
  * ============================================================ */
 import { memo, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Star } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Star, TrendingDown, TrendingUp } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Skeleton } from '@/shared/components/ui/Skeleton';
 import { AssetName } from '@/shared/components/ui/AssetName';
@@ -66,6 +66,7 @@ export function MarketsTable({
   const [query, setQuery] = useState(initialQuery);
   const [limit, setLimit] = useState(PAGE);
   const [source, setSource] = useState<'all' | MarketSource>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'watched' | 'gainers' | 'losers'>('all');
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'rank', dir: 'asc' });
   const [detail, setDetail] = useState<MarketAsset | null>(null);
   const watch = useWatchlistStore((s) => s.items);
@@ -108,10 +109,42 @@ export function MarketsTable({
     return [...list].sort((a, b) => (order[a.source] ?? 9) - (order[b.source] ?? 9) || a.rank - b.rank);
   }, [universes, data]);
 
+  const pulse = useMemo(() => {
+    let up = 0;
+    let down = 0;
+    let totalMcap = 0;
+    let topGain: MarketAsset | null = null;
+    let topLoss: MarketAsset | null = null;
+    let watchCount = 0;
+    for (const a of assets) {
+      if (watch[a.symbol] !== undefined) watchCount++;
+      if (a.marketCap && a.marketCap > 0) totalMcap += a.marketCap;
+      if (a.change24h !== null) {
+        if (a.change24h > 0) up++;
+        else if (a.change24h < 0) down++;
+        if (!topGain || a.change24h > (topGain.change24h ?? -Infinity)) topGain = a;
+        if (!topLoss || a.change24h < (topLoss.change24h ?? Infinity)) topLoss = a;
+      }
+    }
+    const breadthTotal = up + down;
+    return {
+      up,
+      down,
+      upPct: breadthTotal > 0 ? Math.round((up / breadthTotal) * 100) : 50,
+      totalMcap: totalMcap > 0 ? totalMcap : null,
+      topGain,
+      topLoss,
+      watchCount
+    };
+  }, [assets, watch]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = assets;
     if (source !== 'all') out = out.filter((a) => a.source === source);
+    if (quickFilter === 'watched') out = out.filter((a) => watch[a.symbol] !== undefined);
+    else if (quickFilter === 'gainers') out = out.filter((a) => (a.change24h ?? 0) > 0);
+    else if (quickFilter === 'losers') out = out.filter((a) => (a.change24h ?? 0) < 0);
     if (q) out = out.filter((a) => assetSearchText(a.symbol).includes(q));
     if (sort.key !== 'rank' || sort.dir !== 'asc') {
       const k = sort.key;
@@ -128,7 +161,7 @@ export function MarketsTable({
       });
     }
     return out;
-  }, [assets, query, source, sort]);
+  }, [assets, query, source, quickFilter, watch, sort]);
 
   const anyLoading = universes.some((u) => loading[u]);
   const anyError = universes.some((u) => error[u]);
@@ -141,8 +174,69 @@ export function MarketsTable({
 
   return (
     <section aria-label={title} className="space-y-4">
-      {/* toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* نوار نبض بازار (وب و PWA) */}
+      {assets.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <Surface variant="subtle" className="p-3.5">
+            <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-muted">
+              <span className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-accent" />نبض ۲۴ ساعته</span>
+              <span className="num-ltr text-[11px] font-bold text-ink">{toFaDigits(pulse.upPct)}٪ صعودی</span>
+            </div>
+            <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-rose-500/25" dir="ltr">
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pulse.upPct}%` }} />
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-[10px] text-subtle">
+              <span className="text-positive">{toFaDigits(pulse.up)} مثبت</span>
+              <span className="text-negative">{toFaDigits(pulse.down)} منفی</span>
+            </div>
+          </Surface>
+
+          <Surface variant="subtle" className="p-3.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+              <TrendingUp className="h-3.5 w-3.5 text-positive" />پیشتاز رشد ۲۴س
+            </p>
+            {pulse.topGain ? (
+              <button type="button" onClick={() => setDetail(pulse.topGain)} className="mt-1.5 flex w-full items-center justify-between gap-2 text-start">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Logo src={pulse.topGain.image} symbol={pulse.topGain.symbol} size={20} />
+                  <span className="truncate text-xs font-extrabold text-ink">{assetDisplayName(pulse.topGain.symbol).name}</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                  <PercentValue value={pulse.topGain.change24h} tone="none" />
+                </span>
+              </button>
+            ) : <p className="mt-1.5 text-xs text-subtle">—</p>}
+          </Surface>
+
+          <Surface variant="subtle" className="p-3.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+              <TrendingDown className="h-3.5 w-3.5 text-negative" />بیشترین افت ۲۴س
+            </p>
+            {pulse.topLoss ? (
+              <button type="button" onClick={() => setDetail(pulse.topLoss)} className="mt-1.5 flex w-full items-center justify-between gap-2 text-start">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Logo src={pulse.topLoss.image} symbol={pulse.topLoss.symbol} size={20} />
+                  <span className="truncate text-xs font-extrabold text-ink">{assetDisplayName(pulse.topLoss.symbol).name}</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-rose-500/12 px-2 py-0.5 text-[11px] font-extrabold text-rose-600 dark:text-rose-300">
+                  <PercentValue value={pulse.topLoss.change24h} tone="none" />
+                </span>
+              </button>
+            ) : <p className="mt-1.5 text-xs text-subtle">—</p>}
+          </Surface>
+
+          <Surface variant="subtle" className="p-3.5">
+            <p className="text-[11px] font-semibold text-muted">ارزش کل فهرست</p>
+            <p className="mt-1.5 whitespace-nowrap text-sm font-extrabold text-ink">
+              <MoneyValue value={pulse.totalMcap} compact />
+            </p>
+            <p className="mt-0.5 text-[10px] text-subtle">{toFaDigits(assets.length)} دارایی فعال</p>
+          </Surface>
+        </div>
+      )}
+
+      {/* نوار جستجو و فیلترهای سریع */}
+      <div className="flex flex-wrap items-center gap-2.5">
         <SearchField
           value={query}
           onChange={(v) => {
@@ -170,7 +264,21 @@ export function MarketsTable({
             <option value="price:desc">بیشترین قیمت</option>
           </Select>
         </div>
-        <p className="ms-auto hidden text-xs text-muted md:block">
+        <ChipGroup
+          label="فیلتر سریع"
+          value={quickFilter}
+          onChange={(v) => {
+            setQuickFilter(v);
+            setLimit(PAGE);
+          }}
+          options={[
+            { value: 'all', label: 'همه' },
+            { value: 'watched', label: 'پیگیری‌ها', badge: pulse.watchCount || undefined },
+            { value: 'gainers', label: 'صعودی ۲۴س' },
+            { value: 'losers', label: 'نزولی ۲۴س' }
+          ]}
+        />
+        <p className="ms-auto hidden text-xs text-muted lg:block">
           {toFaDigits(filtered.length)} دارایی
           {sort.key !== 'rank' && ` · مرتب بر اساس ${SORT_LABEL[sort.key]}`}
         </p>
@@ -226,22 +334,22 @@ export function MarketsTable({
           />
         )
       ) : (
-        <Surface className="overflow-hidden">
-          {/* desktop — table */}
+        <Surface className="overflow-hidden border border-divider/80">
+          {/* desktop — redesigned modern financial table */}
           <div className="hidden overflow-x-auto md:block">
             <table className="data-table w-full">
               <caption className="sr-only">{title}</caption>
-              <thead>
+              <thead className="sticky top-0 z-10 bg-surface/95 backdrop-blur">
                 <tr>
                   <SortTh k="rank" sort={sort} onSort={onSort} className="w-10 !px-2.5 !ps-4">#</SortTh>
                   <th scope="col" className="!px-2.5">دارایی</th>
-                  <SortTh k="price" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2.5">قیمت</SortTh>
-                  <th scope="col" className="whitespace-nowrap !px-2.5">سقف تاریخی و ریزش</th>
-                  <th scope="col" className="whitespace-nowrap !px-2.5">بازه و مدت رنج</th>
-                  <SortTh k="change24h" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۲۴ ساعت</SortTh>
+                  <SortTh k="price" sort={sort} onSort={onSort} num className="min-w-[132px] whitespace-nowrap !px-3">قیمت</SortTh>
+                  <th scope="col" className="whitespace-nowrap !px-3">سقف تاریخی و ریزش</th>
+                  <th scope="col" className="whitespace-nowrap !px-3">بازه و مدت رنج</th>
+                  <SortTh k="change24h" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2.5">۲۴ ساعت</SortTh>
                   <SortTh k="change7d" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۷ روز</SortTh>
                   <SortTh k="change30d" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۳۰ روز</SortTh>
-                  <SortTh k="marketCap" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2.5">ارزش بازار</SortTh>
+                  <SortTh k="marketCap" sort={sort} onSort={onSort} num className="min-w-[116px] whitespace-nowrap !px-3">ارزش بازار</SortTh>
                   <th scope="col" className="w-10 !px-2 !pe-3"><span className="sr-only">پیگیری</span></th>
                 </tr>
               </thead>
@@ -253,6 +361,7 @@ export function MarketsTable({
                     index={i}
                     watched={watch[a.symbol] !== undefined}
                     onWatch={() => void toggleWatch(a.symbol)}
+                    onOpen={() => setDetail(a)}
                   />
                 ))}
               </tbody>
@@ -435,12 +544,14 @@ const MarketRow = memo(function MarketRow({
   asset,
   index,
   watched,
-  onWatch
+  onWatch,
+  onOpen
 }: {
   asset: MarketAsset;
   index: number;
   watched: boolean;
   onWatch: () => void;
+  onOpen: () => void;
 }) {
   const athRange = useMemo(
     () =>
@@ -454,31 +565,48 @@ const MarketRow = memo(function MarketRow({
     [asset.symbol, asset.price, asset.change30d, asset.change7d, asset.source]
   );
 
+  const c24 = asset.change24h;
+  const pill24 =
+    c24 === null
+      ? 'bg-surface-2 text-muted'
+      : c24 > 0
+        ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+        : c24 < 0
+          ? 'bg-rose-500/12 text-rose-600 dark:text-rose-300'
+          : 'bg-surface-2 text-muted';
+
   return (
-    <tr className="transition-colors hover:bg-surface-2/40">
-      <td className="num-ltr !px-2.5 !ps-4 text-xs text-subtle">{index + 1}</td>
+    <tr
+      onClick={onOpen}
+      className="cursor-pointer transition-colors hover:bg-surface-2/55"
+    >
+      <td className="num-ltr !px-2.5 !ps-4 text-xs font-medium text-subtle">{index + 1}</td>
       <td className="!px-2.5">
         <div className="flex items-center gap-2.5">
-          <Logo src={asset.image} symbol={asset.symbol} />
-          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[10.5rem]" />
+          <Logo src={asset.image} symbol={asset.symbol} size={32} />
+          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[11rem]" />
         </div>
       </td>
-      <td className="col-num whitespace-nowrap !px-2.5 font-bold text-ink">
+      <td className="col-num min-w-[132px] whitespace-nowrap !px-3 text-[13px] font-extrabold text-ink">
         <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
       </td>
-      <td className="!px-2.5">
+      <td className="!px-3">
         <AthDistanceCell info={athRange} />
       </td>
-      <td className="!px-2.5">
+      <td className="!px-3">
         <RangeDurationCell info={athRange} />
       </td>
-      <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change24h} /></td>
+      <td className="col-num whitespace-nowrap !px-2.5">
+        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold', pill24)}>
+          <PercentValue value={asset.change24h} tone="none" />
+        </span>
+      </td>
       <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change7d} /></td>
       <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change30d} /></td>
-      <td className="col-num whitespace-nowrap !px-2.5 text-xs text-muted">
+      <td className="col-num min-w-[116px] whitespace-nowrap !px-3 text-xs font-semibold text-muted">
         <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
       </td>
-      <td className="!px-2 !pe-3">
+      <td className="!px-2 !pe-3" onClick={(e) => e.stopPropagation()}>
         <WatchButton watched={watched} onClick={onWatch} symbol={asset.symbol} />
       </td>
     </tr>
