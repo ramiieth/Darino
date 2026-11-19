@@ -229,20 +229,20 @@ export function MarketsTable({
         <Surface className="overflow-hidden">
           {/* desktop — table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="data-table">
+            <table className="data-table w-full">
               <caption className="sr-only">{title}</caption>
               <thead>
                 <tr>
-                  <SortTh k="rank" sort={sort} onSort={onSort} className="w-12 !ps-5">#</SortTh>
-                  <th scope="col">دارایی</th>
-                  <SortTh k="price" sort={sort} onSort={onSort} num>قیمت</SortTh>
-                  <th scope="col">سقف تاریخی و میزان ریزش</th>
-                  <th scope="col">بازه و مدت‌زمان رنج</th>
-                  <SortTh k="change24h" sort={sort} onSort={onSort} num>۲۴ ساعت</SortTh>
-                  <SortTh k="change7d" sort={sort} onSort={onSort} num>۷ روز</SortTh>
-                  <SortTh k="change30d" sort={sort} onSort={onSort} num>۳۰ روز</SortTh>
-                  <SortTh k="marketCap" sort={sort} onSort={onSort} num>ارزش بازار</SortTh>
-                  <th scope="col" className="w-12 !pe-4"><span className="sr-only">پیگیری</span></th>
+                  <SortTh k="rank" sort={sort} onSort={onSort} className="w-10 !px-2.5 !ps-4">#</SortTh>
+                  <th scope="col" className="!px-2.5">دارایی</th>
+                  <SortTh k="price" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2.5">قیمت</SortTh>
+                  <th scope="col" className="whitespace-nowrap !px-2.5">سقف تاریخی و ریزش</th>
+                  <th scope="col" className="whitespace-nowrap !px-2.5">بازه و مدت رنج</th>
+                  <SortTh k="change24h" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۲۴ ساعت</SortTh>
+                  <SortTh k="change7d" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۷ روز</SortTh>
+                  <SortTh k="change30d" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2">۳۰ روز</SortTh>
+                  <SortTh k="marketCap" sort={sort} onSort={onSort} num className="whitespace-nowrap !px-2.5">ارزش بازار</SortTh>
+                  <th scope="col" className="w-10 !px-2 !pe-3"><span className="sr-only">پیگیری</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -259,10 +259,15 @@ export function MarketsTable({
             </table>
           </div>
 
-          {/* phones — list */}
-          <ul className="divide-y divide-divider px-4 md:hidden">
+          {/* phones / PWA — refined mobile cards */}
+          <ul className="divide-y divide-divider md:hidden">
             {visible.map((a) => (
-              <MarketCard key={a.id} asset={a} onOpen={() => setDetail(a)} />
+              <MarketCard
+                key={a.id}
+                asset={a}
+                watched={watch[a.symbol] !== undefined}
+                onOpen={() => setDetail(a)}
+              />
             ))}
           </ul>
 
@@ -367,19 +372,19 @@ function WatchButton({ watched, onClick, symbol }: { watched: boolean; onClick: 
   );
 }
 
-/* ---------- ATH & Range Cells (واضح و به فارسی روان بدون بهم‌ریختگی جهت اعداد) ---------- */
+/* ---------- ATH & Range Cells (تراز و فشرده بدون شکستگی در دسکتاپ) ---------- */
 export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
   if (!info) return <span className="text-xs text-subtle">—</span>;
   const isNearAth = info.drawdownFromAthPct >= -5;
   return (
-    <div className="min-w-[180px] space-y-1 text-xs">
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <span className="text-[11px] text-muted">
+    <div className="min-w-[165px] max-w-[215px] space-y-1 text-xs">
+      <div className="flex items-center justify-between gap-1.5">
+        <span className="whitespace-nowrap text-[11px] text-muted">
           سقف: <strong className="font-extrabold text-ink">{info.athPriceFa}</strong>
         </span>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-extrabold',
+            'shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-extrabold',
             isNearAth
               ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
               : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
@@ -388,7 +393,7 @@ export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null
           {info.drawdownClearFa}
         </span>
       </div>
-      <p className="text-[11px] text-muted">زمان سقف: {info.elapsedSinceAthFa}</p>
+      <p className="truncate text-[10px] text-subtle">زمان سقف: {info.elapsedSinceAthFa}</p>
     </div>
   );
 }
@@ -396,13 +401,13 @@ export function AthDistanceCell({ info }: { info: ComputedAthAndRangeInfo | null
 export function RangeDurationCell({ info }: { info: ComputedAthAndRangeInfo | null }) {
   if (!info) return <span className="text-xs text-subtle">—</span>;
   return (
-    <div className="min-w-[195px] space-y-1 text-xs">
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <span className="text-[11px] font-bold text-ink">
-          بازه: {info.rangeBandFormatted}
+    <div className="min-w-[175px] max-w-[225px] space-y-1 text-xs">
+      <div className="flex items-center justify-between gap-1.5">
+        <span className="truncate text-[11px] font-bold text-ink" title={info.rangeBandFormatted}>
+          {info.rangeBandFormatted}
         </span>
-        <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
-          مدت رنج: {info.rangeDurationFa}
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+          {info.rangeDurationFa}
         </span>
       </div>
       <div className="flex items-center gap-1.5">
@@ -419,7 +424,7 @@ export function RangeDurationCell({ info }: { info: ComputedAthAndRangeInfo | nu
             style={{ width: `${Math.max(6, Math.min(100, info.positionInRangePct))}%` }}
           />
         </div>
-        <span className="text-[10px] text-muted">{info.rangeStatusLabelFa}</span>
+        <span className="shrink-0 whitespace-nowrap text-[10px] text-muted">{info.rangeStatusLabelFa}</span>
       </div>
     </div>
   );
@@ -450,30 +455,30 @@ const MarketRow = memo(function MarketRow({
   );
 
   return (
-    <tr>
-      <td className="num-ltr !ps-5 text-xs text-subtle">{index + 1}</td>
-      <td>
-        <div className="flex items-center gap-3">
+    <tr className="transition-colors hover:bg-surface-2/40">
+      <td className="num-ltr !px-2.5 !ps-4 text-xs text-subtle">{index + 1}</td>
+      <td className="!px-2.5">
+        <div className="flex items-center gap-2.5">
           <Logo src={asset.image} symbol={asset.symbol} />
-          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[14rem]" />
+          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} className="max-w-[10.5rem]" />
         </div>
       </td>
-      <td className="col-num font-semibold text-ink">
+      <td className="col-num whitespace-nowrap !px-2.5 font-bold text-ink">
         <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
       </td>
-      <td>
+      <td className="!px-2.5">
         <AthDistanceCell info={athRange} />
       </td>
-      <td>
+      <td className="!px-2.5">
         <RangeDurationCell info={athRange} />
       </td>
-      <td className="col-num"><PercentValue value={asset.change24h} /></td>
-      <td className="col-num"><PercentValue value={asset.change7d} /></td>
-      <td className="col-num"><PercentValue value={asset.change30d} /></td>
-      <td className="col-num text-muted">
+      <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change24h} /></td>
+      <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change7d} /></td>
+      <td className="col-num whitespace-nowrap !px-2 text-xs font-semibold"><PercentValue value={asset.change30d} /></td>
+      <td className="col-num whitespace-nowrap !px-2.5 text-xs text-muted">
         <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
       </td>
-      <td className="!pe-4">
+      <td className="!px-2 !pe-3">
         <WatchButton watched={watched} onClick={onWatch} symbol={asset.symbol} />
       </td>
     </tr>
@@ -577,8 +582,16 @@ function MarketDetailSheet({
   );
 }
 
-/* ---------- phone row: every metric stays visible (reflow, not hide) ---------- */
-const MarketCard = memo(function MarketCard({ asset, onOpen }: { asset: MarketAsset; onOpen: () => void }) {
+/* ---------- phone / PWA card: clean hierarchy, single-line price, structured ATH/range ---------- */
+const MarketCard = memo(function MarketCard({
+  asset,
+  watched,
+  onOpen
+}: {
+  asset: MarketAsset;
+  watched: boolean;
+  onOpen: () => void;
+}) {
   const athRange = useMemo(
     () =>
       getAssetAthAndRangeInfo({
@@ -591,46 +604,112 @@ const MarketCard = memo(function MarketCard({ asset, onOpen }: { asset: MarketAs
     [asset.symbol, asset.price, asset.change30d, asset.change7d, asset.source]
   );
 
+  const change24 = asset.change24h;
+  const changePillTone =
+    change24 === null
+      ? 'bg-surface-2 text-muted'
+      : change24 > 0
+        ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+        : change24 < 0
+          ? 'bg-rose-500/12 text-rose-600 dark:text-rose-300'
+          : 'bg-surface-2 text-muted';
+
   return (
     <li>
-      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 py-3 text-start">
-        <Logo src={asset.image} symbol={asset.symbol} size={36} />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} />
-          {athRange && (
-            <div className="space-y-1 rounded-field border border-divider/60 bg-surface-2/50 px-2.5 py-1.5 text-[11px] leading-5">
-              <p className="text-ink">
-                <span className="font-bold text-muted">سقف تاریخی: </span>
-                <strong className="font-extrabold text-ink">{athRange.athPriceFa}</strong>
-                <span className="text-muted"> ({athRange.elapsedSinceAthFa}) · </span>
-                <strong className="font-extrabold text-rose-600 dark:text-rose-300">{athRange.drawdownClearFa}</strong>
-              </p>
-              <p className="text-ink">
-                <span className="font-bold text-muted">وضعیت رنج: </span>
-                <strong className="font-extrabold text-indigo-700 dark:text-indigo-300">
-                  {athRange.rangeSummarySentenceFa}
-                </strong>
-                <span className="text-muted"> ({athRange.rangeStatusLabelFa})</span>
-              </p>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full space-y-2.5 px-3.5 py-3.5 text-start transition-colors active:bg-surface-2/60"
+      >
+        {/* ردیف اول: نام دارایی + قیمت تک‌خطی و تغییر ۲۴ ساعت */}
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logo src={asset.image} symbol={asset.symbol} size={36} />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <AssetName symbol={asset.symbol} meta={SOURCE_FA[asset.source]} />
+                {watched && <Star className="h-3.5 w-3.5 shrink-0 fill-current text-gold" aria-hidden />}
+              </div>
             </div>
-          )}
-          <p className="flex flex-wrap items-center gap-x-2.5 text-2xs text-muted">
-            <span>
-              ۷ روز <PercentValue value={asset.change7d} />
-            </span>
-            <span>
-              ۳۰ روز <PercentValue value={asset.change30d} />
-            </span>
-            <span>
-              ارزش <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
-            </span>
-          </p>
+          </div>
+          <div className="shrink-0 text-end">
+            <p className="whitespace-nowrap text-[15px] font-extrabold tracking-tight text-ink">
+              <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
+            </p>
+            <div className="mt-0.5 flex justify-end">
+              <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold', changePillTone)}>
+                <PercentValue value={asset.change24h} tone="none" />
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="shrink-0 text-end">
-          <p className="text-sm font-semibold text-ink">
-            <MoneyValue value={asset.price && asset.price > 0 ? asset.price : null} />
-          </p>
-          <PercentValue value={asset.change24h} className="text-xs font-semibold" />
+
+        {/* ردیف دوم: کارت فشرده سقف تاریخی و وضعیت کانال رنج */}
+        {athRange && (
+          <div className="space-y-1.5 rounded-field border border-divider/60 bg-surface-2/45 px-3 py-2 text-[11px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-muted">
+                سقف: <strong className="font-bold text-ink">{athRange.athPriceFa}</strong>
+                <span className="ms-1 text-[10px] text-subtle">({athRange.elapsedSinceAthFa})</span>
+              </span>
+              <span
+                className={cn(
+                  'shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-extrabold',
+                  athRange.drawdownFromAthPct >= -5
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
+                )}
+              >
+                {athRange.drawdownClearFa}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-muted">
+                رنج: <strong className="font-bold text-ink">{athRange.rangeBandFormatted}</strong>
+              </span>
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700 dark:text-indigo-300">
+                {athRange.rangeDurationFa}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pt-0.5">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-card">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    athRange.rangeStatus === 'near-bottom' || athRange.rangeStatus === 'breakdown-low'
+                      ? 'bg-emerald-500'
+                      : athRange.rangeStatus === 'near-top' || athRange.rangeStatus === 'breakout-up'
+                        ? 'bg-amber-500'
+                        : 'bg-indigo-500'
+                  )}
+                  style={{ width: `${Math.max(6, Math.min(100, athRange.positionInRangePct))}%` }}
+                />
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-[10px] text-muted">{athRange.rangeStatusLabelFa}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ردیف سوم: بازده ۷ روز، ۳۰ روز و ارزش بازار بدون شکستگی */}
+        <div className="grid grid-cols-3 gap-2 border-t border-divider/50 pt-2 text-[11px]">
+          <div className="min-w-0">
+            <span className="block text-[10px] text-subtle">۷ روز</span>
+            <span className="whitespace-nowrap font-semibold">
+              <PercentValue value={asset.change7d} />
+            </span>
+          </div>
+          <div className="min-w-0 text-center">
+            <span className="block text-[10px] text-subtle">۳۰ روز</span>
+            <span className="whitespace-nowrap font-semibold">
+              <PercentValue value={asset.change30d} />
+            </span>
+          </div>
+          <div className="min-w-0 text-end">
+            <span className="block text-[10px] text-subtle">ارزش بازار</span>
+            <span className="whitespace-nowrap font-semibold text-muted">
+              <MoneyValue value={asset.marketCap && asset.marketCap > 0 ? asset.marketCap : null} compact />
+            </span>
+          </div>
         </div>
       </button>
     </li>

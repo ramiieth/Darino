@@ -89,9 +89,9 @@ export function TradFiTable() {
                           />
                         </div>
                       </td>
-                      <td className="col-num font-semibold text-ink">
+                      <td className="col-num whitespace-nowrap font-semibold text-ink">
                         {price ? <MoneyValue value={price} /> : <span className="text-subtle">N/A</span>}
-                        <span className="block text-2xs font-normal text-muted sm:hidden">
+                        <span className="block whitespace-nowrap text-2xs font-normal text-muted sm:hidden">
                           {mcap ? <MoneyValue value={mcap} compact /> : '—'}
                         </span>
                       </td>
@@ -101,7 +101,7 @@ export function TradFiTable() {
                       <td>
                         <RangeDurationCell info={athRange} />
                       </td>
-                      <td className="col-num hidden text-muted sm:table-cell">
+                      <td className="col-num hidden whitespace-nowrap text-muted sm:table-cell">
                         {mcap ? <MoneyValue value={mcap} compact /> : <span className="text-subtle">N/A</span>}
                       </td>
                       <td className="!pe-4 text-end md:!pe-5">
