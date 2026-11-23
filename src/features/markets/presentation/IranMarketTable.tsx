@@ -1,32 +1,29 @@
 /**
- * جدول و بخش یکپارچه «بورس ایران و آتیه» در صفحهٔ بازارها:
- *   • بورس تهران (TSE)
- *   • فرابورس ایران (IFB)
- *   • بورس کالای ایران (IME — گواهی سپرده طلا، سکه، نقره، زعفران و سلف موازی)
- *   • صندوق‌های سهامی، اهرمی، بخشی، شاخصی، طلا و درآمد ثابت
- *   • صندوق‌های بازنشستگی تکمیلی (آتیه مفید، اندوخته آگاه، کاریز کاریزما و…)
- *   • دارای لوگوی اختصاصی رنگ‌بندی‌شده برای تمام نمادها و صندوق‌ها
+ * بخش «بورس ایران و آتیه» — بازطراحی مینیمال برای وب (جدول چسبان) و PWA (لیست کارتی بومی)
+ *
+ * پوشش یکپارچه:
+ *   • بورس تهران (TSE) · فرابورس (IFB) · بورس کالا (IME)
+ *   • صندوق‌های سهامی، اهرمی، بخشی، شاخصی، طلا و درآمد ثابت (ETF)
+ *   • صندوق‌های بازنشستگی تکمیلی / آتیه (آتیه مفید، اندوخته آگاه، کاریز کاریزما و…)
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Building2,
+  ArrowUpDown,
+  ChevronDown,
   Coins,
   ExternalLink,
   Flame,
-  Landmark,
-  Layers,
   PiggyBank,
   RefreshCw,
   ShieldCheck,
   Star,
-  TrendingUp,
   Zap
 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { SearchField } from '@/shared/components/ui/Input';
-import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { EmptyState } from '@/shared/components/ui/StateViews';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits } from '@/shared/utils/formatters';
 import {
@@ -41,6 +38,9 @@ import {
 } from '../data/iranMarketCatalog';
 
 const WATCHLIST_KEY = 'darino:iran-market:watchlist:v1';
+const PAGE_SIZE = 40;
+
+type SortMode = 'value' | 'gain' | 'loss' | 'name';
 
 function loadWatchlist(): Set<string> {
   try {
@@ -62,20 +62,26 @@ function saveWatchlist(ids: Set<string>) {
 }
 
 const fmtRial = (val: number | null | undefined) => {
-  if (val === null || val === undefined || !Number.isFinite(val)) return '—';
-  return `${toFaDigits(Math.round(val).toLocaleString('en-US'))} ریال`;
+  if (val === null || val === undefined || !Number.isFinite(val)) return null;
+  return `${toFaDigits(Math.round(val).toLocaleString('en-US'))}`;
 };
 
-const SEGMENT_BADGE: Record<IranMarketSegment, { label: string; tone: 'info' | 'gain' | 'warn' | 'neutral' }> = {
-  tse: { label: 'بورس تهران', tone: 'info' },
-  ifb: { label: 'فرابورس', tone: 'neutral' },
-  ime: { label: 'بورس کالا', tone: 'warn' },
-  funds: { label: 'صندوق ETF', tone: 'gain' },
-  pension: { label: 'بازنشستگی / آتیه', tone: 'gain' }
+const fmtPct = (val: number | null | undefined) => {
+  if (val === null || val === undefined || !Number.isFinite(val)) return null;
+  const sign = val > 0 ? '+' : '';
+  return `${sign}${toFaDigits(val.toFixed(2))}٪`;
 };
 
-/** لوگوی اختصاصی و رنگ‌بندی‌شده برای تک‌تک نمادها، کالاها و صندوق‌های بازار سرمایه ایران */
-function IranInstrumentLogo({ item }: { item: IranMarketInstrument }) {
+const SEGMENT_SHORT: Record<IranMarketSegment, string> = {
+  tse: 'بورس',
+  ifb: 'فرابورس',
+  ime: 'بورس کالا',
+  funds: 'صندوق',
+  pension: 'بازنشستگی'
+};
+
+/** لوگوی مینیمال و رنگ‌بندی‌شده برای تمام نمادها و صندوق‌ها (بدون عکس شکسته روی ۱,۰۰۰+ نماد) */
+function IranInstrumentLogo({ item, size = 'md' }: { item: IranMarketInstrument; size?: 'sm' | 'md' }) {
   const txt = `${item.symbol} ${item.nameFa} ${item.sectorFa} ${item.managerFa ?? ''}`;
 
   let gradient = 'from-sky-500 to-indigo-600';
@@ -124,10 +130,14 @@ function IranInstrumentLogo({ item }: { item: IranMarketInstrument }) {
   }
 
   const shortLabel = item.symbol.replace(/\(.*?\)/g, '').trim().split(/\s+/)[0].slice(0, 5);
+  const dim = size === 'sm' ? 'h-9 w-9 text-[10px]' : 'h-10 w-10 text-[11px]';
 
   return (
     <span
-      className="relative inline-flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl text-[11px] font-black text-white shadow-xs ring-1 ring-black/10 dark:ring-white/15"
+      className={cn(
+        'relative inline-flex shrink-0 select-none items-center justify-center rounded-xl font-black text-white shadow-xs ring-1 ring-black/10 dark:ring-white/15',
+        dim
+      )}
       aria-hidden
     >
       <span className={cn('absolute inset-0 rounded-xl bg-gradient-to-br', gradient)} />
@@ -141,6 +151,30 @@ function IranInstrumentLogo({ item }: { item: IranMarketInstrument }) {
   );
 }
 
+function ChangePill({ value }: { value: number | null | undefined }) {
+  const txt = fmtPct(value);
+  if (!txt || value === null || value === undefined) {
+    return <span className="text-xs text-subtle">—</span>;
+  }
+  const positive = value > 0;
+  const negative = value < 0;
+  return (
+    <span
+      dir="ltr"
+      className={cn(
+        'inline-flex min-w-[3.75rem] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
+        positive
+          ? 'bg-gain/12 text-positive'
+          : negative
+            ? 'bg-negative/12 text-negative'
+            : 'bg-surface-2 text-muted'
+      )}
+    >
+      {txt}
+    </span>
+  );
+}
+
 export function IranMarketTable() {
   const [items, setItems] = useState<IranMarketInstrument[]>([...IRAN_MARKET_CATALOG]);
   const [source, setSource] = useState<'live' | 'catalog'>('catalog');
@@ -150,6 +184,9 @@ export function IranMarketTable() {
   const [fundSubtype, setFundSubtype] = useState<IranFundSubtype | 'all'>('all');
   const [query, setQuery] = useState('');
   const [onlyWatchlist, setOnlyWatchlist] = useState(false);
+  const [sortBy, setSortBy] = useState<SortMode>('value');
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<Set<string>>(() => loadWatchlist());
 
   const sync = async () => {
@@ -190,248 +227,317 @@ export function IranMarketTable() {
     return map;
   }, [items]);
 
-  const filtered = useMemo(
-    () =>
-      filterIranMarketInstruments({
-        items,
-        segment,
-        fundSubtype,
-        query,
-        onlyWatchlist,
-        watchlistIds: watchlist
-      }),
-    [items, segment, fundSubtype, query, onlyWatchlist, watchlist]
-  );
+  const breadth = useMemo(() => {
+    let up = 0;
+    let down = 0;
+    for (const it of items) {
+      if (!it.live || it.changePct === null || it.changePct === undefined) continue;
+      if (it.changePct > 0) up++;
+      else if (it.changePct < 0) down++;
+    }
+    return { up, down };
+  }, [items]);
 
-  const segmentIcons: Record<IranMarketSegment, React.ReactNode> = {
-    tse: <Building2 className="h-3.5 w-3.5" aria-hidden />,
-    ifb: <TrendingUp className="h-3.5 w-3.5" aria-hidden />,
-    ime: <Landmark className="h-3.5 w-3.5" aria-hidden />,
-    funds: <Layers className="h-3.5 w-3.5" aria-hidden />,
-    pension: <PiggyBank className="h-3.5 w-3.5" aria-hidden />
-  };
+  const filtered = useMemo(() => {
+    const base = filterIranMarketInstruments({
+      items,
+      segment,
+      fundSubtype,
+      query,
+      onlyWatchlist,
+      watchlistIds: watchlist
+    });
+
+    const sorted = [...base];
+    if (sortBy === 'gain') {
+      sorted.sort((a, b) => (b.changePct ?? -999) - (a.changePct ?? -999));
+    } else if (sortBy === 'loss') {
+      sorted.sort((a, b) => (a.changePct ?? 999) - (b.changePct ?? 999));
+    } else if (sortBy === 'name') {
+      sorted.sort((a, b) => a.symbol.localeCompare(b.symbol, 'fa'));
+    } else {
+      sorted.sort((a, b) => (b.tradeValueBillionToman ?? -1) - (a.tradeValueBillionToman ?? -1));
+    }
+    return sorted;
+  }, [items, segment, fundSubtype, query, onlyWatchlist, watchlist, sortBy]);
+
+  const visible = filtered.slice(0, limit);
 
   return (
-    <section aria-label="بازار سرمایه ایران" className="space-y-4">
-      <Notice
-        tone="info"
-        title={
-          source === 'live'
-            ? 'متصل به تابلوی زندهٔ بازار سرمایه ایران (BrsApi)'
-            : 'کاتالوگ یکپارچهٔ بازار سرمایه ایران (پس از ثبت BRSAPI_KEY در Vercel قیمت زنده فعال می‌شود)'
-        }
-        action={
-          <Button
-            size="sm"
-            variant="outline"
-            icon={<RefreshCw className="h-3.5 w-3.5" />}
-            loading={loading}
-            onClick={() => void sync()}
-          >
-            به‌روزرسانی زنده
-          </Button>
-        }
-      >
-        بورس تهران، فرابورس، بورس کالا (گواهی سپرده طلا/سکه/نقره/زعفران)، انواع صندوق‌های سهامی/اهرمی/طلا و صندوق‌های بازنشستگی تکمیلی (مانند آتیه مفید، اندوخته آگاه و کاریز کاریزما) همگی در یک نما.
-      </Notice>
-
-      {/* فیلترهای دسته‌بندی ۵ بازار + دیده‌بان */}
-      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-1">
-        <button
-          type="button"
-          onClick={() => {
-            setSegment('all');
-            setFundSubtype('all');
-          }}
-          className={cn(
-            'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
-            segment === 'all'
-              ? 'border-accent bg-accent text-on-accent'
-              : 'border-divider bg-card text-muted hover:text-ink'
-          )}
-        >
-          <span>همه</span>
-          <span className="opacity-80">({toFaDigits(counts.all)})</span>
-        </button>
-
-        {IRAN_MARKET_SEGMENTS.map((seg) => {
-          const active = segment === seg.id;
-          return (
-            <button
-              key={seg.id}
-              type="button"
-              onClick={() => {
-                setSegment(seg.id);
-                setFundSubtype('all');
-              }}
+    <section aria-label="بازار سرمایه ایران" className="space-y-3.5">
+      {/* ۱) نوار وضعیت مینیمال و کنترل همگام‌سازی */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-divider/70 bg-card/80 px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 text-xs">
+          <span className="inline-flex items-center gap-1.5 font-bold text-ink">
+            <span
               className={cn(
-                'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
-                active
-                  ? 'border-accent bg-accent text-on-accent'
-                  : 'border-divider bg-card text-muted hover:text-ink'
+                'h-2 w-2 rounded-full',
+                source === 'live' ? 'bg-positive animate-pulse' : 'bg-amber-500'
               )}
-            >
-              {segmentIcons[seg.id]}
-              <span>{seg.labelFa}</span>
-              <span className="opacity-80">({toFaDigits(counts[seg.id])})</span>
-            </button>
-          );
-        })}
-
-        <button
-          type="button"
-          onClick={() => setOnlyWatchlist((v) => !v)}
-          className={cn(
-            'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition',
-            onlyWatchlist
-              ? 'border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-300'
-              : 'border-divider bg-card text-muted hover:text-ink'
+            />
+            {source === 'live' ? 'تابلوی زنده (BrsApi)' : 'کاتالوگ مرجع · آمادهٔ BRSAPI_KEY'}
+          </span>
+          <span className="text-divider">|</span>
+          <span className="text-muted">{toFaDigits(counts.all)} نماد و صندوق</span>
+          {source === 'live' && (breadth.up > 0 || breadth.down > 0) && (
+            <>
+              <span className="hidden text-divider sm:inline">|</span>
+              <span className="hidden items-center gap-2 text-[11px] font-semibold sm:inline-flex">
+                <span className="text-positive">▲ {toFaDigits(breadth.up)}</span>
+                <span className="text-negative">▼ {toFaDigits(breadth.down)}</span>
+              </span>
+            </>
           )}
+        </div>
+
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<RefreshCw className="h-3.5 w-3.5" />}
+          loading={loading}
+          onClick={() => void sync()}
         >
-          <Star className={cn('h-3.5 w-3.5', onlyWatchlist && 'fill-current')} aria-hidden />
-          <span>دیده‌بان من ({toFaDigits(watchlist.size)})</span>
-        </button>
+          به‌روزرسانی
+        </Button>
       </div>
 
-      {/* زیرفیلتر نوع صندوق */}
-      {segment === 'funds' && (
+      {/* ۲) فیلترهای مینیمال بازارها + دیده‌بان */}
+      <div className="space-y-2.5">
         <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          {(['all', 'equity', 'leveraged', 'sector', 'index', 'gold', 'fixed_income'] as const).map((sub) => {
-            const active = fundSubtype === sub;
+          <button
+            type="button"
+            onClick={() => {
+              setSegment('all');
+              setFundSubtype('all');
+              setLimit(PAGE_SIZE);
+            }}
+            className={cn(
+              'shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition',
+              segment === 'all' && !onlyWatchlist
+                ? 'bg-ink text-card shadow-xs'
+                : 'bg-surface-2/80 text-muted hover:text-ink'
+            )}
+          >
+            همه ({toFaDigits(counts.all)})
+          </button>
+
+          {IRAN_MARKET_SEGMENTS.map((seg) => {
+            const active = segment === seg.id;
             return (
               <button
-                key={sub}
+                key={seg.id}
                 type="button"
-                onClick={() => setFundSubtype(sub)}
+                onClick={() => {
+                  setSegment(seg.id);
+                  setFundSubtype('all');
+                  setLimit(PAGE_SIZE);
+                }}
                 className={cn(
-                  'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold transition',
+                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition',
                   active
-                    ? 'border-accent bg-accent-soft text-accent'
-                    : 'border-divider bg-surface-2/60 text-muted hover:text-ink'
+                    ? 'bg-ink text-card shadow-xs'
+                    : 'bg-surface-2/80 text-muted hover:text-ink'
                 )}
               >
-                {sub === 'all' ? 'همهٔ صندوق‌ها' : IRAN_FUND_SUBTYPE_LABELS[sub]}
+                {seg.shortFa} ({toFaDigits(counts[seg.id])})
               </button>
             );
           })}
-        </div>
-      )}
 
-      {/* جستجوی فارسی */}
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchField
-          value={query}
-          onChange={setQuery}
-          placeholder="جستجوی نماد، صندوق یا صنعت (مثلاً فولاد، آتیه مفید، عیار، اهرم، شمش طلا)…"
-          className="flex-1 md:max-w-md"
-        />
-        <p className="ms-auto text-xs text-muted">{toFaDigits(filtered.length)} نماد / صندوق</p>
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyWatchlist((v) => !v);
+              setLimit(PAGE_SIZE);
+            }}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition',
+              onlyWatchlist
+                ? 'bg-amber-500/15 text-amber-600 ring-1 ring-amber-500/40 dark:text-amber-300'
+                : 'bg-surface-2/80 text-muted hover:text-ink'
+            )}
+          >
+            <Star className={cn('h-3.5 w-3.5', onlyWatchlist && 'fill-current')} aria-hidden />
+            <span>دیده‌بان ({toFaDigits(watchlist.size)})</span>
+          </button>
+        </div>
+
+        {/* زیرفیلتر نوع صندوق فقط در بخش صندوق‌ها */}
+        {segment === 'funds' && (
+          <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
+            {(['all', 'equity', 'leveraged', 'sector', 'index', 'gold', 'fixed_income'] as const).map((sub) => {
+              const active = fundSubtype === sub;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => {
+                    setFundSubtype(sub);
+                    setLimit(PAGE_SIZE);
+                  }}
+                  className={cn(
+                    'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold transition',
+                    active
+                      ? 'border-accent bg-accent-soft text-accent'
+                      : 'border-divider/70 bg-card text-muted hover:text-ink'
+                  )}
+                >
+                  {sub === 'all' ? 'همهٔ صندوق‌ها' : IRAN_FUND_SUBTYPE_LABELS[sub]}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* جستجو + مرتب‌سازی */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            value={query}
+            onChange={(v) => {
+              setQuery(v);
+              setLimit(PAGE_SIZE);
+            }}
+            placeholder="جستجوی نماد، صندوق یا صنعت (فولاد، آتیه مفید، عیار، اهرم)…"
+            className="min-w-[220px] flex-1 md:max-w-md"
+          />
+
+          <div className="ms-auto flex items-center gap-1.5">
+            <ArrowUpDown className="h-3.5 w-3.5 text-subtle" aria-hidden />
+            <div className="flex items-center gap-1 rounded-control bg-surface-2/70 p-0.5 text-[11px]">
+              {(
+                [
+                  ['value', 'ارزش'],
+                  ['gain', 'بیشترین رشد'],
+                  ['loss', 'بیشترین افت'],
+                  ['name', 'الفبا']
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSortBy(id)}
+                  className={cn(
+                    'rounded-[6px] px-2 py-1 font-bold transition',
+                    sortBy === id ? 'bg-card text-ink shadow-xs' : 'text-muted hover:text-ink'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* جدول واکنش‌گرا */}
-      {filtered.length === 0 ? (
+      {/* ۳) نمایش داده‌ها: جدول چسبان مینیمال در وب + لیست کارتی بومی در PWA */}
+      {visible.length === 0 ? (
         <EmptyState
-          message="نماد یا صندوقی با این فیلتر یافت نشد"
+          message="نماد یا صندوقی یافت نشد"
           hint={
             onlyWatchlist
-              ? 'هنوز نمادی به دیده‌بان خود اضافه نکرده‌اید؛ روی ستارهٔ کنار هر نماد کلیک کنید.'
-              : 'عبارت جستجو را کوتاه‌تر کنید یا دستهٔ دیگری انتخاب نمایید.'
+              ? 'روی ستارهٔ کنار هر نماد بزنید تا به دیده‌بان اضافه شود.'
+              : 'عبارت جستجو را ساده‌تر کنید یا دستهٔ «همه» را بزنید.'
           }
         />
       ) : (
         <Surface className="overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* نمای وب (Desktop) */}
+          <div className="hidden overflow-x-auto md:block">
             <table className="data-table">
               <caption className="sr-only">
-                بازار سرمایه ایران — بورس، فرابورس، بورس کالا، صندوق‌ها و صندوق‌های بازنشستگی
+                بازار سرمایه ایران — بورس، فرابورس، بورس کالا، صندوق‌ها و صندوق‌های آتیه
               </caption>
-              <thead>
+              <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur">
                 <tr>
-                  <th scope="col" className="!ps-4 md:!ps-5">نماد و نام</th>
-                  <th scope="col">بازار / نوع</th>
-                  <th scope="col" className="hidden md:table-cell">صنعت / مدیر صندوق</th>
-                  <th scope="col" className="col-num">آخرین قیمت / صدور</th>
-                  <th scope="col" className="col-num hidden sm:table-cell">تغییر روز</th>
-                  <th scope="col" className="!pe-4 text-end md:!pe-5">مرجع رسمی</th>
+                  <th scope="col" className="!ps-4 lg:!ps-5">نماد</th>
+                  <th scope="col">بازار / صنعت</th>
+                  <th scope="col" className="col-num">قیمت (ریال)</th>
+                  <th scope="col" className="col-num">تغییر روز</th>
+                  <th scope="col" className="col-num hidden lg:table-cell">ارزش / P/E</th>
+                  <th scope="col" className="!pe-4 text-end lg:!pe-5">
+                    <span className="sr-only">لینک</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => {
+                {visible.map((item) => {
                   const starred = watchlist.has(item.id);
-                  const segBadge = SEGMENT_BADGE[item.segment];
+                  const lastPx = item.live ? fmtRial(item.lastPriceRial) : null;
+                  const closePx = item.live ? fmtRial(item.closePriceRial) : null;
                   return (
-                    <tr key={item.id}>
-                      <td className="!ps-4 md:!ps-5">
-                        <div className="flex items-start gap-2.5">
+                    <tr key={item.id} className="transition-colors hover:bg-surface-2/40">
+                      <td className="!ps-4 lg:!ps-5">
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
                             aria-label={starred ? `حذف ${item.symbol} از دیده‌بان` : `افزودن ${item.symbol} به دیده‌بان`}
                             onClick={() => toggleStar(item.id)}
-                            className="mt-2 shrink-0 text-subtle transition hover:text-amber-500"
+                            className="shrink-0 text-subtle transition hover:text-amber-500"
                           >
                             <Star className={cn('h-4 w-4', starred && 'fill-amber-400 text-amber-500')} />
                           </button>
                           <IranInstrumentLogo item={item} />
                           <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex items-center gap-1.5">
                               <span className="font-extrabold text-ink">{item.symbol}</span>
                               {item.tradeMode === 'issuance' && (
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-gain/15 px-1.5 py-0.5 text-[10px] font-bold text-positive">
-                                  <ShieldCheck className="h-2.5 w-2.5" aria-hidden />
-                                  صدور و ابطالی
-                                </span>
+                                <Badge tone="gain" className="text-[10px]">صدور و ابطالی</Badge>
                               )}
                             </div>
-                            <p className="text-xs text-muted">{item.nameFa}</p>
-                            <p className="mt-0.5 line-clamp-1 text-[11px] text-subtle">{item.noteFa}</p>
+                            <p className="max-w-[16rem] truncate text-xs text-muted">{item.nameFa}</p>
                           </div>
                         </div>
                       </td>
 
                       <td>
-                        <div className="flex flex-col items-start gap-1">
-                          <Badge tone={segBadge.tone}>{segBadge.label}</Badge>
-                          {item.fundSubtype && item.segment !== 'pension' && (
-                            <span className="text-[10px] font-semibold text-muted">
-                              {IRAN_FUND_SUBTYPE_LABELS[item.fundSubtype]}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink">
+                            {item.fundSubtype && item.segment === 'funds'
+                              ? IRAN_FUND_SUBTYPE_LABELS[item.fundSubtype]
+                              : SEGMENT_SHORT[item.segment]}
+                          </span>
+                          <span className="max-w-[11rem] truncate text-xs text-muted">
+                            {item.managerFa ?? item.sectorFa}
+                          </span>
                         </div>
                       </td>
 
-                      <td className="hidden md:table-cell">
-                        <p className="text-xs font-semibold text-ink">{item.sectorFa}</p>
-                        {item.managerFa && <p className="text-[11px] text-muted">{item.managerFa}</p>}
-                      </td>
-
-                      <td className="col-num whitespace-nowrap font-bold text-ink">
-                        {item.live && item.lastPriceRial ? (
-                          fmtRial(item.lastPriceRial)
+                      <td className="col-num whitespace-nowrap">
+                        {lastPx ? (
+                          <div>
+                            <span className="font-extrabold text-ink tabular-nums">{lastPx}</span>
+                            {closePx && closePx !== lastPx && (
+                              <span className="block text-[10px] text-subtle">پایانی: {closePx}</span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-xs font-normal text-subtle">در انتظار BRSAPI_KEY</span>
+                          <span className="text-xs text-subtle">—</span>
                         )}
                       </td>
 
-                      <td className="col-num hidden whitespace-nowrap sm:table-cell">
-                        {item.live && item.changePct !== null && item.changePct !== undefined ? (
-                          <span className={cn('font-bold', item.changePct >= 0 ? 'text-positive' : 'text-negative')}>
-                            {item.changePct > 0 ? '+' : ''}
-                            {toFaDigits(item.changePct.toFixed(2))}٪
-                          </span>
+                      <td className="col-num whitespace-nowrap">
+                        <ChangePill value={item.live ? item.changePct : null} />
+                      </td>
+
+                      <td className="col-num hidden whitespace-nowrap text-xs text-muted lg:table-cell">
+                        {item.tradeValueBillionToman ? (
+                          <span>{toFaDigits(item.tradeValueBillionToman.toLocaleString('en-US'))} م.ت</span>
+                        ) : item.pe && item.pe > 0 ? (
+                          <span dir="ltr">P/E {toFaDigits(item.pe.toFixed(1))}</span>
                         ) : (
                           <span className="text-subtle">—</span>
                         )}
                       </td>
 
-                      <td className="!pe-4 text-end md:!pe-5">
+                      <td className="!pe-4 text-end lg:!pe-5">
                         <a
                           href={item.officialUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-control border border-divider bg-surface-2/60 px-2.5 py-1 text-[11px] font-bold text-accent hover:border-accent"
+                          aria-label={`صفحه رسمی ${item.symbol}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-control text-muted transition hover:bg-surface-2 hover:text-accent"
                         >
-                          <span>مشاهده</span>
-                          <ExternalLink className="h-3 w-3" aria-hidden />
+                          <ExternalLink className="h-4 w-4" aria-hidden />
                         </a>
                       </td>
                     </tr>
@@ -440,6 +546,100 @@ export function IranMarketTable() {
               </tbody>
             </table>
           </div>
+
+          {/* نمای موبایل و PWA (لیست کارتی بومی و لمسی بدون اسکرول افقی) */}
+          <ul className="divide-y divide-divider/60 md:hidden">
+            {visible.map((item) => {
+              const starred = watchlist.has(item.id);
+              const expanded = expandedId === item.id;
+              const lastPx = item.live ? fmtRial(item.lastPriceRial) : null;
+              return (
+                <li key={item.id} className="px-3.5 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      aria-label={starred ? `حذف ${item.symbol} از دیده‌بان` : `افزودن ${item.symbol} به دیده‌بان`}
+                      onClick={() => toggleStar(item.id)}
+                      className="flex h-9 w-7 shrink-0 items-center justify-center text-subtle active:scale-95"
+                    >
+                      <Star className={cn('h-4 w-4', starred && 'fill-amber-400 text-amber-500')} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expanded ? null : item.id)}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-start"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <IranInstrumentLogo item={item} size="sm" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-extrabold text-ink">{item.symbol}</span>
+                            <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-muted">
+                              {item.fundSubtype && item.segment === 'funds'
+                                ? IRAN_FUND_SUBTYPE_LABELS[item.fundSubtype]
+                                : SEGMENT_SHORT[item.segment]}
+                            </span>
+                          </div>
+                          <p className="truncate text-[11px] text-muted">{item.nameFa}</p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-end">
+                        {lastPx ? (
+                          <>
+                            <p className="text-xs font-extrabold text-ink tabular-nums">{lastPx} ریال</p>
+                            <div className="mt-0.5">
+                              <ChangePill value={item.changePct} />
+                            </div>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[11px] text-subtle">
+                            <span>جزئیات</span>
+                            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+
+                  {expanded && (
+                    <div className="mt-2.5 space-y-2 rounded-field bg-surface-2/55 p-2.5 text-xs">
+                      <p className="leading-5 text-muted">{item.noteFa}</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px]">
+                        <span className="font-semibold text-ink">
+                          {item.managerFa ? `${item.sectorFa} · ${item.managerFa}` : item.sectorFa}
+                        </span>
+                        <a
+                          href={item.officialUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-bold text-accent"
+                        >
+                          <span>صفحه رسمی</span>
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* دکمه نمایش بیشتر برای لیست‌های بزرگ ۱,۰۰۰+ نماد */}
+          {filtered.length > limit && (
+            <div className="border-t border-divider/70 p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-accent"
+                onClick={() => setLimit((n) => n + PAGE_SIZE)}
+              >
+                نمایش بیشتر ({toFaDigits(filtered.length - limit)} نماد باقی‌مانده)
+              </Button>
+            </div>
+          )}
         </Surface>
       )}
     </section>
