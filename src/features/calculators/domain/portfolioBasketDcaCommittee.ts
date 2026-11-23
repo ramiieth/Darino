@@ -1,14 +1,15 @@
 /**
- * موتور دامنه «سبد دارایی، میانگین خرید پله‌ای (DCA) و کمیته ایجنت‌ها» در ماشین‌حساب دارینو
+ * موتور دامنه «سبد دارایی، میانگین خرید پله‌ای (DCA)، آزمون استرس بدترین سناریوها و کمیته ایجنت‌ها»
  *
  * قابلیت‌های کلیدی:
- *   ۱) مدیریت سرمایه استیبل‌کوینی دوگانه (مثلاً ۱۷,۶۸۱ USDC + ۵,۰۰۰ USDT = ۲۲,۶۸۱ دلار) + ذخیره نقدینگی / دلتا نوترال
- *   ۲) مدیریت پویا (افزودن، ویرایش، حذف، تغییر وزن و تغییر پله‌های خرید DCA) برای هر رمزارز یا دارایی توکنایز
- *      (HYPE، ETH، SOL، XAUT، PAXG، BTC و سایر رمزارزها)
- *   ۳) محاسبه دقیق میانگین خرید پله‌ای (DCA Ladder) و ترکیب آن با موجودی قبلی کیف پول/داشبورد
- *      (مثلاً ترکیب ۳.۳۳ واحد ETH روی میانگین ۲,۸۲۰ دلار با پله‌های جدید DCA)
- *   ۴) اجرای کمیته ۴ مرحله‌ای ایجنت‌ها (TradingAgents: ۱۱ اندیکاتور تکنیکال، مناظره صعودی/نزولی، معامله‌گر ATR و مدیر پرتفولیو)
- *      روی تک‌تک دارایی‌های سبد و صدور ارزیابی کلان سبد (حذف موارد تکراری، مقایسه XAUT و PAXG، بررسی همبستگی بتا و نقش BTC).
+ *   ۱) اتصال مستقیم به موجودی زندهٔ کیف پول و خریدهای جدید (USDC، USDT، سایر استیبل‌کوین‌ها و میانگین خرید فعلی هر ارز)
+ *   ۲) قفل کردن خودکار «ذخیره هزینه‌های زندگی» (پیش‌فرض ۵,۰۰۰ تتر USDT — خارج از DCA و دست‌نخورده)
+ *   ۳) طراحی پله‌های DCA باقی‌ماندهٔ استیبل‌کوین‌ها در ۳ رژیم:
+ *      - ریزش شدید از همین نقطه (-۱۰٪ تا -۵۰٪ با وزن سنگین‌تر در کف‌ها)
+ *      - ۲ سال بازار رنج و فرسایشی (تقسیم ۲۴ ماههٔ بودجه برای بقا در رکود طولانی)
+ *      - پله‌ای متعادل (۳ پله استاندارد)
+ *   ۴) آزمون استرس ۴ سناریو (ریزش -۴۵٪، ۲ سال رنج ۲۴ ماهه، زمستان عمیق -۶۵٪، و بازگشت تا اهداف)
+ *   ۵) اجرای کمیته ۴ مرحله‌ای ایجنت‌ها (TradingAgents) روی تک‌تک دارایی‌های سبد
  */
 
 import { ETH_POSITION } from '@/features/simulation/domain/constants';
@@ -28,11 +29,37 @@ import {
 } from '@/features/intel/domain/tradingAgents';
 
 export type StableSource = 'USDC' | 'USDT' | 'BOTH';
+export type DcaStressRegime = 'severe_crash' | 'two_year_range' | 'standard';
+
+export const DEFAULT_LIVING_RESERVE_USDT = 5000;
+
+const STABLE_SET = new Set([
+  'USD', 'USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'TUSD', 'USDS', 'PYUSD', 'FRAX', 'BUSD', 'USDD', 'EURC', 'LUSD', 'GHO'
+]);
+
+const SYMBOL_MAP: Record<string, string> = {
+  WETH: 'ETH',
+  STETH: 'ETH',
+  WSTETH: 'ETH',
+  CBETH: 'ETH',
+  RETH: 'ETH',
+  WBTC: 'BTC',
+  CBBTC: 'BTC',
+  TBTC: 'BTC',
+  WSOL: 'SOL',
+  JITOSOL: 'SOL',
+  MSOL: 'SOL'
+};
+
+const normalizeSym = (raw: string): string => {
+  const up = raw.trim().toUpperCase().replace(/[-/_].*$/, '');
+  return SYMBOL_MAP[up] ?? up;
+};
 
 export interface BasketDcaStep {
   id: string;
   labelFa: string;
-  /** درصد افت نسبت به قیمت فعلی (مثلاً 0 برای پله اول، -6 برای پله دوم، -12 برای پله سوم) یا قیمت دستی */
+  /** درصد افت نسبت به قیمت فعلی (مثلاً 0 برای پله اول، -10 برای پله دوم، -50 برای پله چهارم) */
   dropPctFromCurrent: number;
   /** قیمت ورود این پله به دلار */
   targetPriceUsd: number;
@@ -54,11 +81,11 @@ export interface BasketAssetItem {
   preferredStable: StableSource;
   /** قیمت فعلی بازار (دلار) */
   currentPriceUsd: number;
-  /** تغییر ۲۴ ساعته (درصد) برای شبیه‌سازی کندل در صورت نبود داده زنده */
+  /** تغییر ۲۴ ساعته (درصد) */
   change24hPct: number;
-  /** موجودی قبلی کاربر در کیف پول/داشبورد (مثلاً 3.33 برای ETH) */
+  /** موجودی قبلی کاربر در کیف پول/داشبورد */
   existingQuantity: number;
-  /** میانگین قیمت خرید قبلی کاربر (مثلاً 2820 برای ETH) */
+  /** میانگین قیمت خرید قبلی کاربر */
   existingAvgCostUsd: number;
   /** قیمت هدف میان‌مدت کاربر برای محاسبه سود بالقوه (دلار) */
   targetExitPriceUsd: number;
@@ -76,15 +103,10 @@ export interface ComputedBasketStepDetail {
   dropFromMarketPct: number;
   allocatedUsd: number;
   unitsBought: number;
-  /** موجودی تجمعی با احتساب موجودی قبلی کیف پول + پله‌های پرشده تا این پله */
   cumulativeUnits: number;
-  /** سرمایه کل تجمعی (بهای تمام‌شده قبلی + پله‌های پرشده تا این پله) */
   cumulativeCostUsd: number;
-  /** میانگین قیمت تمام‌شده کل پس از پر شدن این پله */
   newCombinedAvgCostUsd: number;
-  /** میانگین قیمت خرید فقط برای پله‌های جدید تا این پله */
   newBuysOnlyAvgCostUsd: number;
-  /** درصد رشد لازم از قیمت این پله تا رسیدن به نقطه سربه‌سر کل */
   bounceToBreakEvenPct: number;
 }
 
@@ -147,15 +169,42 @@ export interface BasketAuditAdvisory {
   actionType?: 'remove_duplicate_gold' | 'add_btc_anchor' | 'keep_dry_powder' | 'prefer_xaut_for_usdt';
 }
 
+export interface StressScenarioOutcome {
+  id: 'severe_crash' | 'two_year_range' | 'deep_winter' | 'recovery_target';
+  titleFa: string;
+  subtitleFa: string;
+  tone: 'loss' | 'warn' | 'info' | 'gain';
+  cryptoShockPct: number;
+  goldShockPct: number;
+  horizonMonths: number;
+  deployedDcaUsd: number;
+  monthlyDcaUsd: number | null;
+  untouchedLivingReserveUsd: number;
+  untouchedDryPowderUsd: number;
+  totalInvestedUsd: number;
+  portfolioValueAtEndUsd: number;
+  netPnlUsd: number;
+  netPnlPct: number;
+  avgCostVsLumpSumBenefitPct: number;
+  survivalVerdictFa: string;
+}
+
 export interface PortfolioBasketSimulationSummary {
   usdcBalanceUsd: number;
   usdtBalanceUsd: number;
   totalStableBalanceUsd: number;
+  /** مبلغ قفل‌شده برای هزینه‌های زندگی (پیش‌فرض ۵,۰۰۰ تتر — هرگز وارد DCA نمی‌شود) */
+  livingReserveUsd: number;
+  /** کل استیبل‌کوین‌های باقی‌مانده پس از کسر ذخیره هزینه‌های زندگی */
+  investableStableUsd: number;
+  /** ذخیره نقدینگی اضطراری سرمایه‌گذاری (جدا از هزینه‌های زندگی) */
   reserveDryPowderUsd: number;
   reserveDryPowderPct: number;
   deployableDcaBudgetUsd: number;
   deployableUsdcUsd: number;
   deployableUsdtUsd: number;
+  /** بودجه دقیق ماهانه در صورت اجرای برنامه ۲ ساله (۲۴ ماه رنج) */
+  monthlyDca24mUsd: number;
   totalExistingBasisUsd: number;
   totalExistingMarketValueUsd: number;
   totalPortfolioAfterDcaCostUsd: number;
@@ -166,6 +215,7 @@ export interface PortfolioBasketSimulationSummary {
   overallVerdictFa: string;
   rows: ComputedBasketAssetRow[];
   advisories: BasketAuditAdvisory[];
+  stressScenarios: StressScenarioOutcome[];
 }
 
 export interface GoldTokenComparisonItem {
@@ -182,10 +232,6 @@ export interface GoldTokenComparisonItem {
   summaryFa: string;
 }
 
-/**
- * جدول مقایسه تخصصی طلای تتر (XAUT) در برابر پکس گلد (PAXG)
- * برای تصمیم‌گیری آگاهانه کاربر و حذف یکی از این دو از سبد.
- */
 export const GOLD_TOKEN_COMPARISON: readonly GoldTokenComparisonItem[] = [
   {
     symbol: 'XAUT',
@@ -195,11 +241,11 @@ export const GOLD_TOKEN_COMPARISON: readonly GoldTokenComparisonItem[] = [
     auditorFa: 'BDO Italia (گزارش دوره‌ای شمش‌های سریال‌دار)',
     vaultLocationFa: 'خزانه‌های امن سوئیس (استاندارد LBMA)',
     mintRedeemFeePct: '۰.۲۵٪ در صدور/بازخرید مستقیم (۰٪ کارمزد نگهداری سالانه)',
-    liquidityAdvantageFa: 'نقدشوندگی بالاتر در بازارهای جهانی و جفت‌ارز مستقیم و عمیق با ۵,۰۰۰ واحد تتر (USDT) شما',
+    liquidityAdvantageFa: 'نقدشوندگی بالاتر در بازارهای جهانی و جفت‌ارز عمیق روی USDT و صرافی‌های دیفای',
     bestStablePair: 'USDT',
     recommendedForUser: true,
     summaryFa:
-      'گزینه پیشنهادی برای سبد شما: نقدشوندگی بالاتر روی جفت XAUT/USDT، رتبه بازار بالاتر در CoinGecko (#۲۸ در برابر #۴۶) و هماهنگی کامل با ۵,۰۰۰ واحد تتر موجود در سبد.'
+      'نقدشوندگی بالاتر و کارمزد نگهداری سالانه صفر؛ به عنوان لنگر تدافعی سبد در ریزش‌های سنگین و بازارهای رنج ۲ ساله.'
   },
   {
     symbol: 'PAXG',
@@ -209,17 +255,14 @@ export const GOLD_TOKEN_COMPARISON: readonly GoldTokenComparisonItem[] = [
     auditorFa: 'KPMG (گواهی حسابرسی ماهانه)',
     vaultLocationFa: 'خزانه‌های Brink’s در لندن (LBMA)',
     mintRedeemFeePct: '۰.۰۲٪ تا ۱٪ پلکانی (۰٪ کارمزد نگهداری سالانه)',
-    liquidityAdvantageFa: 'مناسب جفت‌ارزهای دلاری و USDC؛ نگه داشتن هم‌زمان آن در کنار XAUT تکراری است',
+    liquidityAdvantageFa: 'مناسب جفت‌ارزهای USDC (چون ۵,۰۰۰ USDT برای هزینه‌های زندگی کنار گذاشته شده است)',
     bestStablePair: 'USDC',
     recommendedForUser: false,
     summaryFa:
-      'از نظر گواهی حسابرسی ماهانه KPMG معتبر است، اما با توجه به وجود ۵,۰۰۰ واحد تتر در سبد شما، نگه‌داشتن هم‌زمان آن با XAUT تکراری است و تمرکز سهم طلا روی XAUT کارآمدتر است.'
+      'اگر بودجهٔ خرید شما عمدتاً USDC باشد و گواهی حسابرسی ماهانه KPMG برایتان اولویت دارد، PAXG گزینهٔ تمیزی است؛ فقط یکی از دو توکن طلا را در سبد نگه دارید.'
   }
 ];
 
-/**
- * کاتالوگ دارایی‌های آماده برای افزودن سریع به سبد ماشین‌حساب (شامل BTC، HYPE، ETH، SOL، XAUT، PAXG و...)
- */
 export interface PresetBasketCandidate {
   symbol: string;
   nameFa: string;
@@ -243,7 +286,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDC',
     stepDropsPct: [0, -7.7, -16.15],
     fundamentalNoteFa:
-      'واگرایی مثبت بنیادی: حدود ۳۳٪ اصلاح از سقف ۹۷.۹۶ دلار تا ۶۵ دلار، در حالی که با ۶۹.۷۷ میلیون دلار درآمد ۳۰ روزه (سومین پروتکل درآمدساز بازار پس از تتر و سیرکل در DefiLlama) ۹۹٪ کارمزدها را صرف بازخرید توکن HYPE در صندوق Assistance Fund می‌کند.'
+      'درآمد واقعی بالا از کارمزد معاملات و بازخرید مستمر توکن؛ مناسب ورود پله‌ای روی اصلاح‌های عمیق.'
   },
   {
     symbol: 'ETH',
@@ -255,7 +298,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDC',
     stepDropsPct: [0, -5.26, -10.74],
     fundamentalNoteFa:
-      'کاهش میانگین خرید پوزیشن فعلی داشبورد (۳.۳۳ واحد روی ۲,۸۲۰ دلار): خرید پله‌ای در محدوده ۱,۸۲۵ تا ۱,۶۲۹ دلار میانگین تمام‌شده شما را به ۲,۳۹۸.۵ دلار می‌آورد تا در اولین موج برگشتی به سود برسید.'
+      'کاهش میانگین خرید پوزیشن فعلی کیف پول شما؛ در ریزش‌های سنگین، پله‌های پایین‌تر بیشترین اثر را روی پایین آوردن نقطه سربه‌سر دارند.'
   },
   {
     symbol: 'XAUT',
@@ -267,7 +310,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDT',
     stepDropsPct: [0, -2.67, -5.29],
     fundamentalNoteFa:
-      'لنگر تدافعی و ضدتورمی سبد: هر توکن معادل ۱ انس تروا طلای فیزیکی در خزانه‌های سوئیس. بهترین مقصد برای تبدیل پله‌ای ۵,۰۰۰ واحد تتر (USDT) با نقدشوندگی بالا.'
+      'لنگر تدافعی و ضدتورمی سبد در ریزش‌های شدید کریپتو و بازارهای رنج ۲ ساله.'
   },
   {
     symbol: 'BTC',
@@ -279,7 +322,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDC',
     stepDropsPct: [0, -5.0, -10.36],
     fundamentalNoteFa:
-      'ستون فقرات کلان بازار با دامیننس ۵۸٪ و حدود ۴۸٪ فاصله از سقف ۱۲۶,۰۸۰ دلار؛ افزودن BTC به سبد، نوسان و بتای بالای ترکیب (HYPE + SOL) را متعادل می‌کند.'
+      'ستون فقرات کلان بازار؛ در سناریوی ریزش سنگین یا ۲ سال رنج، بیشترین مقاومت و سریع‌ترین بازیابی را بین رمزارزها دارد.'
   },
   {
     symbol: 'SOL',
@@ -291,7 +334,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDC',
     stepDropsPct: [0, -6.94, -13.89],
     fundamentalNoteFa:
-      'اصلاح عمیق حدود ۷۵٪ از سقف ۲۹۳.۳۱ دلار به محدوده ۷۲ دلار با حفظ جایگاه سومین بلاک‌چین از نظر درآمد کارمزد بلاک‌اسپیس (۱۶.۲ میلیون دلار در ۳۰ روز). مناسب شکار کف پله‌ای با وزن کنترل‌شده.'
+      'بتای بالا و درآمد کارمزد قوی شبکه؛ مناسب شکار کف پله‌ای با وزن کنترل‌شده.'
   },
   {
     symbol: 'PAXG',
@@ -303,7 +346,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     preferredStable: 'USDC',
     stepDropsPct: [0, -2.6, -5.2],
     fundamentalNoteFa:
-      'طلای توکنایز با گواهی حسابرسی ماهانه KPMG. نگه داشتن هم‌زمان آن با XAUT تکراری است؛ یکی از این دو (ترجیحاً XAUT برای تتر) کافی است.'
+      'طلای توکنایز با گواهی حسابرسی ماهانه KPMG؛ مناسب خرید مستقیم با USDC (در کنار XAUT تکراری است).'
   },
   {
     symbol: 'SUI',
@@ -314,7 +357,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     defaultAllocationPct: 10,
     preferredStable: 'USDC',
     stepDropsPct: [0, -8.0, -16.0],
-    fundamentalNoteFa: 'بلاک‌چین لایه اول Move با بتای بالا در موج‌های صعودی؛ صرفاً مناسب سهم کوچک در سبدهای تهاجمی.'
+    fundamentalNoteFa: 'بلاک‌چین لایه اول Move با بتای بالا؛ مناسب سهم کوچک.'
   },
   {
     symbol: 'AAVE',
@@ -325,7 +368,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     defaultAllocationPct: 10,
     preferredStable: 'USDC',
     stepDropsPct: [0, -6.5, -13.0],
-    fundamentalNoteFa: 'بزرگ‌ترین پروتکل وام‌دهی غیرمتمرکز دیفای با درآمد پایدار و نقدشوندگی بالا.'
+    fundamentalNoteFa: 'بزرگ‌ترین پروتکل وام‌دهی غیرمتمرکز دیفای با درآمد پایدار.'
   },
   {
     symbol: 'LINK',
@@ -336,7 +379,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     defaultAllocationPct: 10,
     preferredStable: 'USDC',
     stepDropsPct: [0, -6.5, -13.0],
-    fundamentalNoteFa: 'زیرساخت اوراکل و استاندارد CCIP برای دارایی‌های توکنایزشده (RWA).'
+    fundamentalNoteFa: 'زیرساخت اوراکل و استاندارد CCIP برای دارایی‌های توکنایزشده.'
   },
   {
     symbol: 'PENDLE',
@@ -347,7 +390,7 @@ export const PRESET_BASKET_CANDIDATES: readonly PresetBasketCandidate[] = [
     defaultAllocationPct: 10,
     preferredStable: 'USDC',
     stepDropsPct: [0, -7.0, -14.0],
-    fundamentalNoteFa: 'پروتکل توکنایز سود ثابت (PT/YT) برای استراتژی‌های درآمد ثابت دیفای.'
+    fundamentalNoteFa: 'پروتکل توکنایز سود ثابت (PT/YT) برای استراتژی‌های درآمد ثابت.'
   }
 ];
 
@@ -359,9 +402,6 @@ function roundPriceSmart(px: number): number {
   return Number(px.toPrecision(4));
 }
 
-/**
- * ساخت ۳ پله استاندارد DCA بر اساس قیمت فعلی و درصدهای افت
- */
 export function buildDefaultDcaStepsForPrice(
   symbol: string,
   currentPriceUsd: number,
@@ -536,8 +576,63 @@ export function buildDefaultDcaStepsForPrice(
 }
 
 /**
- * ایجاد یک آیتم دارایی جدید برای افزودن به سبد ماشین‌حساب
+ * ساخت پله‌های DCA متناسب با رژیم انتخابی کاربر:
+ *   - severe_crash: ۴ پلهٔ تدافعی تا -۵۰٪ (وزن سنگین‌تر در کف‌ها: ۱۵/۲۰/۳۰/۳۵٪) برای ریزش شدید بازار
+ *   - two_year_range: ۴ پلهٔ مساوی داخل رنج ۲۴ ماهه (۰٪ تا -۳۰٪) برای انباشت فرسایشی ۲ ساله
+ *   - standard: ۳ پلهٔ استاندارد متعادل
  */
+export function buildStepsForStressRegime(
+  symbol: string,
+  currentPriceUsd: number,
+  regime: DcaStressRegime
+): BasketDcaStep[] {
+  const safePx = currentPriceUsd > 0 ? currentPriceUsd : 100;
+  const up = symbol.toUpperCase();
+  const isGold = up === 'XAUT' || up === 'PAXG';
+
+  if (regime === 'standard') {
+    const preset = PRESET_BASKET_CANDIDATES.find((c) => c.symbol === up);
+    return buildDefaultDcaStepsForPrice(up, safePx, preset?.stepDropsPct ?? [0, -6, -12]);
+  }
+
+  if (regime === 'severe_crash') {
+    const drops = isGold ? [-4, -8, -13, -18] : [-10, -22, -35, -50];
+    const weights = [15, 20, 30, 35];
+    const labels = [
+      'پله ۱ (اصلاح اول)',
+      'پله ۲ (ریزش میانی)',
+      'پله ۳ (ترس شدید بازار)',
+      'پله ۴ (شکار کف بحران)'
+    ];
+    return drops.map((drop, idx) => ({
+      id: `${up}-crash-${idx + 1}`,
+      labelFa: labels[idx],
+      dropPctFromCurrent: drop,
+      targetPriceUsd: roundPriceSmart(safePx * (1 + drop / 100)),
+      weightPct: weights[idx],
+      enabled: true
+    }));
+  }
+
+  // two_year_range: ۲۴ ماه بازار رنج و فرسایشی
+  const drops = isGold ? [0, -4, -8, -12] : [0, -10, -20, -30];
+  const weights = [25, 25, 25, 25];
+  const labels = [
+    'فصل ۱–۲ (میانهٔ رنج)',
+    'فصل ۳–۴ (کف اول رنج)',
+    'فصل ۵–۶ (کف میانی رنج)',
+    'فصل ۷–۸ (کف فرسایشی)'
+  ];
+  return drops.map((drop, idx) => ({
+    id: `${up}-range-${idx + 1}`,
+    labelFa: labels[idx],
+    dropPctFromCurrent: drop,
+    targetPriceUsd: roundPriceSmart(safePx * (1 + drop / 100)),
+    weightPct: weights[idx],
+    enabled: true
+  }));
+}
+
 export function createBasketAssetItem(
   symbol: string,
   livePrices: Record<string, number> = {},
@@ -580,20 +675,10 @@ export function createBasketAssetItem(
     fundamentalNoteFa:
       overrides?.fundamentalNoteFa ??
       preset?.fundamentalNoteFa ??
-      'دارایی اضافه‌شده توسط کاربر برای شبیه‌سازی پله‌های DCA و ارزیابی کمیته ایجنت‌ها.'
+      'دارایی اضافه‌شده برای شبیه‌سازی پله‌های DCA و ارزیابی کمیته ایجنت‌ها.'
   };
 }
 
-/**
- * ساخت چیدمان پیش‌فرض سبد بر اساس درخواست و تایید کاربر:
- *   - موجودی استیبل‌کوین: ۱۷,۶۸۱ USDC و ۵,۰۰۰ USDT (جمعاً ۲۲,۶۸۱ دلار، با ۵,۶۸۱ دلار ذخیره و ۱۷,۰۰۰ دلار بودجه DCA)
- *   - چیدمان بهینه تاییدشده (includeBtcByDefault = true):
- *     * XAUT: ۵,۰۰۰ دلار (۲۹.۴۱٪ از ۱۷,۰۰۰ دلار بودجه خرید — از محل ۵,۰۰۰ USDT)
- *     * HYPE: ۳,۶۰۰ دلار (۲۱.۱۸٪ از ۱۷,۰۰۰ دلار — از محل USDC)
- *     * ETH: ۳,۶۰۰ دلار (۲۱.۱۸٪ از ۱۷,۰۰۰ دلار — از محل USDC + موجودی قبلی ۳.۳۳ واحد روی ۲,۸۲۰$)
- *     * BTC: ۲,۸۰۰ دلار (۱۶.۴۷٪ از ۱۷,۰۰۰ دلار — از محل USDC)
- *     * SOL: ۲,۰۰۰ دلار (۱۱.۷۶٪ از ۱۷,۰۰۰ دلار — از محل USDC)
- */
 export function buildInitialUserBasket(
   livePrices: Record<string, number> = {},
   includeBtcByDefault = true
@@ -671,9 +756,121 @@ export function buildInitialUserBasket(
   ];
 }
 
+export interface WalletSyncInputRow {
+  symbol: string;
+  currentQuantity: number;
+  avgCostUsd: number | null;
+  currentPriceUsd: number | null;
+  currentValueUsd: number;
+  costBasisUsd?: number | null;
+}
+
 /**
- * اجرای کمیته ۴ مرحله‌ای ایجنت‌ها (TradingAgents) روی یک دارایی سبد
+ * همگام‌سازی خودکار سبد با موجودی واقعی کیف پول و خریدهای اخیر کاربر:
+ *   • تفکیک دقیق USDC، USDT و سایر استیبل‌کوین‌ها
+ *   • انتقال دقیق تعداد و میانگین خرید فعلی هر دارایی (مثل ETH، BTC، SOL، HYPE، XAUT/PAXG)
+ *   • تنظیم پله‌های DCA بر اساس رژیم انتخابی (ریزش شدید / ۲ سال رنج / متعادل)
  */
+export function buildWalletSyncedBasket(params: {
+  rows: readonly WalletSyncInputRow[];
+  livePrices: Record<string, number>;
+  regime: DcaStressRegime;
+}): {
+  items: BasketAssetItem[];
+  usdcBalanceUsd: number;
+  usdtBalanceUsd: number;
+  otherStableUsd: number;
+  totalStableUsd: number;
+  syncedHoldingsCount: number;
+} {
+  let usdcBalanceUsd = 0;
+  let usdtBalanceUsd = 0;
+  let otherStableUsd = 0;
+
+  const heldMap = new Map<
+    string,
+    { qty: number; basisSum: number; hasBasis: boolean; valueUsd: number; priceUsd: number }
+  >();
+
+  for (const r of params.rows) {
+    const sym = normalizeSym(r.symbol);
+    if (STABLE_SET.has(sym)) {
+      if (r.currentValueUsd > 0) {
+        if (sym === 'USDC') usdcBalanceUsd += r.currentValueUsd;
+        else if (sym === 'USDT') usdtBalanceUsd += r.currentValueUsd;
+        else otherStableUsd += r.currentValueUsd;
+      }
+      continue;
+    }
+    if (r.currentQuantity <= 0 || r.currentValueUsd < 1) continue;
+    const prev = heldMap.get(sym) ?? { qty: 0, basisSum: 0, hasBasis: false, valueUsd: 0, priceUsd: 0 };
+    const basisAdd =
+      r.costBasisUsd !== null && r.costBasisUsd !== undefined && r.costBasisUsd > 0
+        ? r.costBasisUsd
+        : r.avgCostUsd !== null && r.avgCostUsd > 0
+          ? r.avgCostUsd * r.currentQuantity
+          : 0;
+    heldMap.set(sym, {
+      qty: prev.qty + r.currentQuantity,
+      basisSum: prev.basisSum + basisAdd,
+      hasBasis: prev.hasBasis || basisAdd > 0,
+      valueUsd: prev.valueUsd + r.currentValueUsd,
+      priceUsd: r.currentPriceUsd && r.currentPriceUsd > 0 ? r.currentPriceUsd : prev.priceUsd
+    });
+  }
+
+  const coreWeights: Record<string, number> = {
+    BTC: 30,
+    ETH: 25,
+    XAUT: 20,
+    HYPE: 15,
+    SOL: 10
+  };
+
+  // اگر کاربر در کیف پولش PAXG دارد ولی XAUT ندارد، به جای XAUT از PAXG استفاده می‌کنیم تا تکراری نشود
+  const symbolsOrder = ['BTC', 'ETH', heldMap.has('PAXG') && !heldMap.has('XAUT') ? 'PAXG' : 'XAUT', 'HYPE', 'SOL'];
+  for (const sym of heldMap.keys()) {
+    if (!symbolsOrder.includes(sym) && heldMap.get(sym)!.valueUsd >= 25) {
+      symbolsOrder.push(sym);
+    }
+  }
+
+  const items: BasketAssetItem[] = symbolsOrder.map((sym) => {
+    const held = heldMap.get(sym);
+    const livePx =
+      (held?.priceUsd && held.priceUsd > 0 ? held.priceUsd : undefined) ??
+      (params.livePrices[sym] && params.livePrices[sym] > 0 ? params.livePrices[sym] : undefined);
+    const preset = PRESET_BASKET_CANDIDATES.find((c) => c.symbol === sym);
+    const price = livePx ?? preset?.defaultPriceUsd ?? 100;
+    const existingQty = held ? Number(held.qty.toFixed(6)) : 0;
+    const existingAvg =
+      held && held.hasBasis && held.qty > 0 ? Number((held.basisSum / held.qty).toFixed(2)) : 0;
+
+    return createBasketAssetItem(sym, params.livePrices, {
+      id: `basket-${sym}`,
+      currentPriceUsd: price,
+      allocationPct: coreWeights[sym] ?? (sym === 'PAXG' ? 20 : 10),
+      // چون ۵,۰۰۰ تتر برای هزینه زندگی قفل است، اولویت خرید با USDC باقی‌مانده است
+      preferredStable: 'USDC',
+      existingQuantity: existingQty,
+      existingAvgCostUsd: existingAvg,
+      dcaSteps: buildStepsForStressRegime(sym, price, params.regime)
+    });
+  });
+
+  const roundedUsdc = Math.round((usdcBalanceUsd + otherStableUsd) * 100) / 100;
+  const roundedUsdt = Math.round(usdtBalanceUsd * 100) / 100;
+
+  return {
+    items,
+    usdcBalanceUsd: roundedUsdc,
+    usdtBalanceUsd: roundedUsdt,
+    otherStableUsd: Math.round(otherStableUsd * 100) / 100,
+    totalStableUsd: Math.round((roundedUsdc + roundedUsdt) * 100) / 100,
+    syncedHoldingsCount: heldMap.size
+  };
+}
+
 export function evaluateAssetWithCommittee(params: {
   symbol: string;
   currentPriceUsd: number;
@@ -750,12 +947,179 @@ export function evaluateAssetWithCommittee(params: {
 }
 
 /**
- * شبیه‌سازی کامل سبد دارایی، تخصیص USDC/USDT، پله‌های DCA میانگین خرید و ارزیابی کمیته ایجنت‌ها
+ * موتور آزمون استرس ۴ سناریو (ریزش شدید -۴۵٪، ۲ سال رنج فرسایشی، زمستان عمیق -۶۵٪، بازگشت تا هدف)
+ * با تضمین ۱۰۰٪ دست‌نخورده ماندن ذخیره هزینه‌های زندگی (۵,۰۰۰ تتر).
+ */
+export function computeWorstCaseStressScenarios(params: {
+  rows: readonly ComputedBasketAssetRow[];
+  deployableDcaBudgetUsd: number;
+  livingReserveUsd: number;
+  reserveDryPowderUsd: number;
+}): StressScenarioOutcome[] {
+  const active = params.rows.filter((r) => r.item.enabled);
+  const totalExistingBasis = active.reduce((s, r) => s + r.existingBasisUsd, 0);
+
+  const simulateCrash = (
+    id: 'severe_crash' | 'deep_winter',
+    titleFa: string,
+    subtitleFa: string,
+    cryptoShockPct: number,
+    goldShockPct: number,
+    horizonMonths: number
+  ): StressScenarioOutcome => {
+    let deployed = 0;
+    let endValue = 0;
+    let lumpSumUnitsVal = 0;
+    let dcaUnitsVal = 0;
+
+    for (const r of active) {
+      const isGold = r.item.category === 'gold' || r.item.symbol === 'XAUT' || r.item.symbol === 'PAXG';
+      const shock = isGold ? goldShockPct : cryptoShockPct;
+      const endPx = Math.max(0.0001, r.item.currentPriceUsd * (1 + shock / 100));
+
+      // فقط پله‌هایی پر می‌شوند که قیمتشان بالاتر یا مساوی کف ریزش باشد
+      let addedUnits = 0;
+      let addedUsd = 0;
+      for (const st of r.stepDetails) {
+        if (st.targetPriceUsd >= endPx * 0.999) {
+          addedUnits += st.unitsBought;
+          addedUsd += st.allocatedUsd;
+        }
+      }
+      deployed += addedUsd;
+      endValue += (r.item.existingQuantity + addedUnits) * endPx;
+      dcaUnitsVal += addedUnits * endPx;
+      lumpSumUnitsVal += (addedUsd / Math.max(0.0001, r.item.currentPriceUsd)) * endPx;
+    }
+
+    const totalInvested = totalExistingBasis + deployed;
+    const unspentFromDca = Math.max(0, params.deployableDcaBudgetUsd - deployed);
+    const totalDryPowderLeft = params.reserveDryPowderUsd + unspentFromDca;
+    const netPnlUsd = endValue - totalInvested;
+    const netPnlPct = totalInvested > 0 ? (netPnlUsd / totalInvested) * 100 : 0;
+    const benefitPct =
+      lumpSumUnitsVal > 0 ? Math.max(0, ((dcaUnitsVal - lumpSumUnitsVal) / lumpSumUnitsVal) * 100) : 0;
+
+    return {
+      id,
+      titleFa,
+      subtitleFa,
+      tone: id === 'deep_winter' ? 'loss' : 'warn',
+      cryptoShockPct,
+      goldShockPct,
+      horizonMonths,
+      deployedDcaUsd: Math.round(deployed),
+      monthlyDcaUsd: null,
+      untouchedLivingReserveUsd: Math.round(params.livingReserveUsd),
+      untouchedDryPowderUsd: Math.round(totalDryPowderLeft),
+      totalInvestedUsd: Math.round(totalInvested),
+      portfolioValueAtEndUsd: Math.round(endValue),
+      netPnlUsd: Math.round(netPnlUsd),
+      netPnlPct: Number(netPnlPct.toFixed(1)),
+      avgCostVsLumpSumBenefitPct: Number(benefitPct.toFixed(1)),
+      survivalVerdictFa:
+        params.livingReserveUsd > 0
+          ? '۵,۰۰۰ تتر زندگی کاملاً امن و دست‌نخورده می‌ماند؛ نقدینگی پله‌های عمیق بدون فروش اجباری شما را زنده نگه می‌دارد.'
+          : 'پله‌های عمیق، میانگین خرید شما را نسبت به خرید یکجا به شکل محسوسی پایین می‌آورد.'
+    };
+  };
+
+  // سناریوی ۲ سال بازار رنج و فرسایشی (۲۴ ماه نوسان بدون روند صعودی: میانگین ورود در رنج حدود -۱۲٪ پایین‌تر از امروز، قیمت پایان ماه ۲۴ نزدیک -۵٪ امروز)
+  const monthly24 = params.deployableDcaBudgetUsd / 24;
+  let rangeEndVal = 0;
+  let rangeLumpVal = 0;
+  let rangeDcaVal = 0;
+  for (const r of active) {
+    const isGold = r.item.category === 'gold' || r.item.symbol === 'XAUT' || r.item.symbol === 'PAXG';
+    const avgFillFactor = isGold ? 0.96 : 0.86; // میانگین پر شدن خریدهای ۲۴ ماهه داخل رنج
+    const endPx = r.item.currentPriceUsd * (isGold ? 1.06 : 0.95);
+    const dcaUnits = r.allocatedBudgetUsd / Math.max(0.0001, r.item.currentPriceUsd * avgFillFactor);
+    rangeEndVal += (r.item.existingQuantity + dcaUnits) * endPx;
+    rangeDcaVal += dcaUnits * endPx;
+    rangeLumpVal += (r.allocatedBudgetUsd / Math.max(0.0001, r.item.currentPriceUsd)) * endPx;
+  }
+  const rangeInvested = totalExistingBasis + params.deployableDcaBudgetUsd;
+  const rangePnl = rangeEndVal - rangeInvested;
+  const rangeBenefit = rangeLumpVal > 0 ? Math.max(0, ((rangeDcaVal - rangeLumpVal) / rangeLumpVal) * 100) : 0;
+
+  const twoYearRangeScenario: StressScenarioOutcome = {
+    id: 'two_year_range',
+    titleFa: '۲ سال بازار رنج و فرسایشی (۲۴ ماه)',
+    subtitleFa: 'نوسان خسته کننده بین ۰٪ تا -۳۰٪ بدون روند صعودی برای ۲۴ ماه',
+    tone: 'info',
+    cryptoShockPct: -5,
+    goldShockPct: 6,
+    horizonMonths: 24,
+    deployedDcaUsd: Math.round(params.deployableDcaBudgetUsd),
+    monthlyDcaUsd: Math.round(monthly24),
+    untouchedLivingReserveUsd: Math.round(params.livingReserveUsd),
+    untouchedDryPowderUsd: Math.round(params.reserveDryPowderUsd),
+    totalInvestedUsd: Math.round(rangeInvested),
+    portfolioValueAtEndUsd: Math.round(rangeEndVal),
+    netPnlUsd: Math.round(rangePnl),
+    netPnlPct: rangeInvested > 0 ? Number(((rangePnl / rangeInvested) * 100).toFixed(1)) : 0,
+    avgCostVsLumpSumBenefitPct: Number(rangeBenefit.toFixed(1)),
+    survivalVerdictFa:
+      monthly24 > 0
+        ? `با خرید آرام ماهانه ${Math.round(monthly24).toLocaleString('en-US')} دلار طی ۲۴ ماه، بدون دست زدن به پول زندگی، کل رنج را با میانگین پایین جمع می‌کنید.`
+        : 'بودجهٔ مازاد برای تقسیم ۲۴ ماهه صفر است؛ ابتدا موجودی استیبل‌کوین مازاد بر هزینهٔ زندگی را مشخص کنید.'
+  };
+
+  // سناریوی بازگشت به اهداف قیمتی
+  const recoveryInvested = active.reduce((s, r) => s + r.totalInvestedAfterDcaUsd, 0);
+  const recoveryEndVal = active.reduce((s, r) => s + r.projectedValueAtTargetUsd, 0);
+  const recoveryPnl = recoveryEndVal - recoveryInvested;
+  const recoveryScenario: StressScenarioOutcome = {
+    id: 'recovery_target',
+    titleFa: 'بازگشت بازار تا اهداف میان‌مدت',
+    subtitleFa: 'پاداش صبر و خرید پله‌ای پس از پایان ریزش یا خروج از رنج ۲ ساله',
+    tone: 'gain',
+    cryptoShockPct: 45,
+    goldShockPct: 20,
+    horizonMonths: 18,
+    deployedDcaUsd: Math.round(params.deployableDcaBudgetUsd),
+    monthlyDcaUsd: null,
+    untouchedLivingReserveUsd: Math.round(params.livingReserveUsd),
+    untouchedDryPowderUsd: Math.round(params.reserveDryPowderUsd),
+    totalInvestedUsd: Math.round(recoveryInvested),
+    portfolioValueAtEndUsd: Math.round(recoveryEndVal),
+    netPnlUsd: Math.round(recoveryPnl),
+    netPnlPct: recoveryInvested > 0 ? Number(((recoveryPnl / recoveryInvested) * 100).toFixed(1)) : 0,
+    avgCostVsLumpSumBenefitPct: 0,
+    survivalVerdictFa: 'به دلیل کاهش میانگین خرید در پله‌های پایین، سبد شما خیلی زودتر از خرید یکجا به سود خالص می‌رسد.'
+  };
+
+  return [
+    simulateCrash(
+      'severe_crash',
+      'ریزش شدید از همین‌جا (-۴۵٪)',
+      'سقوط سنگین کریپتو (-۴۵٪) و اصلاح طلا (-۱۲٪) طی ۳ تا ۶ ماه',
+      -45,
+      -12,
+      6
+    ),
+    twoYearRangeScenario,
+    simulateCrash(
+      'deep_winter',
+      'زمستان عمیق / بدترین حالت (-۶۵٪)',
+      'بحران نقدینگی شدید (-۶۵٪ کریپتو، -۱۸٪ طلا) طی ۱۲ ماه',
+      -65,
+      -18,
+      12
+    ),
+    recoveryScenario
+  ];
+}
+
+/**
+ * شبیه‌سازی کامل سبد دارایی، قفل ذخیره هزینه‌های زندگی، پله‌های DCA، آزمون استرس و ارزیابی کمیته ایجنت‌ها
  */
 export function simulatePortfolioBasketDcaAndCommittee(params: {
   usdcBalanceUsd: number;
   usdtBalanceUsd: number;
-  /** مبلغ ذخیره نقد (Dry Powder / دلتا نوترال) که وارد خرید اسپات نمی‌شود */
+  /** مبلغ قفل‌شده برای هزینه‌های زندگی (خارج از DCA — پیش‌فرض ۰ در حالت سازگار با قبل، ۵,۰۰۰ در رابط جدید) */
+  livingReserveUsd?: number;
+  /** مبلغ ذخیره نقدینگی اضطراری سرمایه‌گذاری (Dry Powder جدا از هزینه زندگی) */
   reserveDryPowderUsd: number;
   items: readonly BasketAssetItem[];
   analysisDateIso?: string;
@@ -763,16 +1127,28 @@ export function simulatePortfolioBasketDcaAndCommittee(params: {
   const safeUsdc = Math.max(0, params.usdcBalanceUsd);
   const safeUsdt = Math.max(0, params.usdtBalanceUsd);
   const totalStableBalanceUsd = Number((safeUsdc + safeUsdt).toFixed(2));
-  const reserveDryPowderUsd = Math.min(totalStableBalanceUsd, Math.max(0, params.reserveDryPowderUsd));
+
+  // اولویت ۱: کنار گذاشتن ذخیره هزینه‌های زندگی (ابتدا از USDT، و اگر USDT کم بود از USDC)
+  const livingReserveUsd = Math.min(totalStableBalanceUsd, Math.max(0, params.livingReserveUsd ?? 0));
+  const livingFromUsdt = Math.min(safeUsdt, livingReserveUsd);
+  const livingFromUsdc = Math.max(0, livingReserveUsd - livingFromUsdt);
+
+  const freeUsdtAfterLiving = Math.max(0, safeUsdt - livingFromUsdt);
+  const freeUsdcAfterLiving = Math.max(0, safeUsdc - livingFromUsdc);
+  const investableStableUsd = Number((freeUsdcAfterLiving + freeUsdtAfterLiving).toFixed(2));
+
+  // اولویت ۲: ذخیره اضطراری سرمایه‌گذاری (Dry Powder) از باقی‌ماندهٔ استیبل‌کوین‌ها
+  const reserveDryPowderUsd = Math.min(investableStableUsd, Math.max(0, params.reserveDryPowderUsd));
   const reserveDryPowderPct =
     totalStableBalanceUsd > 0 ? Number(((reserveDryPowderUsd / totalStableBalanceUsd) * 100).toFixed(1)) : 0;
 
-  const deployableDcaBudgetUsd = Number(Math.max(0, totalStableBalanceUsd - reserveDryPowderUsd).toFixed(2));
+  const deployableDcaBudgetUsd = Number(Math.max(0, investableStableUsd - reserveDryPowderUsd).toFixed(2));
+  const monthlyDca24mUsd = Number((deployableDcaBudgetUsd / 24).toFixed(2));
 
   const enabledItems = params.items.filter((i) => i.enabled);
   const rawWeightSum = enabledItems.reduce((acc, i) => acc + Math.max(0, i.allocationPct), 0);
 
-  let remainingUsdt = Math.min(safeUsdt, deployableDcaBudgetUsd);
+  let remainingUsdt = Math.min(freeUsdtAfterLiving, deployableDcaBudgetUsd);
   let remainingUsdc = Math.max(0, deployableDcaBudgetUsd - remainingUsdt);
 
   const rows: ComputedBasketAssetRow[] = params.items.map((item) => {
@@ -974,22 +1350,32 @@ export function simulatePortfolioBasketDcaAndCommittee(params: {
   const advisories: BasketAuditAdvisory[] = [];
   const symbolsSet = new Set(activeRows.map((r) => r.item.symbol.toUpperCase()));
 
+  if (livingReserveUsd > 0) {
+    advisories.push({
+      id: 'living-reserve-protected',
+      tone: 'gain',
+      titleFa: `ذخیره هزینه‌های زندگی (${livingReserveUsd.toLocaleString('en-US')} دلار) به‌طور کامل از DCA جدا شد`,
+      bodyFa:
+        `هیچ بخشی از این مبلغ وارد سفارش‌های خرید نمی‌شود. کل بودجهٔ باقی‌ماندهٔ قابل سرمایه‌گذاری شما ${investableStableUsd.toLocaleString('en-US')} دلار است که ${deployableDcaBudgetUsd.toLocaleString('en-US')} دلار آن در پله‌های DCA توزیع شده است.`
+    });
+  }
+
   if (symbolsSet.has('XAUT') && symbolsSet.has('PAXG')) {
     advisories.push({
       id: 'duplicate-gold',
       tone: 'warn',
       titleFa: 'حذف یکی از دو توکن طلا (نگه‌داشتن XAUT و حذف PAXG)',
       bodyFa:
-        'در سبد فعلی هم XAUT و هم PAXG فعال هستند که هر دو قیمت ۱ انس طلا را دنبال می‌کنند. با توجه به داشتن ۵,۰۰۰ واحد تتر (USDT) و جفت‌ارز مستقیم XAUT/USDT، پیشنهاد کمیته حذف PAXG و متمرکز کردن سهم طلا روی XAUT است.',
+        'هر دو XAUT و PAXG قیمت ۱ انس طلا را دنبال می‌کنند؛ نگه‌داشتن هم‌زمان هر دو تکراری است.',
       actionType: 'remove_duplicate_gold'
     });
-  } else if (symbolsSet.has('PAXG') && !symbolsSet.has('XAUT') && safeUsdt >= 1000) {
+  } else if (symbolsSet.has('PAXG') && !symbolsSet.has('XAUT') && freeUsdtAfterLiving >= 1000) {
     advisories.push({
       id: 'switch-paxg-to-xaut',
       tone: 'info',
-      titleFa: 'پیشنهاد جایگزینی PAXG با XAUT برای ۵,۰۰۰ تتر شما',
+      titleFa: 'پیشنهاد جایگزینی PAXG با XAUT برای تتر مازاد شما',
       bodyFa:
-        'از آنجا که ۵,۰۰۰ دلار از سرمایه شما به صورت USDT است، تبدیل پله‌ای تتر به XAUT کارمزد سواپ کمتری دارد و نقدشوندگی بالاتری در جفت XAUT/USDT فراهم می‌کند.',
+        'تبدیل پله‌ای تتر مازاد به XAUT نقدشوندگی بالاتری در جفت XAUT/USDT فراهم می‌کند.',
       actionType: 'prefer_xaut_for_usdt'
     });
   }
@@ -998,46 +1384,48 @@ export function simulatePortfolioBasketDcaAndCommittee(params: {
     advisories.push({
       id: 'missing-btc-anchor',
       tone: 'info',
-      titleFa: 'تعدیل بتای سبد: افزودن بیت‌کوین (BTC) در کنار HYPE و SOL',
+      titleFa: 'تعدیل ریسک ریزش: افزودن بیت‌کوین (BTC) در کنار آلت‌کوین‌ها',
       bodyFa:
-        'نگه‌داشتن هم‌زمان HYPE و SOL بدون بیت‌کوین، بخش کریپتویی سبد را صددرصد در معرض نوسان آلت‌کوین‌ها قرار می‌دهد. کاستن بخشی از وزن SOL و افزودن BTC در محدوده ۶۵,۰۰۰ دلار پایداری سبد را به شکل چشمگیری بالا می‌برد.',
+        'در سناریوی ریزش سنگین (-۴۵٪ تا -۶۵٪) یا ۲ سال رنج، حضور BTC پایداری سبد را به‌شکل محسوسی بالا می‌برد.',
       actionType: 'add_btc_anchor'
     });
   }
 
-  if (reserveDryPowderPct < 15 && totalStableBalanceUsd >= 10000) {
+  if (reserveDryPowderPct < 15 && investableStableUsd >= 5000) {
     advisories.push({
       id: 'low-dry-powder',
       tone: 'warn',
-      titleFa: 'حفظ حداقل ۲۵٪ ذخیره نقدینگی استیبل‌کوین (Dry Powder)',
+      titleFa: 'نگه‌داشتن ذخیره نقد اضطراری برای کف‌های غیرمنتظره',
       bodyFa:
-        'ورود ۱۰۰٪ از ۲۲,۶۸۱ دلار استیبل‌کوین به پوزیشن‌های جهت‌دار اسپات ریسک نقدینگی را بالا می‌برد. پیشنهاد کمیته ریسک این است که ۵,۶۸۱ دلار USDC را به عنوان ذخیره نقد / دلتا نوترال نگه دارید و ۱۷,۰۰۰ دلار را در ۳ پله DCA وارد کنید.',
+        'علاوه بر پول هزینه‌های زندگی، نگه‌داشتن ۱۵٪ تا ۲۰٪ از بودجهٔ سرمایه‌گذاری به‌عنوان Dry Powder دست شما را در سقوط‌های شدید باز می‌گذارد.',
       actionType: 'keep_dry_powder'
-    });
-  } else {
-    advisories.push({
-      id: 'healthy-structure',
-      tone: 'gain',
-      titleFa: 'ساختار متوازن: ترکیب رشد نقدجریان (HYPE)، کاهش میانگین (ETH)، لنگر BTC و پوشش طلا (XAUT)',
-      bodyFa:
-        `حفظ ${reserveDryPowderUsd.toLocaleString('en-US')} دلار (${reserveDryPowderPct}٪) ذخیره نقدینگی در کنار خرید ۳ پله‌ای DCA، ریسک ریزش بیشتر بازار را مهار می‌کند و میانگین خرید اتریوم شما را از ۲,۸۲۰ دلار به محدوده بسیار نزدیک‌تر به قیمت روز می‌آورد.`
     });
   }
 
   const overallVerdictFa =
     weightedCommitteeScore >= 5.6
-      ? 'تأیید کمیته: ورود پله‌ای (DCA ۳ مرحله‌ای) با حفظ ذخیره نقدینگی'
-      : 'احتیاط کمیته: اولویت با پله‌های لیمیت پایین‌تر (پرهیز از خرید یکجای مارکت)';
+      ? 'تأیید کمیته: ورود پله‌ای آرام با حفظ کامل ذخیره زندگی و نقد اضطراری'
+      : 'احتیاط کمیته: اولویت با پله‌های عمیق‌تر (پرهیز از خرید یکجا)';
+
+  const stressScenarios = computeWorstCaseStressScenarios({
+    rows,
+    deployableDcaBudgetUsd,
+    livingReserveUsd,
+    reserveDryPowderUsd
+  });
 
   return {
     usdcBalanceUsd: safeUsdc,
     usdtBalanceUsd: safeUsdt,
     totalStableBalanceUsd,
+    livingReserveUsd,
+    investableStableUsd,
     reserveDryPowderUsd,
     reserveDryPowderPct,
     deployableDcaBudgetUsd,
-    deployableUsdcUsd: Number(Math.max(0, safeUsdc - reserveDryPowderUsd).toFixed(2)),
-    deployableUsdtUsd: safeUsdt,
+    deployableUsdcUsd: Number(Math.max(0, freeUsdcAfterLiving - reserveDryPowderUsd).toFixed(2)),
+    deployableUsdtUsd: freeUsdtAfterLiving,
+    monthlyDca24mUsd,
     totalExistingBasisUsd,
     totalExistingMarketValueUsd,
     totalPortfolioAfterDcaCostUsd,
@@ -1047,6 +1435,7 @@ export function simulatePortfolioBasketDcaAndCommittee(params: {
     weightedCommitteeScore,
     overallVerdictFa,
     rows,
-    advisories
+    advisories,
+    stressScenarios
   };
 }
