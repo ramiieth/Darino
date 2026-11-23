@@ -8,9 +8,9 @@ describe('منو پس از ساده‌سازی (آبان ۱۴۰۵)', () => {
     expect(NAV_GROUPS.find((g) => g.id === 'trade')!.items.map((i) => i.id)).toEqual(['desk', 'funding', 'journal', 'venues']);
   });
 
-  it('۱۶ آیتم اصلی + ۳ تنظیم در انتهای منو، بدون تکرار؛ سیستم طراحی فقط در جست‌وجو', () => {
+  it('۱۷ آیتم اصلی + ۳ تنظیم در انتهای منو، بدون تکرار؛ سیستم طراحی فقط در جست‌وجو', () => {
     const ids = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.id));
-    expect(NAV_GROUPS.filter((g) => g.id !== 'settings').flatMap((g) => g.items)).toHaveLength(16);
+    expect(NAV_GROUPS.filter((g) => g.id !== 'settings').flatMap((g) => g.items)).toHaveLength(17);
     expect(NAV_GROUPS.find((g) => g.id === 'settings')!.items.map((i) => i.id)).toEqual(['wallets', 'alerts', 'security']);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).not.toContain('design-system');
@@ -25,7 +25,7 @@ describe('منو پس از ساده‌سازی (آبان ۱۴۰۵)', () => {
       '/journal': 'journal',
       '/lighter': 'venues', '/lighter-robinhood': 'venues', '/arcus': 'venues', '/txflow': 'venues', '/variational': 'venues', '/ondo-perps': 'venues',
       '/dashboard': 'dashboard', '/holdings': 'dashboard', '/performance': 'performance', '/assistant': 'assistant',
-      '/calculators': 'calculators', '/simulation': 'simulation', '/simulation/compare': 'simulation',
+      '/calculators': 'calculators', '/simulation': 'simulation', '/simulation/compare': 'simulation', '/founder-lab': 'founder-lab',
       '/gold': 'gold', '/exchanges': 'exchanges', '/vehicle': 'vehicle', '/realestate': 'realestate', '/property-market': 'realestate',
       '/shopping': 'shopping', '/digikala': 'shopping', '/wallets': 'wallets', '/alerts': 'alerts', '/security': 'security'
     };

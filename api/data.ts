@@ -7,5 +7,6 @@ export default groupHandler<'data'>({
   portfolio: () => import('./_portfolioRoute.js'),
   dashboard: () => import('./_dashboardRoute.js'),
   custody: () => import('./_custodyRoute.js'),
-  health: () => import('./_healthRoute.js')
+  health: () => import('./_healthRoute.js'),
+  founderLab: () => import('./_founderLabRoute.js')
 });
