@@ -2,12 +2,9 @@
  * «میز تحلیل هوشمند بازار سهام و صندوق‌های ایران» در دارینو
  *
  * یکپارچه‌شده زیر بخش «بورس ایران و آتیه» در صفحهٔ بازارها:
+ *   • دریافت خودکار اطلاعات زندهٔ هر نماد و صندوق از `/api/integrations?op=iran-market` (فقط با BRSAPI_KEY در Vercel — بدون نیاز به اکسل)
  *   • داشبورد و تحلیل کامل End-to-End با تیم ۶ نفره
- *   • اسکنر بازار (ورود پول حقیقی ۳ روز متوالی، جهش حجم ۲×، شکست ۲۰ روزه، کدال، تخفیف/حباب NAV)
- *   • تیم ۶ نفره هوش مصنوعی (اجرای مستقل هر Agent + خروجی خلاصه و بخش بازشونده «مشاهده جزئیات») + مدیر ریسک تعاملی
- *   • بکتست واقعی با نمودار Chart.js و کد پایتون
- *   • چک‌لیست ۱۱ موردی ریسک + ژورنال معاملاتی و مرور الگوهای ماهانه
- *   • مدیریت داده‌ها (آپلود CSV / PDF کدال با پیش‌نمایش و تأیید) + مقایسه صندوق‌ها
+ *   • اسکنر بازار · تیم ۶ نفره (با Google Gemini) · مدیر ریسک · بکتست واقعی · چک‌لیست ۱۱ موردی · ژورنال و مدیریت داده‌ها
  */
 import { useMemo, useState } from 'react';
 import {
@@ -15,6 +12,7 @@ import {
   Bot,
   CheckCircle2,
   Database,
+  DownloadCloud,
   Play,
   Radar,
   ShieldAlert,
@@ -30,7 +28,11 @@ import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
-import { IRAN_MARKET_CATALOG } from '@/features/markets/data/iranMarketCatalog';
+import {
+  IRAN_MARKET_CATALOG,
+  fetchIranMarketData,
+  type IranMarketInstrument
+} from '@/features/markets/data/iranMarketCatalog';
 import { cn } from '@/shared/lib/cn';
 import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import { ASSET_TYPE_LABELS, DESK_AGENTS } from '../domain/agents';
@@ -46,7 +48,8 @@ import type {
   DeskAssetType,
   IntegratedAnalysisReport,
   RiskManagerResult,
-  ScannerResult
+  ScannerResult,
+  UploadedCodalDocument
 } from '../domain/types';
 import { useIranDeskState } from '../data/store';
 import { IranDeskBacktestPanel } from './IranDeskBacktestPanel';
@@ -78,8 +81,11 @@ export function IranSmartDesk() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>(
     () => state.datasets[0]?.symbol ?? IRAN_MARKET_CATALOG[0]?.symbol ?? 'فولاد'
   );
+  const [liveItems, setLiveItems] = useState<IranMarketInstrument[]>([]);
   const [useGemini, setUseGemini] = useState<boolean>(true);
   const [runningAgent, setRunningAgent] = useState<DeskAgentId | 'full' | null>(null);
+  const [fetchingAuto, setFetchingAuto] = useState<boolean>(false);
+  const [fetchNotice, setFetchNotice] = useState<string | null>(null);
   const [scannerResult, setScannerResult] = useState<ScannerResult | null>(null);
 
   // پارامترهای تعاملی مدیر ریسک (Agent 5)
@@ -92,11 +98,21 @@ export function IranSmartDesk() {
   const [existingExpStr, setExistingExpStr] = useState('0');
   const [manualRiskResult, setManualRiskResult] = useState<RiskManagerResult | null>(null);
 
-  // فهرست یکپارچه نمادها (فایل‌های بارگذاری‌شده + کاتالوگ بازار ایران)
+  // فهرست یکپارچه نمادها (فایل‌های بارگذاری‌شده + نمادهای زنده + کاتالوگ)
   const availableSymbols = useMemo(() => {
     const map = new Map<string, { symbol: string; nameFa: string; assetType: DeskAssetType; hasData: boolean }>();
     for (const ds of state.datasets) {
       map.set(ds.symbol, { symbol: ds.symbol, nameFa: ds.nameFa, assetType: ds.assetType, hasData: true });
+    }
+    for (const li of liveItems) {
+      if (!map.has(li.symbol)) {
+        map.set(li.symbol, {
+          symbol: li.symbol,
+          nameFa: li.nameFa,
+          assetType: mapCatalogToAssetType(li.segment, li.fundSubtype),
+          hasData: Boolean(li.live)
+        });
+      }
     }
     for (const c of IRAN_MARKET_CATALOG) {
       if (!map.has(c.symbol)) {
@@ -109,7 +125,7 @@ export function IranSmartDesk() {
       }
     }
     return [...map.values()];
-  }, [state.datasets]);
+  }, [state.datasets, liveItems]);
 
   const activeMeta = useMemo(
     () =>
@@ -120,6 +136,11 @@ export function IranSmartDesk() {
         hasData: false
       },
     [availableSymbols, selectedSymbol]
+  );
+
+  const activeLiveItem = useMemo(
+    () => liveItems.find((i) => i.symbol === selectedSymbol && i.live) ?? null,
+    [liveItems, selectedSymbol]
   );
 
   const activeDataset = useMemo(
@@ -136,11 +157,93 @@ export function IranSmartDesk() {
     [state.reports, selectedSymbol]
   );
 
-  const buildRiskInput = () => {
+  /** دریافت خودکار داده‌های زندهٔ کل بازار و نماد انتخاب‌شده با BRSAPI_KEY (بدون نیاز به فایل اکسل) */
+  const fetchAutoMarketData = async (): Promise<{ docs: UploadedCodalDocument[]; liveItem: IranMarketInstrument | null }> => {
+    setFetchingAuto(true);
+    setFetchNotice(null);
+    try {
+      const res = await fetchIranMarketData();
+      if (res.source !== 'live') {
+        setFetchNotice('پس از ثبت BRSAPI_KEY در Vercel، اطلاعات زندهٔ تمام نمادها به‌صورت خودکار دریافت می‌شود.');
+        return { docs: activeDocs, liveItem: activeLiveItem };
+      }
+      setLiveItems(res.items);
+      const found = res.items.find((i) => i.symbol === selectedSymbol && i.live) ?? null;
+      if (!found) {
+        setFetchNotice(`تابلوی زنده (${toFaDigits(res.items.length)} نماد) دریافت شد؛ نماد «${selectedSymbol}» در فهرست زنده یافت نشد.`);
+        return { docs: activeDocs, liveItem: null };
+      }
+
+      // محاسبه میانگین P/E واقعی همین صنعت از کل نمادهای زنده دریافت‌شده
+      const sameSectorPes = res.items
+        .filter((i) => i.live && i.sectorFa === found.sectorFa && i.pe && i.pe > 0 && i.pe < 120)
+        .map((i) => i.pe!);
+      const sectorAvgPe =
+        sameSectorPes.length >= 3
+          ? Number((sameSectorPes.reduce((s, x) => s + x, 0) / sameSectorPes.length).toFixed(2))
+          : null;
+
+      const lastPx = found.lastPriceRial ?? found.closePriceRial ?? 0;
+      if (lastPx > 0 && !entryStr) {
+        setEntryStr(String(Math.round(lastPx)));
+        setStopStr(String(Math.round(lastPx * 0.94)));
+        setTargetStr(String(Math.round(lastPx * 1.15)));
+      }
+
+      const autoDoc: UploadedCodalDocument = {
+        id: `live-snap-${selectedSymbol}`,
+        symbol: selectedSymbol,
+        title: `دادهٔ زندهٔ تابلو و صنعت (${selectedSymbol})`,
+        docType: found.segment === 'funds' || found.segment === 'pension' ? 'fund_report' : 'financial_statement',
+        fileName: 'تابلوی زنده بازار سرمایه',
+        reportDate: new Date().toISOString().slice(0, 10),
+        uploadedAt: Date.now(),
+        extractedText: [
+          `نام کامل: ${found.nameFa}`,
+          `صنعت: ${found.sectorFa}`,
+          lastPx > 0 ? `آخرین قیمت: ${Math.round(lastPx).toLocaleString('en-US')} ریال` : null,
+          found.closePriceRial ? `قیمت پایانی: ${Math.round(found.closePriceRial).toLocaleString('en-US')} ریال` : null,
+          found.changePct !== null && found.changePct !== undefined ? `تغییر ۱ روزه: ${found.changePct}٪` : null,
+          found.pe && found.pe > 0 ? `نسبت P/E: ${found.pe}` : null,
+          sectorAvgPe ? `میانگین P/E صنعت (${found.sectorFa}): ${sectorAvgPe}` : null,
+          found.tradeValueBillionToman ? `ارزش معاملات روز: ${found.tradeValueBillionToman} میلیارد تومان` : null
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        metrics: {
+          pe: found.pe ?? null,
+          sectorAvgPe,
+          marketPriceRial: lastPx > 0 ? lastPx : null
+        }
+      };
+
+      const nextDocs = [autoDoc, ...activeDocs.filter((d) => d.id !== autoDoc.id)];
+      updateState((prev) => ({
+        ...prev,
+        documents: [autoDoc, ...prev.documents.filter((d) => d.id !== autoDoc.id)]
+      }));
+      setFetchNotice(`اطلاعات زندهٔ ${selectedSymbol} و میانگین صنعت با موفقیت دریافت شد.`);
+      return { docs: nextDocs, liveItem: found };
+    } finally {
+      setFetchingAuto(false);
+    }
+  };
+
+  const buildRiskInput = (liveOverride?: IranMarketInstrument | null) => {
+    const liveItem = liveOverride ?? activeLiveItem;
     const bars = activeDataset?.bars ?? [];
-    const lastClose = bars.length ? bars[bars.length - 1].close : 0;
+    const lastClose =
+      (bars.length ? bars[bars.length - 1].close : 0) ||
+      liveItem?.lastPriceRial ||
+      liveItem?.closePriceRial ||
+      0;
     const prev20 = bars.slice(-21, -1);
-    const avgVal20 = prev20.length ? prev20.reduce((s, b) => s + b.tradeValueRial, 0) / prev20.length : null;
+    const avgVal20 = prev20.length
+      ? prev20.reduce((s, b) => s + b.tradeValueRial, 0) / prev20.length
+      : liveItem?.tradeValueBillionToman
+        ? liveItem.tradeValueBillionToman * 10_000_000_000
+        : null;
+
     return {
       symbol: selectedSymbol,
       assetType: activeMeta.assetType,
@@ -166,20 +269,27 @@ export function IranSmartDesk() {
     if (runningAgent) return;
     setRunningAgent(agentId);
     try {
-      const scanSignals = scannerResult?.rows.filter((r) => r.symbol === selectedSymbol) ?? [];
+      let docsToUse = activeDocs;
+      let liveToUse = activeLiveItem;
+      if (!activeDataset && docsToUse.length === 0 && agentId !== 'backtester') {
+        const auto = await fetchAutoMarketData();
+        docsToUse = auto.docs;
+        liveToUse = auto.liveItem;
+      }
+      const riskIn = buildRiskInput(liveToUse);
       const out = await runSingleDeskAgent(agentId, {
         symbol: selectedSymbol,
         nameFa: activeMeta.nameFa,
         assetType: activeMeta.assetType,
         dataset: activeDataset,
-        documents: activeDocs,
-        scannerSignals: scanSignals,
+        documents: docsToUse,
+        scannerSignals: scannerResult?.rows.filter((r) => r.symbol === selectedSymbol) ?? [],
         priorRuns: activeRuns,
-        riskInput: buildRiskInput(),
+        riskInput: riskIn,
         useGeminiIfAvailable: useGemini
       });
       if (agentId === 'risk_manager') {
-        setManualRiskResult(evaluateTradeRisk(buildRiskInput()));
+        setManualRiskResult(evaluateTradeRisk(riskIn));
       }
       updateState((prev) => ({
         ...prev,
@@ -197,15 +307,24 @@ export function IranSmartDesk() {
     if (runningAgent) return;
     setRunningAgent('full');
     try {
+      let docsToUse = activeDocs;
+      let liveToUse = activeLiveItem;
+      // اگر فایل اکسل آپلود نشده، به‌طور خودکار دادهٔ زندهٔ نماد و صنعت را از سرور می‌گیرد
+      if (!activeDataset && docsToUse.length === 0) {
+        const auto = await fetchAutoMarketData();
+        docsToUse = auto.docs;
+        liveToUse = auto.liveItem;
+      }
+      const riskIn = buildRiskInput(liveToUse);
       const { report, runs, riskResult, backtestResult } = await runFullAnalysisPipeline({
         symbol: selectedSymbol,
         nameFa: activeMeta.nameFa,
         assetType: activeMeta.assetType,
         dataset: activeDataset,
-        documents: activeDocs,
+        documents: docsToUse,
         scannerSignals: scannerResult?.rows.filter((r) => r.symbol === selectedSymbol) ?? [],
         priorRuns: activeRuns,
-        riskInput: buildRiskInput(),
+        riskInput: riskIn,
         useGeminiIfAvailable: useGemini
       });
       if (riskResult) setManualRiskResult(riskResult);
@@ -222,7 +341,6 @@ export function IranSmartDesk() {
 
   return (
     <div className="space-y-4">
-      {/* هدر مینیمال میز تحلیل هوشمند + انتخابگر نماد + دکمه تحلیل کامل */}
       <Surface variant="focal" className="border border-accent/30 p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -252,6 +370,16 @@ export function IranSmartDesk() {
 
             <Button
               size="sm"
+              variant="outline"
+              icon={<DownloadCloud className="h-3.5 w-3.5" />}
+              loading={fetchingAuto}
+              onClick={() => void fetchAutoMarketData()}
+            >
+              دریافت خودکار داده
+            </Button>
+
+            <Button
+              size="sm"
               icon={<Sparkles className="h-3.5 w-3.5" />}
               loading={runningAgent === 'full'}
               onClick={() => void handleRunFullPipeline()}
@@ -261,16 +389,19 @@ export function IranSmartDesk() {
           </div>
         </div>
 
-        {/* نوار وضعیت داده و موتور هوش مصنوعی */}
+        {fetchNotice && <p className="text-xs font-semibold text-accent">{fetchNotice}</p>}
+
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider/60 pt-2.5 text-[11px] text-muted">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={activeDataset ? 'gain' : 'warn'}>
+            <Badge tone={activeDataset || activeLiveItem ? 'gain' : 'neutral'}>
               {activeDataset
-                ? `داده قیمت: ${toFaDigits(activeDataset.bars.length)} روز (${activeDataset.lastBarDate})`
-                : 'بدون فایل قیمت روزانه'}
+                ? `سابقه قیمت: ${toFaDigits(activeDataset.bars.length)} روز (${activeDataset.lastBarDate})`
+                : activeLiveItem
+                  ? `داده زنده دریافت‌شده (${toFaDigits(Math.round(activeLiveItem.lastPriceRial ?? 0).toLocaleString('en-US'))} ریال)`
+                  : 'آماده دریافت خودکار یا آپلود فایل'}
             </Badge>
             <Badge tone={activeDocs.length > 0 ? 'gain' : 'neutral'}>
-              {toFaDigits(activeDocs.length)} گزارش کدال/صندوق
+              {toFaDigits(activeDocs.length)} سند/شاخص بنیادی
             </Badge>
             <span>نوع: <strong className="text-ink">{ASSET_TYPE_LABELS[activeMeta.assetType]}</strong></span>
           </div>
@@ -282,12 +413,11 @@ export function IranSmartDesk() {
               onChange={(e) => setUseGemini(e.target.checked)}
               className="h-3.5 w-3.5 accent-[rgb(var(--c-brand-500))]"
             />
-            <span>تکمیل تحلیلی با Google Gemini (در صورت فعال بودن)</span>
+            <span>تحلیل عمیق با Google Gemini</span>
           </label>
         </div>
       </Surface>
 
-      {/* ناوبری داخلی میز تحلیل هوشمند */}
       <Tabs<DeskSubTab>
         label="بخش‌های میز تحلیل هوشمند"
         value={subTab}
@@ -302,23 +432,8 @@ export function IranSmartDesk() {
         ]}
       />
 
-      {/* تب ۱: داشبورد و گزارش کامل End-to-End */}
       {subTab === 'overview' && (
         <div className="space-y-4">
-          {!activeDataset && activeDocs.length === 0 && (
-            <Notice
-              tone="info"
-              title="قانون طلایی داده: هیچ عددی ساخته نمی‌شود"
-              action={
-                <Button size="sm" variant="secondary" onClick={() => setSubTab('data')}>
-                  بارگذاری فایل قیمت / کدال
-                </Button>
-              }
-            >
-              برای دریافت اسکن واقعی، تحلیل بنیادی مستند و بکتست واقعی روی <strong>{selectedSymbol}</strong>، ابتدا فایل CSV خروجی TSETMC یا گزارش PDF کدال را در تب «داده‌ها و صندوق‌ها» بارگذاری کنید.
-            </Notice>
-          )}
-
           {latestReport ? (
             <Surface className="p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -357,7 +472,7 @@ export function IranSmartDesk() {
                 {latestReport.bear && (
                   <div className="rounded-field border border-negative/30 bg-negative/5 p-3 text-xs space-y-1">
                     <p className="font-extrabold text-negative flex items-center gap-1">
-                      <TrendingDown className="h-3.5 w-3.5" /> دیدگاه بدبین (Bear — وکیل مدافع شیطان)
+                      <TrendingDown className="h-3.5 w-3.5" /> دیدگاه بدبین (Bear)
                     </p>
                     <p className="text-ink">{latestReport.bear.summaryFa}</p>
                     <Disclosure summary="مشاهده جزئیات">
@@ -394,25 +509,24 @@ export function IranSmartDesk() {
             </Surface>
           ) : (
             <EmptyState
-              message="هنوز تحلیل کاملی برای این نماد اجرا نشده"
-              hint="روی دکمه «تحلیل کامل با تیم هوشمند» در بالا کلیک کنید یا هر یک از ۶ Agent را به‌صورت مستقل در تب «تیم ۶ نفره و ریسک» اجرا نمایید."
+              message="آماده تحلیل هوشمند بدون نیاز به فایل اکسل"
+              hint="روی «تحلیل کامل با تیم هوشمند» کلیک کنید تا اطلاعات زندهٔ نماد و صنعت به‌طور خودکار دریافت و توسط تیم ۶ نفره بررسی شود."
             />
           )}
         </div>
       )}
 
-      {/* تب ۲: اسکنر بازار (Agent 1) */}
       {subTab === 'scanner' && (
         <Surface className="p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-extrabold text-ink">اسکنر بازار (Market Scanner)</h3>
               <p className="text-xs text-muted">
-                بررسی ورود پول حقیقی ۳ روز متوالی، جهش حجم &gt; ۲× میانگین ۲۰ روزه، شکست سقف ۲۰ روزه، اطلاعیه‌های کدال و تخفیف/حباب NAV صندوق‌ها (حداکثر ۵ نماد برتر).
+                ورود پول حقیقی ۳ روز متوالی، جهش حجم &gt; ۲× میانگین ۲۰ روزه، شکست سقف ۲۰ روزه، اطلاعیه‌های کدال و تخفیف/حباب NAV.
               </p>
             </div>
             <Button size="sm" icon={<Radar className="h-3.5 w-3.5" />} onClick={handleRunScannerAll}>
-              اجرای اسکنر روی داده‌های بارگذاری‌شده ({toFaDigits(state.datasets.length)})
+              اجرای اسکنر ({toFaDigits(state.datasets.length)} فایل)
             </Button>
           </div>
 
@@ -459,13 +573,11 @@ export function IranSmartDesk() {
         </Surface>
       )}
 
-      {/* تب ۳: تیم ۶ نفره (اجرای مستقل) + ماشین‌حساب دقیق مدیر ریسک */}
       {subTab === 'agents' && (
         <div className="space-y-4">
-          {/* پنل محاسبه مستقیم مدیر ریسک */}
           <Surface className="p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-extrabold text-ink">مدیر ریسک (Risk Manager) — کنترل حجم، R:R ≥ ۱:۲، صف فروش و دامنه نوسان</h3>
+              <h3 className="text-sm font-extrabold text-ink">مدیر ریسک (Risk Manager) — حجم مجاز، R:R ≥ ۱:۲، صف فروش و دامنه نوسان</h3>
               <Button size="sm" onClick={() => setManualRiskResult(evaluateTradeRisk(buildRiskInput()))}>
                 محاسبه حکم مدیر ریسک
               </Button>
@@ -486,13 +598,13 @@ export function IranSmartDesk() {
                 />
               </Field>
               <Field label="قیمت ورود (ریال)">
-                <Input dir="ltr" inputMode="numeric" value={entryStr} onChange={(e) => setEntryStr(e.target.value)} placeholder="مثلاً 4500" />
+                <Input dir="ltr" inputMode="numeric" value={entryStr} onChange={(e) => setEntryStr(e.target.value)} />
               </Field>
               <Field label="حد ضرر (ریال)">
-                <Input dir="ltr" inputMode="numeric" value={stopStr} onChange={(e) => setStopStr(e.target.value)} placeholder="مثلاً 4200" />
+                <Input dir="ltr" inputMode="numeric" value={stopStr} onChange={(e) => setStopStr(e.target.value)} />
               </Field>
               <Field label="هدف قیمتی (ریال)">
-                <Input dir="ltr" inputMode="numeric" value={targetStr} onChange={(e) => setTargetStr(e.target.value)} placeholder="مثلاً 5200" />
+                <Input dir="ltr" inputMode="numeric" value={targetStr} onChange={(e) => setTargetStr(e.target.value)} />
               </Field>
               <Field label="دامنه نوسان (%)">
                 <Input dir="ltr" inputMode="decimal" value={dailyLimitStr} onChange={(e) => setDailyLimitStr(e.target.value)} suffix="٪" />
@@ -529,7 +641,6 @@ export function IranSmartDesk() {
             )}
           </Surface>
 
-          {/* کارت ۶ Agent مستقل */}
           <div className="grid gap-3 md:grid-cols-2">
             {DESK_AGENTS.map((agent) => {
               const out = activeRuns[agent.id];
@@ -576,7 +687,6 @@ export function IranSmartDesk() {
         </div>
       )}
 
-      {/* تب ۴: بکتست واقعی */}
       {subTab === 'backtest' && (
         <IranDeskBacktestPanel
           dataset={activeDataset}
@@ -587,7 +697,6 @@ export function IranSmartDesk() {
         />
       )}
 
-      {/* تب ۵: ژورنال معاملاتی و چک‌لیست ۱۱ موردی */}
       {subTab === 'journal' && (
         <IranDeskJournalPanel
           activeSymbol={selectedSymbol}
@@ -617,7 +726,6 @@ export function IranSmartDesk() {
         />
       )}
 
-      {/* تب ۶: مدیریت داده‌ها و مقایسه صندوق‌ها */}
       {subTab === 'data' && (
         <IranDeskDataPanel
           datasets={state.datasets}
