@@ -2,10 +2,11 @@
  * MarketsPage — Markets module body
  *
  *  Tabs (page sections):
- *   - همه:        Crypto Top 200 + Ondo + xStocks (one row per symbol)
- *   - رمزارز:     Crypto Top 200
- *   - توکن‌ایز:   Ondo + xStocks (source chips)
- *   - سنتی:       reference catalogue (reference prices — no fake live data)
+ *   - همه:            Crypto Top 200 + Ondo + xStocks (one row per symbol)
+ *   - رمزارز:         Crypto Top 200
+ *   - دارایی توکن‌ایز: Ondo + xStocks (source chips)
+ *   - بورس ایران و آتیه: TSE, IFB, IME, ETF Funds, and Supplementary Retirement (Atiyeh) Funds
+ *   - سنتی جهانی:     reference catalogue (reference prices — no fake live data)
  *
  *  All reads come from the central pipeline — no requests in render.
  * ============================================================ */
@@ -13,27 +14,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMarketsStore } from '../pipeline/store';
 import { MarketsTable } from './MarketsTable';
 import { TradFiTable } from './TradFiTable';
+import { IranMarketTable } from './IranMarketTable';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useUiStore } from '@/shared/store/uiStore';
 import type { MarketUniverse } from '../pipeline/types';
 
-export type MarketsTab = 'all' | 'crypto' | 'tokenized' | 'tradfi';
+export type MarketsTab = 'all' | 'crypto' | 'tokenized' | 'iran' | 'tradfi';
 
 const TABS: { value: MarketsTab; label: string }[] = [
   { value: 'all', label: 'همه' },
   { value: 'crypto', label: 'رمزارز' },
   { value: 'tokenized', label: 'دارایی توکن‌ایز' },
-  { value: 'tradfi', label: 'سنتی' }
+  { value: 'iran', label: 'بورس ایران و آتیه' },
+  { value: 'tradfi', label: 'سنتی جهانی' }
 ];
 
-export const TAB_UNIVERSES: Record<Exclude<MarketsTab, 'tradfi'>, MarketUniverse[]> = {
+export const TAB_UNIVERSES: Record<Exclude<MarketsTab, 'tradfi' | 'iran'>, MarketUniverse[]> = {
   all: ['crypto_top_200', 'ondo_tokenized', 'xstocks'],
   crypto: ['crypto_top_200'],
   tokenized: ['ondo_tokenized', 'xstocks']
 };
 
 export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange: (t: MarketsTab) => void }) {
-  // search handed over from the command palette (consumed once)
   const marketSearch = useUiStore((s) => s.marketSearch);
   const setMarketSearch = useUiStore((s) => s.setMarketSearch);
   const [initialQuery, setInitialQuery] = useState('');
@@ -49,7 +51,7 @@ export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange
   const tabs = useMemo(
     () =>
       TABS.map((t) =>
-        t.value === 'tradfi'
+        t.value === 'tradfi' || t.value === 'iran'
           ? t
           : { ...t, badge: TAB_UNIVERSES[t.value].reduce((n, u) => n + counts[u].length, 0) }
       ),
@@ -65,6 +67,7 @@ export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange
       {tab === 'tokenized' && (
         <MarketsTable universes={TAB_UNIVERSES.tokenized} title="دارایی‌های توکن‌ایز" sourceFilter />
       )}
+      {tab === 'iran' && <IranMarketTable />}
       {tab === 'tradfi' && <TradFiTable />}
     </div>
   );
