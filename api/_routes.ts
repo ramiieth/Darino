@@ -17,7 +17,7 @@ export const ROUTE_PARAM = '__fn';
 
 export const API_GROUPS = {
   /** دادهٔ کاربر روی Neon — سبک و احراز هویت‌شده */
-  data: ['auth', 'accounting', 'portfolio', 'dashboard', 'custody', 'health'],
+  data: ['auth', 'accounting', 'portfolio', 'dashboard', 'custody', 'health', 'founderLab'],
   /** بازار عمومی و پروکسی‌ها — قابل کش، کرون‌های بازار */
   markets: ['cg', 'usdt', 'boros', 'propertyMarket', 'traders', 'intel'],
   /** سرویس‌های ثالث (Zerion، Gemini، پرپ‌ها، اعلان‌ها) — طولانی‌تر */

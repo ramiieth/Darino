@@ -55,6 +55,10 @@
       "destination": "/api/data?__fn=health"
     },
     {
+      "source": "/api/founderLab",
+      "destination": "/api/data?__fn=founderLab"
+    },
+    {
       "source": "/api/cg",
       "destination": "/api/markets?__fn=cg"
     },

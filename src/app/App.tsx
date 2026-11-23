@@ -37,6 +37,7 @@ const EomPage = lazy(() => import('@/features/intel/presentation/EomPage'));
 const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
+const FounderLabPage = lazy(() => import('@/features/founder-lab/presentation/FounderLabPage').then((m) => ({ default: m.FounderLabPage })));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
 /** /intel و /traders (نام قبلی میز معامله) ← /desk با همان پارامترها؛ تب طلای قبلی ← صفحهٔ مستقل /gold */
@@ -123,6 +124,14 @@ export function App() {
             element={
               <Lazy>
                 <CalculatorsPage />
+              </Lazy>
+            }
+          />
+          <Route
+            path="/founder-lab"
+            element={
+              <Lazy label="آزمایشگاه ایده کسب‌وکار">
+                <FounderLabPage />
               </Lazy>
             }
           />

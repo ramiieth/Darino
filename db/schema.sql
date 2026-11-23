@@ -342,3 +342,20 @@ CREATE TABLE IF NOT EXISTS "fundingLog" (
   rate    DOUBLE PRECISION NOT NULL,
   PRIMARY KEY (venue, market, hour)
 );
+
+-- ------------------------------------------------------------
+-- آزمایشگاه ایده کسب‌وکار (Founder Lab) — پروژه‌های اعتبارسنجی ۱۱ مرحله‌ای
+--   هر پروژه یک ردیف JSONB با ایزوله‌سازی کامل به تفکیک userId
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS "founderLabProjects" (
+  "userId"    TEXT NOT NULL DEFAULT 'local-user',
+  id          TEXT NOT NULL,
+  title       TEXT NOT NULL DEFAULT '',
+  stage       TEXT NOT NULL DEFAULT 'idea',
+  currency    TEXT NOT NULL DEFAULT 'IRT',
+  payload     JSONB NOT NULL,
+  "createdAt" BIGINT NOT NULL,
+  "updatedAt" BIGINT NOT NULL,
+  PRIMARY KEY ("userId", id)
+);
+CREATE INDEX IF NOT EXISTS idx_founderLabProjects_updated ON "founderLabProjects" ("userId", "updatedAt" DESC);

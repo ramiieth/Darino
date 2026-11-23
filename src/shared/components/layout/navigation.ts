@@ -14,7 +14,7 @@
  *   تنظیمات و اتصال‌ها wallets, alerts and security (setup, not daily destinations)
  * Pages inside one section share a SectionTabs bar; old URLs keep working.
  */
-import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, FlaskConical, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -122,6 +122,14 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'اگر خریده بودم (شبیه‌سازی)',
         description: 'سناریوی «اگر سرمایه‌گذاری کرده بودم»، مقایسهٔ سرمایهٔ یکسان در چند دارایی و دلار بازده‌دار به‌جای تتر',
         icon: LineChart
+      },
+      {
+        id: 'founder-lab',
+        to: '/founder-lab',
+        label: 'آزمایشگاه ایده',
+        title: 'Founder Lab | آزمایشگاه ایده کسب‌وکار',
+        description: 'اعتبارسنجی ۱۱ مرحله‌ای ایده کسب‌وکار، پنل مشتریان فرضی، Van Westendorp و تحلیل مالی CFO',
+        icon: FlaskConical
       }
     ]
   },
