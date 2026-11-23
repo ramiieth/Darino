@@ -1,22 +1,26 @@
 /**
- * جدول و بخش یکپارچه «بورس ایران» در صفحهٔ بازارها:
+ * جدول و بخش یکپارچه «بورس ایران و آتیه» در صفحهٔ بازارها:
  *   • بورس تهران (TSE)
  *   • فرابورس ایران (IFB)
  *   • بورس کالای ایران (IME — گواهی سپرده طلا، سکه، نقره، زعفران و سلف موازی)
  *   • صندوق‌های سهامی، اهرمی، بخشی، شاخصی، طلا و درآمد ثابت
  *   • صندوق‌های بازنشستگی تکمیلی (آتیه مفید، اندوخته آگاه، کاریز کاریزما و…)
+ *   • دارای لوگوی اختصاصی رنگ‌بندی‌شده برای تمام نمادها و صندوق‌ها
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
+  Coins,
   ExternalLink,
+  Flame,
   Landmark,
   Layers,
   PiggyBank,
   RefreshCw,
   ShieldCheck,
   Star,
-  TrendingUp
+  TrendingUp,
+  Zap
 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -69,6 +73,73 @@ const SEGMENT_BADGE: Record<IranMarketSegment, { label: string; tone: 'info' | '
   funds: { label: 'صندوق ETF', tone: 'gain' },
   pension: { label: 'بازنشستگی / آتیه', tone: 'gain' }
 };
+
+/** لوگوی اختصاصی و رنگ‌بندی‌شده برای تک‌تک نمادها، کالاها و صندوق‌های بازار سرمایه ایران */
+function IranInstrumentLogo({ item }: { item: IranMarketInstrument }) {
+  const txt = `${item.symbol} ${item.nameFa} ${item.sectorFa} ${item.managerFa ?? ''}`;
+
+  let gradient = 'from-sky-500 to-indigo-600';
+  let cornerIcon: React.ReactNode = null;
+
+  if (item.segment === 'pension' || /آتیه|آتيه|بازنشست/.test(txt)) {
+    gradient = /مفید/.test(txt)
+      ? 'from-teal-500 to-emerald-600'
+      : /آگاه/.test(txt)
+        ? 'from-blue-600 to-indigo-700'
+        : /کاریز/.test(txt)
+          ? 'from-violet-600 to-purple-700'
+          : 'from-emerald-500 to-teal-700';
+    cornerIcon = <PiggyBank className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-300" aria-hidden />;
+  } else if (item.fundSubtype === 'gold' || /طلا|سکه|شمش|عیار|لوتوس|کهربا|فزر/.test(txt)) {
+    gradient = 'from-amber-400 to-yellow-600';
+    cornerIcon = <Coins className="h-2.5 w-2.5 text-amber-600 dark:text-amber-300" aria-hidden />;
+  } else if (item.fundSubtype === 'leveraged' || /اهرم|شتاب|توان|موج/.test(txt)) {
+    gradient = 'from-rose-500 to-orange-600';
+    cornerIcon = <Zap className="h-2.5 w-2.5 text-rose-600 dark:text-rose-300" aria-hidden />;
+  } else if (item.fundSubtype === 'fixed_income' || /درآمد\s*ثابت|آوند|کارا/.test(txt)) {
+    gradient = 'from-emerald-500 to-cyan-600';
+    cornerIcon = <ShieldCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-300" aria-hidden />;
+  } else if (/نقره/.test(txt)) {
+    gradient = 'from-slate-400 to-zinc-600';
+    cornerIcon = <Coins className="h-2.5 w-2.5 text-slate-600 dark:text-slate-300" aria-hidden />;
+  } else if (/زعفران/.test(txt)) {
+    gradient = 'from-fuchsia-600 to-rose-600';
+  } else if (/پسته/.test(txt)) {
+    gradient = 'from-lime-500 to-emerald-600';
+  } else if (/فولاد|معدن|کگل|کچاد|هرمز|استیل|فلزات/.test(txt)) {
+    gradient = 'from-slate-600 to-blue-800';
+  } else if (/مس|فملی/.test(txt)) {
+    gradient = 'from-orange-500 to-amber-700';
+  } else if (/پتروشیمی|شیمیایی|پالایش|نفت|فارس|آریا|زاگرس|شپنا|شبندر|نوری|اکتان/.test(txt)) {
+    gradient = 'from-cyan-500 to-teal-700';
+    cornerIcon = <Flame className="h-2.5 w-2.5 text-cyan-600 dark:text-cyan-300" aria-hidden />;
+  } else if (/بانک|بیمه|وبملت|وتجارت|دارا|بپاس/.test(txt)) {
+    gradient = 'from-indigo-600 to-blue-800';
+  } else if (/خودرو|خساپا/.test(txt)) {
+    gradient = 'from-red-500 to-rose-700';
+  } else if (/مخابرات|همراه/.test(txt)) {
+    gradient = 'from-sky-500 to-cyan-600';
+  } else if (item.segment === 'ifb') {
+    gradient = 'from-violet-500 to-indigo-600';
+  }
+
+  const shortLabel = item.symbol.replace(/\(.*?\)/g, '').trim().split(/\s+/)[0].slice(0, 5);
+
+  return (
+    <span
+      className="relative inline-flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-xl text-[11px] font-black text-white shadow-xs ring-1 ring-black/10 dark:ring-white/15"
+      aria-hidden
+    >
+      <span className={cn('absolute inset-0 rounded-xl bg-gradient-to-br', gradient)} />
+      <span className="relative z-10 leading-none tracking-tight">{shortLabel}</span>
+      {cornerIcon && (
+        <span className="absolute -bottom-1 -end-1 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-card shadow-xs ring-1 ring-divider">
+          {cornerIcon}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export function IranMarketTable() {
   const [items, setItems] = useState<IranMarketInstrument[]>([...IRAN_MARKET_CATALOG]);
@@ -142,21 +213,26 @@ export function IranMarketTable() {
 
   return (
     <section aria-label="بازار سرمایه ایران" className="space-y-4">
-      {/* نوار وضعیت اتصال زنده / کاتالوگ مرجع */}
       <Notice
         tone="info"
         title={
           source === 'live'
-            ? 'متصل به تابلوی زندهٔ بازار سرمایه ایران'
-            : 'کاتالوگ یکپارچهٔ بازار سرمایه ایران (آمادهٔ اتصال به کلید BrsApi / TSETMC)'
+            ? 'متصل به تابلوی زندهٔ بازار سرمایه ایران (BrsApi)'
+            : 'کاتالوگ یکپارچهٔ بازار سرمایه ایران (پس از ثبت BRSAPI_KEY در Vercel قیمت زنده فعال می‌شود)'
         }
         action={
-          <Button size="sm" variant="outline" icon={<RefreshCw className="h-3.5 w-3.5" />} loading={loading} onClick={() => void sync()}>
-            بررسی اتصال زنده
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<RefreshCw className="h-3.5 w-3.5" />}
+            loading={loading}
+            onClick={() => void sync()}
+          >
+            به‌روزرسانی زنده
           </Button>
         }
       >
-        بورس تهران، فرابورس، بورس کالا (گواهی سپرده طلا/سکه/نقره/زعفران)، انواع صندوق‌های سهامی/اهرمی/طلا و صندوق‌های بازنشستگی تکمیلی (مانند آتیه مفید، اندوخته آگاه و کاریز کاریزما) همگی در یک نما؛ بدون قیمت جعلی تا زمان فعال‌سازی کلید زنده.
+        بورس تهران، فرابورس، بورس کالا (گواهی سپرده طلا/سکه/نقره/زعفران)، انواع صندوق‌های سهامی/اهرمی/طلا و صندوق‌های بازنشستگی تکمیلی (مانند آتیه مفید، اندوخته آگاه و کاریز کاریزما) همگی در یک نما.
       </Notice>
 
       {/* فیلترهای دسته‌بندی ۵ بازار + دیده‌بان */}
@@ -217,7 +293,7 @@ export function IranMarketTable() {
         </button>
       </div>
 
-      {/* زیرفیلتر نوع صندوق (وقتی تب صندوق‌ها فعال است) */}
+      {/* زیرفیلتر نوع صندوق */}
       {segment === 'funds' && (
         <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {(['all', 'equity', 'leveraged', 'sector', 'index', 'gold', 'fixed_income'] as const).map((sub) => {
@@ -249,22 +325,26 @@ export function IranMarketTable() {
           placeholder="جستجوی نماد، صندوق یا صنعت (مثلاً فولاد، آتیه مفید، عیار، اهرم، شمش طلا)…"
           className="flex-1 md:max-w-md"
         />
-        <p className="ms-auto text-xs text-muted">
-          {toFaDigits(filtered.length)} نماد / صندوق
-        </p>
+        <p className="ms-auto text-xs text-muted">{toFaDigits(filtered.length)} نماد / صندوق</p>
       </div>
 
       {/* جدول واکنش‌گرا */}
       {filtered.length === 0 ? (
         <EmptyState
           message="نماد یا صندوقی با این فیلتر یافت نشد"
-          hint={onlyWatchlist ? 'هنوز نمادی به دیده‌بان خود اضافه نکرده‌اید؛ روی ستارهٔ کنار هر نماد کلیک کنید.' : 'عبارت جستجو را کوتاه‌تر کنید یا دستهٔ دیگری انتخاب نمایید.'}
+          hint={
+            onlyWatchlist
+              ? 'هنوز نمادی به دیده‌بان خود اضافه نکرده‌اید؛ روی ستارهٔ کنار هر نماد کلیک کنید.'
+              : 'عبارت جستجو را کوتاه‌تر کنید یا دستهٔ دیگری انتخاب نمایید.'
+          }
         />
       ) : (
         <Surface className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="data-table">
-              <caption className="sr-only">بازار سرمایه ایران — بورس، فرابورس، بورس کالا، صندوق‌ها و صندوق‌های بازنشستگی</caption>
+              <caption className="sr-only">
+                بازار سرمایه ایران — بورس، فرابورس، بورس کالا، صندوق‌ها و صندوق‌های بازنشستگی
+              </caption>
               <thead>
                 <tr>
                   <th scope="col" className="!ps-4 md:!ps-5">نماد و نام</th>
@@ -287,10 +367,11 @@ export function IranMarketTable() {
                             type="button"
                             aria-label={starred ? `حذف ${item.symbol} از دیده‌بان` : `افزودن ${item.symbol} به دیده‌بان`}
                             onClick={() => toggleStar(item.id)}
-                            className="mt-0.5 shrink-0 text-subtle hover:text-amber-500 transition"
+                            className="mt-2 shrink-0 text-subtle transition hover:text-amber-500"
                           >
                             <Star className={cn('h-4 w-4', starred && 'fill-amber-400 text-amber-500')} />
                           </button>
+                          <IranInstrumentLogo item={item} />
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="font-extrabold text-ink">{item.symbol}</span>
@@ -327,7 +408,7 @@ export function IranMarketTable() {
                         {item.live && item.lastPriceRial ? (
                           fmtRial(item.lastPriceRial)
                         ) : (
-                          <span className="text-xs font-normal text-subtle">نیاز به اتصال زنده</span>
+                          <span className="text-xs font-normal text-subtle">در انتظار BRSAPI_KEY</span>
                         )}
                       </td>
 

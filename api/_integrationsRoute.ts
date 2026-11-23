@@ -23,6 +23,7 @@ import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/doma
 import { shopAsk } from './_shop.js';
 import { relayEndpoint } from './_shopRelay.js';
 import { fetchImage } from './_shopHttp.js';
+import { getIranMarketSnapshot } from './_iranMarket.js';
 export const config={api:{bodyParser:false}};
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -50,6 +51,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if((publicOndo==='ondo-perps-history'||publicOndo==='ondo-perps-depth')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{res.setHeader('Cache-Control',publicOndo==='ondo-perps-history'?'public, max-age=300, s-maxage=600':'public, max-age=10, s-maxage=15');json(res,200,publicOndo==='ondo-perps-history'?await getOndoFundingHistory(market):await getOndoDepth(market));}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(publicOndo?.startsWith('qfex-perps-')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{const load=publicOndo==='qfex-perps-public'?getQfexPublicMarkets:publicOndo==='qfex-perps-history'?()=>getQfexFundingHistory(market):publicOndo==='qfex-perps-depth'?()=>getQfexDepth(market):null;if(!load){json(res,400,{error:'درخواست ناشناخته'});return;}res.setHeader('Cache-Control',publicOndo==='qfex-perps-history'?'public, max-age=300, s-maxage=600':publicOndo==='qfex-perps-depth'?'public, max-age=10, s-maxage=15':'public, max-age=30, s-maxage=30');json(res,200,await load());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(webhookUrl.searchParams.get('op')==='ondo-perps-public'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getOndoPublicMarkets());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
+  if(webhookUrl.searchParams.get('op')==='iran-market'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getIranMarketSnapshot());}catch{res.setHeader('Cache-Control','no-store');json(res,200,{items:[],updatedAt:null,configured:!!process.env.BRSAPI_KEY});}return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
   const op = u.searchParams.get('op') ?? 'status';
