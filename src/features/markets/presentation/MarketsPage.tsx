@@ -5,17 +5,16 @@
  *   - همه:            Crypto Top 200 + Ondo + xStocks (one row per symbol)
  *   - رمزارز:         Crypto Top 200
  *   - دارایی توکن‌ایز: Ondo + xStocks (source chips)
- *   - بورس ایران و آتیه: TSE, IFB, IME, ETF Funds, and Supplementary Retirement (Atiyeh) Funds
+ *   - بورس ایران و آتیه: تابلوی بازار + میز تحلیل هوشمند (۶ Agent تخصصی)
  *   - سنتی جهانی:     reference catalogue (reference prices — no fake live data)
- *
- *  All reads come from the central pipeline — no requests in render.
  * ============================================================ */
 import { useEffect, useMemo, useState } from 'react';
 import { useMarketsStore } from '../pipeline/store';
 import { MarketsTable } from './MarketsTable';
 import { TradFiTable } from './TradFiTable';
 import { IranMarketTable } from './IranMarketTable';
-import { Tabs } from '@/shared/components/ui/SegmentedControl';
+import { IranSmartDesk } from '@/features/iran-desk/presentation/IranSmartDesk';
+import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
 import { useUiStore } from '@/shared/store/uiStore';
 import type { MarketUniverse } from '../pipeline/types';
 
@@ -39,6 +38,8 @@ export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange
   const marketSearch = useUiStore((s) => s.marketSearch);
   const setMarketSearch = useUiStore((s) => s.setMarketSearch);
   const [initialQuery, setInitialQuery] = useState('');
+  const [iranView, setIranView] = useState<'board' | 'desk'>('board');
+
   useEffect(() => {
     if (marketSearch) {
       setInitialQuery(marketSearch);
@@ -67,7 +68,21 @@ export function MarketsPage({ tab, onTabChange }: { tab: MarketsTab; onTabChange
       {tab === 'tokenized' && (
         <MarketsTable universes={TAB_UNIVERSES.tokenized} title="دارایی‌های توکن‌ایز" sourceFilter />
       )}
-      {tab === 'iran' && <IranMarketTable />}
+      {tab === 'iran' && (
+        <div className="space-y-4">
+          <SegmentedControl<'board' | 'desk'>
+            label="نمای بازار سرمایه ایران"
+            size="sm"
+            value={iranView}
+            onChange={setIranView}
+            options={[
+              { value: 'board', label: 'تابلوی بازار' },
+              { value: 'desk', label: 'میز تحلیل هوشمند' }
+            ]}
+          />
+          {iranView === 'board' ? <IranMarketTable /> : <IranSmartDesk />}
+        </div>
+      )}
       {tab === 'tradfi' && <TradFiTable />}
     </div>
   );

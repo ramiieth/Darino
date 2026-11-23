@@ -662,7 +662,7 @@ export async function analyzeReview(data: z.infer<typeof reviewAnalysisSchema>):
 
 export async function analyzeTradingAgents(data: TradingAgentsRequest): Promise<TradingAgentsReport> {
   try {
-    const { text, finishReason } = await gemini({
+    const { text } = await gemini({
       lane: 'tools',
       system: TRADING_AGENTS_SYSTEM,
       contents: [{ role: 'user', parts: [{ text: JSON.stringify(data) }] }],
@@ -679,4 +679,50 @@ export async function analyzeTradingAgents(data: TradingAgentsRequest): Promise<
     console.error('[gemini] trading-agents fallback to deterministic engine', e instanceof Error ? e.message : e);
     return sanitizeTradingAgentsResult({}, data);
   }
+}
+
+/* ---------------- میز تحلیل هوشمند بازار سرمایه ایران (۶ Agent تخصصی) ---------------- */
+
+export const iranDeskAgentSchema = z.object({
+  agentId: z.enum(['scanner', 'fundamental', 'bull', 'bear', 'risk_manager', 'backtester']),
+  symbol: z.string().trim().min(1).max(60),
+  nameFa: z.string().trim().min(1).max(140),
+  assetType: z.string().trim().min(1).max(40),
+  systemInstruction: z.string().trim().min(20).max(6000),
+  payload: z.record(z.string(), z.unknown()).refine((v) => JSON.stringify(v).length <= 45_000, 'payload too large')
+});
+
+export async function analyzeIranDeskAgent(
+  data: z.infer<typeof iranDeskAgentSchema>
+): Promise<{ answer: string; summary: string; model: string }> {
+  const { text, model } = await gemini({
+    lane: 'tools',
+    system: data.systemInstruction,
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: JSON.stringify({
+              symbol: data.symbol,
+              nameFa: data.nameFa,
+              assetType: data.assetType,
+              data: data.payload
+            })
+          }
+        ]
+      }
+    ],
+    config: { temperature: 0.2, maxOutputTokens: 3500 },
+    timeoutMs: 35_000
+  });
+  const firstLine = text
+    .split('\n')
+    .map((l) => l.replace(/^[#*\-\s]+/, '').trim())
+    .find((l) => l.length > 15);
+  return {
+    answer: text,
+    summary: firstLine ? firstLine.slice(0, 220) : text.slice(0, 220),
+    model
+  };
 }
