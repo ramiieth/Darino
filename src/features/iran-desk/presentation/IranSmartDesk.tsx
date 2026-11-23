@@ -27,7 +27,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
-import { EmptyState, Notice } from '@/shared/components/ui/StateViews';
+import { EmptyState } from '@/shared/components/ui/StateViews';
 import {
   IRAN_MARKET_CATALOG,
   fetchIranMarketData,
@@ -55,6 +55,7 @@ import { useIranDeskState } from '../data/store';
 import { IranDeskBacktestPanel } from './IranDeskBacktestPanel';
 import { IranDeskDataPanel } from './IranDeskDataPanel';
 import { IranDeskJournalPanel } from './IranDeskJournalPanel';
+import { IranDeskScreenerPanel } from './IranDeskScreenerPanel';
 
 type DeskSubTab = 'overview' | 'scanner' | 'agents' | 'backtest' | 'journal' | 'data';
 
@@ -424,7 +425,7 @@ export function IranSmartDesk() {
         onChange={setSubTab}
         options={[
           { value: 'overview', label: 'داشبورد و گزارش کامل', icon: <Activity /> },
-          { value: 'scanner', label: 'اسکنر بازار', icon: <Radar /> },
+          { value: 'scanner', label: 'اسکنر، ۶ اندیکاتور و ۱۲ فیلتر', icon: <Radar /> },
           { value: 'agents', label: 'تیم ۶ نفره و ریسک', icon: <Bot /> },
           { value: 'backtest', label: 'بکتست', icon: <TrendingUp /> },
           { value: 'journal', label: 'ژورنال و چک‌لیست', icon: <ShieldAlert /> },
@@ -517,60 +518,17 @@ export function IranSmartDesk() {
       )}
 
       {subTab === 'scanner' && (
-        <Surface className="p-4 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-extrabold text-ink">اسکنر بازار (Market Scanner)</h3>
-              <p className="text-xs text-muted">
-                ورود پول حقیقی ۳ روز متوالی، جهش حجم &gt; ۲× میانگین ۲۰ روزه، شکست سقف ۲۰ روزه، اطلاعیه‌های کدال و تخفیف/حباب NAV.
-              </p>
-            </div>
-            <Button size="sm" icon={<Radar className="h-3.5 w-3.5" />} onClick={handleRunScannerAll}>
-              اجرای اسکنر ({toFaDigits(state.datasets.length)} فایل)
-            </Button>
-          </div>
-
-          {scannerResult && (
-            scannerResult.emptyMessageFa ? (
-              <Notice tone="neutral" title="نتیجه اسکنر">{scannerResult.emptyMessageFa}</Notice>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead>
-                    <tr className="border-b border-divider text-muted">
-                      <th className="pb-2">نماد</th>
-                      <th className="pb-2">نوع دارایی</th>
-                      <th className="pb-2">سیگنال</th>
-                      <th className="pb-2">مقدار دقیق</th>
-                      <th className="pb-2">قدرت سیگنال</th>
-                      <th className="pb-2">منبع داده</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-divider/60">
-                    {scannerResult.rows.map((r, idx) => (
-                      <tr key={`${r.symbol}-${r.signalCode}-${idx}`} className="hover:bg-surface-2/40">
-                        <td className="py-2 font-extrabold text-accent">
-                          <button type="button" onClick={() => { setSelectedSymbol(r.symbol); setSubTab('agents'); }}>
-                            {r.symbol}
-                          </button>
-                        </td>
-                        <td className="py-2 text-muted">{ASSET_TYPE_LABELS[r.assetType]}</td>
-                        <td className="py-2 font-bold text-ink">{r.signalTitleFa}</td>
-                        <td className="py-2">{r.exactValueFa}</td>
-                        <td className="py-2">
-                          <Badge tone={r.strength === 'strong' ? 'gain' : r.strength === 'medium' ? 'warn' : 'neutral'}>
-                            {r.strength === 'strong' ? 'قوی' : r.strength === 'medium' ? 'متوسط' : 'ضعیف'}
-                          </Badge>
-                        </td>
-                        <td className="py-2 text-[11px] text-muted">{r.sourceName} ({r.dataDate})</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
-        </Surface>
+        <IranDeskScreenerPanel
+          datasets={state.datasets}
+          documents={state.documents}
+          liveItems={liveItems}
+          scannerResult={scannerResult}
+          onRunCoreScan={handleRunScannerAll}
+          onSelectSymbol={(sym) => {
+            setSelectedSymbol(sym);
+            setSubTab('agents');
+          }}
+        />
       )}
 
       {subTab === 'agents' && (

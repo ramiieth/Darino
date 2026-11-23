@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DESK_AGENTS } from './agents';
 import { runHistoricalBacktest } from './backtester';
 import { PRE_TRADE_CHECKLIST_ITEMS, evaluateChecklist } from './checklist';
+import { buildSixIndicatorMatrix, runTwelvePracticalFilters } from './indicatorsAndFilters';
 import { analyzeMonthlyJournal } from './journal';
 import { runFullAnalysisPipeline, runSingleDeskAgent } from './orchestrator';
 import { parsePriceCsvText } from './parsers';
@@ -269,5 +270,69 @@ describe('Iran Smart Trading Desk — Core Engines & Acceptance Criteria', () =>
     expect(review.detectedPatterns.some((p) => p.code === 'ignored_risk_manager')).toBe(true);
     expect(review.detectedPatterns.some((p) => p.code === 'stop_violation')).toBe(true);
     expect(review.detectedPatterns.some((p) => p.code === 'emotional_entry')).toBe(true);
+  });
+
+  it('computes all 6 aggregated indicators (RSI, MACD, CCI, MFI, BB, ADX) and all 12 practical market filters', () => {
+    const bars = makeSyntheticBars(45);
+    const ds: UploadedPriceDataset = {
+      id: 'ds-ind',
+      symbol: 'شتبریز',
+      nameFa: 'پالایش نفت تبریز',
+      assetType: 'stock',
+      segment: 'tse',
+      fileName: 'shatabriz.csv',
+      sourceName: 'TSETMC',
+      currencyUnit: 'rial',
+      uploadedAt: Date.now(),
+      lastBarDate: '2026-03-10',
+      bars,
+      validationWarnings: []
+    };
+
+    const matrix = buildSixIndicatorMatrix([ds]);
+    expect(matrix.map((m) => m.id)).toEqual(['RSI', 'MACD', 'CCI', 'MFI', 'BB', 'ADX']);
+
+    const filters = runTwelvePracticalFilters({
+      datasets: [ds],
+      liveItems: [
+        {
+          id: 'live-1',
+          symbol: 'شپنا',
+          nameFa: 'پالایش نفت اصفهان',
+          segment: 'tse',
+          sectorFa: 'فرآورده‌های نفتی',
+          tradeMode: 'exchange',
+          noteFa: '',
+          officialUrl: 'https://tsetmc.com',
+          live: true,
+          openPriceRial: 9800,
+          highPriceRial: 10300,
+          lowPriceRial: 9700,
+          lastPriceRial: 10250,
+          closePriceRial: 10150,
+          yesterdayPriceRial: 10000,
+          changePct: 2.5,
+          volume: 25_000_000,
+          avgVolume20d: 8_000_000,
+          tradeValueBillionToman: 25.5,
+          realBuyVolume: 18_000_000,
+          realSellVolume: 6_000_000,
+          realBuyCount: 60,
+          realSellCount: 1500,
+          legalBuyVolume: 1_000_000,
+          legalSellVolume: 13_000_000
+        }
+      ]
+    });
+
+    expect(filters).toHaveLength(12);
+    const suspiciousVol = filters.find((f) => f.id === 'suspicious_volume');
+    const smartMoney = filters.find((f) => f.id === 'smart_money_inflow');
+    const codeToCode = filters.find((f) => f.id === 'code_to_code_legal_to_real');
+    const perCapita250 = filters.find((f) => f.id === 'per_capita_buy_250m');
+    expect(suspiciousVol?.hits.some((h) => h.symbol === 'شپنا')).toBe(true);
+    expect(smartMoney?.hits.some((h) => h.symbol === 'شپنا')).toBe(true);
+    expect(codeToCode?.hits.some((h) => h.symbol === 'شپنا')).toBe(true);
+    expect(perCapita250?.hits.some((h) => h.symbol === 'شپنا')).toBe(true);
   });
 });

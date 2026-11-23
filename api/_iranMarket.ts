@@ -16,7 +16,19 @@ export interface LiveIranInstrument {
   change60dPct: number | null;
   change90dPct: number | null;
   change365dPct: number | null;
+  openPriceRial: number | null;
+  highPriceRial: number | null;
+  lowPriceRial: number | null;
+  yesterdayPriceRial: number | null;
+  volume: number | null;
+  realBuyVolume: number | null;
+  realSellVolume: number | null;
+  realBuyCount: number | null;
+  realSellCount: number | null;
+  legalBuyVolume: number | null;
+  legalSellVolume: number | null;
   pe: number | null;
+  eps: number | null;
   tradeValueBillionToman: number | null;
   noteFa: string;
   officialUrl: string;
@@ -76,7 +88,19 @@ function mapRow(raw: Record<string, unknown>, idx: number, defaultSeg?: IranMark
   const change60dPct = numOrNull(raw.r60 ?? raw.return_60d ?? raw.change_60d ?? raw.two_month_change);
   const change90dPct = numOrNull(raw.r90 ?? raw.return_90d ?? raw.change_90d ?? raw.quarter_change);
   const change365dPct = numOrNull(raw.r365 ?? raw.return_365d ?? raw.change_365d ?? raw.year_change);
+  const openPriceRial = numOrNull(raw.pf ?? raw.open ?? raw.first_price);
+  const highPriceRial = numOrNull(raw.pmax ?? raw.high ?? raw.max_price);
+  const lowPriceRial = numOrNull(raw.pmin ?? raw.low ?? raw.min_price);
+  const yesterdayPriceRial = numOrNull(raw.py ?? raw.yesterday_price ?? raw.prev_close);
+  const volume = numOrNull(raw.tvol ?? raw.vol ?? raw.volume);
+  const realBuyVolume = numOrNull(raw.Buy_I_Volume ?? raw.buy_i_volume ?? raw.real_buy_vol);
+  const realSellVolume = numOrNull(raw.Sell_I_Volume ?? raw.sell_i_volume ?? raw.real_sell_vol);
+  const realBuyCount = numOrNull(raw.Buy_CountI ?? raw.buy_count_i ?? raw.real_buy_count);
+  const realSellCount = numOrNull(raw.Sell_CountI ?? raw.sell_count_i ?? raw.real_sell_count);
+  const legalBuyVolume = numOrNull(raw.Buy_N_Volume ?? raw.buy_n_volume ?? raw.legal_buy_vol);
+  const legalSellVolume = numOrNull(raw.Sell_N_Volume ?? raw.sell_n_volume ?? raw.legal_sell_vol);
   const pe = numOrNull(raw.pe);
+  const eps = numOrNull(raw.eps);
   const tval = numOrNull(raw.tval ?? raw.trade_value ?? raw.value);
   const tradeValueBillionToman = tval && tval > 0 ? Number((tval / 10_000_000_000).toFixed(2)) : null;
   const ins = clean(raw.isin ?? raw.id ?? raw.ins_code ?? raw.tsetmc_id);
@@ -97,7 +121,19 @@ function mapRow(raw: Record<string, unknown>, idx: number, defaultSeg?: IranMark
     change60dPct,
     change90dPct,
     change365dPct,
+    openPriceRial,
+    highPriceRial,
+    lowPriceRial,
+    yesterdayPriceRial,
+    volume,
+    realBuyVolume,
+    realSellVolume,
+    realBuyCount,
+    realSellCount,
+    legalBuyVolume,
+    legalSellVolume,
     pe,
+    eps,
     tradeValueBillionToman,
     noteFa: [pe && pe > 0 && segment !== 'funds' ? `P/E: ${pe.toFixed(1)}` : null, tradeValueBillionToman ? `ارزش: ${tradeValueBillionToman} م.ت` : null].filter(Boolean).join(' · ') || sectorFa,
     officialUrl: segment === 'ime' ? 'https://www.ime.co.ir/' : /^\d{10,20}$/.test(ins) ? `https://www.tsetmc.com/instInfo/${ins}` : 'https://www.tsetmc.com/',

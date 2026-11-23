@@ -46,8 +46,23 @@ export interface IranMarketInstrument {
   change60dPct?: number | null;
   change90dPct?: number | null;
   change365dPct?: number | null;
-  /** نسبت P/E (برای سهام) */
+  /** قیمت‌های روزانه (باز، بیشترین، کمترین، دیروز) و حجم برای ۱۲ فیلتر کاربردی */
+  openPriceRial?: number | null;
+  highPriceRial?: number | null;
+  lowPriceRial?: number | null;
+  yesterdayPriceRial?: number | null;
+  volume?: number | null;
+  avgVolume20d?: number | null;
+  /** داده‌های حقیقی و حقوقی روزانه برای محاسبه سرانه، ورود پول هوشمند و کدبه‌کد */
+  realBuyVolume?: number | null;
+  realSellVolume?: number | null;
+  realBuyCount?: number | null;
+  realSellCount?: number | null;
+  legalBuyVolume?: number | null;
+  legalSellVolume?: number | null;
+  /** نسبت P/E و EPS (برای سهام) */
   pe?: number | null;
+  eps?: number | null;
   /** ارزش معاملات روز (میلیارد تومان) */
   tradeValueBillionToman?: number | null;
   /** توضیح کوتاه کاربردی */
