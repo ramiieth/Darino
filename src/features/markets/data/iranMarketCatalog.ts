@@ -39,8 +39,13 @@ export interface IranMarketInstrument {
   lastPriceRial?: number | null;
   /** قیمت پایانی یا ابطال (ریال) — فقط وقتی دادهٔ زنده دریافت شود */
   closePriceRial?: number | null;
-  /** درصد تغییر روزانه */
+  /** درصد تغییر ۱، ۷، ۳۰، ۶۰، ۹۰ و ۳۶۵ روزه */
   changePct?: number | null;
+  change7dPct?: number | null;
+  change30dPct?: number | null;
+  change60dPct?: number | null;
+  change90dPct?: number | null;
+  change365dPct?: number | null;
   /** نسبت P/E (برای سهام) */
   pe?: number | null;
   /** ارزش معاملات روز (میلیارد تومان) */

@@ -11,6 +11,11 @@ export interface LiveIranInstrument {
   lastPriceRial: number | null;
   closePriceRial: number | null;
   changePct: number | null;
+  change7dPct: number | null;
+  change30dPct: number | null;
+  change60dPct: number | null;
+  change90dPct: number | null;
+  change365dPct: number | null;
   pe: number | null;
   tradeValueBillionToman: number | null;
   noteFa: string;
@@ -66,6 +71,11 @@ function mapRow(raw: Record<string, unknown>, idx: number, defaultSeg?: IranMark
   const lastPriceRial = numOrNull(raw.pl ?? raw.last_price ?? raw.price);
   const closePriceRial = numOrNull(raw.pc ?? raw.close_price ?? raw.final_price);
   const changePct = numOrNull(raw.plp ?? raw.pcp ?? raw.change_percent ?? raw.percent);
+  const change7dPct = numOrNull(raw.r7 ?? raw.return_7d ?? raw.change_7d ?? raw.week_change);
+  const change30dPct = numOrNull(raw.r30 ?? raw.return_30d ?? raw.change_30d ?? raw.month_change);
+  const change60dPct = numOrNull(raw.r60 ?? raw.return_60d ?? raw.change_60d ?? raw.two_month_change);
+  const change90dPct = numOrNull(raw.r90 ?? raw.return_90d ?? raw.change_90d ?? raw.quarter_change);
+  const change365dPct = numOrNull(raw.r365 ?? raw.return_365d ?? raw.change_365d ?? raw.year_change);
   const pe = numOrNull(raw.pe);
   const tval = numOrNull(raw.tval ?? raw.trade_value ?? raw.value);
   const tradeValueBillionToman = tval && tval > 0 ? Number((tval / 10_000_000_000).toFixed(2)) : null;
@@ -82,6 +92,11 @@ function mapRow(raw: Record<string, unknown>, idx: number, defaultSeg?: IranMark
     lastPriceRial,
     closePriceRial,
     changePct,
+    change7dPct,
+    change30dPct,
+    change60dPct,
+    change90dPct,
+    change365dPct,
     pe,
     tradeValueBillionToman,
     noteFa: [pe && pe > 0 && segment !== 'funds' ? `P/E: ${pe.toFixed(1)}` : null, tradeValueBillionToman ? `ارزش: ${tradeValueBillionToman} م.ت` : null].filter(Boolean).join(' · ') || sectorFa,
