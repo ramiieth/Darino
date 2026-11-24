@@ -22,6 +22,7 @@ function MarketsStatus({ tab }: { tab: MarketsTab }) {
   const loading = useMarketsStore((s) => s.loading);
 
   if (tab === 'tradfi') return <StatusDot tone="warn" label="قیمت مرجع (غیرزنده)" className="font-normal" />;
+  if (tab === 'iran') return <StatusDot tone="info" label="بورس، فرابورس، بورس کالا و آتیه" className="font-normal" />;
   const us = TAB_UNIVERSES[tab];
   const anyLoading = us.some((u) => loading[u]);
   const anyError = us.some((u) => error[u]);

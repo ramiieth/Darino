@@ -16,13 +16,14 @@ import { lookupBridge } from './_bridge.js';
 import { getPerpsRead, getLighterPnl, getLighterTrades, getLighterDaily, getLighterOrders, getOndoPublicMarkets, getOndoFundingHistory, getOndoDepth, getQfexPublicMarkets, getQfexFundingHistory, getQfexDepth } from './_perpsRead.js';
 import { getSpotTokens } from './_arcusSpot.js';
 import { envAddresses, getKeyedPerps } from './_keyedPerps.js';
-import { analyze, analysisSchema, hasGeminiKey, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReviewWithMeta, analyzeTradingAgents, optionsAnalysisSchema, reviewAnalysisSchema, tradingAgentsRequestSchema } from './_assistant.js';
+import { analyze, analysisSchema, hasGeminiKey, analyzeDelta, analyzeOptions, analyzePerformance, analyzeStable, analyzePlan, analyzeReviewWithMeta, analyzeTradingAgents, analyzeIranDeskAgent, iranDeskAgentSchema, optionsAnalysisSchema, reviewAnalysisSchema, tradingAgentsRequestSchema } from './_assistant.js';
 import { DERIVE_OPS, getDerive } from './_derive.js';
 import { searchDigikala, digikalaProduct } from './_digikala.js';
 import { DK_SORT_IDS, type DkSort } from '../src/features/shopping/digikala/domain/types.js';
 import { shopAsk } from './_shop.js';
 import { relayEndpoint } from './_shopRelay.js';
 import { fetchImage } from './_shopHttp.js';
+import { getIranMarketSnapshot } from './_iranMarket.js';
 export const config={api:{bodyParser:false}};
 const limits = new Map<string, { start: number; count: number }>();
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -50,6 +51,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if((publicOndo==='ondo-perps-history'||publicOndo==='ondo-perps-depth')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{res.setHeader('Cache-Control',publicOndo==='ondo-perps-history'?'public, max-age=300, s-maxage=600':'public, max-age=10, s-maxage=15');json(res,200,publicOndo==='ondo-perps-history'?await getOndoFundingHistory(market):await getOndoDepth(market));}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(publicOndo?.startsWith('qfex-perps-')&&req.method==='GET'){const market=webhookUrl.searchParams.get('market')??'';try{const load=publicOndo==='qfex-perps-public'?getQfexPublicMarkets:publicOndo==='qfex-perps-history'?()=>getQfexFundingHistory(market):publicOndo==='qfex-perps-depth'?()=>getQfexDepth(market):null;if(!load){json(res,400,{error:'درخواست ناشناخته'});return;}res.setHeader('Cache-Control',publicOndo==='qfex-perps-history'?'public, max-age=300, s-maxage=600':publicOndo==='qfex-perps-depth'?'public, max-age=10, s-maxage=15':'public, max-age=30, s-maxage=30');json(res,200,await load());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
   if(webhookUrl.searchParams.get('op')==='ondo-perps-public'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getOndoPublicMarkets());}catch(e){res.setHeader('Cache-Control','no-store');json(res,e instanceof ProviderError?e.status:502,{error:e instanceof ProviderError?e.message:'ارتباط با سرویس برقرار نشد'});}return;}
+  if(webhookUrl.searchParams.get('op')==='iran-market'&&req.method==='GET'){try{res.setHeader('Cache-Control','public, max-age=30, s-maxage=60');json(res,200,await getIranMarketSnapshot());}catch{res.setHeader('Cache-Control','no-store');json(res,200,{items:[],updatedAt:null,configured:!!process.env.BRSAPI_KEY});}return;}
   const auth = await requireSession(req, res); if (!auth) return;
   const u = new URL(req.url ?? '/', 'https://darino.local');
   const op = u.searchParams.get('op') ?? 'status';
@@ -57,7 +59,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   // Isolate limits per account and operation; no model retry that could duplicate billing.
   const k = `${auth.userId}:${op}`; const now = Date.now();
   const old = limits.get(k); const limit = old && now - old.start < 60000 ? old : { start: now, count: 0 };
-  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' || op === 'analyze-review' || op === 'analyze-performance' || op === 'analyze-stable' || op === 'analyze-trading-agents' ? 4 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
+  if (++limit.count > (op === 'analyze' || op === 'analyze-options' || op === 'analyze-plan' || op === 'analyze-delta' || op === 'analyze-review' || op === 'analyze-performance' || op === 'analyze-stable' || op === 'analyze-trading-agents' || op === 'iran-desk-agent' ? 6 : op === 'shop-ask' ? 12 : op === 'shop-img' ? 240 : 30)) { res.setHeader('Retry-After','60'); json(res,429,{ error:'درخواست‌های زیادی ارسال شده؛ یک دقیقه بعد تلاش کنید' }); return; }
   if (limits.size > 1000) limits.clear(); limits.set(k,limit);
   try {
     if ((ALERT_OPS as readonly string[]).includes(op)) {
@@ -96,6 +98,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const parsed = tradingAgentsRequestSchema.safeParse(await readBody(req));
       if (!parsed.success) { json(res,400,{ error:'اطلاعات ورودی کمیته ایجنت‌ها کامل یا معتبر نیست' }); return; }
       json(res,200,{ report: await analyzeTradingAgents(parsed.data), provider:'gemini', generatedAt:Date.now() }); return;
+    }
+    if (req.method === 'POST' && op === 'iran-desk-agent') {
+      const parsed = iranDeskAgentSchema.safeParse(await readBody(req));
+      if (!parsed.success) { json(res,400,{ error:'اطلاعات ورودی ایجنت میز تحلیل کامل یا معتبر نیست' }); return; }
+      const out = await analyzeIranDeskAgent(parsed.data);
+      json(res,200,{ answer: out.answer, summary: out.summary, model: out.model, provider:'gemini', generatedAt:Date.now() }); return;
     }
     if (req.method === 'POST' && op === 'analyze-stable') {
       const parsed = optionsAnalysisSchema.safeParse(await readBody(req));
