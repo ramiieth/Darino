@@ -14,7 +14,7 @@
  *   تنظیمات و اتصال‌ها wallets, alerts and security (setup, not daily destinations)
  * Pages inside one section share a SectionTabs bar; old URLs keep working.
  */
-import { ArrowLeftRight, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, FlaskConical, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, BarChart3, Bell, BookOpenCheck, Boxes, Calculator, CandlestickChart, Car, Coins, FlaskConical, Home, Landmark, LayoutDashboard, LineChart, Palette, Percent, ShieldCheck, ShoppingBag, Sparkles, Telescope, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   id: string;
@@ -155,6 +155,15 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'iran',
     label: 'بازار ایران',
     items: [
+      {
+        id: 'iran-stocks',
+        to: '/iran-stocks',
+        label: 'بورس ایران و آتیه',
+        title: 'بورس ایران و میز تحلیل',
+        description: 'تابلوی سهام، فرابورس، بورس کالا و صندوق‌های آتیه + میز تحلیل هوشمند ۶ نفره، ۱۲ فیلتر و ۶ اندیکاتور',
+        icon: BarChart3,
+        match: ['/bourse', '/iran-desk']
+      },
       {
         id: 'gold',
         to: '/gold',

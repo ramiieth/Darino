@@ -37,6 +37,7 @@ const EomPage = lazy(() => import('@/features/intel/presentation/EomPage'));
 const PerformancePage = lazy(() => import('@/features/performance/presentation/PerformancePage'));
 const GoldPage = lazy(() => import('@/features/intel/presentation/GoldPage'));
 const IrExchangesPage = lazy(() => import('@/features/intel/presentation/IrExchangesPage'));
+const IranBoursePage = lazy(() => import('@/features/iran-desk/presentation/IranBoursePage').then((m) => ({ default: m.IranBoursePage })));
 const FounderLabPage = lazy(() => import('@/features/founder-lab/presentation/FounderLabPage').then((m) => ({ default: m.FounderLabPage })));
 
 /** صفحهٔ «دارایی من» — فقط پس از ورود با Passkey (کنترل واقعی روی سرور است) */
@@ -90,6 +91,9 @@ export function App() {
           />
           <Route path="/market-performance" element={<Lazy><MarketPerformancePage /></Lazy>} />
           <Route path="/desk" element={<Lazy label="میز معامله"><IntelHubPage /></Lazy>} />
+          <Route path="/iran-stocks" element={<Lazy label="بورس ایران و میز تحلیل"><IranBoursePage /></Lazy>} />
+          <Route path="/bourse" element={<Lazy label="بورس ایران و میز تحلیل"><IranBoursePage /></Lazy>} />
+          <Route path="/iran-desk" element={<Navigate to="/iran-stocks?view=desk" replace />} />
           <Route path="/gold" element={<Lazy label="طلای ایران"><GoldPage /></Lazy>} />
           <Route path="/exchanges" element={<Lazy label="صرافی‌های ایران"><IrExchangesPage /></Lazy>} />
           <Route path="/journal" element={<Private label="ژورنال معاملاتی"><JournalPage /></Private>} />
