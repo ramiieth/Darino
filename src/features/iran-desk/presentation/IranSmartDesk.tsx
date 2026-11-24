@@ -33,6 +33,7 @@ import {
   fetchIranMarketData,
   type IranMarketInstrument
 } from '@/features/markets/data/iranMarketCatalog';
+import { IranInstrumentLogo } from '@/features/markets/presentation/IranInstrumentLogo';
 import { cn } from '@/shared/lib/cn';
 import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import { ASSET_TYPE_LABELS, DESK_AGENTS } from '../domain/agents';
@@ -58,6 +59,42 @@ import { IranDeskJournalPanel } from './IranDeskJournalPanel';
 import { IranDeskScreenerPanel } from './IranDeskScreenerPanel';
 
 type DeskSubTab = 'overview' | 'scanner' | 'agents' | 'backtest' | 'journal' | 'data';
+
+const AGENT_VISUALS: Record<
+  DeskAgentId,
+  { bar: string; badgeBg: string; badgeText: string }
+> = {
+  scanner: {
+    bar: 'from-cyan-500 via-sky-500 to-blue-500',
+    badgeBg: 'bg-cyan-500/15 ring-cyan-500/30',
+    badgeText: 'text-cyan-700 dark:text-cyan-300'
+  },
+  fundamental: {
+    bar: 'from-indigo-500 via-blue-500 to-violet-500',
+    badgeBg: 'bg-indigo-500/15 ring-indigo-500/30',
+    badgeText: 'text-indigo-700 dark:text-indigo-300'
+  },
+  bull: {
+    bar: 'from-emerald-500 via-green-500 to-teal-500',
+    badgeBg: 'bg-emerald-500/15 ring-emerald-500/30',
+    badgeText: 'text-emerald-700 dark:text-emerald-300'
+  },
+  bear: {
+    bar: 'from-rose-500 via-red-500 to-orange-500',
+    badgeBg: 'bg-rose-500/15 ring-rose-500/30',
+    badgeText: 'text-rose-700 dark:text-rose-300'
+  },
+  risk_manager: {
+    bar: 'from-amber-500 via-orange-500 to-yellow-500',
+    badgeBg: 'bg-amber-500/15 ring-amber-500/30',
+    badgeText: 'text-amber-700 dark:text-amber-300'
+  },
+  backtester: {
+    bar: 'from-violet-500 via-purple-500 to-fuchsia-500',
+    badgeBg: 'bg-violet-500/15 ring-violet-500/30',
+    badgeText: 'text-violet-700 dark:text-violet-300'
+  }
+};
 
 const parseNum = (s: string, fallback = 0) => {
   const n = Number(toEnDigits(s).replace(/[,٬\s]/g, ''));
@@ -342,17 +379,29 @@ export function IranSmartDesk() {
 
   return (
     <div className="space-y-4">
-      <Surface variant="focal" className="border border-accent/30 p-4 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Bot className="h-5 w-5 text-accent" aria-hidden />
-              <h2 className="text-base font-extrabold text-ink">میز تحلیل هوشمند</h2>
-              <Badge tone="neutral">تیم ۶ نفره · بدون معامله خودکار</Badge>
+      <Surface variant="focal" className="relative overflow-hidden border border-accent/30 p-4 space-y-3">
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-l from-indigo-500/[0.08] via-sky-500/[0.04] to-emerald-500/[0.08]"
+          aria-hidden
+        />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <IranInstrumentLogo
+              item={activeLiveItem ?? { symbol: activeMeta.symbol, nameFa: activeMeta.nameFa }}
+              size="lg"
+            />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-extrabold text-ink">میز تحلیل هوشمند</h2>
+                <span className="rounded-full bg-accent/12 px-2 py-0.5 text-[11px] font-bold text-accent">
+                  {activeMeta.symbol}
+                </span>
+                <Badge tone="neutral">تیم ۶ نفره</Badge>
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                {activeMeta.nameFa} · غربالگر ۱۲ فیلتر، ۶ اندیکاتور، کدال، مدیریت ریسک و بکتست
+              </p>
             </div>
-            <p className="mt-0.5 text-xs text-muted">
-              تحلیل بازار، بررسی فرصت‌ها، مدیریت ریسک و ارزیابی استراتژی‌های معاملاتی با کمک تیم هوش مصنوعی
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -438,13 +487,19 @@ export function IranSmartDesk() {
           {latestReport ? (
             <Surface className="p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-extrabold text-ink">
-                    گزارش نهایی یکپارچه — {latestReport.symbol} ({latestReport.nameFa})
-                  </h3>
-                  <p className="text-[11px] text-muted">
-                    کفایت داده: {latestReport.dataSufficiencyFa} · منابع: {latestReport.dataSources.join('، ') || 'ثبت نشده'}
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  <IranInstrumentLogo
+                    item={activeLiveItem ?? { symbol: latestReport.symbol, nameFa: latestReport.nameFa }}
+                    size="md"
+                  />
+                  <div>
+                    <h3 className="text-sm font-extrabold text-ink">
+                      گزارش نهایی یکپارچه — {latestReport.symbol} ({latestReport.nameFa})
+                    </h3>
+                    <p className="text-[11px] text-muted">
+                      کفایت داده: {latestReport.dataSufficiencyFa} · منابع: {latestReport.dataSources.join('، ') || 'ثبت نشده'}
+                    </p>
+                  </div>
                 </div>
                 <Badge tone={FINAL_VERDICT_META[latestReport.finalVerdict].tone}>
                   {latestReport.finalVerdictLabelFa}
@@ -523,6 +578,8 @@ export function IranSmartDesk() {
           documents={state.documents}
           liveItems={liveItems}
           scannerResult={scannerResult}
+          fetchingLive={fetchingAuto}
+          onRefreshLive={() => void fetchAutoMarketData()}
           onRunCoreScan={handleRunScannerAll}
           onSelectSymbol={(sym) => {
             setSelectedSymbol(sym);
@@ -602,42 +659,57 @@ export function IranSmartDesk() {
           <div className="grid gap-3 md:grid-cols-2">
             {DESK_AGENTS.map((agent) => {
               const out = activeRuns[agent.id];
+              const vis = AGENT_VISUALS[agent.id];
               return (
-                <Surface key={agent.id} className="p-4 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge tone="neutral">{toFaDigits(agent.order)}</Badge>
-                        <h4 className="text-sm font-extrabold text-ink">{agent.nameFa}</h4>
-                        {out && (
-                          <Badge tone={out.provider === 'gemini' ? 'info' : 'neutral'}>
-                            {out.provider === 'gemini' ? 'Gemini' : 'موتور محاسباتی'}
-                          </Badge>
-                        )}
+                <Surface
+                  key={agent.id}
+                  className="overflow-hidden border border-divider/85 transition duration-200 hover:shadow-md"
+                >
+                  <div className={cn('h-1 w-full bg-gradient-to-l', vis.bar)} aria-hidden />
+                  <div className="p-4 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={cn(
+                              'inline-flex h-6 w-6 items-center justify-center rounded-lg text-[11px] font-black ring-1',
+                              vis.badgeBg,
+                              vis.badgeText
+                            )}
+                          >
+                            {toFaDigits(agent.order)}
+                          </span>
+                          <h4 className="text-sm font-extrabold text-ink">{agent.nameFa}</h4>
+                          {out && (
+                            <Badge tone={out.provider === 'gemini' ? 'info' : 'neutral'}>
+                              {out.provider === 'gemini' ? 'Gemini' : 'موتور محاسباتی'}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-5 text-muted">{agent.descriptionFa}</p>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-muted">{agent.descriptionFa}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={<Play className="h-3 w-3" />}
+                        loading={runningAgent === agent.id}
+                        onClick={() => void handleRunSingleAgent(agent.id)}
+                      >
+                        اجرا
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      icon={<Play className="h-3 w-3" />}
-                      loading={runningAgent === agent.id}
-                      onClick={() => void handleRunSingleAgent(agent.id)}
-                    >
-                      اجرا
-                    </Button>
-                  </div>
 
-                  {out && (
-                    <div className="space-y-1.5 rounded-field bg-surface-2/55 p-2.5 text-xs">
-                      <p className="font-semibold text-ink">{out.summaryFa}</p>
-                      <Disclosure summary="مشاهده جزئیات">
-                        <pre className="whitespace-pre-wrap pt-2 font-sans text-[11px] leading-6 text-muted">
-                          {out.detailsMarkdownFa}
-                        </pre>
-                      </Disclosure>
-                    </div>
-                  )}
+                    {out && (
+                      <div className="space-y-1.5 rounded-field border border-divider/60 bg-surface-2/55 p-3 text-xs">
+                        <p className="font-semibold leading-6 text-ink">{out.summaryFa}</p>
+                        <Disclosure summary="مشاهده جزئیات">
+                          <pre className="whitespace-pre-wrap pt-2 font-sans text-[11px] leading-6 text-muted">
+                            {out.detailsMarkdownFa}
+                          </pre>
+                        </Disclosure>
+                      </div>
+                    )}
+                  </div>
                 </Surface>
               );
             })}

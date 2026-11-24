@@ -8,6 +8,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Notice } from '@/shared/components/ui/StateViews';
+import { IranInstrumentLogo } from '@/features/markets/presentation/IranInstrumentLogo';
 import { cn } from '@/shared/lib/cn';
 import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import { PRE_TRADE_CHECKLIST_ITEMS, evaluateChecklist } from '../domain/checklist';
@@ -104,9 +105,10 @@ export function IranDeskJournalPanel({
       {/* ۱) چک‌لیست تعاملی ۱۱ موردی ریسک قبل از هر معامله */}
       <Surface className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4 text-accent" aria-hidden />
-            <h3 className="text-sm font-extrabold text-ink">
+          <div className="flex items-center gap-2.5">
+            <IranInstrumentLogo item={{ symbol: activeSymbol }} size="sm" />
+            <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-ink">
+              <CheckSquare className="h-4 w-4 text-accent" aria-hidden />
               چک‌لیست ریسک قبل از معامله برای {activeSymbol}
             </h3>
           </div>
@@ -255,7 +257,8 @@ export function IranDeskJournalPanel({
             <div className="max-h-56 space-y-1.5 overflow-y-auto pt-1">
               {journal.slice(0, 10).map((j) => (
                 <div key={j.id} className="flex items-center justify-between rounded-field border border-divider/70 bg-surface-2/40 px-2.5 py-1.5 text-xs">
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <IranInstrumentLogo item={{ symbol: j.symbol }} size="xs" showCornerIcon={false} />
                     <span className="font-bold text-ink">{j.symbol}</span>{' '}
                     <span className="text-[11px] text-muted">{j.date} · {j.entryReasonFa}</span>
                   </div>

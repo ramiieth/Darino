@@ -4,14 +4,9 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Coins,
   ExternalLink,
-  Flame,
-  PiggyBank,
   RefreshCw,
-  ShieldCheck,
-  Star,
-  Zap
+  Star
 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Button } from '@/shared/components/ui/Button';
@@ -29,6 +24,7 @@ import {
   type IranMarketInstrument,
   type IranMarketSegment
 } from '../data/iranMarketCatalog';
+import { IranInstrumentLogo } from './IranInstrumentLogo';
 
 const WATCHLIST_KEY = 'darino:iran-market:watchlist:v1';
 const PAGE_SIZE = 40;
@@ -82,76 +78,7 @@ const SEGMENT_SHORT: Record<IranMarketSegment, string> = {
   pension: 'آتیه'
 };
 
-/** لوگوی اختصاصی و رنگ‌بندی‌شده برای تمام نمادها و صندوق‌ها */
-function IranInstrumentLogo({ item, size = 'md' }: { item: IranMarketInstrument; size?: 'sm' | 'md' }) {
-  const txt = `${item.symbol} ${item.nameFa} ${item.sectorFa} ${item.managerFa ?? ''}`;
 
-  let gradient = 'from-sky-500 to-indigo-600';
-  let cornerIcon: React.ReactNode = null;
-
-  if (item.segment === 'pension' || /آتیه|آتيه|بازنشست/.test(txt)) {
-    gradient = /مفید/.test(txt)
-      ? 'from-teal-500 to-emerald-600'
-      : /آگاه/.test(txt)
-        ? 'from-blue-600 to-indigo-700'
-        : /کاریز/.test(txt)
-          ? 'from-violet-600 to-purple-700'
-          : 'from-emerald-500 to-teal-700';
-    cornerIcon = <PiggyBank className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-300" aria-hidden />;
-  } else if (item.fundSubtype === 'gold' || /طلا|سکه|شمش|عیار|لوتوس|کهربا|فزر/.test(txt)) {
-    gradient = 'from-amber-400 to-yellow-600';
-    cornerIcon = <Coins className="h-2.5 w-2.5 text-amber-600 dark:text-amber-300" aria-hidden />;
-  } else if (item.fundSubtype === 'leveraged' || /اهرم|شتاب|توان|موج/.test(txt)) {
-    gradient = 'from-rose-500 to-orange-600';
-    cornerIcon = <Zap className="h-2.5 w-2.5 text-rose-600 dark:text-rose-300" aria-hidden />;
-  } else if (item.fundSubtype === 'fixed_income' || /درآمد\s*ثابت|آوند|کارا/.test(txt)) {
-    gradient = 'from-emerald-500 to-cyan-600';
-    cornerIcon = <ShieldCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-300" aria-hidden />;
-  } else if (/نقره/.test(txt)) {
-    gradient = 'from-slate-400 to-zinc-600';
-    cornerIcon = <Coins className="h-2.5 w-2.5 text-slate-600 dark:text-slate-300" aria-hidden />;
-  } else if (/زعفران/.test(txt)) {
-    gradient = 'from-fuchsia-600 to-rose-600';
-  } else if (/پسته/.test(txt)) {
-    gradient = 'from-lime-500 to-emerald-600';
-  } else if (/فولاد|معدن|کگل|کچاد|هرمز|استیل|فلزات/.test(txt)) {
-    gradient = 'from-slate-600 to-blue-800';
-  } else if (/مس|فملی/.test(txt)) {
-    gradient = 'from-orange-500 to-amber-700';
-  } else if (/پتروشیمی|شیمیایی|پالایش|نفت|فارس|آریا|زاگرس|شپنا|شبندر|نوری|اکتان/.test(txt)) {
-    gradient = 'from-cyan-500 to-teal-700';
-    cornerIcon = <Flame className="h-2.5 w-2.5 text-cyan-600 dark:text-cyan-300" aria-hidden />;
-  } else if (/بانک|بیمه|وبملت|وتجارت|دارا|بپاس/.test(txt)) {
-    gradient = 'from-indigo-600 to-blue-800';
-  } else if (/خودرو|خساپا/.test(txt)) {
-    gradient = 'from-red-500 to-rose-700';
-  } else if (/مخابرات|همراه/.test(txt)) {
-    gradient = 'from-sky-500 to-cyan-600';
-  } else if (item.segment === 'ifb') {
-    gradient = 'from-violet-500 to-indigo-600';
-  }
-
-  const shortLabel = item.symbol.replace(/\(.*?\)/g, '').trim().split(/\s+/)[0].slice(0, 5);
-  const dim = size === 'sm' ? 'h-9 w-9 text-[10px]' : 'h-9 w-9 text-[11px]';
-
-  return (
-    <span
-      className={cn(
-        'relative inline-flex shrink-0 select-none items-center justify-center rounded-xl font-black text-white shadow-xs ring-1 ring-black/10 dark:ring-white/15',
-        dim
-      )}
-      aria-hidden
-    >
-      <span className={cn('absolute inset-0 rounded-xl bg-gradient-to-br', gradient)} />
-      <span className="relative z-10 leading-none tracking-tight">{shortLabel}</span>
-      {cornerIcon && (
-        <span className="absolute -bottom-1 -end-1 z-20 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-card shadow-xs ring-1 ring-divider">
-          {cornerIcon}
-        </span>
-      )}
-    </span>
-  );
-}
 
 function ReturnCell({ value, pill = false }: { value: number | null | undefined; pill?: boolean }) {
   const txt = fmtPct(value);

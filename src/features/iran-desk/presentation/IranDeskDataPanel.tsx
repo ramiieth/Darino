@@ -8,6 +8,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button, IconButton } from '@/shared/components/ui/Button';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Notice } from '@/shared/components/ui/StateViews';
+import { IranInstrumentLogo } from '@/features/markets/presentation/IranInstrumentLogo';
 import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import { ASSET_TYPE_LABELS } from '../domain/agents';
 import { extractPdfPlainText, parsePriceCsvText, validateUploadedFile, type ParsedDatasetPreview } from '../domain/parsers';
@@ -308,12 +309,15 @@ export function IranDeskDataPanel({
         <div className="grid gap-2 sm:grid-cols-2">
           {datasets.map((ds) => (
             <div key={ds.id} className="flex items-center justify-between rounded-field border border-divider bg-surface-2/40 px-3 py-2 text-xs">
-              <div>
-                <span className="font-bold text-ink">{ds.symbol}</span>{' '}
-                <Badge tone="neutral">{ASSET_TYPE_LABELS[ds.assetType]}</Badge>
-                <p className="text-[11px] text-muted">
-                  {ds.fileName} · {toFaDigits(ds.bars.length)} روز · آخرین تاریخ: {ds.lastBarDate}
-                </p>
+              <div className="flex items-center gap-2.5">
+                <IranInstrumentLogo item={{ symbol: ds.symbol, nameFa: ds.nameFa }} size="sm" />
+                <div>
+                  <span className="font-bold text-ink">{ds.symbol}</span>{' '}
+                  <Badge tone="neutral">{ASSET_TYPE_LABELS[ds.assetType]}</Badge>
+                  <p className="text-[11px] text-muted">
+                    {ds.fileName} · {toFaDigits(ds.bars.length)} روز · آخرین تاریخ: {ds.lastBarDate}
+                  </p>
+                </div>
               </div>
               <IconButton size="sm" aria-label={`حذف ${ds.symbol}`} onClick={() => onDeleteDataset(ds.id)}>
                 <Trash2 className="h-3.5 w-3.5 text-negative" />
@@ -322,9 +326,12 @@ export function IranDeskDataPanel({
           ))}
           {documents.map((doc) => (
             <div key={doc.id} className="flex items-center justify-between rounded-field border border-divider bg-surface-2/40 px-3 py-2 text-xs">
-              <div>
-                <span className="font-bold text-ink">{doc.symbol} — {doc.title}</span>
-                <p className="text-[11px] text-muted">{doc.fileName} · تاریخ: {doc.reportDate}</p>
+              <div className="flex items-center gap-2.5">
+                <IranInstrumentLogo item={{ symbol: doc.symbol }} size="sm" />
+                <div>
+                  <span className="font-bold text-ink">{doc.symbol} — {doc.title}</span>
+                  <p className="text-[11px] text-muted">{doc.fileName} · تاریخ: {doc.reportDate}</p>
+                </div>
               </div>
               <IconButton size="sm" aria-label={`حذف ${doc.title}`} onClick={() => onDeleteDocument(doc.id)}>
                 <Trash2 className="h-3.5 w-3.5 text-negative" />
