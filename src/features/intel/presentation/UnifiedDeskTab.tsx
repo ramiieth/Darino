@@ -67,7 +67,13 @@ import {
 } from './EomSetupTab';
 import { UsdShort, fmtPrice } from './parts';
 
-const QUICK_DEFAULT_SYMBOLS = ['BTC', 'ETH', 'SOL', 'HYPE', 'PAXG', 'SUI', 'LINK', 'AAVE'] as const;
+/** واچ‌لیست تمرکز اصلی (رمزارزهای منتخب: BTC، SOL، HYPE + سهام جهانی مثل NVDA — بدون استیبل‌کوین) */
+const FOCUS_BUY_SYMBOLS = [
+  { symbol: 'BTC', tagFa: 'رمزارز' },
+  { symbol: 'SOL', tagFa: 'رمزارز' },
+  { symbol: 'HYPE', tagFa: 'رمزارز' },
+  { symbol: 'NVDA', tagFa: 'سهام' }
+] as const;
 
 type ExecutionMode = 'eom' | 'sizer';
 
@@ -115,7 +121,9 @@ export function UnifiedDeskTab({
     }
   }, [walletBridge.totalLiveUsd, sizerCapital]);
 
-  const activeSymbol = canonicalAssetSymbol(selectedMarket || 'ETH');
+  const rawSymbol = canonicalAssetSymbol(selectedMarket || 'BTC');
+  // استیبل‌کوین‌ها نقدینگی آزاد برای خرید هستند و هرگز هدف خرید قرار نمی‌گیرند
+  const activeSymbol = isStableSymbol(rawSymbol) ? 'BTC' : rawSymbol;
 
   const walletHoldings = useMemo(() => {
     const map = new Map<string, { symbol: string; valueUsd: number; avgCostUsd: number | null }>();
@@ -164,23 +172,23 @@ export function UnifiedDeskTab({
     if (!q) return [];
     const seen = new Set<string>();
     const out: { symbol: string; nameFa: string; price: number }[] = [];
-    for (const c of cryptoTop200) {
-      const sym = canonicalAssetSymbol(c.symbol);
-      if (seen.has(sym)) continue;
-      const nameFa = assetDisplayName(sym).name;
-      if (sym.toLowerCase().includes(q) || nameFa.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)) {
+    for (const m of GLOBAL_COMMITTEE_MARKETS) {
+      const sym = canonicalAssetSymbol(m.coin);
+      if (seen.has(sym) || isStableSymbol(sym)) continue;
+      if (sym.toLowerCase().includes(q) || m.nameFa.toLowerCase().includes(q)) {
         seen.add(sym);
-        out.push({ symbol: sym, nameFa, price: c.price ?? 0 });
+        out.push({ symbol: sym, nameFa: m.nameFa, price: m.refPrice });
       }
       if (out.length >= 6) break;
     }
     if (out.length < 6) {
-      for (const m of GLOBAL_COMMITTEE_MARKETS) {
-        const sym = canonicalAssetSymbol(m.coin);
-        if (seen.has(sym)) continue;
-        if (sym.toLowerCase().includes(q) || m.nameFa.toLowerCase().includes(q)) {
+      for (const c of cryptoTop200) {
+        const sym = canonicalAssetSymbol(c.symbol);
+        if (seen.has(sym) || isStableSymbol(sym)) continue;
+        const nameFa = assetDisplayName(sym).name;
+        if (sym.toLowerCase().includes(q) || nameFa.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)) {
           seen.add(sym);
-          out.push({ symbol: sym, nameFa: m.nameFa, price: m.refPrice });
+          out.push({ symbol: sym, nameFa, price: c.price ?? 0 });
         }
         if (out.length >= 6) break;
       }
@@ -456,49 +464,71 @@ export function UnifiedDeskTab({
 
   return (
     <div className="space-y-4">
-      {/* نوار انتخاب ارز — تک‌ردیفه، مینیمال و شناور */}
+      {/* نوار انتخاب هدف خرید: تمرکز روی BTC، SOL، HYPE و سهام (مثل NVDA) + نقدینگی آزاد استیبل‌کوین */}
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-0.5">
           <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-muted">
-            {walletHoldings.length > 0 ? (
-              <Wallet className="h-3.5 w-3.5 text-accent" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            )}
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            هدف خرید:
           </span>
-          {(walletHoldings.length > 0
-            ? walletHoldings.map((h) => h.symbol)
-            : swingOpportunities.length > 0
-              ? swingOpportunities.slice(0, 6).map((o) => canonicalAssetSymbol(o.symbol))
-              : [...QUICK_DEFAULT_SYMBOLS]
-          ).map((sym) => {
-            const active = sym === activeSymbol;
-            return (
-              <button
-                key={sym}
-                type="button"
-                onClick={() => onChangeMarket(sym)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition duration-150',
-                  active
-                    ? 'border-ink bg-ink text-card shadow-sm'
-                    : 'border-divider/80 bg-card text-ink hover:border-divider-strong hover:bg-surface-2/60'
-                )}
-              >
-                <MarketAssetLogo symbol={sym} size={16} />
-                <span dir="ltr">{sym}</span>
-              </button>
-            );
-          })}
+          {(() => {
+            const seen = new Set<string>();
+            const chips: { sym: string; badge?: string }[] = [];
+            for (const f of FOCUS_BUY_SYMBOLS) {
+              seen.add(f.symbol);
+              chips.push({ sym: f.symbol, badge: f.tagFa });
+            }
+            for (const h of walletHoldings) {
+              if (!seen.has(h.symbol) && !isStableSymbol(h.symbol)) {
+                seen.add(h.symbol);
+                chips.push({ sym: h.symbol, badge: 'کیف پول' });
+              }
+            }
+            return chips.map(({ sym, badge }) => {
+              const active = sym === activeSymbol;
+              return (
+                <button
+                  key={sym}
+                  type="button"
+                  onClick={() => onChangeMarket(sym)}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition duration-150',
+                    active
+                      ? 'border-ink bg-ink text-card shadow-sm'
+                      : 'border-divider/80 bg-card text-ink hover:border-divider-strong hover:bg-surface-2/60'
+                  )}
+                >
+                  <MarketAssetLogo symbol={sym} size={16} />
+                  <span dir="ltr">{sym}</span>
+                  {badge && (
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+                        active ? 'bg-card/15 text-card/90' : 'bg-surface-2 text-muted'
+                      )}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            });
+          })()}
+          {walletPos.stableCashUsd >= 10 && (
+            <span className="ms-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.08] px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+              <Wallet className="h-3 w-3" />
+              نقد آزاد (استیبل): <UsdShort value={walletPos.stableCashUsd} />
+            </span>
+          )}
         </div>
 
-        <div className="relative w-full sm:w-52">
+        <div className="relative w-full sm:w-56">
           <Search className="pointer-events-none absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="جستجوی نماد…"
+            placeholder="جستجوی رمزارز یا سهام (NVDA, AAPL…)"
             className="w-full rounded-full border border-divider/85 bg-card py-1.5 pe-3.5 ps-8 text-xs text-ink shadow-2xs placeholder:text-subtle focus:border-accent focus:outline-none"
           />
           {searchResults.length > 0 && (
