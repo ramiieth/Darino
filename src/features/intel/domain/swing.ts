@@ -226,10 +226,11 @@ export interface SwingOpportunity {
   change7d: number | null;
   change30d: number | null;
   score: number;
-  verdict: 'entry' | 'accumulate' | 'watch';
+  verdict: 'entry' | 'accumulate' | 'watch' | 'avoid';
   verdictFa: string;
   entry: number;
   stop: number;
+  stopPct: number;
   target1: number;
   target2: number;
   reason: string;
@@ -243,8 +244,10 @@ const STABLE_SYMBOLS = new Set([
 const MAJORS = new Set(['BTC', 'ETH', 'SOL', 'BNB']);
 
 /**
- * انتخاب و رتبه‌بندی بهترین فرصت‌های ورود سوینگ از میان نمادهای زندهٔ بازار
- * ترکیب: ناحیهٔ ارزنده (کف کانال رنج / افت سالم از سقف) + برگشت مومنتوم کوتاه‌مدت + سیگنال فاندینگ منفی پرپ
+ * انتخاب و رتبه‌بندی فرصت‌های سوینگ (نسخه اصلاح‌شده پس از لوپ نقد):
+ *  - شکست کف کانال (breakdown-low) جریمه سنگین و حکم «دور بمانید» می‌گیرد (هرگز امتیاز مثبت نمی‌گیرد)
+ *  - در رژیم نزولی (off) برای همه ارزها حتی BTC/ETH جریمه اعمال می‌شود و بدون نشانه تثبیت حکم پله‌ای صادر نمی‌شود
+ *  - حد ضرر بر اساس نوسان واقعی بازار (۱۰ تا ۲۲٪) تنظیم می‌شود نه عدد ثابت ۸٪
  */
 export function pickSwingOpportunities(
   assets: readonly SwingMarketInput[],
@@ -253,6 +256,7 @@ export function pickSwingOpportunities(
 ): SwingOpportunity[] {
   const perpMap = new Map((payload?.candidates ?? []).map((c) => [c.coin.toUpperCase(), c]));
   const regimeOn = payload?.regime.state === 'on';
+  const regimeOff = payload?.regime.state === 'off';
   const scored: SwingOpportunity[] = [];
 
   for (const a of assets) {
@@ -261,62 +265,96 @@ export function pickSwingOpportunities(
     if (STABLE_SYMBOLS.has(sym) || EXCLUDE.has(sym)) continue;
     if (a.rank > 120 && !perpMap.has(sym)) continue;
 
-    let score = 40;
+    const c24 = a.change24h ?? 0;
+    const c7 = a.change7d ?? 0;
+    const c30 = a.change30d ?? 0;
+    const isMajor = MAJORS.has(sym);
+    const isBreakdown = a.rangeStatus === 'breakdown-low';
+    const activeSelloff = c24 < -2.5 && c7 < -3;
+
+    let score = 42;
     const reasons: string[] = [];
     const fromPerpSignal = perpMap.has(sym);
 
     if (fromPerpSignal) {
-      score += 28;
+      score += 26;
       reasons.push('بالای میانگین ۵۰ روزه + فاندینگ منفی');
     }
 
-    if (a.rangeStatus === 'near-bottom' || a.rangeStatus === 'breakdown-low') {
-      score += 22;
-      reasons.push('نزدیک کف کانال رنج');
+    if (isBreakdown) {
+      score -= 24;
+      reasons.push('شکست کف حمایت (ریسک ادامه ریزش)');
+    } else if (a.rangeStatus === 'near-bottom') {
+      score += activeSelloff ? 6 : 18;
+      reasons.push(activeSelloff ? 'کف کانال بدون نشانه تثبیت' : 'نزدیک حمایت کف کانال');
     } else if (a.rangeStatus === 'mid-range') {
-      score += 8;
+      score += 6;
     } else if (a.rangeStatus === 'near-top' || a.rangeStatus === 'breakout-up') {
       score -= 10;
     }
 
     if (a.drawdownFromAthPct != null) {
-      if (a.drawdownFromAthPct <= -20 && a.drawdownFromAthPct >= -75) {
-        score += 12;
+      if (a.drawdownFromAthPct <= -20 && a.drawdownFromAthPct >= -75 && !isBreakdown) {
+        score += 10;
         if (reasons.length < 2) reasons.push(`${Math.round(Math.abs(a.drawdownFromAthPct))}٪ زیر سقف تاریخی`);
       } else if (a.drawdownFromAthPct > -8) {
         score -= 8;
       }
     }
 
-    const c24 = a.change24h ?? 0;
-    const c7 = a.change7d ?? 0;
-    const c30 = a.change30d ?? 0;
-    if (c30 < -5 && c24 > 0.8) {
+    if (c30 < -5 && c24 > 1.0 && !isBreakdown) {
       score += 14;
-      if (reasons.length < 2) reasons.push('نشانهٔ برگشت ۲۴ ساعته پس از اصلاح');
+      if (reasons.length < 2) reasons.push('نشانهٔ تثبیت ۲۴ ساعته پس از اصلاح');
     } else if (c7 > 1 && c7 < 22 && c24 > 0) {
       score += 12;
       if (reasons.length < 2) reasons.push('روند صعودی متعادل ۷ روزه');
     } else if (c7 > 30) {
       score -= 12;
+    } else if (activeSelloff) {
+      score -= 12;
+      if (reasons.length < 2) reasons.push('فشار فروش فعال در ۲۴ ساعت و ۷ روز');
     }
 
-    if (MAJORS.has(sym)) score += 6;
-    if (!regimeOn && !MAJORS.has(sym)) score -= 6;
+    if (isMajor) score += 4;
+    if (regimeOff) {
+      score -= isMajor ? 10 : 16;
+    }
 
-    const finalScore = Math.max(20, Math.min(98, Math.round(score)));
+    const finalScore = Math.max(10, Math.min(95, Math.round(score)));
     const entry = a.price;
-    const defaultStopPct = MAJORS.has(sym) ? 0.08 : 0.11;
-    const rangeStop = a.rangeLow && a.rangeLow < entry * 0.97 && a.rangeLow > entry * 0.78 ? a.rangeLow * 0.985 : null;
-    const stop = rangeStop ?? entry * (1 - defaultStopPct);
-    const risk = Math.max(entry * 0.03, entry - stop);
+
+    // حد ضرر متناسب با نوسان واقعی (نه ثابت ۸٪ که با فتیله عادی کریپتو فعال می‌شود)
+    const volProxyPct = Math.max(Math.abs(c24) * 2.2, Math.abs(c7) * 0.85, isMajor ? 10 : 14);
+    const dynamicStopPct = Math.min(isMajor ? 16 : 22, Math.max(isMajor ? 10 : 13, volProxyPct)) / 100;
+    const rangeStop =
+      !isBreakdown && a.rangeLow && a.rangeLow < entry * 0.92 && a.rangeLow > entry * 0.78
+        ? a.rangeLow * 0.975
+        : null;
+    const stop = rangeStop ?? entry * (1 - dynamicStopPct);
+    const stopPct = Number((((entry - stop) / entry) * 100).toFixed(1));
+    const risk = Math.max(entry * 0.05, entry - stop);
     const target1 = entry + risk * 1.5;
     const target2 = entry + risk * 2.5;
 
-    const verdict: SwingOpportunity['verdict'] =
-      finalScore >= 72 && regimeOn ? 'entry' : finalScore >= 60 ? 'accumulate' : 'watch';
+    let verdict: SwingOpportunity['verdict'];
+    if (isBreakdown || finalScore < 38) {
+      verdict = 'avoid';
+    } else if (finalScore >= 72 && regimeOn && !activeSelloff) {
+      verdict = 'entry';
+    } else if (finalScore >= 58 && !activeSelloff) {
+      verdict = 'accumulate';
+    } else {
+      verdict = 'watch';
+    }
+
     const verdictFa =
-      verdict === 'entry' ? 'فرصت ورود سوینگ' : verdict === 'accumulate' ? 'ناحیه ارزنده (پله‌ای)' : 'زیر نظر';
+      verdict === 'entry'
+        ? 'فرصت ورود سوینگ'
+        : verdict === 'accumulate'
+          ? 'ناحیه ارزنده (پله‌ای)'
+          : verdict === 'avoid'
+            ? 'ساختار نزولی — دور بمانید'
+            : 'زیر نظر (صبر برای تثبیت)';
 
     scored.push({
       id: a.id,
@@ -331,9 +369,10 @@ export function pickSwingOpportunities(
       verdictFa,
       entry,
       stop,
+      stopPct,
       target1,
       target2,
-      reason: reasons.slice(0, 2).join(' · ') || 'نقدشوندگی بالا و ساختار متعادل برای سوینگ',
+      reason: reasons.slice(0, 2).join(' · ') || 'نقدشوندگی بالا؛ در انتظار تثبیت مومنتوم',
       fromPerpSignal
     });
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EXCLUDE, addSignals, isExperimental, mayBeExperimental, regimeOf, settle, sizeFor, summarize, trendOf,
-  type CoinTrend, type DayBar, type LogEntry, type Regime
+  EXCLUDE, addSignals, isExperimental, mayBeExperimental, pickSwingOpportunities, regimeOf, settle, sizeFor, summarize, trendOf,
+  type CoinTrend, type DayBar, type LogEntry, type Regime, type SwingPayload
 } from './swing';
 
 const DAY = 86_400_000;
@@ -106,5 +106,70 @@ describe('سوینگ: ثبت عملکرد زنده', () => {
     ]);
     expect(s).toMatchObject({ total: 3, closed: 2, wins: 1 });
     expect(s.meanNet).toBeCloseTo((0.1 - 0.05) / 2 - 0.003, 9);
+  });
+});
+
+describe('سوینگ: اصلاحات لوپ نقد (شکست کف، رژیم نزولی و حد ضرر پویا)', () => {
+  const offPayload: SwingPayload = {
+    fetchedAt: Date.now(),
+    day: null,
+    regime: { state: 'off', btcAbove200: false, breadth: 0.25, counted: 40 },
+    btc: null,
+    candidates: [],
+    log: [],
+    summary: { total: 0, closed: 0, wins: 0, meanNet: null },
+    pending: 0,
+    total: 0
+  };
+
+  it('شکست کف کانال (breakdown-low) هرگز امتیاز مثبت نمی‌گیرد و حکم avoid صادر می‌شود', () => {
+    const [eth] = pickSwingOpportunities(
+      [
+        {
+          id: 'ethereum',
+          symbol: 'ETH',
+          price: 1645,
+          change24h: -3.5,
+          change7d: -8,
+          change30d: -20,
+          marketCap: 200e9,
+          rank: 2,
+          image: null,
+          rangeStatus: 'breakdown-low',
+          drawdownFromAthPct: -67,
+          rangeLow: 1700
+        }
+      ],
+      offPayload,
+      6
+    );
+    expect(eth.verdict).toBe('avoid');
+    expect(eth.verdictFa).toContain('دور بمانید');
+    expect(eth.stopPct).toBeGreaterThanOrEqual(10);
+  });
+
+  it('در رژیم نزولی + فشار فروش فعال، حتی ارز بزرگ حکم accumulate نمی‌گیرد', () => {
+    const [eth] = pickSwingOpportunities(
+      [
+        {
+          id: 'ethereum',
+          symbol: 'ETH',
+          price: 1645,
+          change24h: -3.44,
+          change7d: -6,
+          change30d: -15,
+          marketCap: 200e9,
+          rank: 2,
+          image: null,
+          rangeStatus: 'near-bottom',
+          drawdownFromAthPct: -67,
+          rangeLow: 1600
+        }
+      ],
+      offPayload,
+      6
+    );
+    expect(eth.verdict).not.toBe('accumulate');
+    expect(eth.verdict).not.toBe('entry');
   });
 });
