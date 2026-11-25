@@ -677,7 +677,17 @@ export function UnifiedDeskTab({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Badge tone={swingForAsset.verdict === 'entry' ? 'gain' : swingForAsset.verdict === 'accumulate' ? 'info' : 'neutral'}>
+                  <Badge
+                    tone={
+                      swingForAsset.verdict === 'entry'
+                        ? 'gain'
+                        : swingForAsset.verdict === 'accumulate'
+                          ? 'info'
+                          : swingForAsset.verdict === 'avoid'
+                            ? 'loss'
+                            : 'neutral'
+                    }
+                  >
                     {swingForAsset.verdictFa}
                   </Badge>
                   <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-black text-ink tabular-nums">

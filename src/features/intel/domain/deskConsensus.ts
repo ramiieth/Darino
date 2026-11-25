@@ -118,13 +118,33 @@ export function reconcileDeskSignals(params: {
     : { dir: 'neutral' as const, labelFa: 'در حال بررسی' };
 
   const swingIsLong = params.swingVerdict === 'entry' || params.swingVerdict === 'accumulate';
+  const swingIsAvoid = params.swingVerdict === 'avoid';
   const swingDirection: 'long' | 'neutral' = swingIsLong ? 'long' : 'neutral';
   const swingDirectionFa =
     params.swingVerdict === 'entry'
       ? 'لانگ سوینگ'
       : params.swingVerdict === 'accumulate'
         ? 'پله‌ای اسپات (میان‌مدت)'
-        : 'زیر نظر / صبر';
+        : swingIsAvoid
+          ? 'ساختار نزولی — دور بمانید'
+          : 'زیر نظر / صبر';
+
+  // ۰) هشدار شکست حمایت در سوینگ
+  if (swingIsAvoid) {
+    return {
+      committeeDirection: cm.dir,
+      committeeDirectionFa: cm.labelFa,
+      swingDirection: 'neutral',
+      swingDirectionFa,
+      alignment: 'aligned_caution',
+      tone: 'loss',
+      badgeFa: 'ساختار نزولی · دور بمانید',
+      headlineFa: 'حمایت میان‌مدت شکسته شده یا فشار نزولی غالب است — فعلاً وارد نشوید',
+      explanationFa:
+        'مدل سوینگ نشانه‌های شکست حمایت یا ریزش فعال را تشخیص داده است؛ خرید در این نقطه به معنای گرفتن چاقوی در حال سقوط است.',
+      actionRuleFa: 'نقد بمانید و تا بازگشت قیمت بالای حمایت و تثبیت چندروزه، ورود جدیدی انجام ندهید.'
+    };
+  }
 
   // ۱) هم‌سویی کامل روی لانگ
   if (cm.dir === 'long' && swingIsLong) {

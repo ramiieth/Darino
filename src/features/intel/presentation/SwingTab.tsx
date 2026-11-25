@@ -20,6 +20,7 @@ import { hydrateUniverse, syncUniverse, useMarketsStore } from '@/features/marke
 import { useMarkets } from '@/features/markets/pipeline/useMarkets';
 import { getAssetAthAndRangeInfo } from '@/features/markets/domain/athAndRangeAnalytics';
 import {
+  ALT_BEAT_BTC_20D,
   REGIME_BREADTH,
   pickSwingOpportunities,
   sizeFor,
@@ -154,6 +155,18 @@ function RegimeStrip({ d, onOpenEom }: { d: SwingPayload; onOpenEom: () => void 
           value={up === null ? '—' : `${toFaDigits(up)} از ${toFaDigits(r.counted)}`}
         />
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider/60 pt-2.5 text-[11px] text-muted">
+        <span>
+          واقعیت بکتست ۳ ساله: آلت‌کوین‌ها در افق ۲۰ روزه فقط{' '}
+          <strong className="text-ink">{pct(ALT_BEAT_BTC_20D.low)} تا {pct(ALT_BEAT_BTC_20D.high)}</strong> مواقع از نگه‌داشتن BTC بهتر بوده‌اند.
+        </span>
+        {d.summary.closed > 0 && (
+          <span className="font-semibold text-ink">
+            کاندید آزمایشی D+E: {toFaDigits(d.summary.wins)} برد از {toFaDigits(d.summary.closed)} بسته
+            {d.summary.meanNet !== null ? ` (میانگین خالص ${pct(d.summary.meanNet, 1)})` : ''}
+          </span>
+        )}
+      </div>
     </Surface>
   );
 }
@@ -176,7 +189,14 @@ function RegimePill({ ok, label, value }: { ok: boolean | null; label: string; v
 
 function OpportunityCard({ op, onAnalyze }: { op: SwingOpportunity; onAnalyze: () => void }) {
   const info = assetDisplayName(op.symbol);
-  const badgeTone = op.verdict === 'entry' ? 'gain' : op.verdict === 'accumulate' ? 'info' : 'neutral';
+  const badgeTone =
+    op.verdict === 'entry'
+      ? 'gain'
+      : op.verdict === 'accumulate'
+        ? 'info'
+        : op.verdict === 'avoid'
+          ? 'loss'
+          : 'neutral';
   const img =
     op.image?.includes('coin-images.coingecko.com') && op.image.includes('/large/')
       ? op.image.replace('/large/', '/small/')
@@ -222,7 +242,7 @@ function OpportunityCard({ op, onAnalyze }: { op: SwingOpportunity; onAnalyze: (
             <p className="num-ltr text-xs font-bold text-ink">{fmtPrice(op.entry)}</p>
           </div>
           <div className="bg-card px-2 py-1.5">
-            <p className="text-[10px] text-subtle">حد زیان</p>
+            <p className="text-[10px] text-subtle">حد زیان (-{toFaDigits(op.stopPct)}٪)</p>
             <p className="num-ltr text-xs font-bold text-negative">{fmtPrice(op.stop)}</p>
           </div>
           <div className="bg-card px-2 py-1.5">
@@ -279,13 +299,22 @@ function CompactSizer() {
     <Surface className="space-y-3.5 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-ink">اندازهٔ پوزیشن سوینگ</h3>
-        <SegmentedControl<string>
-          size="sm"
-          label="مدت نگه‌داری"
-          value={String(s.h)}
-          onChange={(v) => set({ h: v === '5' ? 5 : 20 })}
-          options={[{ value: '5', label: '۱ هفته' }, { value: '20', label: '۱ ماه' }]}
-        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <SegmentedControl<AssetClass>
+            size="sm"
+            label="نوع دارایی"
+            value={s.cls}
+            onChange={(cls) => set({ cls })}
+            options={[{ value: 'crypto', label: 'رمزارز' }, { value: 'tradfi', label: 'سنتی/سهام' }]}
+          />
+          <SegmentedControl<string>
+            size="sm"
+            label="مدت نگه‌داری"
+            value={String(s.h)}
+            onChange={(v) => set({ h: v === '5' ? 5 : 20 })}
+            options={[{ value: '5', label: '۱ هفته' }, { value: '20', label: '۱ ماه' }]}
+          />
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
