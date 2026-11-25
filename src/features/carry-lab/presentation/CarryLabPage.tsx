@@ -9,17 +9,18 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RotateCcw } from 'lucide-react';
+import { Bot, FlaskConical, RotateCcw } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { FUNDING_TABS, SectionTabs } from '@/shared/components/layout/SectionTabs';
 import { Section, Surface } from '@/shared/components/ui/GlassCard';
-import { ChipGroup, SegmentedControl, Tabs } from '@/shared/components/ui/SegmentedControl';
+import { ChipGroup, SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { AuthGate } from '@/features/auth/AuthGate';
 import { PaperBotTab } from './PaperBotTab';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { ErrorState, ListSkeleton, Notice } from '@/shared/components/ui/StateViews';
+import { cn } from '@/shared/lib/cn';
 import { toFaDigits, toEnDigits } from '@/shared/utils/formatters';
 import { formatJalali } from '@/shared/utils/jalali';
 import { gridConfigs, liquidationDistance, monthlyFunding, runStudy, type CostParams } from '../domain/engine';
@@ -53,35 +54,74 @@ const num = (s: string, fallback: number, max: number) => {
 };
 
 type Tab = 'lab' | 'bot';
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'lab', label: 'آزمایشگاه (بک‌تست)' },
-  { value: 'bot', label: 'بات کاغذی' }
+const TABS: { value: Tab; label: string; desc: string; icon: typeof FlaskConical }[] = [
+  { value: 'lab', label: 'آزمایشگاه (بک‌تست)', desc: 'آزمون پیش‌رونده و جاروب ۲۵ قانون روی داده واقعی هایپرلیکوئید', icon: FlaskConical },
+  { value: 'bot', label: 'بات کاغذی', desc: 'اجرای شبیه‌سازی‌شده و پایش روزانه بدون ریسک سرمایه', icon: Bot }
 ];
 
 export default function CarryLabPage() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get('tab') === 'bot' ? 'bot' : 'lab';
+  const setTab = (t: Tab) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (t === 'lab') next.delete('tab');
+        else next.set('tab', t);
+        return next;
+      },
+      { replace: true }
+    );
+
   return (
     <Page>
-      <PageHeader title="آزمایشگاه کری فاندینگ" subtitle="بک‌تست صادق دلتا نوترال (لانگ اسپات + شورت پرپ) و بات کاغذی روی دادهٔ زنده" />
-      <SectionTabs tabs={FUNDING_TABS} label="بخش‌های درآمد فاندینگ" />
-      <Tabs
-        label="بخش‌های آزمایشگاه کری"
-        options={TABS}
-        value={tab}
-        onChange={(t) =>
-          setParams(
-            (p) => {
-              const next = new URLSearchParams(p);
-              if (t === 'lab') next.delete('tab');
-              else next.set('tab', t);
-              return next;
-            },
-            { replace: true }
-          )
-        }
-        className="mb-5"
+      <PageHeader
+        eyebrow="آزمون علمی · دادهٔ واقعی هایپرلیکوئید"
+        title="آزمایشگاه کری فاندینگ"
+        subtitle="بک‌تست صادق دلتا نوترال (لانگ اسپات + شورت پرپ) و بات کاغذی روی دادهٔ زنده"
       />
+      <SectionTabs tabs={FUNDING_TABS} label="بخش‌های درآمد فاندینگ" />
+
+      <Surface className="relative mb-5 overflow-hidden p-3.5 md:p-4">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-l from-accent/80 via-gain/60 to-transparent"
+        />
+        <div className="grid gap-2 sm:grid-cols-2" role="tablist" aria-label="بخش‌های آزمایشگاه کری">
+          {TABS.map(({ value, label, desc, icon: Icon }) => {
+            const active = tab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(value)}
+                className={cn(
+                  'flex items-start gap-2.5 rounded-xl border p-3 text-start transition-all duration-150',
+                  active
+                    ? 'border-accent/45 bg-accent/[0.06] shadow-sm'
+                    : 'border-divider/70 bg-card hover:border-divider-strong hover:bg-surface-2/50'
+                )}
+              >
+                <span
+                  className={cn(
+                    'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                    active ? 'bg-accent text-on-accent' : 'bg-surface-2 text-muted'
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className={cn('block text-xs font-bold', active ? 'text-accent' : 'text-ink')}>{label}</span>
+                  <span className="mt-0.5 block line-clamp-1 text-[11px] text-muted">{desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Surface>
+
       {tab === 'bot' ? (
         <AuthGate>
           <PaperBotTab />
@@ -165,7 +205,6 @@ function LabView() {
 
   return (
     <>
-
       <Surface className="mb-5 space-y-4 p-4 md:p-5">
         <Field label="دارایی">
           <div className="flex flex-wrap items-center gap-2">
@@ -198,9 +237,11 @@ function LabView() {
             <SegmentedControl label="اهرم" options={LEVS.map((l) => ({ value: l, label: `${toFaDigits(l)}×` }))} value={lev} onChange={(l) => update({ lev: l })} />
           </Field>
         </div>
-        <p className="text-xs leading-6 text-muted">
-          با اهرم {toFaDigits(lev)}× حدود {toFaDigits(Math.round((Number(lev) / (Number(lev) + 1)) * 100))}٪ سرمایه در هر پا کار می‌کند و پای شورت با رشد حدود {toFaDigits(liqPct.toFixed(0))}٪ قیمت (از آخرین ریبالانس) لیکوئید
-          می‌شود. ریبالانس در نیمهٔ این فاصله. مارجین نگهداری {toFaDigits(mmrPct.toFixed(2))}٪{data.data?.maxLeverage ? ` (حداکثر اهرم ${toFaDigits(data.data.maxLeverage)}×)` : ' (پیش‌فرض)'}.
+        <p className="rounded-xl bg-surface-2/55 px-3.5 py-2.5 text-xs leading-6 text-muted">
+          با اهرم <strong className="text-ink">{toFaDigits(lev)}×</strong> حدود{' '}
+          <strong className="text-ink">{toFaDigits(Math.round((Number(lev) / (Number(lev) + 1)) * 100))}٪</strong> سرمایه در هر پا کار می‌کند و پای شورت با رشد حدود{' '}
+          <strong className="text-ink">{toFaDigits(liqPct.toFixed(0))}٪</strong> قیمت (از آخرین ریبالانس) لیکوئید می‌شود. ریبالانس در نیمهٔ این فاصله. مارجین نگهداری{' '}
+          {toFaDigits(mmrPct.toFixed(2))}٪{data.data?.maxLeverage ? ` (حداکثر اهرم ${toFaDigits(data.data.maxLeverage)}×)` : ' (پیش‌فرض)'}.
         </p>
         {levTooHigh && <Notice tone="warn">این اهرم از حداکثر اهرم این بازار بیشتر است.</Notice>}
         <Disclosure summary="هزینه‌ها و معیار مقایسه">

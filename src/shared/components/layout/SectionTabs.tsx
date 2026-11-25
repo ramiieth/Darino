@@ -6,6 +6,7 @@
  */
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, type ReactNode } from 'react';
+import { FlaskConical, Lock, Radar, Zap } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 
 export interface SectionTab {
@@ -13,6 +14,8 @@ export interface SectionTab {
   to: string;
   label: string;
   icon?: ReactNode;
+  /** پارامترهای tab قدیمی که همچنان باید این تب را فعال نشان دهند */
+  matchTabs?: readonly string[];
 }
 
 export function isSectionTabActive(tab: SectionTab, pathname: string, search: string, all: readonly SectionTab[]): boolean {
@@ -20,15 +23,29 @@ export function isSectionTabActive(tab: SectionTab, pathname: string, search: st
   if (pathname !== path) return false;
   const want = new URLSearchParams(query ?? '').get('tab');
   const have = new URLSearchParams(search).get('tab');
+  if (have && tab.matchTabs?.includes(have)) return true;
   if (want) return have === want;
   // گزینهٔ بدون tab فعال است مگر گزینهٔ دیگری روی همین مسیر با tab فعلی جور باشد
-  return !all.some((t) => t !== tab && t.to.startsWith(`${path}?`) && new URLSearchParams(t.to.split('?')[1]).get('tab') === have);
+  return !all.some((t) => {
+    if (t === tab) return false;
+    const [tPath, tQuery] = t.to.split('?');
+    if (tPath !== path) return false;
+    if (have && t.matchTabs?.includes(have)) return true;
+    const tWant = new URLSearchParams(tQuery ?? '').get('tab');
+    return !!tWant && tWant === have;
+  });
 }
 
 export function SectionTabs({ tabs, label, className }: { tabs: readonly SectionTab[]; label: string; className?: string }) {
   const { pathname, search } = useLocation();
   return (
-    <nav aria-label={label} className={cn('no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1', className)}>
+    <nav
+      aria-label={label}
+      className={cn(
+        'no-scrollbar flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-divider/80 bg-surface-2/60 p-1.5',
+        className
+      )}
+    >
       {tabs.map((t) => {
         const active = isSectionTabActive(t, pathname, search, tabs);
         return (
@@ -37,8 +54,10 @@ export function SectionTabs({ tabs, label, className }: { tabs: readonly Section
             to={t.to}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-xs font-semibold transition-colors duration-fast [&_svg]:h-3.5 [&_svg]:w-3.5',
-              active ? 'border-accent bg-accent-soft text-accent' : 'border-divider bg-card text-muted hover:border-divider-strong hover:text-ink'
+              'flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 text-xs font-semibold transition-all duration-150 [&_svg]:h-3.5 [&_svg]:w-3.5',
+              active
+                ? 'bg-card text-accent shadow-sm ring-1 ring-divider/80'
+                : 'text-muted hover:bg-card/60 hover:text-ink'
             )}
           >
             {t.icon}
@@ -53,12 +72,10 @@ export function SectionTabs({ tabs, label, className }: { tabs: readonly Section
 /* ---------------- بخش‌های چندصفحه‌ای ---------------- */
 
 export const FUNDING_TABS: readonly SectionTab[] = [
-  { to: '/funding', label: 'فرصت‌ها' },
-  { to: '/funding?tab=decide', label: 'سود خالص و تصمیم' },
-  { to: '/funding?tab=run', label: 'اجرا و پایش' },
-  { to: '/funding?tab=ledger', label: 'دفتر جفت‌ها' },
-  { to: '/boros', label: 'نرخ ثابت (بوروس)' },
-  { to: '/carry-lab', label: 'بک‌تست و بات' }
+  { to: '/funding', label: 'فرصت و سود', icon: <Radar aria-hidden />, matchTabs: ['decide'] },
+  { to: '/funding?tab=run', label: 'اجرا و دفتر', icon: <Zap aria-hidden />, matchTabs: ['ledger'] },
+  { to: '/boros', label: 'نرخ ثابت (بوروس)', icon: <Lock aria-hidden /> },
+  { to: '/carry-lab', label: 'بک‌تست و بات', icon: <FlaskConical aria-hidden /> }
 ];
 
 export const VENUE_TABS: readonly SectionTab[] = [

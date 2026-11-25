@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, TrendingUp } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
@@ -44,7 +44,12 @@ const qty = (n: number | null) => (n === null ? '—' : faNumber(n, { maximumFra
 
 function StatusBadge({ a }: { a: PerpVenueAccount }) {
   if (a.status === 'loading') return <Badge>در حال دریافت</Badge>;
-  if (a.status === 'error') return <span title={a.error}><Badge tone="warn">دریافت نشد</Badge></span>;
+  if (a.status === 'error')
+    return (
+      <span title={a.error}>
+        <Badge tone="warn">دریافت نشد</Badge>
+      </span>
+    );
   if (a.stale) return <Badge tone="warn">قدیمی</Badge>;
   return null;
 }
@@ -53,11 +58,11 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
   const v = VENUE[a.venue];
   const state = a.status === 'loading' ? 'loading' : 'ready';
   return (
-    <Surface className="flex flex-col gap-4 p-4">
+    <Surface className="group flex flex-col gap-4 p-4 transition-all duration-200 hover:border-accent/35 hover:shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="relative shrink-0">
-            <LogoImage src={v.logo} label={v.name} size={36} />
+            <LogoImage src={v.logo} label={v.name} size={38} />
             {v.network && (
               <span className="absolute -bottom-1 -end-1 rounded-full bg-card p-px">
                 <LogoImage src={v.network} label="رابین‌هود" size={15} />
@@ -71,27 +76,32 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
         </div>
         <StatusBadge a={a} />
       </div>
+
       <Metric
         size="lg"
         label={`سود/زیان ${rangeTitle(range)}`}
         value={<MoneyValue value={pnlIn(a, range)} signed tone="auto" state={state} />}
         sub={a.venue === 'txflow' && range !== 'all' && pnlIn(a, range) === null ? 'سری دوره‌ای عمومی ندارد (از ابتدا در دسترس است)' : undefined}
       />
-      <MetricGrid cols={3} className="!gap-x-4 border-t border-divider pt-3">
+
+      <MetricGrid cols={3} className="!gap-x-3 rounded-xl border border-divider/70 bg-surface-2/50 p-3">
         <Metric size="sm" label="بسته‌شده" value={<MoneyValue value={a.realizedPnl} signed tone="auto" state={state} />} />
         <Metric size="sm" label="باز" value={<MoneyValue value={a.unrealizedPnl} signed tone="auto" state={state} />} />
         <Metric size="sm" label="ارزش حساب" value={<MoneyValue value={a.equity} state={state} />} />
       </MetricGrid>
-      <div className="mt-auto border-t border-divider pt-1">
+
+      <div className="mt-auto border-t border-divider/70 pt-2">
         {a.positions.length ? (
           <Disclosure summary={`${toFaDigits(a.positions.length)} پوزیشن باز`}>
-            <ul className="divide-y divide-divider">
+            <ul className="divide-y divide-divider/70">
               {a.positions.map((p, i) => (
                 <li key={`${p.symbol}-${i}`} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <MarketAssetIdentity symbol={p.symbol} robinhood={a.venue === 'lighter-robinhood'} />
-                    <p className="mt-1 text-2xs text-muted">
-                      <Badge tone={p.side === 'long' ? 'gain' : 'loss'} className="me-1.5">{p.side === 'long' ? 'لانگ' : 'شورت'}</Badge>
+                    <p className="mt-1 text-2xs text-muted tabular-nums">
+                      <Badge tone={p.side === 'long' ? 'gain' : 'loss'} className="me-1.5">
+                        {p.side === 'long' ? 'لانگ' : 'شورت'}
+                      </Badge>
                       {qty(p.size)} @ {qty(p.entry)}
                       {p.mark !== null && <> · مارک {qty(p.mark)}</>}
                       {p.liquidation !== null && <> · لیکویید {qty(p.liquidation)}</>}
@@ -103,17 +113,24 @@ function VenueCard({ a, range }: { a: PerpVenueAccount; range: Range }) {
             </ul>
           </Disclosure>
         ) : (
-          <p className="py-2 text-xs text-muted">{a.status === 'ready' ? 'پوزیشن بازی وجود ندارد؛ کل سود/زیان این حساب بسته‌شده است.' : ' '}</p>
+          <p className="py-2 text-xs text-muted">
+            {a.status === 'ready' ? 'پوزیشن بازی وجود ندارد؛ کل سود/زیان این حساب بسته‌شده است.' : ' '}
+          </p>
         )}
         {v.to ? (
-          <Link to={v.to(a)} className={cn(buttonClass('ghost', 'sm'), 'w-full justify-between')}>
+          <Link to={v.to(a)} className={cn(buttonClass('ghost', 'sm'), 'mt-1 w-full justify-between hover:bg-surface-2/80')}>
             {v.cta ?? `تاریخچه و جزئیات ${v.name}`}
-            <ArrowLeft className="h-4 w-4" aria-hidden />
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
           </Link>
         ) : v.href ? (
-          <a href={v.href} target="_blank" rel="noopener noreferrer" className={cn(buttonClass('ghost', 'sm'), 'w-full justify-between')}>
+          <a
+            href={v.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonClass('ghost', 'sm'), 'mt-1 w-full justify-between hover:bg-surface-2/80')}
+          >
             باز کردن {v.name}
-            <ArrowLeft className="h-4 w-4" aria-hidden />
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
           </a>
         ) : null}
       </div>
@@ -127,25 +144,58 @@ export function PerpPortfolioSection({ arcus }: { arcus: ConnectedPortfolio['arc
   if (!accounts.length) return null;
   const t = perpTotals(accounts);
   const loading = accounts.every((a) => a.status === 'loading') ? 'loading' : 'ready';
+
   return (
     <section aria-labelledby="perp-portfolio-title" className="space-y-4">
-      <Surface variant="focal" className="space-y-5 p-5 md:p-6">
+      <Surface variant="focal" className="relative space-y-5 overflow-hidden p-5 md:p-6">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l from-accent/80 via-gain/60 to-accent/40"
+        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id="perp-portfolio-title" className="text-sm font-semibold text-muted">سود/زیان پرپچوال</h2>
-            <div className="mt-1 text-3xl font-extrabold tracking-tight md:text-4xl">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                <TrendingUp className="h-4 w-4" aria-hidden />
+              </span>
+              <h2 id="perp-portfolio-title" className="text-sm font-semibold text-muted">
+                سود/زیان پرپچوال
+              </h2>
+            </div>
+            <div className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
               <MoneyValue value={pnlIn(t, range)} signed tone="auto" state={loading} />
             </div>
             <p className="mt-1.5 text-xs text-muted">
-              {rangeTitle(range)} · {toFaDigits(t.accounts)} حساب · {toFaDigits(t.positions)} پوزیشن باز{t.partial && ' · برخی مقادیر در دسترس نیست و در جمع نیامده'}
+              {rangeTitle(range)} · {toFaDigits(t.accounts)} حساب · {toFaDigits(t.positions)} پوزیشن باز
+              {t.partial && ' · برخی مقادیر در دسترس نیست و در جمع نیامده'}
             </p>
           </div>
-          <SegmentedControl label="بازهٔ سود/زیان" size="sm" options={RANGES.map(({ value, label }) => ({ value, label }))} value={range} onChange={setRange} />
+          <SegmentedControl
+            label="بازهٔ سود/زیان"
+            size="sm"
+            options={RANGES.map(({ value, label }) => ({ value, label }))}
+            value={range}
+            onChange={setRange}
+          />
         </div>
-        <MetricGrid cols={3} className="border-t border-divider pt-4">
-          <Metric label="سود/زیان بسته‌شده" value={<MoneyValue value={t.realizedPnl} signed tone="auto" state={loading} />} sub="معاملات بسته + فاندینگ − کارمزد" />
-          <Metric label="سود/زیان باز" value={<MoneyValue value={t.unrealizedPnl} signed tone="auto" state={loading} />} sub="پوزیشن‌های فعلی" />
-          <Metric label="ارزش کل حساب‌ها" value={<MoneyValue value={t.equity} state={loading} />} />
+        <MetricGrid cols={3} className="!gap-3 border-t border-divider/80 pt-4">
+          <div className="rounded-xl border border-divider/70 bg-surface-2/50 p-3">
+            <Metric
+              label="سود/زیان بسته‌شده"
+              value={<MoneyValue value={t.realizedPnl} signed tone="auto" state={loading} />}
+              sub="معاملات بسته + فاندینگ − کارمزد"
+            />
+          </div>
+          <div className="rounded-xl border border-divider/70 bg-surface-2/50 p-3">
+            <Metric
+              label="سود/زیان باز"
+              value={<MoneyValue value={t.unrealizedPnl} signed tone="auto" state={loading} />}
+              sub="پوزیشن‌های فعلی"
+            />
+          </div>
+          <div className="rounded-xl border border-divider/70 bg-surface-2/50 p-3">
+            <Metric label="ارزش کل حساب‌ها" value={<MoneyValue value={t.equity} state={loading} />} />
+          </div>
         </MetricGrid>
       </Surface>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -44,6 +44,7 @@ import { useMarketsStore } from '@/features/markets/pipeline/store';
 import { assetDisplayName } from '@/shared/i18n/assetDisplayName';
 import { cn } from '@/shared/lib/cn';
 import { toFaDigits, toEnDigits } from '@/shared/utils/formatters';
+import { resolveUnifiedDeskPrice } from '../domain/deskConsensus';
 import {
   ETH_GAS_REGIMES,
   EXECUTION_VENUE_PRESETS,
@@ -91,7 +92,7 @@ const fmtQty = (v: number) => {
 /* ---------------- توابع مشترک اتصال به کیف پول و میانگین خرید ---------------- */
 
 const STABLE_SYMBOLS = new Set([
-  'USD', 'USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'TUSD', 'USDS', 'PYUSD', 'FRAX', 'BUSD', 'USDD', 'EURC', 'LUSD', 'GHO'
+  'USD', 'USDC', 'USDT', 'USDT0', 'DAI', 'USDE', 'FDUSD', 'TUSD', 'USDS', 'PYUSD', 'FRAX', 'BUSD', 'USDD', 'EURC', 'LUSD', 'GHO', 'RLUSD', 'USD1', 'USDG', 'CRVUSD'
 ]);
 
 const SYMBOL_ALIASES: Record<string, string> = {
@@ -393,15 +394,20 @@ export function EomSetupTab({ externalSymbol, embedded = false }: EomSetupTabPro
   const candlesQuery = useEomDailyCandles(selectedAsset);
 
   const livePrice = useMemo((): number => {
-    if (selectedAsset.hlCoin && marketsQuery.data) {
-      const found = marketsQuery.data.find((m) => m.coin.toUpperCase() === selectedAsset.hlCoin!.toUpperCase());
-      if (found && found.markPx > 0) return found.markPx;
-    }
+    const foundPerp =
+      selectedAsset.hlCoin && marketsQuery.data
+        ? marketsQuery.data.find((m) => m.coin.toUpperCase() === selectedAsset.hlCoin!.toUpperCase())
+        : undefined;
     const fromTop200 = cryptoTop200.find(
       (c) => canonicalAssetSymbol(c.symbol) === canonicalAssetSymbol(selectedAsset.logoKey)
     );
-    if (fromTop200 && typeof fromTop200.price === 'number' && fromTop200.price > 0) return fromTop200.price;
-    return selectedAsset.refPrice;
+    return resolveUnifiedDeskPrice({
+      livePerpPrice: foundPerp?.markPx ?? null,
+      livePerpIsReference: Boolean(foundPerp?.isReference),
+      topMarketPrice: fromTop200?.price ?? null,
+      topMarketIsSnapshot: Boolean(fromTop200?.snapshot),
+      curatedRefPrice: selectedAsset.refPrice
+    }).price;
   }, [selectedAsset, marketsQuery.data, cryptoTop200]);
 
   // استخراج دقیق موجودی فعلی همین ارز، میانگین خرید فعلی و نقدینگی آزاد استیبل‌کوین از کیف پول متصل

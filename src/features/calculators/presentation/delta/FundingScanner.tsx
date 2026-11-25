@@ -5,7 +5,7 @@
  * فقط تحلیل؛ هیچ سفارشی ثبت نمی‌شود.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Bell, BellRing } from 'lucide-react';
+import { Bell, BellRing, SlidersHorizontal } from 'lucide-react';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { Surface } from '@/shared/components/ui/GlassCard';
@@ -71,6 +71,20 @@ export function FundingScanner() {
   return (
     <div className="space-y-5">
       <Surface className="space-y-4 p-4 md:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />
+            </span>
+            <p className="text-sm font-bold text-ink">تنظیمات اسکنر</p>
+          </div>
+          {!loading && (
+            <span className="rounded-full bg-surface-2/80 px-2.5 py-0.5 text-[11px] font-semibold text-muted tabular-nums">
+              {toFaDigits(rows.length)} فرصت فعال
+            </span>
+          )}
+        </div>
+
         <div>
           <p className="mb-1.5 text-xs font-semibold text-muted">هدف</p>
           <SegmentedControl<Mode>
@@ -86,13 +100,13 @@ export function FundingScanner() {
           />
         </div>
         {farm ? (
-          <p className="text-xs leading-6 text-muted">
+          <p className="rounded-xl bg-surface-2/55 px-3.5 py-2.5 text-xs leading-6 text-muted">
             یک طرف روی <span className="font-semibold text-ink">{venueName(mode)}</span> برای حجم و پوینت، طرف دیگر روی هر صرافی که پوشش ارزان‌تری بدهد. فقط بازارهای پرحجم
             (بیش از ۱ میلیون دلار در ۲۴ ساعت) آمده‌اند. «سود/هزینهٔ ۷ روز» با میانگین فاندینگ واقعاً پرداخت‌شدهٔ ۷ روز گذشته، کارمزد سفارش فوری و اسلیپیج دفتر سفارش زنده حساب
             شده است؛ هدف، سود کم یا کمترین هزینه برای همان حجم است.
           </p>
         ) : (
-          <p className="text-xs leading-6 text-muted">
+          <p className="rounded-xl bg-surface-2/55 px-3.5 py-2.5 text-xs leading-6 text-muted">
             جفت‌هایی که اختلاف فاندینگشان <span className="font-semibold text-ink">در گذشته</span> پایدار بوده، نه فقط همین الان. اعداد از نرخ‌های واقعاً پرداخت‌شدهٔ
             هر ساعت ساخته شده‌اند. زنگ را بزنید تا اگر اختلاف برعکس شد خبر بدهیم.
           </p>
@@ -120,16 +134,19 @@ export function FundingScanner() {
       </Surface>
 
       {watched.length > 0 && (
-        <Surface as="section" aria-labelledby="scanner-watch" className="p-4 md:p-5">
-          <h3 id="scanner-watch" className="mb-1 text-sm font-bold text-ink">
-            زیر نظر ({toFaDigits(watched.length)})
-          </h3>
-          <p className="mb-2 text-2xs text-subtle">هشدار فقط وقتی دارینو باز است کار می‌کند.</p>
-          <ul className="divide-y divide-divider">
+        <Surface as="section" aria-labelledby="scanner-watch" className="border-accent/25 bg-accent/[0.025] p-4 md:p-5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 id="scanner-watch" className="flex items-center gap-2 text-sm font-bold text-ink">
+              <BellRing className="h-4 w-4 text-accent" aria-hidden />
+              زیر نظر ({toFaDigits(watched.length)})
+            </h3>
+            <p className="text-2xs text-subtle">هشدار وقتی دارینو باز است کار می‌کند.</p>
+          </div>
+          <ul className="divide-y divide-divider/70">
             {watched.map((e) => {
               const apr = currentSpreadApr(e, books);
               return (
-                <li key={e.key} className="flex items-center gap-3 py-2 text-sm">
+                <li key={e.key} className="flex items-center gap-3 py-2.5 text-sm">
                   <bdi dir="ltr" className="font-latin font-bold text-ink">
                     {e.base}
                   </bdi>
@@ -159,7 +176,7 @@ export function FundingScanner() {
           <Skeleton className="h-20 w-full" />
         </Surface>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-3.5 md:grid-cols-2">
           {rows.map((o) => (
             <ScannerCard key={o.key} o={o} notional={notional} farm={farm} watched={watched.some((w) => w.key === o.key)} />
           ))}
@@ -190,7 +207,7 @@ export function FundingScanner() {
           <li>
             <b className="text-ink">HIP-3:</b> بازار هایپرلیکوئید که یک سازندهٔ شخص ثالث راه انداخته؛ قیمت مرجع (اوراکل) و قواعدش دست اوست و ریسک بیشتری دارد.
           </li>
-          <li>کارمزد برداشت، گس و پل در این فهرست نیست؛ در تب «سود واقعی دلتا» وارد کنید.</li>
+          <li>کارمزد برداشت، گس و پل در این فهرست نیست؛ در زیرتب «سود واقعی من» وارد کنید.</li>
         </ul>
       </Disclosure>
     </div>
@@ -207,11 +224,22 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
   const longVenue = o.long.venue;
   const isPoints = (v: DeltaVenue) => (POINTS_VENUES as readonly DeltaVenue[]).includes(v);
   const doublePoints = farm && isPoints(shortVenue) && isPoints(longVenue);
+  const highlight = o.stability === 'high' && (o.stats?.d7.avgApr ?? 0) > 0;
+
   return (
     <li>
-      <Surface as="article" className="p-4">
+      <Surface
+        as="article"
+        className={cn(
+          'relative h-full overflow-hidden p-4 transition-all duration-150 hover:border-accent/35 hover:shadow-sm',
+          highlight && 'border-gain/30'
+        )}
+      >
+        {highlight && (
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-l from-gain/70 via-accent/40 to-transparent" />
+        )}
         <div className="flex items-start gap-3">
-          <AssetLogo symbol={o.base} kind={logoKindOf(o)} size={32} />
+          <AssetLogo symbol={o.base} kind={logoKindOf(o)} size={34} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <bdi dir="ltr" className="font-latin text-sm font-bold text-ink">
@@ -225,35 +253,35 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
                 </Badge>
               )}
             </div>
-            <p className="mt-0.5 text-xs text-muted">
-              <span className="font-semibold text-positive">Long</span> {venueName(o.long.venue)} ·{' '}
+            <p className="mt-1 text-xs text-muted">
+              <span className="font-semibold text-gain-text">Long</span> {venueName(o.long.venue)} ·{' '}
               <span className="font-semibold text-negative">Short</span> {venueName(o.short.venue)}
             </p>
           </div>
           {isAlertVenue(shortVenue) && isAlertVenue(longVenue) && (
-          <IconButton
-            size="sm"
-            aria-pressed={watched}
-            aria-label={watched ? 'حذف هشدار' : 'هشدار وقتی برعکس شد'}
-            className={cn(watched && 'text-accent hover:text-accent')}
-            onClick={() => {
-              const on = toggleWatch({ key: o.key, base: o.base, shortVenue, shortRef: o.short.ref, longVenue, longRef: o.long.ref });
-              toast('info', on ? `${o.base} زیر نظر است؛ اگر اختلاف برعکس شد خبر می‌دهیم.` : `هشدار ${o.base} حذف شد.`);
-            }}
-          >
-            {watched ? <BellRing aria-hidden /> : <Bell aria-hidden />}
-          </IconButton>
+            <IconButton
+              size="sm"
+              aria-pressed={watched}
+              aria-label={watched ? 'حذف هشدار' : 'هشدار وقتی برعکس شد'}
+              className={cn(watched && 'bg-accent/10 text-accent hover:text-accent')}
+              onClick={() => {
+                const on = toggleWatch({ key: o.key, base: o.base, shortVenue, shortRef: o.short.ref, longVenue, longRef: o.long.ref });
+                toast('info', on ? `${o.base} زیر نظر است؛ اگر اختلاف برعکس شد خبر می‌دهیم.` : `هشدار ${o.base} حذف شد.`);
+              }}
+            >
+              {watched ? <BellRing aria-hidden /> : <Bell aria-hidden />}
+            </IconButton>
           )}
         </div>
 
-        <dl className="mt-3 grid grid-cols-4 gap-2 text-center">
+        <dl className="mt-3.5 grid grid-cols-4 gap-2 rounded-xl border border-divider/70 bg-surface-2/50 p-2.5 text-center">
           <Cell label="الان" value={<PercentValue value={o.currentApr} digits={1} className="font-bold" />} />
           <Cell label="۱ روز" value={<StatApr s={o.stats?.d1} loading={o.historyStatus === 'loading'} />} />
           <Cell label="۷ روز" value={<StatApr s={o.stats?.d7} loading={o.historyStatus === 'loading'} strong />} />
           <Cell label="۳۰ روز" value={<StatApr s={o.stats?.d30} loading={o.historyStatus === 'loading'} />} />
         </dl>
 
-        <dl className="mt-2 grid grid-cols-3 gap-2 border-t border-divider pt-2 text-center">
+        <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-divider/70 pt-2.5 text-center">
           <Cell
             label="ساعت‌های سودده"
             value={o.stats?.d7.profitableShare == null ? '—' : `${toFaDigits(Math.round(o.stats.d7.profitableShare * 100))}٪`}
@@ -273,7 +301,7 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
           />
         </dl>
         {farm && (
-          <dl className="mt-2 grid grid-cols-2 gap-2 border-t border-divider pt-2 text-center">
+          <dl className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-surface-2/45 p-2.5 text-center">
             <Cell
               label="سود/هزینهٔ خالص ۷ روز"
               value={
@@ -292,7 +320,7 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
                 per100k === null ? (
                   '—'
                 ) : per100k <= 0 ? (
-                  <span className="font-semibold text-positive">سودده</span>
+                  <span className="font-semibold text-gain-text">سودده</span>
                 ) : (
                   <MoneyValue value={-per100k} tone="loss" digits={2} />
                 )
@@ -316,7 +344,7 @@ function Cell({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-2xs text-subtle">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm">{value}</dd>
+      <dd className="mt-0.5 truncate text-sm tabular-nums">{value}</dd>
     </div>
   );
 }

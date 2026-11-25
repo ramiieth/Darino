@@ -37,12 +37,16 @@ describe('منو پس از ساده‌سازی (آبان ۱۴۰۵)', () => {
     expect(PRIMARY_MOBILE.map((i) => i.id)).toEqual(['dashboard', 'desk', 'funding', 'market']);
   });
 
-  it('نوار بخش‌ها: گزینهٔ فعال با مسیر و tab', () => {
+  it('نوار بخش‌ها: گزینهٔ فعال با مسیر و tab (شامل لینک‌های قدیمی فاندینگ)', () => {
     const at = (path: string, search = '') => FUNDING_TABS.filter((t) => isSectionTabActive(t, path, search, FUNDING_TABS)).map((t) => t.to);
+    expect(FUNDING_TABS).toHaveLength(4);
     expect(at('/funding')).toEqual(['/funding']);
     expect(at('/funding', '?view=arb')).toEqual(['/funding']);
+    expect(at('/funding', '?tab=decide')).toEqual(['/funding']);
     expect(at('/funding', '?tab=run&pv=lighter,arcus')).toEqual(['/funding?tab=run']);
+    expect(at('/funding', '?tab=ledger')).toEqual(['/funding?tab=run']);
     expect(at('/boros')).toEqual(['/boros']);
+    expect(at('/carry-lab')).toEqual(['/carry-lab']);
     expect(VENUE_TABS.filter((t) => isSectionTabActive(t, '/lighter-robinhood', '', VENUE_TABS)).map((t) => t.to)).toEqual(['/lighter-robinhood']);
   });
 });
