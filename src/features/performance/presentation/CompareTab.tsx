@@ -31,33 +31,42 @@ const GROUP_FA = { iran: 'بازارهای ایران', global: 'بازارها�
 
 function RowCard({ r }: { r: CompareRow }) {
   const ok = r.status === 'ok';
+  const ahead = ok && (r.vsPortfolioUsd ?? 0) >= 0;
   return (
-    <li className="px-4 py-3">
+    <li
+      className={cn(
+        'border-s-4 px-4 py-3.5 transition-colors hover:bg-surface-2/35',
+        !ok ? 'border-s-divider' : ahead ? 'border-s-emerald-500/70' : 'border-s-rose-500/70'
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink">
+          <p className="flex flex-wrap items-center gap-1.5 text-sm font-extrabold text-ink">
             {r.name}
             {r.kind === 'inflation' && <Badge tone="info">تورم رسمی</Badge>}
+            {ok && (
+              <Badge tone={ahead ? 'gain' : 'loss'}>
+                {ahead ? 'شما جلوترید' : 'عقب‌تر از این بازار'}
+              </Badge>
+            )}
           </p>
           {r.detail && <p className="text-2xs text-muted">{r.detail}</p>}
         </div>
         {ok ? (
           <div className="text-end">
-            <Usd v={r.endUsd} className="text-sm font-bold" />
-            <div className="text-xs"><Pct v={r.returnUsd} /> <span className="text-subtle">دلاری</span></div>
+            <Usd v={r.endUsd} className="text-sm font-black text-ink" />
+            <div className="text-xs font-bold"><Pct v={r.returnUsd} /> <span className="font-normal text-subtle">دلاری</span></div>
           </div>
         ) : (
           <NoData />
         )}
       </div>
       {ok ? (
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4">
-          <div><dt className="text-subtle">ارزش شروع</dt><dd><Usd v={r.startUsd} compact /> · <Toman v={r.startToman} /></dd></div>
-          <div><dt className="text-subtle">ارزش فرضی امروز</dt><dd><Toman v={r.endToman} /></dd></div>
-          <div><dt className="text-subtle">سود/زیان</dt><dd><Usd v={r.pnlUsd} signed compact /> · <Toman v={r.pnlToman} signed /></dd></div>
-          <div><dt className="text-subtle">بازده تومانی</dt><dd><Pct v={r.returnToman} /></dd></div>
-          <div className="col-span-2"><dt className="text-subtle">اختلاف با پرتفوی شما</dt><dd><Usd v={r.vsPortfolioUsd} signed compact /> · <Toman v={r.vsPortfolioToman} signed /> <span className="text-subtle">{(r.vsPortfolioUsd ?? 0) >= 0 ? '(شما جلوترید)' : '(شما عقب‌ترید)'}</span></dd></div>
-          <div className="col-span-2"><dt className="text-subtle">هزینهٔ فرصت</dt><dd>{(r.opportunityUsd ?? 0) > 0 ? <><Usd v={r.opportunityUsd} compact /> · <Toman v={r.opportunityToman} /></> : <span className="text-muted">ندارد</span>}</dd></div>
+        <dl className="mt-2.5 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          <div className="rounded-xl bg-surface-2/45 px-2.5 py-2"><dt className="text-[10px] text-subtle">ارزش فرضی امروز</dt><dd className="mt-0.5 font-bold text-ink"><Toman v={r.endToman} /></dd></div>
+          <div className="rounded-xl bg-surface-2/45 px-2.5 py-2"><dt className="text-[10px] text-subtle">سود/زیان</dt><dd className="mt-0.5 font-bold"><Usd v={r.pnlUsd} signed compact /> · <Toman v={r.pnlToman} signed /></dd></div>
+          <div className="rounded-xl bg-surface-2/45 px-2.5 py-2"><dt className="text-[10px] text-subtle">بازده تومانی</dt><dd className="mt-0.5 font-bold"><Pct v={r.returnToman} /></dd></div>
+          <div className={cn('rounded-xl px-2.5 py-2', ahead ? 'bg-emerald-500/[0.08]' : 'bg-rose-500/[0.08]')}><dt className="text-[10px] text-subtle">اختلاف با سبد شما</dt><dd className="mt-0.5 font-extrabold"><Usd v={r.vsPortfolioUsd} signed compact /></dd></div>
         </dl>
       ) : (
         <>

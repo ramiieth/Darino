@@ -9,7 +9,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { History, Percent, Plus, Scale, Sparkles, TrendingUp } from 'lucide-react';
 import { Page, PageHeader } from '@/shared/components/layout/Page';
 import { Tabs } from '@/shared/components/ui/SegmentedControl';
 import { Button } from '@/shared/components/ui/Button';
@@ -34,13 +34,7 @@ import { InflationTab } from './InflationTab';
 import { ReportTab } from './ReportTab';
 
 type Tab = 'overview' | 'records' | 'compare' | 'inflation' | 'report';
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'overview', label: 'نمای کلی' },
-  { value: 'records', label: 'سوابق ارزش دارایی' },
-  { value: 'compare', label: 'مقایسه با بازارها' },
-  { value: 'inflation', label: 'تورم و قدرت خرید' },
-  { value: 'report', label: 'تحلیل هوشمند' }
-];
+const TAB_IDS: readonly Tab[] = ['overview', 'records', 'compare', 'inflation', 'report'];
 const FIRST_YEAR = 1402;
 
 export default function PerformancePage() {
@@ -51,7 +45,7 @@ export default function PerformancePage() {
   const live = useLiveValue();
   const walletBridge = useWalletAndCostBridge();
   const [params, setParams] = useSearchParams();
-  const tab = (TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'overview') as Tab;
+  const tab = (TAB_IDS.includes(params.get('tab') as Tab) ? params.get('tab') : 'overview') as Tab;
   const update = useCallback(
     (patch: Record<string, string | null>) =>
       setParams((p) => {
@@ -142,14 +136,25 @@ export default function PerformancePage() {
   const [sheet, setSheet] = useState<{ open: boolean; editing: ValueRecord | null; preset: { usd: number; breakdown: ValueBreakdown | null } | null }>({ open: false, editing: null, preset: null });
   const openAdd = () => setSheet({ open: true, editing: null, preset: null });
 
+  const tabOptions = useMemo(
+    () => [
+      { value: 'overview' as const, label: 'نمای کلی', icon: <TrendingUp /> },
+      { value: 'records' as const, label: 'سوابق ارزش', icon: <History />, badge: records.length || undefined },
+      { value: 'compare' as const, label: 'مقایسه با بازارها', icon: <Scale /> },
+      { value: 'inflation' as const, label: 'تورم و قدرت خرید', icon: <Percent /> },
+      { value: 'report' as const, label: 'تحلیل هوشمند', icon: <Sparkles /> }
+    ],
+    [records.length]
+  );
+
   return (
     <Page>
       <PageHeader
         title="عملکرد و مقایسه سرمایه"
-        subtitle="تاریخچهٔ ارزش کل دارایی، مقایسه با تورم و بازارهای موازی، و گزارش تحلیلی"
+        subtitle="روند ارزش کل دارایی، مقایسه هم‌بازه با بازارهای موازی، قدرت خرید واقعی و تحلیل هوشمند"
         actions={<Button icon={<Plus />} onClick={openAdd}>ثبت ارزش</Button>}
       />
-      <Tabs label="بخش‌های عملکرد سرمایه" options={TABS} value={tab} onChange={(t) => update({ tab: t === 'overview' ? null : t })} className="mb-5" />
+      <Tabs label="بخش‌های عملکرد سرمایه" options={tabOptions} value={tab} onChange={(t) => update({ tab: t === 'overview' ? null : t })} className="mb-5" />
 
       {!data.loaded ? (
         <ListSkeleton rows={4} />
