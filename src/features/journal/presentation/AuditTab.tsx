@@ -1,11 +1,12 @@
 /**
- * تب «حسابرسی» — حسابرسی خودکار دفتر جهت‌دار به سبک ارزیابی Prop (ترکیب دو پرامپت؛ هیچ معیاری حذف نشده)
- *
- *   لایهٔ ۰ اعتماد داده (خاکستری/آبی، بدون نمره) → ۱ حکم (بدون اسکرول) → ۲ کارنامه (عملکرد / اجرا، مرتب با هزینهٔ دلاری)
- *   → ۳ تحلیل (چهار سؤال، حداکثر ۸ نمودار پیش‌فرض) → «اول این را درست کن» + سه بعدی + سه قانون → ۴ پیوست
- *   افشای تدریجی: هر بخش یک لایه بازشو، نه تودرتو.
+ * تب «گزارش و کارنامه» (حسابرسی خودکار) — ساده، روان، بدون اصطلاحات سنگین و بدون نیاز به تایپ دستی:
+ *   ۱. خلاصهٔ ساده: چه اتفاقی افتاد؟ (تعداد معاملات، نتیجهٔ خالص و ۴ عدد اصلی)
+ *   ۲. اول این را درست کن + پیشنهاد خودکار بهبود (قابل افزودن با یک کلیک به مرور هفته)
+ *   ۳. کارنامهٔ عملکرد و رفتار (آنچه تولید کردید / چطور اجرا کردید)
+ *   ۴. نمودارها و جزئیات بیشتر (جمع‌شده در بخش‌های بازشونده تا صفحه خلوت بماند)
  */
 import { useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Disclosure } from '@/shared/components/ui/Disclosure';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -27,7 +28,19 @@ import { Bars, EquityChart } from './charts';
 import { ExcursionPanel } from './ExcursionPanel';
 import { AmountText } from '@/shared/components/ui/FinancialValue';
 
-const BAND_STYLE = { pass: 'border-gain/50 bg-gain/5', conditions: 'border-warn/50 bg-warn/5', fail: 'border-negative/50 bg-negative/5', insufficient: 'border-divider bg-surface-2/60' } as const;
+const BAND_ACCENT = {
+  pass: 'from-gain via-gain/60 to-accent/50',
+  conditions: 'from-warn via-warn/60 to-accent/40',
+  fail: 'from-negative via-negative/60 to-warn/40',
+  insufficient: 'from-accent/70 via-divider to-transparent'
+} as const;
+
+const BAND_SURFACE = {
+  pass: 'border-gain/35',
+  conditions: 'border-warn/35',
+  fail: 'border-negative/35',
+  insufficient: 'border-divider'
+} as const;
 
 function DataConfidencePanel({ a }: { a: BookAudit }) {
   const d = a.data;
@@ -35,13 +48,19 @@ function DataConfidencePanel({ a }: { a: BookAudit }) {
     <Disclosure summary="این حسابرسی چه چیزی را می‌تواند بگوید و چه چیزی را نه">
       <div className="space-y-3 pt-1">
         <p className="text-xs leading-6 text-muted">
-          {fa(d.trades)} معاملهٔ بسته · {d.from ? `${faDate(d.from)} تا ${faDate(d.to)}` : 'بدون بازه'} · سبک: {d.style ? STYLE_FA[d.style] : '—'} · <span className="text-info">{CONFIDENCE_FA[d.confidence]}</span>
+          بر اساس {fa(d.trades)} معاملهٔ بسته · {d.from ? `${faDate(d.from)} تا ${faDate(d.to)}` : 'بدون بازه'} · سبک: {d.style ? STYLE_FA[d.style] : '—'} ·{' '}
+          <span className="font-semibold text-info">{CONFIDENCE_FA[d.confidence]}</span>
         </p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           {d.coverage.map((c) => (
             <div key={c.field} className="min-w-0">
-              <div className="flex justify-between text-xs text-muted"><span>{c.label}</span><span className="num-ltr">{pct(c.pct, 0)}</span></div>
-              <div className="mt-1 h-1.5 rounded-full bg-card" dir="ltr"><div className="h-full rounded-full bg-info/60" style={{ width: `${c.pct}%` }} /></div>
+              <div className="flex justify-between text-xs text-muted">
+                <span>{c.label}</span>
+                <span className="num-ltr">{pct(c.pct, 0)}</span>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-surface-2" dir="ltr">
+                <div className="h-full rounded-full bg-accent/70" style={{ width: `${c.pct}%` }} />
+              </div>
             </div>
           ))}
         </div>
@@ -50,18 +69,42 @@ function DataConfidencePanel({ a }: { a: BookAudit }) {
   );
 }
 
-function Hero({ label, value, sub, tone }: { label: React.ReactNode; value: string; sub: string; tone: 'gain' | 'warn' | 'loss' | 'neutral' }) {
+function HeroTile({
+  label,
+  value,
+  sub,
+  tone
+}: {
+  label: React.ReactNode;
+  value: string;
+  sub: string;
+  tone: 'gain' | 'warn' | 'loss' | 'neutral';
+}) {
   const dot = tone === 'gain' ? 'bg-gain' : tone === 'warn' ? 'bg-warn' : tone === 'loss' ? 'bg-negative' : 'bg-subtle';
+  const bg =
+    tone === 'gain'
+      ? 'border-gain/25 bg-gain/[0.04]'
+      : tone === 'warn'
+        ? 'border-warn/25 bg-warn/[0.04]'
+        : tone === 'loss'
+          ? 'border-negative/25 bg-negative/[0.04]'
+          : 'border-divider/80 bg-surface-2/50';
   return (
-    <div className="min-w-0">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-muted"><span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden />{label}</p>
-      <p className="num-ltr mt-1 text-2xl font-extrabold text-ink"><AmountText text={value} /></p>
-      <p className="text-xs text-muted">{sub}</p>
+    <div className={cn('min-w-0 rounded-xl border p-3.5', bg)}>
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+        <span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden />
+        {label}
+      </p>
+      <p className="num-ltr mt-1.5 text-2xl font-extrabold text-ink">
+        <AmountText text={value} />
+      </p>
+      <p className="mt-0.5 truncate text-[11px] text-muted">{sub}</p>
     </div>
   );
 }
 
-const toneOf = (r: ScoreRow | undefined) => (!r ? 'neutral' : r.verdict === 'meets' ? 'gain' : r.verdict === 'borderline' ? 'warn' : r.verdict === 'fails' ? 'loss' : 'neutral');
+const toneOf = (r: ScoreRow | undefined) =>
+  !r ? 'neutral' : r.verdict === 'meets' ? 'gain' : r.verdict === 'borderline' ? 'warn' : r.verdict === 'fails' ? 'loss' : 'neutral';
 
 export function AuditTab({
   a: primary,
@@ -97,40 +140,66 @@ export function AuditTab({
   const [loopApplied, setLoopApplied] = useState(false);
   const critique = useMemo(() => buildAutoCritiqueLoop(a, settings), [a, settings]);
 
-  const eq = useMemo(() => ({ labels: m.equity.map((p) => faDate(p.t)), equity: m.equity.map((p) => p.equity), drawdown: m.equity.map((p) => p.drawdown) }), [m.equity]);
+  const eq = useMemo(
+    () => ({
+      labels: m.equity.map((p) => faDate(p.t)),
+      equity: m.equity.map((p) => p.equity),
+      drawdown: m.equity.map((p) => p.drawdown)
+    }),
+    [m.equity]
+  );
   const hist = useMemo(() => {
     const vals = a.trades.map((t) => t.netPnl);
     if (vals.length < 5) return null;
-    const lo = Math.min(...vals), hi = Math.max(...vals);
-    const bins = 12, w = (hi - lo) / bins || 1;
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    const bins = 12;
+    const w = (hi - lo) / bins || 1;
     const counts = Array(bins).fill(0) as number[];
     for (const v of vals) counts[Math.min(bins - 1, Math.floor((v - lo) / w))]++;
     const centers = counts.map((_, i) => lo + w * (i + 0.5));
     const floor = m.scratchFloor;
-    return { labels: centers.map((c) => usd(c)), counts, colors: centers.map((c) => (Math.abs(c) < Math.max(floor, w / 2) ? 'rgba(140,140,150,0.6)' : c > 0 ? 'rgba(22,163,74,0.8)' : 'rgba(220,38,38,0.8)')) };
+    return {
+      labels: centers.map((c) => usd(c)),
+      counts,
+      colors: centers.map((c) =>
+        Math.abs(c) < Math.max(floor, w / 2) ? 'rgba(140,140,150,0.6)' : c > 0 ? 'rgba(15,157,107,0.82)' : 'rgba(200,41,63,0.82)'
+      )
+    };
   }, [a.trades, m.scratchFloor]);
+
   const freq = useMemo(() => {
     const days = new Map<string, number>();
-    for (const t of a.trades) { const k = dayKey(t.openTime, tz); days.set(k, (days.get(k) ?? 0) + 1); }
+    for (const t of a.trades) {
+      const k = dayKey(t.openTime, tz);
+      days.set(k, (days.get(k) ?? 0) + 1);
+    }
     const keys = [...days.keys()].sort();
     return { labels: keys.map((k) => k.slice(5)), values: keys.map((k) => days.get(k)!) };
   }, [a.trades, tz]);
+
   const sizeQuartiles = useMemo(() => {
     const ts = [...a.trades].filter((t) => t.maxNotional > 0).sort((x, y) => x.maxNotional - y.maxNotional);
     if (ts.length < 8) return null;
     const q = Math.ceil(ts.length / 4);
     return [0, 1, 2, 3].map((i) => {
       const g = ts.slice(i * q, (i + 1) * q);
-      return { label: `${usd(g[0]?.maxNotional)}–${usd(g.at(-1)?.maxNotional)}`, exp: g.reduce((s, t) => s + t.netPnl, 0) / Math.max(1, g.length), n: g.length };
+      return {
+        label: `${usd(g[0]?.maxNotional)}–${usd(g.at(-1)?.maxNotional)}`,
+        exp: g.reduce((s, t) => s + t.netPnl, 0) / Math.max(1, g.length),
+        n: g.length
+      };
     });
   }, [a.trades]);
 
   if (!hasPerp && !hasSpot) {
     if (outsideRangeCount > 0 && onShowAllRange) {
       return (
-        <Notice tone="info" title="معاملات جهت‌دار شما قدیمی‌تر از بازهٔ فعلی هستند">
-          در این بازه معاملهٔ بسته‌ای ثبت نشده، اما {fa(outsideRangeCount)} معاملهٔ جهت‌دار در تاریخچهٔ کامل شما وجود دارد.{' '}
-          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش حسابرسی همهٔ زمان‌ها</button>
+        <Notice tone="info" title="معاملاتت قدیمی‌تر از این بازه هستند">
+          در این بازه معاملهٔ بسته‌ای نیست، اما {fa(outsideRangeCount)} معامله در تاریخچهٔ کاملت پیدا شد.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>
+            نمایش همهٔ زمان‌ها
+          </button>
         </Notice>
       );
     }
@@ -142,8 +211,10 @@ export function AuditTab({
       <div className="space-y-5">
         {outsideRangeCount > 0 && onShowAllRange && (
           <Notice tone="info">
-            {fa(outsideRangeCount)} معاملهٔ پرپ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
-            <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+            {fa(outsideRangeCount)} معاملهٔ صرافی قدیمی‌تر از این بازه داری.{' '}
+            <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>
+              نمایش همهٔ زمان‌ها
+            </button>
           </Notice>
         )}
         <SpotAutoAuditPanel b={spotBook} tz={tz} reviews={reviews} />
@@ -160,89 +231,211 @@ export function AuditTab({
   const sortedTrades = [...a.trades].sort((x, y) => x.netPnl - y.netPnl);
   const worstIds = new Set(sortedTrades.slice(0, Math.max(1, Math.ceil(a.trades.length * 0.05))).map((t) => t.id));
   const allTrades = [...a.trades].sort((x, y) => (y.closeTime ?? 0) - (x.closeTime ?? 0));
+  const winsCount = a.trades.filter((t) => t.netPnl > 0).length;
+  const lossesCount = a.trades.filter((t) => t.netPnl < 0).length;
+
+  // داستان ساده و انسانی: دقیقاً چه اتفاقی افتاده؟
+  const plainStory =
+    m.n === 0
+      ? 'فعلاً معاملهٔ بسته‌ای ثبت نشده؛ به محض بسته شدن اولین معامله، تحلیل اینجا آماده می‌شود.'
+      : `در این بازه ${fa(m.n)} معامله بستی (${fa(winsCount)} سود و ${fa(lossesCount)} ضرر). در کل ${
+          m.netPnl >= 0 ? `${usd(m.netPnl)} سود کردی` : `${usd(Math.abs(m.netPnl))} ضرر کردی`
+        }${m.fees > 0 ? ` و ${usd(m.fees)} کارمزد دادی` : ''}.${
+          a.first ? ` مهم‌ترین نکته‌ای که الان باید اصلاح کنی: ${a.first.fix}` : ''
+        }`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {usingFallbackPerp && (
         <Notice tone="info" title="حسابرسی خودکار روی کل معاملات پرپ (شامل دفتر دلتا نوترال)">
-          در این بازه معاملهٔ جهت‌دار جداگانه‌ای نبود؛ برای اینکه حسابرسی و لوپ نقد بدون وقفه فعال بمانند، تمام معاملات پرپ متصل به‌صورت خودکار حسابرسی شدند.
+          در این بازه معاملهٔ جداگانه‌ای نبود؛ همه معاملات صرافی به‌صورت خودکار اینجا بررسی شدند.
         </Notice>
       )}
       {outsideRangeCount > 0 && !hasPrimary && onShowAllRange && (
         <Notice tone="info">
-          {fa(outsideRangeCount)} معاملهٔ جهت‌دار قدیمی‌تر از بازهٔ فعلی دارید.{' '}
-          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>نمایش همهٔ زمان‌ها</button>
+          {fa(outsideRangeCount)} معاملهٔ قدیمی‌تر از این بازه داری.{' '}
+          <button type="button" className="font-bold text-accent underline" onClick={onShowAllRange}>
+            نمایش همهٔ زمان‌ها
+          </button>
         </Notice>
       )}
-      <DataConfidencePanel a={a} />
 
-      {/* لایهٔ ۱ — حکم */}
-      <Surface variant="focal" className={cn('border-2 p-5 md:p-6', BAND_STYLE[a.verdict.band])}>
-        <p className="text-lg font-extrabold leading-8 text-ink md:text-xl">{a.verdict.headline}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge tone={a.verdict.band === 'pass' ? 'gain' : a.verdict.band === 'conditions' ? 'warn' : a.verdict.band === 'fail' ? 'loss' : 'neutral'}>{STATUS_FA[a.verdict.band]}</Badge>
-          <span className="text-xs text-muted">{a.verdict.reason}</span>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
-          <Hero label="سود خالص" value={usd(m.netPnl, true)} sub={`ناخالص ${usd(m.grossPnl, true)} · کارمزد ${usd(-m.fees)}`} tone={m.netPnl > 0 ? 'gain' : m.netPnl < 0 ? 'loss' : 'neutral'} />
-          <Hero label={<Term id="winRate" yours={pct(m.winRateDecisive)} action={row('winRate')?.action}>نرخ برد</Term>} value={pct(m.winRateDecisive)} sub={`با سربه‌سرها ${pct(m.winRateAll)}`} tone={toneOf(row('winRate'))} />
-          <Hero label={<Term id="profitFactor" yours={row('profitFactor')?.display} action={row('profitFactor')?.action}>ضریب سود</Term>} value={row('profitFactor')?.display ?? '—'} sub={m.profitFactor ? `هر ۱ دلار زیان → ${usd(m.profitFactor === Infinity ? null : m.profitFactor)}` : '—'} tone={toneOf(row('profitFactor'))} />
-          <Hero label={<Term id="maxDrawdown" yours={row('maxDrawdown')?.display} action={row('maxDrawdown')?.action}>بیشترین افت</Term>} value={m.maxDrawdownPct !== null ? pct(m.maxDrawdownPct) : usd(-m.maxDrawdown)} sub={m.drawdownFrom ? `${faDate(m.drawdownFrom)} تا ${faDate(m.drawdownTo)}` : 'افتی ثبت نشد'} tone={toneOf(row('maxDrawdown'))} />
-        </div>
-        <Disclosure summary={`همهٔ ${fa(a.rows.length + 8)} معیار به‌صورت فشرده`} className="mt-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {[
-              ['امید ریاضی', usd(m.expectancy, true), row('expectancy')],
-              ['نسبت سود به زیان', row('payoff')?.display, row('payoff')],
-              ['ضریب بازیابی', row('recovery')?.display, row('recovery')],
-              ['شارپ روزانه', m.sharpe === null ? '—' : fa(m.sharpe, 2), undefined],
-              ['فشار کارمزد', pct(m.feeDragPct), row('feeDrag')],
-              ['بلندترین رشتهٔ برد / باخت', `${fa(m.longestWinStreak)} / ${fa(m.longestLossStreak)}`, undefined],
-              ['بزرگ‌ترین سود', `${usd(m.largestWin)} (${pct(m.largestWinPctNet)} سود خالص)`, undefined],
-              ['بزرگ‌ترین زیان', `${usd(m.largestLoss)} (${pct(m.largestLossPctNet)})`, undefined],
-              ['معامله در روز (فعال)', `${fa(m.tradesPerDay, 2)} (${fa(m.tradesPerActiveDay, 1)})`, row('tradesPerDay')],
-              ['ناخالص / خالص', `${usd(m.grossPnl, true)} / ${usd(m.netPnl, true)}`, undefined],
-              ['معاملهٔ سربه‌سر', `${fa(m.scratches)} (${pct(m.scratchPct)})`, undefined],
-              ['فاندینگ', m.fundingKnown ? usd(m.funding, true) : `${usd(m.funding, true)} (ناقص)`, undefined],
-              ['بدترین روز', usd(m.worstDay), row('dailyLoss')],
-              ['ثبات (سهم بهترین روز)', pct(m.bestDayShare), row('consistency')],
-              ['ماه‌های مثبت', `${fa(m.monthsPositive)} از ${fa(m.months)}`, undefined],
-              ['میانهٔ نگه‌داری', duration(m.medianHoldMs), undefined]
-            ].map(([label, value, r]) => (
-              <div key={label as string} className="min-w-0 rounded-control border border-divider p-2.5">
-                <p className="text-[11px] text-muted">{label as string}</p>
-                <p className="num-ltr text-sm font-bold text-ink">{value as string}</p>
-                {r && <div className="mt-1 flex flex-wrap gap-1"><ClassBadge c={(r as ScoreRow).cls} /><VerdictBadge v={(r as ScoreRow).verdict} /></div>}
-                {r && <p className="mt-1 text-[11px] text-subtle">معیار: {(r as ScoreRow).benchmark}</p>}
-              </div>
-            ))}
+      {/* کارت ۱: خلاصهٔ ساده و روشن (چه اتفاقی افتاد؟) */}
+      <Surface variant="focal" className={cn('relative overflow-hidden border p-5 md:p-6', BAND_SURFACE[a.verdict.band])}>
+        <div aria-hidden className={cn('pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l', BAND_ACCENT[a.verdict.band])} />
+
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={a.verdict.band === 'pass' ? 'gain' : a.verdict.band === 'conditions' ? 'warn' : a.verdict.band === 'fail' ? 'loss' : 'neutral'}>
+                {STATUS_FA[a.verdict.band]}
+              </Badge>
+              <span className="text-xs text-muted">{a.verdict.reason}</span>
+            </div>
+            <p className="mt-2 text-lg font-extrabold leading-8 text-ink md:text-xl">{a.verdict.headline}</p>
+            <p className="mt-1.5 text-sm leading-7 text-muted">{plainStory}</p>
           </div>
-        </Disclosure>
+          <span
+            className={cn(
+              'hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:flex',
+              m.netPnl >= 0 ? 'bg-gain/12 text-gain-text' : 'bg-negative/12 text-negative'
+            )}
+          >
+            {m.netPnl >= 0 ? <TrendingUp className="h-6 w-6" aria-hidden /> : <TrendingDown className="h-6 w-6" aria-hidden />}
+          </span>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <HeroTile
+            label="سود و زیان خالص"
+            value={usd(m.netPnl, true)}
+            sub={`کارمزد ${usd(-m.fees)}`}
+            tone={m.netPnl > 0 ? 'gain' : m.netPnl < 0 ? 'loss' : 'neutral'}
+          />
+          <HeroTile
+            label={
+              <Term id="winRate" yours={pct(m.winRateDecisive)} action={row('winRate')?.action}>
+                نرخ برد
+              </Term>
+            }
+            value={pct(m.winRateDecisive)}
+            sub={`${fa(winsCount)} برد · ${fa(lossesCount)} باخت`}
+            tone={toneOf(row('winRate'))}
+          />
+          <HeroTile
+            label={
+              <Term id="profitFactor" yours={row('profitFactor')?.display} action={row('profitFactor')?.action}>
+                نسبت کل سود به ضرر
+              </Term>
+            }
+            value={row('profitFactor')?.display ?? '—'}
+            sub={m.profitFactor ? `به‌ازای هر ۱ دلار ضرر: ${usd(m.profitFactor === Infinity ? null : m.profitFactor)}` : '—'}
+            tone={toneOf(row('profitFactor'))}
+          />
+          <HeroTile
+            label={
+              <Term id="maxDrawdown" yours={row('maxDrawdown')?.display} action={row('maxDrawdown')?.action}>
+                بیشترین افت حساب
+              </Term>
+            }
+            value={m.maxDrawdownPct !== null ? pct(m.maxDrawdownPct) : usd(-m.maxDrawdown)}
+            sub={m.drawdownFrom ? `${faDate(m.drawdownFrom)} تا ${faDate(m.drawdownTo)}` : 'افتی ثبت نشد'}
+            tone={toneOf(row('maxDrawdown'))}
+          />
+        </div>
+
+        <div className="mt-4 space-y-2 border-t border-divider/70 pt-3">
+          <DataConfidencePanel a={a} />
+          <Disclosure summary={`نمایش همهٔ ${fa(a.rows.length + 8)} عدد خلاصه`}>
+            <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-3 lg:grid-cols-4">
+              {[
+                ['میانگین سود هر معامله', usd(m.expectancy, true), row('expectancy')],
+                ['سود معمول به ضرر معمول', row('payoff')?.display, row('payoff')],
+                ['بزرگ‌ترین سود', usd(m.largestWin), undefined],
+                ['بزرگ‌ترین ضرر', usd(m.largestLoss), undefined],
+                ['سهم کارمزد از نتیجه', pct(m.feeDragPct), row('feeDrag')],
+                ['بیشترین برد / باخت پیاپی', `${fa(m.longestWinStreak)} / ${fa(m.longestLossStreak)}`, undefined],
+                ['میانگین معامله در روز فعال', fa(m.tradesPerActiveDay, 1), row('tradesPerDay')],
+                ['بدترین روز', usd(m.worstDay), row('dailyLoss')],
+                ['ماه‌های مثبت', `${fa(m.monthsPositive)} از ${fa(m.months)}`, undefined],
+                ['مدت معمول هر معامله', duration(m.medianHoldMs), undefined],
+                ['فاندینگ', usd(m.funding, true), undefined],
+                ['معاملات تقریباً سربه‌سر', `${fa(m.scratches)} (${pct(m.scratchPct)})`, undefined]
+              ].map(([label, value, r]) => (
+                <div key={label as string} className="min-w-0 rounded-xl border border-divider/70 bg-surface-2/40 p-2.5">
+                  <p className="text-[11px] text-muted">{label as string}</p>
+                  <p className="num-ltr mt-0.5 text-sm font-bold text-ink">{value as string}</p>
+                  {r && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <VerdictBadge v={(r as ScoreRow).verdict} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Disclosure>
+        </div>
       </Surface>
 
-      {/* لوپ نقد کمّی خودکار (تشخیص ← نقد متقابل آماری ← تعهد اجرایی) */}
+      {/* کارت ۲: مهم‌ترین اقدام الان (اول این را درست کن) */}
+      {a.first ? (
+        <Surface variant="focal" className="relative overflow-hidden border border-accent/40 bg-accent/[0.03] p-5">
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 start-0 w-1 bg-accent" />
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+              <AlertCircle className="h-5 w-5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-accent">اول این را درست کن</p>
+              <p className="mt-1 text-base font-extrabold text-ink">{a.first.fix}</p>
+              <p className="mt-1 text-sm leading-7 text-muted">
+                {a.first.detail} · ضرر این اشتباه: <span className="font-bold text-negative">{usd(-a.first.cost)}</span>
+              </p>
+            </div>
+          </div>
+
+          {a.rules.length > 0 && (
+            <div className="mt-4 rounded-xl border border-divider/70 bg-card p-3.5">
+              <p className="text-xs font-bold text-ink">۳ قانون ساده از روی معاملات خودت</p>
+              <ol className="mt-1.5 list-decimal space-y-1 ps-5 text-xs leading-6 text-ink">
+                {a.rules.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {a.next.length > 0 && (
+            <Disclosure summary="۳ نکتهٔ مهم بعدی (به ترتیب بیشترین ضرر)" className="mt-3">
+              <ol className="space-y-2 pt-1 text-sm">
+                {a.next.map((l) => (
+                  <li key={l.id} className="rounded-xl bg-card p-3">
+                    <span className="font-semibold text-ink">{l.title}</span> — <span className="font-bold text-negative">{usd(-l.cost)}</span>
+                    <p className="mt-0.5 text-xs leading-6 text-muted">
+                      {l.detail} {l.fix}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </Disclosure>
+          )}
+        </Surface>
+      ) : m.n >= 10 ? (
+        <Notice tone="success" title="اشتباه پرهزینه‌ای دیده نشد">
+          روند معاملاتت منظم بوده؛ همین مسیر را ادامه بده.
+        </Notice>
+      ) : null}
+
+      {/* کارت ۳: جمع‌بندی و پیشنهاد خودکار هوشمند (لوپ نقد خودکار) */}
       {critique.active && (
-        <Surface variant="focal" className="space-y-3 border border-accent/40 p-5">
+        <Surface className="space-y-3 border-divider/90 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-bold text-accent">لوپ نقد خودکار معاملات (فعال)</p>
-              <p className="text-[11px] text-muted">حسابرسی خودکار از معاملات واقعی + اعتبارسنجی آماری + تبدیل مستقیم به قانون هفتهٔ بعد</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                <Sparkles className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-ink">تحلیل خودکار و برنامهٔ هفتهٔ بعد</p>
+                <p className="text-[11px] text-muted">کاملاً خودکار از معاملات واقعی استخراج شده</p>
+              </div>
             </div>
             <Badge tone="info">{critique.confidenceLabel}</Badge>
           </div>
           <div className="grid gap-2.5 md:grid-cols-3">
             {critique.steps.map((st) => (
-              <div key={st.stage} className="rounded-control border border-divider bg-card p-3">
+              <div key={st.stage} className="rounded-xl border border-divider/70 bg-surface-2/40 p-3.5">
                 <p className="text-xs font-bold text-ink">{st.title}</p>
                 <p className="mt-1 text-xs leading-6 text-muted">{st.body}</p>
               </div>
             ))}
           </div>
           {reviews && critique.proposedCommitments.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-2.5">
-              <span className="text-[11px] text-subtle">قوانین استخراج‌شده از لوپ نقد را مستقیم به تعهدهای مرور این هفته اضافه کنید تا هفتهٔ بعد خودکار سنجیده شوند.</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider/70 pt-3">
+              <span className="text-xs text-muted">با یک کلیک این قوانین را به مرور این هفته اضافه کن تا خودکار پیگیری شوند:</span>
               {loopApplied ? (
-                <Badge tone="gain">✓ به تعهدهای مرور این هفته اضافه شد</Badge>
+                <Badge tone="gain">
+                  <CheckCircle2 /> به مرور این هفته اضافه شد
+                </Badge>
               ) : (
                 <Button
                   size="sm"
@@ -255,7 +448,7 @@ export function AuditTab({
                     void saveReview({ ...base, commitments: merged }).then(() => setLoopApplied(true));
                   }}
                 >
-                  افزودن خودکار قوانین به مرور این هفته
+                  افزودن خودکار به مرور این هفته
                 </Button>
               )}
             </div>
@@ -263,194 +456,209 @@ export function AuditTab({
         </Surface>
       )}
 
-      {/* اول این را درست کن */}
-      {a.first ? (
-        <Surface variant="focal" className="border-2 border-accent p-5">
-          <p className="text-xs font-semibold text-accent">اول این را درست کن</p>
-          <p className="mt-1 text-base font-extrabold text-ink">{a.first.fix}</p>
-          <p className="mt-1 text-sm leading-7 text-muted">{a.first.detail} هزینه: <span className="font-bold text-negative">{usd(-a.first.cost)}</span></p>
-          {a.next.length > 0 && (
-            <Disclosure summary="سه اولویت بعدی، به ترتیب هزینه" className="mt-2">
-              <ol className="space-y-2 text-sm">
-                {a.next.map((l) => <li key={l.id}><span className="font-semibold text-ink">{l.title}</span> — <span className="text-negative">{usd(-l.cost)}</span><br /><span className="text-xs text-muted">{l.detail} {l.fix}</span></li>)}
-              </ol>
-            </Disclosure>
-          )}
-          {a.rules.length > 0 && (
-            <div className="mt-3 rounded-control bg-surface-2 p-3">
-              <p className="text-xs font-semibold text-ink">سه قانون سخت از دادهٔ خود شما</p>
-              <ol className="mt-1 list-decimal space-y-1 ps-5 text-xs leading-6 text-ink">{a.rules.map((r, i) => <li key={i}>{r}</li>)}</ol>
-              <p className="mt-1 text-[11px] text-subtle">این‌ها را در «مرور هفتگی» به‌عنوان تعهد قابل‌سنجش اضافه کنید.</p>
-            </div>
-          )}
-        </Surface>
-      ) : m.n >= 10 ? (
-        <Notice tone="success" title="نشتی قیمت‌گذاری‌شده‌ای پیدا نشد">یا انضباط است، یا دادهٔ کم. در هر دو حال تگ «چرا» را ادامه دهید.</Notice>
-      ) : null}
-
-      {/* لایهٔ ۲ — کارنامه */}
-      <section>
-        <h2 className="text-base font-bold text-ink md:text-lg">کارنامه در برابر معیار حرفه‌ای</h2>
-        <p className="mt-1 text-xs leading-6 text-muted">معیارها مرجع شرکت‌های Prop هستند و برای نمونه‌های بزرگ؛ روی نمونهٔ کوچک جهت‌نما هستند نه حکم. ترتیب: بیشترین هزینهٔ دلاری اول.</p>
-        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+      {/* کارت ۴: کارنامهٔ ساده (نتیجه و رفتار) */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-bold text-ink">کارنامهٔ خلاصه</h2>
+          <p className="text-xs text-muted">مرتب‌شده از بیشترین اثر روی حسابت به کمترین.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
           <Surface className="p-4 md:p-5">
             <h3 className="text-sm font-bold text-ink">آنچه معامله‌گری شما تولید کرد</h3>
-            <p className="text-xs text-muted">نتیجه‌ها (عملکرد) — آنچه در حساب ماند.</p>
-            {perf.map((r) => <ScoreRowView key={r.id} row={r} />)}
+            <p className="mb-2 text-xs text-muted">نتیجهٔ نهایی در حساب</p>
+            {perf.map((r) => (
+              <ScoreRowView key={r.id} row={r} />
+            ))}
           </Surface>
           <Surface className="p-4 md:p-5">
             <h3 className="text-sm font-bold text-ink">چطور اجرا کردید</h3>
-            <p className="text-xs text-muted">رفتار — جدا از نتیجه؛ یک معاملهٔ خوب می‌تواند ضرر بدهد.</p>
-            {exec.map((r) => <ScoreRowView key={r.id} row={r} />)}
+            <p className="mb-2 text-xs text-muted">نظم و عادت‌های معامله‌گری</p>
+            {exec.map((r) => (
+              <ScoreRowView key={r.id} row={r} />
+            ))}
           </Surface>
         </div>
       </section>
 
-      <ExcursionPanel trades={a.trades} />
-
-      {/* لایهٔ ۳ — تحلیل */}
+      {/* نمودار مسیر سرمایه — مهم‌ترین نمودار، تمیز و واضح */}
       {m.n > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-base font-bold text-ink md:text-lg">واقعاً پول می‌سازید؟</h2>
-          <ChartBlock
-            title={m.maxDrawdown > Math.max(0, m.netPnl) ? 'یک دورهٔ بد از کل سودتان بزرگ‌تر بوده' : 'مسیر سود و افت‌ها'}
-            term="منحنی سرمایه و افت (Equity curve, drawdown)"
-            cls="performance"
-            caption={`سود خالص ${usd(m.netPnl, true)} با بیشترین افت ${usd(-m.maxDrawdown)}${m.maxDrawdownPct !== null ? ` (${pct(m.maxDrawdownPct)} حساب)` : ''}. ${m.recoveryFactor !== null ? `ضریب بازیابی ${fa(m.recoveryFactor, 2)}؛ ${m.recoveryFactor < 1 ? 'یعنی بدترین افت از کل سود بزرگ‌تر است.' : 'یعنی سود از بدترین افت بزرگ‌تر است.'}` : ''}`}
-            howTo="خط آبی سود خالص تجمعی بعد از هر معامله است. ناحیهٔ قرمز زیر صفر فاصلهٔ هر لحظه از بالاترین نقطهٔ قبلی است؛ هرچه عمیق‌تر، افت بزرگ‌تر."
-          >
-            <EquityChart labels={eq.labels} equity={eq.equity} drawdown={eq.drawdown} />
-          </ChartBlock>
-          <Disclosure summary="ثبات ماه‌به‌ماه، تمرکز سود در یک روز و آزمون «یک معاملهٔ بد»">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Surface variant="subtle" className="p-3 text-xs leading-6">بدون بدترین معامله: <b className={pnlTone(m.withoutWorst1)}>{usd(m.withoutWorst1, true)}</b><br />بدون بدترین ۳ معامله: <b className={pnlTone(m.withoutWorst3)}>{usd(m.withoutWorst3, true)}</b>{m.netPnl < 0 && (m.withoutWorst3 ?? -1) > 0 && <><br /><span className="text-negative">فقط سه معامله شما را از سود به ضرر برده است.</span></>}</Surface>
-              <Surface variant="subtle" className="p-3 text-xs leading-6">ماه‌های مثبت: {fa(m.monthsPositive)} از {fa(m.months)}<br />سهم بهترین روز از سود: {pct(m.bestDayShare)} {m.bestDayKey && `(${m.bestDayKey})`}</Surface>
-              <Surface variant="subtle" className="p-3 text-xs leading-6"><Term id="sharpe">شارپ روزانه</Term>: {m.sharpe === null ? `ارزیابی نشد (حداقل ۲۰ روز و ۱۰ روز فعال؛ الان ${fa(m.spanDays)} روز)` : fa(m.sharpe, 2)}</Surface>
-            </div>
-          </Disclosure>
-
-          <h2 className="pt-2 text-base font-bold text-ink md:text-lg">پول از کجا می‌آید؟</h2>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ChartBlock
-              title={m.payoff !== null && m.payoff < 1 ? 'زیان‌هایتان از سودهایتان بزرگ‌ترند' : 'سود متوسط در برابر زیان متوسط'}
-              term="نسبت سود به زیان (Payoff ratio)"
-              cls="performance"
-              caption={m.avgWin !== null && m.avgLoss !== null ? `زیان معمول شما ${usd(m.avgLoss)} و سود معمولتان ${usd(m.avgWin)} است. برای سربه‌سر شدن باید ${pct(breakEvenWin)} ببرید و ${pct(m.winRateDecisive)} می‌برید.${breakEvenWin !== null && (m.winRateDecisive ?? 0) < breakEvenWin ? ' تا این نسبت عوض نشود، انتخاب بهتر ورود هم حساب را سودده نمی‌کند.' : ''}` : 'برای این نمودار حداقل یک برد و یک باخت لازم است.'}
-              howTo="میلهٔ کم‌رنگ کنار سود نشان می‌دهد سود متوسط برای نسبت ۱٫۵ به ۱ چقدر باید باشد."
-            >
-              <Bars labels={['سود متوسط', 'زیان متوسط']} values={[m.avgWin ?? 0, -(m.avgLoss ?? 0)]} ghost={[ghostWin, null]} />
-            </ChartBlock>
-            <ChartBlock
-              title={m.top5Share !== null && m.top5Share > 80 ? 'بیشتر سود از چند معامله آمده' : 'سهم ۵ معاملهٔ برتر'}
-              term="تمرکز سود (Profit concentration)"
-              cls="performance"
-              caption={m.top5Share !== null ? `۵ معاملهٔ برتر ${usd(m.top5Pnl)} سود دادند، یعنی ${pct(m.top5Share)} سود خالص. ${m.top5Share > 100 ? 'بقیهٔ معاملات در مجموع ضرر داده‌اند؛ لبه هنوز ثابت نشده.' : ''}` : 'وقتی سود خالص مثبت نیست، تمرکز سود معنا ندارد.'}
-            >
-              <Bars labels={['۵ معاملهٔ برتر', 'بقیهٔ معاملات']} values={[m.top5Pnl, m.netPnl - m.top5Pnl]} />
-            </ChartBlock>
-          </div>
-          {b.bySymbol.length > 1 && (
-            <ChartBlock title="سود هر نماد" term="امید ریاضی به تفکیک نماد" cls="performance" caption={(() => { const w = b.bySymbol.find((x) => x.verdict !== 'thin' && x.net < 0); return w ? `${w.label} با ${fa(w.n)} معامله ${usd(w.net, true)} داده است — ${w.verdict === 'delete' ? 'حذف' : 'اصلاح'}.` : 'هیچ نمادی با نمونهٔ کافی در مجموع ضرر نداده.'; })()}>
-              <Bars labels={b.bySymbol.map((x) => x.label)} values={b.bySymbol.map((x) => x.net)} />
-            </ChartBlock>
-          )}
-          <Disclosure summary="لانگ در برابر شورت، و سود هر نوع ورود (تگ «چرا»)">
-            <BucketTable title="لانگ / شورت" rows={b.byDirection} />
-            <BucketTable title="تگ «چرا» — فقط تگ‌های زده‌شده قبل از بستن معامله (بی‌طرف)" rows={b.byTagPreOnly} empty="هنوز تگی قبل از بستن معامله زده نشده." />
-            <BucketTable title="تگ «چرا» — همهٔ تگ‌ها (شامل تگ بعد از دیدن نتیجه)" rows={b.byTag} empty="هنوز تگ «چرا» زده نشده." />
-          </Disclosure>
-
-          <h2 className="pt-2 text-base font-bold text-ink md:text-lg">چقدر ریسک می‌کنید؟</h2>
-          {hist && (
-            <ChartBlock
-              title={(m.tailLossShare ?? 0) > 40 ? 'چند زیان بزرگ بیشتر ضرر را ساخته' : 'پراکندگی نتیجهٔ معاملات'}
-              term="توزیع سود و زیان (PnL distribution)"
-              cls="performance"
-              caption={`بدترین ۵٪ معاملات ${pct(m.tailLossShare)} کل زیان را ساخته‌اند. ${(m.tailLossShare ?? 0) > 40 ? 'دم چپ چاق است: یک سقف زیان سخت بیشترین اثر را دارد.' : ''} باند خاکستری محدودهٔ سربه‌سر است.`}
-              howTo="هر میله تعداد معاملاتی است که نتیجه‌شان در آن بازه بوده؛ چپ زیان، راست سود."
-            >
-              <Bars labels={hist.labels} values={hist.counts} unit="n" signed={false} colors={hist.colors} />
-            </ChartBlock>
-          )}
-          {sizeQuartiles && (
-            <ChartBlock title="روی ایده‌های بدتر حجم بزرگ‌تر می‌گیرید؟" term="اندازهٔ پوزیشن در برابر نتیجه" cls="behaviour" caption={`امید ریاضی در بزرگ‌ترین یک‌چهارم معاملات ${usd(sizeQuartiles[3].exp, true)} و در کوچک‌ترین یک‌چهارم ${usd(sizeQuartiles[0].exp, true)} است.${sizeQuartiles[3].exp < sizeQuartiles[0].exp ? ' معاملات بزرگ بدتر نتیجه می‌دهند — اندازه از حس می‌آید نه از قاعده.' : ''} ضریب تغییرات اندازه ${fa(m.sizeCv, 2)}.`}>
-              <Bars labels={sizeQuartiles.map((q) => q.label)} values={sizeQuartiles.map((q) => q.exp)} />
-            </ChartBlock>
-          )}
-          <Disclosure summary="رشته‌ها، ریسک هر معامله و پراکندگی R">
-            <div className="grid gap-3 text-xs leading-6 sm:grid-cols-3">
-              <Surface variant="subtle" className="p-3">بلندترین رشتهٔ باخت: {fa(m.longestLossStreak)} · برد: {fa(m.longestWinStreak)}</Surface>
-              <Surface variant="subtle" className="p-3"><Term id="riskPerTrade">ریسک هر معامله</Term>: {m.riskPctAvg === null ? 'ارزیابی نشد — برنامه با استاپ و اندازهٔ حساب لازم است' : `${pct(m.riskPctAvg, 2)} (${fa(m.riskPctCount)} معامله)`}</Surface>
-              <Surface variant="subtle" className="p-3"><Term id="rMultiple">R</Term>: {m.rCount ? `میانگین ${fa(m.avgR, 2)}R · بدترین ${fa(Math.min(...m.rValues), 2)}R · بهترین ${fa(Math.max(...m.rValues), 2)}R` : 'ارزیابی نشد'}</Surface>
-            </div>
-          </Disclosure>
-
-          <h2 className="pt-2 text-base font-bold text-ink md:text-lg">عادت‌هایتان با شما چه می‌کنند؟</h2>
-          {dayStyle && freq.labels.length > 2 && (
-            <ChartBlock title={b.tilt?.days.length ? 'روزهای پرمعامله گران تمام شده‌اند' : 'تعداد معامله در هر روز'} term="بسامد معامله در برابر معیار" cls="behaviour" caption={`میانگین ${fa(m.tradesPerActiveDay, 1)} معامله در روز فعال؛ معیار مرجع حدود ۳٫۲. ${b.tilt?.days.length ? `${fa(b.tilt.days.length)} روز با ${fa(b.tilt.threshold)}+ معامله جمعاً ${usd(b.tilt.tiltNet, true)}.` : ''}`}>
-              <Bars labels={freq.labels} values={freq.values} unit="n" signed={false} />
-            </ChartBlock>
-          )}
-          {!dayStyle && context.length > 0 && <p className="text-xs text-muted">تعداد معامله در روز برای سبک {m.style ? STYLE_FA[m.style] : ''} معیار ندارد (زمینه): {fa(m.tradesPerActiveDay, 1)} در روز فعال.</p>}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <HabitCard title="بعد از ضرر" body={b.revenge ? `${fa(b.revenge.n)} معامله بعد از ضرر؛ ${pct(b.revenge.fasterShare, 0)} زودتر از فاصلهٔ معمول (${duration(b.revenge.medianGapMs)}). نرخ برد ${pct(b.revenge.winRate)} در برابر ${pct(b.revenge.baseWinRate)} معمول؛ اندازه ${fa(b.revenge.sizeRatio, 2)} برابر.` : 'دادهٔ کافی نیست (حداقل ۳ معامله بعد از ضرر).'} cost={b.revenge?.cost} />
-            <HabitCard title="زمان نگه‌داری" body={b.holding ? `سودده‌ها به‌طور میانگین ${duration(b.holding.winMs)} و ضرردهی‌ها ${duration(b.holding.lossMs)} باز ماندند (${fa(b.holding.ratio, 1)} برابر).` : 'دادهٔ کافی نیست.'} cost={b.holding?.cost} />
-            <HabitCard title="بعد از برد بزرگ" body={b.postWin ? `${fa(b.postWin.n)} معامله؛ نرخ برد ${pct(b.postWin.winRate)} در برابر ${pct(b.postWin.baseWinRate)}، اندازه ${fa(b.postWin.sizeRatio, 2)} برابر معمول.` : 'دادهٔ کافی نیست.'} />
-            <HabitCard title="اندازه بعد از رشته" body={b.sizing ? `بعد از دو برد پیاپی ${fa(b.sizing.afterWins, 2)} برابر و بعد از دو باخت پیاپی ${fa(b.sizing.afterLosses, 2)} برابر اندازهٔ معمول.` : 'دادهٔ کافی نیست.'} />
-          </div>
-          <Disclosure summary="ساعت و روز هفته، روزهای پرمعامله، کارمزد و تناقض یادداشت‌ها">
-            <BucketTable title="ساعت باز کردن (وقت محلی)" rows={b.byHour} />
-            <BucketTable title="روز هفته" rows={b.byWeekday} />
-            {b.overtrading && <BucketTable title={`پرمعاملگی — اگر فقط ${fa(b.overtrading.capN)} معاملهٔ اول هر روز: ${usd(b.overtrading.netIfCapped, true)} (${usd(b.overtrading.delta, true)})`} rows={b.overtrading.buckets} />}
-            <p className="mt-2 text-xs text-muted"><Term id="feeDrag">فشار کارمزد</Term>: {pct(m.feeDragPct)} · کل کارمزد {usd(m.fees)} · <Term id="scratch">سربه‌سر</Term>: {fa(m.scratches)} معامله (آستانهٔ ثابت {usd(m.scratchFloor)})</p>
-            {b.contradictions.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs font-semibold text-ink">یادداشت‌های خودتان در برابر نتیجه</p>
-                <ul className="mt-1 space-y-1 text-xs leading-6">{b.contradictions.map((c) => <li key={c.tradeId}>«{c.quote}» → <span className="text-negative">{usd(c.net)}</span></li>)}</ul>
-              </div>
-            )}
-          </Disclosure>
-        </section>
+        <ChartBlock
+          title={m.maxDrawdown > Math.max(0, m.netPnl) ? 'یک دورهٔ بد از کل سودت بزرگ‌تر بوده' : 'مسیر سود و افت حساب در طول زمان'}
+          term="روند سود و زیان"
+          cls="performance"
+          caption={`سود خالص ${usd(m.netPnl, true)} با بیشترین افت ${usd(-m.maxDrawdown)}${m.maxDrawdownPct !== null ? ` (${pct(m.maxDrawdownPct)} حساب)` : ''}.`}
+          howTo="خط آبی سود کل تو بعد از هر معامله است و بخش قرمز زیر خط صفر، میزان افت از بالاترین قله را نشان می‌دهد."
+        >
+          <EquityChart labels={eq.labels} equity={eq.equity} drawdown={eq.drawdown} />
+        </ChartBlock>
       )}
 
-      {/* لایهٔ ۴ — پیوست */}
-      <Disclosure summary="پیوست: همهٔ معاملات، روش محاسبه، آنچه ارزیابی نشد، پوزیشن‌های باز">
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-card border border-divider">
-            {(showAllTrades ? allTrades : allTrades.slice(0, 8)).map((t) => (
-              <div key={t.id} className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-divider px-3 py-2 text-xs last:border-0', worstIds.has(t.id) && 'bg-negative/5')}>
-                <span className="font-semibold text-ink" dir="ltr">{t.symbol}</span>
-                <span className={t.direction === 'long' ? 'text-positive' : 'text-negative'}>{t.direction === 'long' ? 'لانگ' : 'شورت'}</span>
-                <span className="text-muted">{VENUE_FA[t.venue]}</span>
-                <span className="text-muted">{faDateTime(t.openTime)} ← {duration((t.closeTime ?? 0) - t.openTime)}</span>
-                <span className={cn('num-ltr ms-auto font-bold', pnlTone(t.netPnl))}><AmountText text={usd(t.netPnl, true)} /></span>
-                {worstIds.has(t.id) && <Badge tone="loss">بدترین ۵٪</Badge>}
+      {/* عادت‌های مهم به زبان ساده */}
+      {m.n > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <HabitCard
+            title="بعد از ضرر چطور معامله می‌کنی؟"
+            body={
+              b.revenge
+                ? `${fa(b.revenge.n)} بار بعد از ضرر وارد شدی؛ ${pct(b.revenge.fasterShare, 0)} مواقع عجولانه‌تر از معمول. درصد بردت در این مواقع ${pct(b.revenge.winRate)} بوده (در حالت عادی ${pct(b.revenge.baseWinRate)}).`
+                : 'فعلاً دادهٔ کافی نیست.'
+            }
+            cost={b.revenge?.cost}
+          />
+          <HabitCard
+            title="سودها را نگه می‌داری یا ضررها را؟"
+            body={
+              b.holding
+                ? `معاملات سودده به‌طور میانگین ${duration(b.holding.winMs)} و معاملات ضررده ${duration(b.holding.lossMs)} باز مانده‌اند (${fa(b.holding.ratio, 1)} برابر).`
+                : 'فعلاً دادهٔ کافی نیست.'
+            }
+            cost={b.holding?.cost}
+          />
+        </div>
+      )}
+
+      {/* نمودارها و تحلیل‌های عمیق‌تر — جمع‌شده تا صفحه شلوغ نشود */}
+      {m.n > 0 && (
+        <Disclosure summary="نمودارها و جزئیات بیشتر (سود هر نماد، سود در برابر ضرر، ساعت‌های بهتر و پیوست)">
+          <div className="space-y-4 pt-2">
+            <ExcursionPanel trades={a.trades} />
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ChartBlock
+                title={m.payoff !== null && m.payoff < 1 ? 'ضررهایت از سودهایت بزرگ‌ترند' : 'میانگین سود در برابر میانگین ضرر'}
+                term="مقایسه سود و ضرر"
+                cls="performance"
+                caption={
+                  m.avgWin !== null && m.avgLoss !== null
+                    ? `ضرر معمولت ${usd(m.avgLoss)} و سود معمولت ${usd(m.avgWin)} است. برای سربه‌سر شدن باید ${pct(breakEvenWin)} ببری و الان ${pct(m.winRateDecisive)} می‌بری.`
+                    : 'حداقل یک برد و یک باخت لازم است.'
+                }
+              >
+                <Bars labels={['سود معمول', 'ضرر معمول']} values={[m.avgWin ?? 0, -(m.avgLoss ?? 0)]} ghost={[ghostWin, null]} />
+              </ChartBlock>
+
+              <ChartBlock
+                title="سهم ۵ معاملهٔ برتر از کل سود"
+                term="تمرکز سود"
+                cls="performance"
+                caption={m.top5Share !== null ? `۵ معاملهٔ برترت ${usd(m.top5Pnl)} سود ساخته‌اند (${pct(m.top5Share)} کل سود).` : 'وقتی سود خالص مثبت نباشد، این مقایسه معنا ندارد.'}
+              >
+                <Bars labels={['۵ معاملهٔ برتر', 'بقیهٔ معاملات']} values={[m.top5Pnl, m.netPnl - m.top5Pnl]} />
+              </ChartBlock>
+            </div>
+
+            {b.bySymbol.length > 1 && (
+              <ChartBlock
+                title="سود و ضرر به تفکیک هر ارز"
+                term="عملکرد هر نماد"
+                cls="performance"
+                caption={(() => {
+                  const w = b.bySymbol.find((x) => x.verdict !== 'thin' && x.net < 0);
+                  return w ? `بیشترین ضرر روی ${w.label} بوده (${fa(w.n)} معامله · ${usd(w.net, true)}).` : 'هیچ ارزی با تعداد کافی در مجموع ضررده نبوده.';
+                })()}
+              >
+                <Bars labels={b.bySymbol.map((x) => x.label)} values={b.bySymbol.map((x) => x.net)} />
+              </ChartBlock>
+            )}
+
+            {hist && (
+              <ChartBlock
+                title="پراکندگی سود و ضرر معاملات"
+                term="توزیع نتیجه"
+                cls="performance"
+                caption={`بدترین ۵٪ معاملاتت ${pct(m.tailLossShare)} از کل ضررت را ساخته‌اند.`}
+              >
+                <Bars labels={hist.labels} values={hist.counts} unit="n" signed={false} colors={hist.colors} />
+              </ChartBlock>
+            )}
+
+            {sizeQuartiles && (
+              <ChartBlock
+                title="آیا معاملات بزرگ‌ترت نتیجهٔ بدتری می‌دهند؟"
+                term="اندازه در برابر نتیجه"
+                cls="behaviour"
+                caption={`میانگین نتیجه در بزرگ‌ترین معاملات ${usd(sizeQuartiles[3].exp, true)} و در کوچک‌ترین‌ها ${usd(sizeQuartiles[0].exp, true)} بوده.`}
+              >
+                <Bars labels={sizeQuartiles.map((q) => q.label)} values={sizeQuartiles.map((q) => q.exp)} />
+              </ChartBlock>
+            )}
+
+            {dayStyle && freq.labels.length > 2 && (
+              <ChartBlock
+                title="تعداد معامله در هر روز"
+                term="تعداد معاملات روزانه"
+                cls="behaviour"
+                caption={`میانگین ${fa(m.tradesPerActiveDay, 1)} معامله در هر روز فعال.`}
+              >
+                <Bars labels={freq.labels} values={freq.values} unit="n" signed={false} />
+              </ChartBlock>
+            )}
+
+            <BucketTable title="خرید (لانگ) در برابر فروش (شورت)" rows={b.byDirection} />
+            <BucketTable title="ساعت‌های بهتر و بدتر" rows={b.byHour} />
+            <BucketTable title="روزهای هفته" rows={b.byWeekday} />
+
+            {/* لیست معاملات بسته */}
+            <div className="space-y-2 pt-2">
+              <p className="text-xs font-bold text-ink">فهرست معاملات بررسی‌شده ({fa(allTrades.length)})</p>
+              <div className="overflow-hidden rounded-xl border border-divider">
+                {(showAllTrades ? allTrades : allTrades.slice(0, 8)).map((t) => (
+                  <div
+                    key={t.id}
+                    className={cn(
+                      'flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-divider/70 px-3 py-2 text-xs last:border-0',
+                      worstIds.has(t.id) && 'bg-negative/5'
+                    )}
+                  >
+                    <span className="font-semibold text-ink" dir="ltr">
+                      {t.symbol}
+                    </span>
+                    <span className={t.direction === 'long' ? 'text-positive' : 'text-negative'}>
+                      {t.direction === 'long' ? 'خرید' : 'فروش'}
+                    </span>
+                    <span className="text-muted">{VENUE_FA[t.venue]}</span>
+                    <span className="text-muted">
+                      {faDateTime(t.openTime)} · {duration((t.closeTime ?? 0) - t.openTime)}
+                    </span>
+                    <span className={cn('num-ltr ms-auto font-bold', pnlTone(t.netPnl))}>
+                      <AmountText text={usd(t.netPnl, true)} />
+                    </span>
+                    {worstIds.has(t.id) && <Badge tone="loss">بدترین ۵٪</Badge>}
+                  </div>
+                ))}
               </div>
+              {allTrades.length > 8 && (
+                <Button size="sm" variant="outline" onClick={() => setShowAllTrades((v) => !v)}>
+                  {showAllTrades ? 'نمایش ۸ معاملهٔ اخیر' : `نمایش همهٔ ${fa(allTrades.length)} معامله`}
+                </Button>
+              )}
+            </div>
+
+            {a.open.length > 0 && (
+              <div className="text-xs">
+                <p className="font-semibold text-ink">معاملات باز (فعلاً در آمار حساب نشده‌اند)</p>
+                {a.open.map((t) => (
+                  <p key={t.id} className="text-muted">
+                    <span dir="ltr">{t.symbol}</span> · {t.direction === 'long' ? 'خرید' : 'فروش'} · {VENUE_FA[t.venue]} · حجم {usd(t.maxNotional)}
+                  </p>
+                ))}
+              </div>
+            )}
+            {context.map((r) => (
+              <p key={r.id} className="text-xs text-muted">
+                {r.term}: {r.display}
+              </p>
             ))}
           </div>
-          {allTrades.length > 8 && <Button size="sm" variant="outline" onClick={() => setShowAllTrades((v) => !v)}>{showAllTrades ? 'نمایش ۸ معاملهٔ اخیر' : `نمایش همهٔ ${fa(allTrades.length)} معامله`}</Button>}
-          <div className="text-xs leading-6 text-muted">
-            <p className="font-semibold text-ink">روش</p>
-            <p>معامله = از صفر شدن پوزیشن یک (حساب، نماد) تا صفر شدن دوباره؛ چرخش جهت دو معامله حساب می‌شود و کارمزد به نسبت حجم تقسیم می‌شود. سود قیمتی از قیمت اجراها محاسبه می‌شود؛ فاندینگ به معاملهٔ باز همان زمان نسبت داده می‌شود. زمان‌ها به وقت محلی مرورگر. آستانهٔ سربه‌سر: بزرگ‌ترِ کارمزد همان معامله و {usd(m.scratchFloor)} (۲٪ میانگین سود، یک‌بار محاسبه). پوزیشن‌های باز و معاملات با شروع خارج از تاریخچه از آمار کنار گذاشته شده‌اند.</p>
-            <p className="mt-2 font-semibold text-ink">ارزیابی‌نشده‌ها</p>
-            <ul>{a.rows.filter((r) => r.verdict === 'na').map((r) => <li key={r.id}>• {r.term}: {r.note ?? 'دادهٔ لازم نیست'}</li>)}</ul>
-          </div>
-          {a.open.length > 0 && (
-            <div className="text-xs">
-              <p className="font-semibold text-ink">پوزیشن‌های باز (در آمار نیستند)</p>
-              {a.open.map((t) => <p key={t.id} className="text-muted"><span dir="ltr">{t.symbol}</span> · {t.direction === 'long' ? 'لانگ' : 'شورت'} · {VENUE_FA[t.venue]} · از {faDateTime(t.openTime)} · ارزش {usd(t.maxNotional)}</p>)}
-            </div>
-          )}
-          {a.truncated.length > 0 && <p className="text-xs text-subtle">{fa(a.truncated.length)} معامله با شروع خارج از تاریخچه (سود گزارش‌شدهٔ صرافی جمعاً {usd(a.truncated.reduce((s, t) => s + t.netPnl, 0), true)}) کنار گذاشته شد.</p>}
-          {context.map((r) => <p key={r.id} className="text-xs text-muted">{r.term} (زمینه): {r.display} — {r.note}</p>)}
-        </div>
-      </Disclosure>
+        </Disclosure>
+      )}
+
       {hasSpot && spotBook && <SpotAutoAuditPanel b={spotBook} tz={tz} reviews={reviews} />}
     </div>
   );
 }
 
-/** حسابرسی خودکار و لوپ نقد اسپات — فقط اعداد واقعی و تأییدشده (بدون سود/زیان بازِ ناقص یا کارت خالی) */
+/** حسابرسی خودکار اسپات — ساده، روشن و بدون نیاز به تایپ */
 function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; reviews?: ReadonlyMap<string, WeeklyReview> }) {
   const [applied, setApplied] = useState(false);
   const t = b.totals;
@@ -460,54 +668,60 @@ function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; revie
   const openValueUsd = b.open.reduce((sum, a) => sum + (a.value ?? 0), 0);
   const avgSwapUsd = t.swaps > 0 ? t.volume / t.swaps : 0;
 
-  const step1 = feeDragPct > 1
-    ? `هزینهٔ گاز و لغزش (${pct(feeDragPct, 2)} حجم) بالاست.`
-    : `${fa(t.swaps)} سواپ با حجم ${usd(t.volume)} و هزینهٔ کل ${usd(t.gas + t.swapCost)} ثبت شده است.`;
-  const step2 = decided > 0
-    ? `نرخ برد فروش‌ها ${pct(winRate, 0)} (${fa(t.wins)} سود · ${fa(t.losses)} زیان) و سود محقق ${usd(t.realized, true)}.`
-    : `${fa(b.open.length)} دارایی فعال به ارزش ${usd(openValueUsd)} دارید؛ هنوز فروش بسته‌ای برای محاسبهٔ نرخ برد ثبت نشده.`;
-  const step3 = feeDragPct > 1
-    ? 'سواپ‌های خرد را تجمیع کنید و لغزش را زیر ۰٫۵٪ بگذارید.'
-    : 'حد زیان و هدف ۲R هر دارایی باز را در «برنامهٔ معامله» چک کنید.';
+  const step1 =
+    feeDragPct > 1
+      ? `هزینهٔ کارمزد و گس (${pct(feeDragPct, 2)} حجم) نسبتاً بالاست.`
+      : `${fa(t.swaps)} سواپ با حجم ${usd(t.volume)} و هزینهٔ کل ${usd(t.gas + t.swapCost)} ثبت شده است.`;
+  const step2 =
+    decided > 0
+      ? `از فروش‌هایت ${pct(winRate, 0)} سودده بوده (${fa(t.wins)} سود · ${fa(t.losses)} ضرر) و سود قطعی ${usd(t.realized, true)}.`
+      : `${fa(b.open.length)} دارایی فعال به ارزش ${usd(openValueUsd)} داری و هنوز فروش بسته‌ای ثبت نشده.`;
+  const step3 =
+    feeDragPct > 1
+      ? 'تبدیل‌های کوچک را یکی کن تا گس کمتری بدهی.'
+      : 'حد ضرر و هدف دارایی‌های باز را در تب «برنامه خودکار» چک کن.';
 
   return (
-    <Surface variant="focal" className="space-y-4 border border-accent/35 p-5">
+    <Surface variant="focal" className="relative space-y-4 overflow-hidden border border-accent/30 p-5">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2.5px] bg-gradient-to-l from-gain via-accent/60 to-transparent" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-extrabold text-ink">حسابرسی خودکار معاملات اسپات (کیف پول‌ها)</p>
-          <p className="text-xs text-muted">{fa(t.swaps)} سواپ · {fa(b.open.length)} دارایی فعال</p>
+          <p className="text-xs text-muted">
+            {fa(t.swaps)} تبدیل · {fa(b.open.length)} دارایی فعال
+          </p>
         </div>
-        <Badge tone="gain">لوپ نقد فعال</Badge>
+        <Badge tone="gain">تحلیل خودکار فعال</Badge>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Hero label="ارزش دارایی‌های باز" value={usd(openValueUsd)} sub={`${fa(b.open.length)} دارایی`} tone="neutral" />
-        <Hero label="حجم سواپ‌ها" value={usd(t.volume)} sub={`${fa(t.swaps)} سواپ`} tone="neutral" />
+        <HeroTile label="ارزش دارایی‌های باز" value={usd(openValueUsd)} sub={`${fa(b.open.length)} دارایی`} tone="neutral" />
+        <HeroTile label="حجم تبدیل‌ها" value={usd(t.volume)} sub={`${fa(t.swaps)} تبدیل`} tone="neutral" />
         {decided > 0 ? (
-          <Hero label="نرخ برد فروش‌ها" value={pct(winRate, 0)} sub={`سود محقق ${usd(t.realized, true)}`} tone={(winRate ?? 0) >= 50 ? 'gain' : 'warn'} />
+          <HeroTile label="درصد فروش‌های سودده" value={pct(winRate, 0)} sub={`سود قطعی ${usd(t.realized, true)}`} tone={(winRate ?? 0) >= 50 ? 'gain' : 'warn'} />
         ) : (
-          <Hero label="میانگین هر سواپ" value={usd(avgSwapUsd)} sub={`${fa(t.chains.length || 1)} شبکه`} tone="neutral" />
+          <HeroTile label="میانگین هر تبدیل" value={usd(avgSwapUsd)} sub={`${fa(t.chains.length || 1)} شبکه`} tone="neutral" />
         )}
-        <Hero label="گاز و لغزش" value={usd(t.gas + t.swapCost)} sub={`${pct(feeDragPct, 2)} حجم`} tone={feeDragPct > 1 ? 'loss' : 'gain'} />
+        <HeroTile label="کارمزد و گس" value={usd(t.gas + t.swapCost)} sub={`${pct(feeDragPct, 2)} حجم`} tone={feeDragPct > 1 ? 'loss' : 'gain'} />
       </div>
       <div className="grid gap-2.5 md:grid-cols-3">
-        <div className="rounded-control border border-divider bg-card p-3">
-          <p className="text-xs font-bold text-ink">۱. وضعیت فعلی</p>
+        <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+          <p className="text-xs font-bold text-ink">۱. چه اتفاقی افتاده؟</p>
           <p className="mt-1 text-xs leading-6 text-muted">{step1}</p>
         </div>
-        <div className="rounded-control border border-divider bg-card p-3">
-          <p className="text-xs font-bold text-ink">۲. ارزیابی آماری</p>
+        <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+          <p className="text-xs font-bold text-ink">۲. نتیجه چطور بوده؟</p>
           <p className="mt-1 text-xs leading-6 text-muted">{step2}</p>
         </div>
-        <div className="rounded-control border border-divider bg-card p-3">
-          <p className="text-xs font-bold text-ink">۳. اقدام هفتهٔ بعد</p>
+        <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+          <p className="text-xs font-bold text-ink">۳. پیشنهاد بعدی</p>
           <p className="mt-1 text-xs leading-6 text-muted">{step3}</p>
         </div>
       </div>
       {reviews && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-2.5">
-          <span className="text-[11px] text-subtle">ثبت خودکار قانون لوپ نقد در مرور این هفته</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-divider/70 pt-2.5">
+          <span className="text-xs text-muted">افزودن خودکار این پیشنهاد به مرور این هفته</span>
           {applied ? (
-            <Badge tone="gain">✓ به مرور این هفته اضافه شد</Badge>
+            <Badge tone="gain">✓ اضافه شد</Badge>
           ) : (
             <Button
               size="sm"
@@ -516,29 +730,19 @@ function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; revie
                 const wk = isoWeekKey(Date.now(), tz);
                 const base = reviews.get(wk) ?? emptyReview(wk);
                 if (!base.commitments.some((c) => c.text === step3)) {
-                  const next = [...base.commitments, { id: `spot-loop-${Date.now().toString(36)}`, text: step3, rule: { type: 'requirePlan' as const }, done: false }].slice(0, 3);
+                  const next = [
+                    ...base.commitments,
+                    { id: `spot-loop-${Date.now().toString(36)}`, text: step3, rule: { type: 'requirePlan' as const }, done: false }
+                  ].slice(0, 3);
                   void saveReview({ ...base, commitments: next }).then(() => setApplied(true));
                 } else {
                   setApplied(true);
                 }
               }}
             >
-              افزودن قانون به مرور این هفته
+              افزودن به مرور این هفته
             </Button>
           )}
-        </div>
-      )}
-      {b.open.length > 0 && (
-        <div className="border-t border-divider pt-3 text-xs">
-          <p className="mb-1.5 font-semibold text-ink">دارایی‌های فعال اسپات</p>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {b.open.slice(0, 6).map((a) => (
-              <div key={a.asset} className="flex items-center justify-between rounded-control bg-surface-2/60 px-3 py-2">
-                <span dir="ltr" className="font-bold text-ink">{a.symbol}</span>
-                <span className="num-ltr font-semibold text-muted">{a.value !== null ? usd(a.value) : `${fa(a.qty, 4)}`}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </Surface>
@@ -548,30 +752,37 @@ function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; revie
 function HabitCard({ title, body, cost }: { title: string; body: string; cost?: number | null }) {
   return (
     <Surface className="p-4">
-      <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">{title}</p><ClassBadge c="behaviour" /></div>
-      <p className="mt-1 text-xs leading-6 text-muted">{body}</p>
-      {cost ? <p className="mt-1 text-xs font-semibold text-negative">هزینه ≈ {usd(-cost)}</p> : null}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold text-ink">{title}</p>
+        <ClassBadge c="behaviour" />
+      </div>
+      <p className="mt-1.5 text-xs leading-6 text-muted">{body}</p>
+      {cost ? <p className="mt-1.5 text-xs font-bold text-negative">ضرر این عادت ≈ {usd(-cost)}</p> : null}
     </Surface>
   );
 }
 
-const VERDICT_LABEL = { keep: 'نگه دار', fix: 'اصلاح', delete: 'حذف', thin: 'نمونه کم' } as const;
+const VERDICT_LABEL = { keep: 'خوب است', fix: 'نیاز به اصلاح', delete: 'تکرار نکن', thin: 'داده کم' } as const;
 function BucketTable({ title, rows, empty }: { title: string; rows: BookAudit['behavior']['byHour']; empty?: string }) {
   return (
     <div className="mt-3">
-      <p className="text-xs font-semibold text-ink">{title}</p>
+      <p className="text-xs font-bold text-ink">{title}</p>
       {!rows.length ? (
         <p className="text-xs text-subtle">{empty ?? '—'}</p>
       ) : (
-        <div className="mt-1 divide-y divide-divider rounded-control border border-divider">
+        <div className="mt-1.5 divide-y divide-divider/70 rounded-xl border border-divider">
           {rows.map((r) => (
-            <div key={r.key} className="flex flex-wrap items-center gap-x-3 px-3 py-1.5 text-xs">
-              <span className="min-w-20 text-ink">{r.label}</span>
+            <div key={r.key} className="flex flex-wrap items-center gap-x-3 px-3 py-2 text-xs">
+              <span className="min-w-20 font-medium text-ink">{r.label}</span>
               <span className="text-muted">{fa(r.n)} معامله</span>
               <span className="text-muted">برد {pct(r.winRate, 0)}</span>
-              <span className={cn('num-ltr', pnlTone(r.expectancy))}>هر معامله {usd(r.expectancy, true)}</span>
-              <span className={cn('num-ltr ms-auto font-semibold', pnlTone(r.net))}><AmountText text={usd(r.net, true)} /></span>
-              <Badge tone={r.verdict === 'keep' ? 'gain' : r.verdict === 'delete' ? 'loss' : r.verdict === 'fix' ? 'warn' : 'neutral'}>{VERDICT_LABEL[r.verdict]}</Badge>
+              <span className={cn('num-ltr', pnlTone(r.expectancy))}>میانگین {usd(r.expectancy, true)}</span>
+              <span className={cn('num-ltr ms-auto font-semibold', pnlTone(r.net))}>
+                <AmountText text={usd(r.net, true)} />
+              </span>
+              <Badge tone={r.verdict === 'keep' ? 'gain' : r.verdict === 'delete' ? 'loss' : r.verdict === 'fix' ? 'warn' : 'neutral'}>
+                {VERDICT_LABEL[r.verdict]}
+              </Badge>
             </div>
           ))}
         </div>
@@ -579,4 +790,3 @@ function BucketTable({ title, rows, empty }: { title: string; rows: BookAudit['b
     </div>
   );
 }
-
