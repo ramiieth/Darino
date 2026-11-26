@@ -1,29 +1,104 @@
 /** اجزای کوچک مشترک صفحهٔ عملکرد و مقایسه سرمایه */
 import type { ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import { Badge } from '@/shared/components/ui/Badge';
 import { cn } from '@/shared/lib/cn';
 import { fmtCompactFa, fmtRelativeAge, toFaDigits } from '@/shared/utils/formatters';
 import { formatGregorianIso, formatJalali } from '@/shared/utils/jalali';
 
-/** درصد از کسر (0.12 → +۱۲٪) */
-export function Pct({ v, digits, tone = 'auto', className }: { v: number | null | undefined; digits?: number; tone?: 'auto' | 'none'; className?: string }) {
-  return <PercentValue value={v === null || v === undefined ? null : v * 100} digits={digits} tone={tone} className={className} />;
-}
-
-export function Usd({ v, signed, compact, tone, className }: { v: number | null | undefined; signed?: boolean; compact?: boolean; tone?: 'auto' | 'none'; className?: string }) {
-  return <MoneyValue value={v} signed={signed} compact={compact} tone={tone ?? (signed ? 'auto' : 'none')} digits={compact ? undefined : 0} className={className} />;
-}
-
-/** مبلغ تومانی فشرده: «۵٫۴ میلیارد تومان» */
-export function Toman({ v, signed, className }: { v: number | null | undefined; signed?: boolean; className?: string }) {
-  if (v === null || v === undefined || !Number.isFinite(v)) return <span className={cn('text-subtle', className)}>—</span>;
-  const tone = signed ? (v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '') : '';
+/**
+ * درصد از کسر (0.12 → +۱۲.۰۰٪ · -0.0355 → -۳.۵۵٪)
+ * در جهت راست‌به‌چپ فارسی، علامت + / - دقیقاً پیش از عدد (سمت راست) و ٪ پس از عدد (سمت چپ) قرار می‌گیرد.
+ */
+export function Pct({
+  v,
+  digits = 2,
+  tone = 'auto',
+  className
+}: {
+  v: number | null | undefined;
+  digits?: number;
+  tone?: 'auto' | 'none';
+  className?: string;
+}) {
+  if (v === null || v === undefined || !Number.isFinite(v)) {
+    return <span className={cn('num-ltr text-subtle', className)}>—</span>;
+  }
+  const pct = v * 100;
+  const abs = Math.abs(pct);
+  const sign = pct > 0 ? '+' : pct < 0 ? '-' : '';
+  const toneCls = tone === 'none' ? '' : pct > 0 ? 'text-positive' : pct < 0 ? 'text-negative' : '';
+  const formatted = toFaDigits(
+    abs.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  );
   return (
-    <span className={cn(tone, className)}>
-      {signed && v > 0 ? '+' : ''}
-      {fmtCompactFa(v)} تومان
+    <span dir="rtl" className={cn('inline-flex items-baseline whitespace-nowrap', toneCls, className)}>
+      {sign && <span>{sign}</span>}
+      <bdi dir="ltr" className="num-ltr">{formatted}</bdi>
+      <span>٪</span>
+    </span>
+  );
+}
+
+/**
+ * مبلغ دلاری با علامت پیش از عدد در جهت فارسی:
+ *  -۱,۱۰۴ دلار / +۱,۱۰۴ دلار / -۱.۶ هزار دلار
+ */
+export function Usd({
+  v,
+  signed,
+  compact,
+  tone,
+  className
+}: {
+  v: number | null | undefined;
+  signed?: boolean;
+  compact?: boolean;
+  tone?: 'auto' | 'none';
+  className?: string;
+}) {
+  if (v === null || v === undefined || !Number.isFinite(v)) {
+    return <span className={cn('num-ltr text-subtle', className)}>—</span>;
+  }
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : signed && v > 0 ? '+' : '';
+  const effectiveTone = tone ?? (signed ? 'auto' : 'none');
+  const toneCls = effectiveTone === 'none' ? '' : v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '';
+  const body = compact ? fmtCompactFa(abs) : toFaDigits(Math.round(abs).toLocaleString('en-US'));
+  const [number, ...scale] = body.split(' ');
+  return (
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', toneCls, className)}>
+      <span className="inline-flex items-baseline">
+        {sign && <span>{sign}</span>}
+        <bdi dir="ltr" className="num-ltr">{number}</bdi>
+      </span>
+      {scale.length > 0 && <span className="text-[0.82em] font-medium">{scale.join(' ')}</span>}
+      <span className="text-[0.65em] font-medium opacity-70">دلار</span>
+    </span>
+  );
+}
+
+/**
+ * مبلغ تومانی فشرده با علامت پیش از عدد در جهت فارسی:
+ *  -۴۱۸ میلیون تومان / +۵.۴ میلیارد تومان
+ */
+export function Toman({ v, signed, className }: { v: number | null | undefined; signed?: boolean; className?: string }) {
+  if (v === null || v === undefined || !Number.isFinite(v)) {
+    return <span className={cn('text-subtle', className)}>—</span>;
+  }
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : signed && v > 0 ? '+' : '';
+  const toneCls = signed ? (v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '') : '';
+  const body = fmtCompactFa(abs);
+  const [number, ...scale] = body.split(' ');
+  return (
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', toneCls, className)}>
+      <span className="inline-flex items-baseline">
+        {sign && <span>{sign}</span>}
+        <bdi dir="ltr" className="num-ltr">{number}</bdi>
+      </span>
+      {scale.length > 0 && <span>{scale.join(' ')}</span>}
+      <span>تومان</span>
     </span>
   );
 }
