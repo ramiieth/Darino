@@ -254,7 +254,7 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
               )}
             </div>
             <p className="mt-1 text-xs text-muted">
-              <span className="font-semibold text-gain-text">Long</span> {venueName(o.long.venue)} ·{' '}
+              <span className="font-semibold text-positive">Long</span> {venueName(o.long.venue)} ·{' '}
               <span className="font-semibold text-negative">Short</span> {venueName(o.short.venue)}
             </p>
           </div>
@@ -320,7 +320,7 @@ function ScannerCard({ o, notional, farm, watched }: { o: Opportunity; notional:
                 per100k === null ? (
                   '—'
                 ) : per100k <= 0 ? (
-                  <span className="font-semibold text-gain-text">سودده</span>
+                  <span className="font-semibold text-positive">سودده</span>
                 ) : (
                   <MoneyValue value={-per100k} tone="loss" digits={2} />
                 )

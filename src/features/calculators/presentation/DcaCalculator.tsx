@@ -44,7 +44,6 @@ import {
 } from '@/features/calculators/domain';
 import { assetsOfClass, type CalculatorAsset } from '@/features/calculators/data/catalogs';
 import { WalletAverageDownPanel } from './WalletAverageDownPanel';
-import { PortfolioBasketDcaCommitteePanel } from './PortfolioBasketDcaCommitteePanel';
 import { fmtUSD, fmtPct, toFaDigits } from '@/shared/utils/formatters';
 import { cn } from '@/shared/lib/cn';
 
@@ -442,11 +441,6 @@ export function DcaCalculator() {
 
   return (
     <div className="space-y-5">
-      <Disclosure summary="باز کردن شبیه‌ساز چنددارایی سبد (۱۷,۶۸۱ USDC + ۵,۰۰۰ USDT)، پله‌های DCA و کمیته ایجنت‌ها">
-        <div className="pt-2">
-          <PortfolioBasketDcaCommitteePanel />
-        </div>
-      </Disclosure>
       <WalletAverageDownPanel onSelectHoldingForParent={handleSyncFromWalletPanel} />
       <CalcShell inputs={inputs}>
         {!asset || !result ? (

@@ -57,11 +57,23 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted" aria-live="polite">
-        <span>{toFaDigits(totalRows)} {t('rowsCount')}</span>
-        <StatusDot tone="gain" label={`${t('live')} ${toFaDigits(liveCount)}`} className="font-normal" />
-        <StatusDot tone="warn" label={`${t('snapshot')} ${toFaDigits(snapshotCount)}`} className="font-normal" />
-        <StatusDot tone="neutral" label={`N/A ${toFaDigits(naCount)}`} className="font-normal" />
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-live="polite">
+        <span className="rounded-full border border-divider bg-surface-2/60 px-2.5 py-0.5 font-semibold text-ink">
+          {toFaDigits(rows.length)} از {toFaDigits(totalRows)} {t('rowsCount')}
+        </span>
+        <span className="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-0.5">
+          <StatusDot tone="gain" label={`${t('live')} ${toFaDigits(liveCount)}`} className="font-normal" />
+        </span>
+        {snapshotCount > 0 && (
+          <span className="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-0.5">
+            <StatusDot tone="warn" label={`${t('snapshot')} ${toFaDigits(snapshotCount)}`} className="font-normal" />
+          </span>
+        )}
+        {naCount > 0 && (
+          <span className="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-0.5">
+            <StatusDot tone="neutral" label={`بدون داده ${toFaDigits(naCount)}`} className="font-normal" />
+          </span>
+        )}
       </div>
 
       {rows.length === 0 ? (
@@ -114,6 +126,7 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                   )}
                   {g.rows.map((row) => {
                     const na = row.currentPrice === null || row.buyPrice === null;
+                    const isGain = (row.changePct ?? 0) >= 0;
                     return (
                       <tr key={row.key} onClick={() => onSelectRow(row)} className={cn('group cursor-pointer', na && 'text-muted')}>
                         <td className="sticky start-0 z-10 bg-card !ps-5 group-hover:bg-surface-2">
@@ -123,14 +136,16 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                               e.stopPropagation();
                               onSelectRow(row);
                             }}
-                            className="flex min-w-[10rem] items-center gap-3 text-start"
+                            className="flex min-w-[10.5rem] items-center gap-3 text-start"
                           >
                             <AssetLogo symbol={row.symbol} kind={row.kind} size={32} />
                             <span className="min-w-0">
-                              <span className="block max-w-[11rem] truncate font-semibold text-ink">{row.nameFa}</span>
-                              <span className="block text-2xs font-semibold text-muted">
-
-                                {row.source === 'snapshot' && <span className="text-warn"> · {t('snapshot')}</span>}
+                              <span className="block max-w-[11.5rem] truncate font-semibold text-ink">{row.nameFa}</span>
+                              <span className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
+                                <bdi dir="ltr" className="font-mono uppercase">{row.symbol}</bdi>
+                                {row.source === 'snapshot' && (
+                                  <span className="rounded bg-warn/12 px-1 py-0.2 text-warn">{t('snapshot')}</span>
+                                )}
                               </span>
                             </span>
                           </button>
@@ -139,8 +154,19 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                         <td className="col-num font-semibold text-ink"><Price row={row} v={row.currentPrice} /></td>
                         <td className="col-num font-semibold text-ink"><MoneyValue value={row.valueUsd} /></td>
                         <td className="col-num">
-                          <MoneyValue value={row.profitLoss} signed tone="auto" />
-                          <span className="block text-2xs"><PercentValue value={row.changePct} /></span>
+                          <MoneyValue value={row.profitLoss} signed tone="auto" className="font-semibold" />
+                          {row.changePct !== null && (
+                            <span className="mt-0.5 block">
+                              <span
+                                className={cn(
+                                  'inline-flex rounded-full px-1.5 py-0.5 text-2xs font-bold',
+                                  isGain ? 'bg-gain/10 text-positive' : 'bg-negative/10 text-negative'
+                                )}
+                              >
+                                <PercentValue value={row.changePct} />
+                              </span>
+                            </span>
+                          )}
                         </td>
                         <td className="col-num !pe-5"><MoneyValue value={row.vsEth} signed tone="auto" /></td>
                       </tr>
@@ -167,9 +193,12 @@ export function SimulationTable({ result, visibleRows, groups, sort, dir, onSort
                       <button type="button" onClick={() => onSelectRow(row)} className="flex w-full items-center gap-3 py-3 text-start">
                         <AssetLogo symbol={row.symbol} kind={row.kind} size={36} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-ink">{row.nameFa}</span>
+                          <span className="flex items-baseline gap-1.5">
+                            <span className="truncate text-sm font-semibold text-ink">{row.nameFa}</span>
+                            <bdi dir="ltr" className="font-mono text-2xs uppercase text-subtle">{row.symbol}</bdi>
+                          </span>
                           <span className="block text-2xs text-muted">
-                             · {t('colCurrentPrice')} <Price row={row} v={row.currentPrice} />
+                            {t('colCurrentPrice')}: <Price row={row} v={row.currentPrice} />
                           </span>
                         </span>
                         <span className="shrink-0 text-end">

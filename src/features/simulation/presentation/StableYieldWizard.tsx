@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check as CheckIcon, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react';
 import { Field, Input } from '@/shared/components/ui/Input';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -163,45 +163,92 @@ export function StableYieldWizard() {
 
   return (
     <div ref={topRef} className="mx-auto w-full max-w-3xl scroll-mt-4 space-y-5">
-      <Surface className="p-3.5 md:p-4">
-        <p className="mb-1 text-xs leading-6 text-muted">
-          تتر و یو اس دی سی بی‌کار هیچ سودی نمی‌دهند. «دلار بازده‌دار» توکن یا سپرده‌ای دلاری است که سود می‌گیرد: از اوراق خزانهٔ آمریکا، وام دادن یا فاندینگ.
-          این ابزار در چهار قدم نشان می‌دهد اگر پولتان را در هر بازار گذاشته بودید، با نرخ‌هایی که واقعاً پرداخت شد، چقدر سود کرده بودید.
-        </p>
-        <p className="mb-2.5 text-2xs text-subtle">نرخ روزانهٔ هر بازار از DeFiLlama خوانده می‌شود. همهٔ اعداد در خود اپ حساب می‌شوند و هیچ تراکنشی انجام نمی‌شود.</p>
-        <ol className="grid grid-cols-4 gap-1.5" aria-label="قدم‌ها">
-          {STEPS.map((t, i) => {
-            const here = i === s.step;
-            return (
-              <li key={t}>
-                <button type="button" onClick={() => (i <= s.step || (amountOk && allowed.length) ? set('step', i) : undefined)} aria-current={here ? 'step' : undefined} className="flex w-full flex-col items-center gap-1.5">
-                  <span className={cn('h-1.5 w-full rounded-full', here ? 'bg-accent' : i < s.step ? 'bg-accent/50' : 'bg-surface-2')} />
-                  <span className={cn('max-w-full truncate text-2xs font-semibold', here ? 'text-accent' : i < s.step ? 'text-ink' : 'text-subtle')}>
-                    {toFaDigits(i + 1)}
-                    <span className={cn(!here && 'hidden sm:inline')}>. {t}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+      <Surface variant="focal" className="overflow-hidden">
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-gain/65 to-transparent" aria-hidden />
+        <div className="space-y-3.5 p-4 md:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs leading-6 text-muted">
+              ببینید اگر به‌جای نگه داشتن تتر یا یو اس دی سی بی‌کار، آن را در بازارهای دلار بازده‌دار گذاشته بودید، با نرخ‌های واقعی چقدر سود می‌کردید.
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 text-2xs font-semibold text-subtle">
+              <span className="inline-flex items-center gap-1 rounded-full border border-divider bg-surface-2/70 px-2.5 py-0.5">
+                <Sparkles aria-hidden className="h-3 w-3 text-accent" />
+                نرخ روزانهٔ واقعی DeFiLlama
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-divider bg-surface-2/70 px-2.5 py-0.5">
+                <ShieldCheck aria-hidden className="h-3 w-3 text-positive" />
+                فقط شبیه‌سازی (بدون تراکنش)
+              </span>
+            </div>
+          </div>
+          <ol className="grid grid-cols-4 gap-2" aria-label="قدم‌ها">
+            {STEPS.map((t, i) => {
+              const here = i === s.step;
+              const done = i < s.step;
+              return (
+                <li key={t}>
+                  <button
+                    type="button"
+                    onClick={() => (i <= s.step || (amountOk && allowed.length) ? set('step', i) : undefined)}
+                    aria-current={here ? 'step' : undefined}
+                    className="flex w-full flex-col items-center gap-1.5"
+                  >
+                    <span className={cn('h-1.5 w-full rounded-full transition-colors', here ? 'bg-accent' : done ? 'bg-gain/70' : 'bg-surface-2')} />
+                    <span className={cn('inline-flex max-w-full items-center gap-1 truncate text-2xs font-semibold', here ? 'text-accent' : done ? 'text-ink' : 'text-subtle')}>
+                      {done ? <CheckIcon aria-hidden className="h-3 w-3 shrink-0 text-positive" /> : <span>{toFaDigits(i + 1)}.</span>}
+                      <span className={cn(!here && 'hidden sm:inline')}>{t}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       </Surface>
 
       {s.step === 0 && (
         <StepCard n={1} title="چه دلاری دارید و چقدر؟" sub="مبلغی که الان به‌صورت تتر یا یو اس دی سی نگه داشته‌اید و می‌خواهید ببینید چقدر می‌توانست سود بدهد.">
           <Chips<Coin> label="دلار شما" value={s.coin} onChange={(v) => set('coin', v)} options={[{ value: 'USDT', label: 'تتر (USDT)' }, { value: 'USDC', label: 'یو اس دی سی (USDC)' }]} />
-          <Field
-            label="مبلغ"
-            hint={heldOfCoin > 0 ? <>موجودی {COIN_FA[s.coin]} کیف پول‌های شما: <MoneyValue value={heldOfCoin} />. خالی بگذارید تا همین حساب شود.</> : 'خالی بگذارید تا با ۱۰,۰۰۰ دلار نمونه حساب شود. اگر کیف پولتان را در «دارایی من» وصل کرده باشید، موجودی خودکار پیشنهاد می‌شود.'}
-            error={s.amount.trim() !== '' && !amountOk ? 'یک عدد بزرگ‌تر از صفر وارد کنید.' : null}
-          >
-            <Input dir="ltr" inputMode="decimal" value={s.amount} placeholder={heldOfCoin > 0 ? String(Math.round(heldOfCoin)) : '10000'} onChange={(e) => set('amount', e.target.value)} suffix="دلار" />
-          </Field>
-          {heldOfCoin > 0 && s.amount.trim() !== '' && (
-            <button type="button" className="text-xs font-semibold text-accent underline" onClick={() => set('amount', '')}>
-              همان موجودی کیف پول
-            </button>
-          )}
+          <div className="space-y-2">
+            <Field
+              label="مبلغ"
+              hint={heldOfCoin > 0 ? <>موجودی {COIN_FA[s.coin]} کیف پول‌های شما: <MoneyValue value={heldOfCoin} />. خالی بگذارید تا همین حساب شود.</> : 'خالی بگذارید تا با ۱۰,۰۰۰ دلار نمونه حساب شود. اگر کیف پولتان را در «دارایی من» وصل کرده باشید، موجودی خودکار پیشنهاد می‌شود.'}
+              error={s.amount.trim() !== '' && !amountOk ? 'یک عدد بزرگ‌تر از صفر وارد کنید.' : null}
+            >
+              <Input dir="ltr" inputMode="decimal" value={s.amount} placeholder={heldOfCoin > 0 ? String(Math.round(heldOfCoin)) : '10000'} onChange={(e) => set('amount', e.target.value)} suffix="دلار" />
+            </Field>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[1000, 5000, 10000, 50000].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => set('amount', String(amt))}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
+                    amount === amt && s.amount.trim() !== ''
+                      ? 'border-accent bg-accent text-on-accent'
+                      : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
+                  )}
+                >
+                  <bdi dir="ltr" className="num-ltr">{toFaDigits(amt.toLocaleString('en-US'))}</bdi> دلار
+                </button>
+              ))}
+              {heldOfCoin > 0 && (
+                <button
+                  type="button"
+                  onClick={() => set('amount', '')}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
+                    s.amount.trim() === ''
+                      ? 'border-gain bg-gain/15 text-positive'
+                      : 'border-divider bg-surface-2/70 text-accent hover:border-accent'
+                  )}
+                >
+                  موجودی کیف پول (<MoneyValue value={heldOfCoin} compact />)
+                </button>
+              )}
+            </div>
+          </div>
           <Chips<Period> label="از چه زمانی؟" value={s.period} onChange={(v) => set('period', v)} options={(Object.keys(PERIOD_FA) as Period[]).map((p) => ({ value: p, label: `${PERIOD_FA[p]} پیش` }))} />
         </StepCard>
       )}
@@ -238,15 +285,35 @@ export function StableYieldWizard() {
           ) : (
             <>
               {best && amount && (
-                <div className="rounded-card border border-accent/40 bg-accent-soft/40 p-4">
-                  <p className="text-xs text-muted">بیشترین سود در این بازه</p>
-                  <p className="mt-1 text-2xl font-extrabold text-positive md:text-3xl">
-                    <MoneyValue value={profitOf(best)} signed />
-                  </p>
-                  <p className="mt-1 text-xs leading-6 text-muted">
-                    با {nameOf(best.m)} <bdi dir="ltr" className="font-latin">{best.m.symbol}</bdi> روی {best.m.chain}: <MoneyValue value={amount} /> می‌شد <MoneyValue value={amount * best.sim!.growth} />.
-                    همین پول به‌صورت {COIN_FA[s.coin]} بی‌کار هنوز <MoneyValue value={amount} /> است.
-                  </p>
+                <div className="overflow-hidden rounded-card border border-gain/30 bg-gain/[0.04]">
+                  <div className="h-[3px] w-full bg-gradient-to-l from-gain via-accent/60 to-transparent" aria-hidden />
+                  <div className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold text-muted">بیشترین سود در این بازه</p>
+                        <p className="mt-0.5 text-2xl font-extrabold text-positive md:text-3xl">
+                          <MoneyValue value={profitOf(best)} signed />
+                        </p>
+                      </div>
+                      <Badge tone="gain">
+                        {nameOf(best.m)} · <bdi dir="ltr" className="font-mono">{best.m.symbol}</bdi> ({best.m.chain})
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 rounded-xl border border-divider/70 bg-card/85 p-2.5 text-xs">
+                      <div>
+                        <span className="block text-2xs text-muted">ارزش نهایی</span>
+                        <strong className="mt-0.5 block font-extrabold text-ink"><MoneyValue value={amount * best.sim!.growth} /></strong>
+                      </div>
+                      <div>
+                        <span className="block text-2xs text-muted">{COIN_FA[s.coin]} بی‌کار</span>
+                        <strong className="mt-0.5 block font-semibold text-muted"><MoneyValue value={amount} /></strong>
+                      </div>
+                      <div>
+                        <span className="block text-2xs text-muted">میانگین سالانه</span>
+                        <strong className="mt-0.5 block font-extrabold text-positive"><PercentValue value={best.sim!.avgApy} signed={false} /></strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
               {loadingCharts && <p className="text-2xs text-subtle">بقیهٔ بازارها در حال دریافت‌اند…</p>}
@@ -380,7 +447,7 @@ function MarketRow({ r, rank, amount, active, onPick }: { r: Row; rank: number; 
       aria-pressed={active}
       className={cn('flex w-full items-center gap-3 rounded-card border p-3 text-start transition-colors', active ? 'border-accent bg-accent-soft' : 'border-divider bg-card hover:border-divider-strong')}
     >
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold text-ink">{toFaDigits(rank)}</span>
+      <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold', rank === 1 ? 'bg-gain/15 text-positive ring-1 ring-gain/30' : 'bg-surface-2 text-ink')}>{toFaDigits(rank)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-bold text-ink">{nameOf(m)}</span>
@@ -452,8 +519,8 @@ function Forward({ r, amount, coin }: { r: Row; amount: number; coin: Coin }) {
     <div className="space-y-4">
       <div className="grid gap-2.5 sm:grid-cols-3">
         {[30, 90, 365].map((d) => (
-          <div key={d} className="rounded-card border border-divider p-3">
-            <p className="text-2xs text-muted">برآورد {d === 365 ? '۱ سال' : `${toFaDigits(d / 30)} ماه`} آینده</p>
+          <div key={d} className="rounded-card border border-gain/20 bg-gain/[0.03] p-3.5">
+            <p className="text-2xs font-semibold text-muted">برآورد {d === 365 ? '۱ سال' : `${toFaDigits(d / 30)} ماه`} آینده</p>
             <p className="mt-1 text-lg font-extrabold text-positive"><MoneyValue value={est(d)} signed /></p>
           </div>
         ))}

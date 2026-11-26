@@ -3,12 +3,12 @@ import { CostSummaryPanel } from '@/features/cost-basis/presentation/CostSummary
 import { NetworkPicker } from './NetworkPicker';
 import { AssetValue } from './AssetValue';
 import { WalletBalanceChart } from './WalletBalanceChart';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Decimal from 'decimal.js';
 import { Link, useSearchParams } from 'react-router-dom';
 import { TransferReview } from './TransferReview';
 import { zerionRetryAt, refreshTransactions } from '../data/store';
-import { RefreshCw, Wallet, Sparkles, ArrowLeft, Layers, Activity as ActivityIcon, Coins, ChevronDown } from 'lucide-react';
+import { RefreshCw, Wallet, Sparkles, ArrowLeft, Layers, Activity as ActivityIcon, Coins, ChevronDown, TrendingUp } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { Notice } from '@/shared/components/ui/StateViews';
@@ -17,6 +17,7 @@ import { PositionsList } from './PositionsList';
 import { ActivityExplorer } from './ActivityExplorer';
 import { ActivityList } from './ActivityList';
 import { ProtocolBadge } from './ProtocolBadge';
+import { tokenName } from './identity';
 import { visiblePositions, visibleTransaction } from '../domain/visibility';
 import { useActivity } from '../data/useActivity';
 import type { ConnectedPortfolio } from '../data/useConnectedPortfolio';
@@ -24,6 +25,8 @@ import type { LivePosition } from '../domain/model';
 import { usePlatformPerpVenues } from '@/features/perps/data/usePerpVenues';
 import { perpInNetWorth } from '@/features/perps/domain/perpPortfolio';
 import { toFaDigits } from '@/shared/utils/formatters';
+
+const ALLOC_COLORS = ['bg-accent', 'bg-gain', 'bg-chart-3', 'bg-gold', 'bg-chart-4', 'bg-divider-strong'] as const;
 
 export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfolio }) {
   const [syncOpen, setSyncOpen] = useState(false);
@@ -127,32 +130,63 @@ export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfol
     platformGroups.set(id, [...(platformGroups.get(id) ?? []), position]);
   }
 
+  // نوار تخصیص ۵ دارایی برتر پرتفولیو (مثل Zerion / DeBank)
+  const allocation = useMemo(() => {
+    const bySymbol = new Map<string, { label: string; value: number }>();
+    let sum = 0;
+    for (const pos of positions) {
+      if (pos.value === null || pos.value <= 0) continue;
+      const key = (pos.symbol || pos.name || pos.id).toUpperCase();
+      const prev = bySymbol.get(key);
+      bySymbol.set(key, { label: tokenName(pos.symbol, pos.name), value: (prev?.value ?? 0) + pos.value });
+      sum += pos.value;
+    }
+    if (sum <= 0) return [];
+    const sorted = [...bySymbol.values()].sort((a, b) => b.value - a.value);
+    const top5 = sorted.slice(0, 5);
+    const rest = sorted.slice(5).reduce((acc, x) => acc + x.value, 0);
+    const items = rest > 0 ? [...top5, { label: 'سایر', value: rest }] : top5;
+    return items.map((item, idx) => ({
+      ...item,
+      pct: (item.value / sum) * 100,
+      color: ALLOC_COLORS[idx % ALLOC_COLORS.length]
+    }));
+  }, [positions]);
+
+  const walletSharePct = total && total > 0 && walletValue !== null ? Math.min(100, Math.max(0, (walletValue / total) * 100)) : null;
+  const perpSharePct = total && total > 0 && perpValue !== null ? Math.min(100, Math.max(0, (perpValue / total) * 100)) : null;
+
   return (
     <>
       <Surface
         variant="focal"
         className="native-portfolio-hero relative overflow-hidden p-5 md:p-7"
       >
-        {/* نوار گرادینت ظریف و هاله نوری نرم در لبه بالایی — الهام‌گرفته از زریون */}
+        {/* نوار گرادینت پرمیوم و هاله‌های نوری ملایم */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l from-accent via-accent/60 to-gain/70"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l from-accent via-chart-3 to-gain"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -end-16 -top-16 h-48 w-48 rounded-full bg-accent/[0.06] blur-3xl"
+          className="pointer-events-none absolute -end-20 -top-20 h-56 w-56 rounded-full bg-accent/[0.08] blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 start-10 h-44 w-44 rounded-full bg-gain/[0.07] blur-3xl"
         />
 
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 max-w-full items-center gap-3.5 md:gap-5">
-            <span className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/15 to-accent/5 text-accent shadow-sm sm:flex md:h-16 md:w-16">
+            <span className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/18 via-accent/8 to-gain/10 text-accent shadow-sm sm:flex md:h-16 md:w-16">
               <Layers className="h-7 w-7 md:h-8 md:w-8" aria-hidden />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs font-semibold text-muted md:text-sm">ارزش دارایی‌های متصل</p>
                 {p.wallets.length > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-surface-2/80 px-2 py-0.5 text-[11px] font-medium text-muted">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-surface-2/90 px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+                    <span className="h-1.5 w-1.5 rounded-full bg-positive" aria-hidden />
                     {toFaDigits(p.wallets.length)} کیف پول
                   </span>
                 )}
@@ -174,37 +208,77 @@ export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfol
             icon={<RefreshCw className="h-3.5 w-3.5" />}
             loading={p.loading}
             onClick={() => void p.refresh()}
-            className="bg-card/80 backdrop-blur-sm"
+            className="bg-card/85 backdrop-blur-sm"
           >
             به‌روزرسانی
           </Button>
         </div>
 
+        {/* نوار تخصیص رنگی ۵ دارایی بزرگ پرتفولیو */}
+        {allocation.length > 1 && (
+          <div className="relative mt-5 space-y-2">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-2/90" dir="ltr">
+              {allocation.map((seg) => (
+                <div
+                  key={seg.label}
+                  className={`${seg.color} h-full transition-all duration-300 first:rounded-s-full last:rounded-e-full`}
+                  style={{ width: `${Math.max(seg.pct, 1.5)}%` }}
+                  title={`${seg.label}: ${toFaDigits(seg.pct.toFixed(1))}٪`}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11px] text-muted">
+              {allocation.map((seg) => (
+                <span key={seg.label} className="inline-flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${seg.color}`} aria-hidden />
+                  <span className="font-semibold text-ink">{seg.label}</span>
+                  <span className="tabular-nums">{toFaDigits(seg.pct.toFixed(1))}٪</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-divider/80 pt-4">
           <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            <span className="inline-flex flex-wrap items-baseline gap-2 rounded-xl border border-divider/80 bg-surface-2/60 px-3 py-1.5 text-muted">
+            <span className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-divider/80 bg-surface-2/65 px-3 py-2 text-muted">
+              <Wallet className="h-3.5 w-3.5 text-accent" aria-hidden />
               <span>کیف پول‌ها</span>
-              <MoneyValue value={walletValue} className="font-bold text-ink" />
+              <MoneyValue value={walletValue} className="font-extrabold text-ink" />
+              {walletSharePct !== null && (
+                <span className="rounded-full bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted tabular-nums">
+                  {toFaDigits(Math.round(walletSharePct))}٪
+                </span>
+              )}
             </span>
             {perpCount > 0 && (
               <span
-                className="inline-flex flex-wrap items-baseline gap-2 rounded-xl border border-divider/80 bg-surface-2/60 px-3 py-1.5 text-muted"
+                className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-divider/80 bg-surface-2/65 px-3 py-2 text-muted"
                 title={[...realArcus.map((a) => a.holding.label), ...perp.accounts.map((a) => a.label)].join('، ')}
               >
+                <TrendingUp className="h-3.5 w-3.5 text-positive" aria-hidden />
                 <span>حساب‌های پرپچوال ({toFaDigits(perpCount)})</span>
-                <MoneyValue value={perpValue} className="font-bold text-ink" />
+                <MoneyValue value={perpValue} className="font-extrabold text-ink" />
+                {perpSharePct !== null && (
+                  <span className="rounded-full bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted tabular-nums">
+                    {toFaDigits(Math.round(perpSharePct))}٪
+                  </span>
+                )}
                 {perpPartial && <span className="rounded-full bg-warn/10 px-1.5 py-0.5 text-[10px] font-semibold text-warn">ناقص</span>}
               </span>
             )}
           </div>
           <nav aria-label="دسترسی‌های پرتفولیو" className="flex flex-wrap gap-2">
-            <Link to="/wallets" className={`${buttonClass('outline', 'sm')} bg-card/80 transition-colors hover:border-accent/40`}>
+            <Link to="/wallets" className={`${buttonClass('outline', 'sm')} bg-card/85 transition-colors hover:border-accent/40`}>
               <Wallet className="h-3.5 w-3.5" />
               مدیریت کیف پول‌ها
             </Link>
-            <Link to="/assistant" className={`${buttonClass('outline', 'sm')} bg-card/80 transition-colors hover:border-accent/40`}>
-              <Sparkles className="h-3.5 w-3.5 text-accent" />
-              دستیار
+            <Link
+              to="/assistant"
+              className={`${buttonClass('outline', 'sm')} border-accent/30 bg-accent/10 text-accent transition-colors hover:bg-accent/15`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              دستیار هوشمند
             </Link>
           </nav>
         </div>
@@ -249,7 +323,7 @@ export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfol
 
       <section aria-label="پرتفولیو" id="portfolio-assets" className="min-w-0 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-divider pb-3">
-          <div role="tablist" aria-label="نمای پرتفولیو" className="flex items-center gap-1.5 rounded-xl bg-surface-2/70 p-1">
+          <div role="tablist" aria-label="نمای پرتفولیو" className="flex items-center gap-1.5 rounded-xl bg-surface-2/75 p-1">
             {(
               [
                 ['assets', 'دارایی‌ها', Coins, snapshot.positions.length],
@@ -341,7 +415,7 @@ export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfol
                 ) : platformGroups.size ? (
                   [...platformGroups].map(([id, rows]) => (
                     <section key={id} className="mb-5 last:mb-0">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2/55 px-3 py-2.5">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2/60 px-3 py-2.5">
                         <h3 className="text-sm font-semibold">
                           {id === 'wallet' ? (
                             'کیف پول'
@@ -372,7 +446,7 @@ export function PortfolioSummary({ portfolio: p }: { portfolio: ConnectedPortfol
               <Surface as="aside" aria-labelledby="portfolio-recent-title" className="portfolio-recent min-w-0 p-4 md:p-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h2 id="portfolio-recent-title" className="flex items-center gap-2 text-base font-bold">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-surface-2 text-muted">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
                       <ActivityIcon className="h-4 w-4" aria-hidden />
                     </span>
                     فعالیت‌های اخیر

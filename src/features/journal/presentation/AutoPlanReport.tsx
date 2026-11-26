@@ -116,7 +116,7 @@ export function AutoPlanReport({
 
 function Hero({ rep, maxRiskPct, accountSize }: { rep: AutoReport; maxRiskPct: number; accountSize: number | null }) {
   const discipline = rep.readable ? (rep.withStop / rep.readable) * 100 : null;
-  const tone = discipline === null ? 'text-muted' : discipline >= 90 ? 'text-gain-text' : discipline >= 60 ? 'text-warn' : 'text-negative';
+  const tone = discipline === null ? 'text-muted' : discipline >= 90 ? 'text-positive' : discipline >= 60 ? 'text-warn' : 'text-negative';
   return (
     <Surface variant="focal" className="relative overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l from-gain/80 via-accent/60 to-transparent" />
@@ -216,7 +216,7 @@ function Insights({ rep, maxRiskPct }: { rep: AutoReport; maxRiskPct: number }) 
     <Surface className="divide-y divide-divider/70">
       {items.slice(0, 4).map((x, i) => (
         <div key={i} className="flex items-start gap-2.5 px-4 py-3 text-sm leading-7 [&_svg]:mt-1 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0">
-          {x.tone === 'bad' ? <AlertTriangle className="text-negative" /> : x.tone === 'good' ? <CheckCircle2 className="text-gain-text" /> : <Compass className="text-accent" />}
+          {x.tone === 'bad' ? <AlertTriangle className="text-negative" /> : x.tone === 'good' ? <CheckCircle2 className="text-positive" /> : <Compass className="text-accent" />}
           <p className="text-ink">{x.text}</p>
         </div>
       ))}
@@ -264,13 +264,13 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
   return (
     <Surface className="flex flex-col gap-3 p-4 transition-all duration-150 hover:border-accent/35 hover:shadow-sm">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl [&_svg]:h-4.5 [&_svg]:w-4.5', long ? 'bg-gain/12 text-gain-text' : 'bg-negative/12 text-negative')}>
+        <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl [&_svg]:h-4.5 [&_svg]:w-4.5', long ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative')}>
           {long ? <TrendingUp /> : <TrendingDown />}
         </span>
         <div className="min-w-0">
           <p className="text-sm font-bold text-ink">
             <span dir="ltr">{t.symbol}</span>{' '}
-            <span className={cn('text-xs font-semibold', long ? 'text-gain-text' : 'text-negative')}>{long ? 'خرید (لانگ)' : 'فروش (شورت)'}</span>
+            <span className={cn('text-xs font-semibold', long ? 'text-positive' : 'text-negative')}>{long ? 'خرید (لانگ)' : 'فروش (شورت)'}</span>
           </p>
           <p className="text-[11px] text-muted">
             {VENUE_FA[t.venue]} · {t.fills === 0 ? 'پوزیشن باز صرافی' : faDateTime(t.openTime)}
@@ -320,13 +320,13 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
         <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 text-xs leading-6">
           <p className="font-bold text-accent">پیشنهاد خودکار حد ضرر و هدف:</p>
           <p className="mt-0.5 text-ink">
-            حد ضرر: <b className="num-ltr text-negative">{fa(sug.stop, 5)}</b> · حد سود: <b className="num-ltr text-gain-text">{fa(sug.target, 5)}</b>
+            حد ضرر: <b className="num-ltr text-negative">{fa(sug.stop, 5)}</b> · حد سود: <b className="num-ltr text-positive">{fa(sug.target, 5)}</b>
             {suggestedSizeUsd !== null && <> · حجم مناسب: <b className="num-ltr">{usd(suggestedSizeUsd)}</b></>}
           </p>
           {t.open && (
             <div className="mt-2">
               {saved ? (
-                <span className="font-semibold text-gain-text">✓ ثبت شد</span>
+                <span className="font-semibold text-positive">✓ ثبت شد</span>
               ) : (
                 <Button size="sm" variant="outline" onClick={() => void adoptAutoPlan()}>
                   تأیید خودکار این برنامه
@@ -345,7 +345,7 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
         </div>
       )}
       {o.proTrend !== '-' && (
-        <p className={cn('text-xs font-semibold', o.proTrend === 'y' ? 'text-gain-text' : 'text-negative')}>
+        <p className={cn('text-xs font-semibold', o.proTrend === 'y' ? 'text-positive' : 'text-negative')}>
           {o.proTrend === 'y' ? '✓ هم‌جهت با روند روزانه' : '✕ خلاف روند روزانه'}
         </p>
       )}
@@ -353,7 +353,7 @@ function PlanCard({ t, p, accountSize, maxRiskPct }: { t: ClassifiedTrade; p: Tr
   );
 }
 
-const biasTone = (b: Bias) => (b === 'bullish' ? 'text-gain-text' : b === 'bearish' ? 'text-negative' : 'text-muted');
+const biasTone = (b: Bias) => (b === 'bullish' ? 'text-positive' : b === 'bearish' ? 'text-negative' : 'text-muted');
 
 function Cell({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
@@ -448,12 +448,12 @@ function SpotAutoPlans({ assets, maxRiskPct, accountSize }: { assets: SpotAsset[
           return (
             <Surface key={a.asset} className="flex flex-col gap-3 p-4 transition-all duration-150 hover:border-accent/35 hover:shadow-sm">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gain/12 text-gain-text [&_svg]:h-4.5 [&_svg]:w-4.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gain/12 text-positive [&_svg]:h-4.5 [&_svg]:w-4.5">
                   <TrendingUp />
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-ink">
-                    <span dir="ltr">{a.symbol}</span> <span className="text-xs font-semibold text-gain-text">اسپات</span>
+                    <span dir="ltr">{a.symbol}</span> <span className="text-xs font-semibold text-positive">اسپات</span>
                   </p>
                   <p className="text-[11px] text-muted">{a.avgCost !== null ? 'بر پایه میانگین خرید' : 'بر پایه قیمت روز'}</p>
                 </div>
@@ -477,7 +477,7 @@ function SpotAutoPlans({ assets, maxRiskPct, accountSize }: { assets: SpotAsset[
               </div>
               <p className="text-xs text-muted">
                 حد ضرر: <b className="num-ltr text-negative">{fa(stop, entry < 1 ? 6 : 2)}</b> · هدف سود:{' '}
-                <b className="num-ltr text-gain-text">{fa(target, entry < 1 ? 6 : 2)}</b>
+                <b className="num-ltr text-positive">{fa(target, entry < 1 ? 6 : 2)}</b>
               </p>
             </Surface>
           );
