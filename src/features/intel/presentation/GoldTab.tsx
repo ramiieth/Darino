@@ -378,12 +378,12 @@ export function GoldTab() {
 
   return (
     <div className="space-y-5">
-      {/* کارت کانونی طلایی: قیمت روز طلای ۱۸ عیار + شمش طلا + شاخص‌های ۷/۳۰/۶۰ روزه و اسنپ‌شات */}
-      <Surface variant="focal" className="relative overflow-hidden border-amber-500/30">
-        <div className="h-[3.5px] w-full bg-gradient-to-l from-amber-400 via-yellow-500 to-amber-600" aria-hidden />
+      {/* کارت کانونی: قیمت روز طلای ۱۸ عیار + نشان شمش دارینو + شاخص‌های ۷/۳۰/۶۰ روزه و اسنپ‌شات */}
+      <Surface variant="focal" className="relative overflow-hidden border-divider">
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-accent/65 to-gold/55" aria-hidden />
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-16 start-8 h-44 w-72 rounded-full bg-amber-400/12 blur-3xl"
+          className="pointer-events-none absolute -top-16 start-8 h-44 w-72 rounded-full bg-accent/[0.07] blur-3xl"
         />
         <div className="relative space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -391,7 +391,7 @@ export function GoldTab() {
               <GoldBullionEmblem size="lg" />
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
+                  <span className="text-xs font-extrabold text-muted">
                     قیمت روز هر گرم طلای ۱۸ عیار
                   </span>
                   <Badge tone={!d ? 'neutral' : isOfflineCached ? 'warn' : isStale ? 'neutral' : 'gain'}>
@@ -422,7 +422,6 @@ export function GoldTab() {
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               loading={q.isFetching}
               onClick={() => void q.refetch()}
-              className="border-amber-500/35 hover:border-amber-500/60"
             >
               به‌روزرسانی
             </Button>
@@ -443,8 +442,8 @@ export function GoldTab() {
                   className={cn(
                     'rounded-xl border p-3 text-start transition-all',
                     isSelected
-                      ? 'border-amber-500/65 bg-amber-500/[0.08] shadow-xs ring-1 ring-amber-400/25'
-                      : 'border-divider bg-card/85 hover:border-amber-500/35 hover:bg-card'
+                      ? 'border-accent/60 bg-accent/[0.07] shadow-xs ring-1 ring-accent/20'
+                      : 'border-divider bg-card/85 hover:border-divider-strong hover:bg-card'
                   )}
                 >
                   <p className="text-2xs font-semibold text-muted">تغییر {toFaDigits(h.days)} روز گذشته</p>
@@ -462,8 +461,8 @@ export function GoldTab() {
               );
             })}
 
-            <div className="rounded-xl border border-amber-500/35 bg-gradient-to-bl from-amber-500/[0.10] via-card to-card p-3">
-              <p className="truncate text-2xs font-bold text-amber-700 dark:text-amber-300">
+            <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
+              <p className="truncate text-2xs font-bold text-accent">
                 نسبت به اسنپ‌شات ({activeSnapshot?.title ?? 'مرجع'})
               </p>
               {snapshotComparison ? (
@@ -486,7 +485,7 @@ export function GoldTab() {
         </div>
       </Surface>
 
-      {/* ناوبری کارتی ۴گانه ماژول طلای ایران با آیکون و رنگ‌بندی طلایی */}
+      {/* ناوبری کارتی ۴گانه ماژول طلای ایران هماهنگ با سیستم دیزاین دارینو */}
       <nav
         aria-label="بخش‌های طلای ایران"
         className="grid grid-cols-2 gap-2.5 lg:grid-cols-4"
@@ -502,15 +501,15 @@ export function GoldTab() {
               className={cn(
                 'flex items-center gap-2.5 rounded-2xl border p-3 text-start transition-all duration-150',
                 active
-                  ? 'border-amber-500/65 bg-gradient-to-bl from-amber-500/14 via-amber-500/[0.05] to-card shadow-sm ring-1 ring-amber-400/30'
-                  : 'border-divider bg-card hover:border-amber-500/30 hover:bg-surface-2/50'
+                  ? 'border-accent/60 bg-accent/[0.06] shadow-sm ring-1 ring-accent/20'
+                  : 'border-divider bg-card hover:border-divider-strong hover:bg-surface-2/50'
               )}
             >
               <span
                 className={cn(
                   'grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors',
                   active
-                    ? 'bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-amber-950 shadow-xs'
+                    ? 'bg-accent text-on-accent shadow-xs'
                     : 'bg-surface-2 text-muted'
                 )}
               >
@@ -728,7 +727,7 @@ function MarketAndHistorySection({
                     }}
                     className={cn(
                       'cursor-pointer transition-colors',
-                      h.days === selectedHorizon.days && 'bg-amber-500/[0.07]'
+                      h.days === selectedHorizon.days && 'bg-accent/[0.06]'
                     )}
                   >
                     <td className="font-bold text-ink">
@@ -802,8 +801,8 @@ function MarketAndHistorySection({
                 className={cn(
                   'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-all',
                   active
-                    ? 'border-amber-500/65 bg-amber-500/12 text-amber-800 dark:text-amber-200'
-                    : 'border-divider bg-card text-muted hover:border-amber-500/35 hover:text-ink'
+                    ? 'border-accent/60 bg-accent/10 text-accent'
+                    : 'border-divider bg-card text-muted hover:border-divider-strong hover:text-ink'
                 )}
               >
                 <span>{sn.title}</span>
@@ -814,7 +813,7 @@ function MarketAndHistorySection({
         </div>
 
         {snapshotComparison && (
-          <div className="grid grid-cols-2 gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3.5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-divider bg-surface-2/45 p-3.5 sm:grid-cols-4">
             <div>
               <p className="text-2xs text-muted">قیمت مرجع ({snapshotComparison.snapshot.dateLabelFa})</p>
               <p className="mt-1 text-sm font-bold text-ink">{fmtToman(snapshotComparison.snapshot.price18kToman)}</p>
@@ -1107,7 +1106,7 @@ function OnlineGoldSection({
   return (
     <div className="space-y-5">
       <Surface className="overflow-hidden">
-        <div className="h-[3px] w-full bg-gradient-to-l from-amber-400 via-emerald-500/70 to-transparent" aria-hidden />
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-gain/65 to-transparent" aria-hidden />
         <div className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -1135,8 +1134,8 @@ function OnlineGoldSection({
                   className={cn(
                     'flex items-center gap-2.5 rounded-xl border p-2.5 text-start transition-all',
                     active
-                      ? 'border-amber-500/65 bg-amber-500/[0.08] shadow-xs ring-1 ring-amber-400/25'
-                      : 'border-divider bg-card hover:border-amber-500/35'
+                      ? 'border-accent/60 bg-accent/[0.06] shadow-xs ring-1 ring-accent/20'
+                      : 'border-divider bg-card hover:border-divider-strong'
                   )}
                 >
                   <GoldPlatformLogo platformId={p.id} name={p.name} size="sm" />
@@ -1154,7 +1153,7 @@ function OnlineGoldSection({
           {/* انتخاب سریع وزن */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
-              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              <Sparkles aria-hidden className="h-3 w-3 text-accent" />
               وزن سریع:
             </span>
             {QUICK_WEIGHTS.map((w) => {
@@ -1167,7 +1166,7 @@ function OnlineGoldSection({
                   className={cn(
                     'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
                     active
-                      ? 'border-amber-500 bg-amber-500 text-amber-950'
+                      ? 'border-accent bg-accent text-on-accent'
                       : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
                   )}
                 >
@@ -1212,7 +1211,7 @@ function OnlineGoldSection({
           {/* کارت‌های خلاصه نتیجه */}
           {calc.valid && (
             <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-              <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+              <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
                 <p className="text-2xs font-semibold text-muted">مبلغ کل پرداختی خرید</p>
                 <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.totalBuyCostToman)}</p>
                 <p className="text-2xs text-subtle">کارمزد خرید: {fmtToman(calc.buyFeeToman)}</p>
@@ -1234,8 +1233,8 @@ function OnlineGoldSection({
                 </p>
                 <p className="text-2xs text-subtle">هزینه رفت‌وبرگشت و اسپرد</p>
               </div>
-              <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
-                <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر گرم</p>
+              <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
+                <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم</p>
                 <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenSellPricePerGramToman)}</p>
                 <p className="text-2xs text-subtle">وزن خالص: {toFaDigits(calc.netReceivedWeightGrams)} گرم</p>
               </div>
@@ -1432,7 +1431,7 @@ function JewelryAndComparisonSection({
     <div className="space-y-5">
       {/* محاسبه‌گر خرید و فروش مجدد طلای زینتی */}
       <Surface className="overflow-hidden">
-        <div className="h-[3px] w-full bg-gradient-to-l from-rose-400 via-amber-400 to-yellow-500" aria-hidden />
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-indigo-500/70 to-transparent" aria-hidden />
         <div className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -1447,7 +1446,7 @@ function JewelryAndComparisonSection({
           {/* سناریوهای سریع طلای زینتی */}
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
-              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              <Sparkles aria-hidden className="h-3 w-3 text-accent" />
               نمونهٔ سریع:
             </span>
             {JEWELRY_PRESETS.map((pr) => (
@@ -1467,7 +1466,7 @@ function JewelryAndComparisonSection({
                 className={cn(
                   'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
                   s.jewelryProductName === pr.name && s.jewelryWeightGrams === pr.weight
-                    ? 'border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-200'
+                    ? 'border-accent bg-accent/12 text-accent'
                     : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
                 )}
               >
@@ -1514,7 +1513,7 @@ function JewelryAndComparisonSection({
 
           {j.valid && (
             <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-              <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+              <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
                 <p className="text-2xs font-semibold text-muted">ارزش طلای خام داخل محصول</p>
                 <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.rawGoldValueToman)}</p>
                 <p className="text-2xs text-subtle">وزن خالص طلا: {toFaDigits(j.netGoldWeightGrams)} گرم</p>
@@ -1533,8 +1532,8 @@ function JewelryAndComparisonSection({
                   اختلاف با خرید: {fmtToman(j.netProfitOrLossToman, true)} ({fmtPct(j.roiPct, 1)})
                 </p>
               </div>
-              <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
-                <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
+              <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
+                <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
                 <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.breakEven18kPriceToman)}</p>
                 <p className="text-2xs text-subtle">رشد لازم بازار: {fmtPct(j.requiredMarketGrowthPctToBreakEven, 1)}</p>
               </div>
@@ -1839,7 +1838,7 @@ function GoldEtfSection({
     <div className="space-y-5">
       {/* داشبورد ۶ صندوق طلای بورسی لوگودار با قیمت مرجع ثابت ۱۰ مرداد ۱۴۰۵ */}
       <Surface className="overflow-hidden">
-        <div className="h-[3px] w-full bg-gradient-to-l from-amber-400 via-yellow-500 to-indigo-500/70" aria-hidden />
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-accent/65 to-gold/55" aria-hidden />
         <div className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1858,8 +1857,8 @@ function GoldEtfSection({
                   className={cn(
                     'space-y-3 rounded-2xl border p-3.5 transition-all',
                     selected
-                      ? 'border-amber-500/65 bg-amber-500/[0.06] shadow-xs ring-1 ring-amber-400/25'
-                      : 'border-divider bg-card hover:border-amber-500/35'
+                      ? 'border-accent/60 bg-accent/[0.05] shadow-xs ring-1 ring-accent/20'
+                      : 'border-divider bg-card hover:border-divider-strong'
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -1881,7 +1880,7 @@ function GoldEtfSection({
                       className={cn(
                         'rounded-full px-2.5 py-1 text-2xs font-bold transition-colors',
                         selected
-                          ? 'bg-amber-500 text-amber-950'
+                          ? 'bg-accent text-on-accent'
                           : 'bg-surface-2 text-accent hover:bg-accent/15'
                       )}
                     >
@@ -1969,7 +1968,7 @@ function GoldEtfSection({
         {s.etfCalcMode === 'by_amount' && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
-              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              <Sparkles aria-hidden className="h-3 w-3 text-accent" />
               مبلغ سریع:
             </span>
             {QUICK_ETF_AMOUNTS.map((item) => {
@@ -1982,7 +1981,7 @@ function GoldEtfSection({
                   className={cn(
                     'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
                     active
-                      ? 'border-amber-500 bg-amber-500 text-amber-950'
+                      ? 'border-accent bg-accent text-on-accent'
                       : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
                   )}
                 >
@@ -2064,7 +2063,7 @@ function GoldEtfSection({
 
         {calc.valid && (
           <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-            <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+            <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
               <p className="text-2xs font-semibold text-muted">تعداد واحد و هزینه واقعی ورود</p>
               <p className="mt-1 text-sm font-extrabold text-ink">
                 {toFaDigits(calc.unitsPurchased.toLocaleString('en-US'))} واحد
@@ -2095,8 +2094,8 @@ function GoldEtfSection({
                 <p className="text-2xs text-subtle">باقیمانده نقدی: {fmtToman(calc.leftoverCashToman)}</p>
               )}
             </div>
-            <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
-              <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر واحد</p>
+            <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
+              <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر واحد</p>
               <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenUnitPriceToman)}</p>
               <p className="text-2xs text-subtle">
                 نسبت به مرجع {GOLD_ETF_SNAPSHOT_DATE_FA}: {fmtPct(calc.futureChangeVsSnapshotPct, 1)}
@@ -2123,13 +2122,13 @@ const VALUE_FA: Record<Valuation, { title: (p: number) => string; border: string
   rich: {
     title: (p) => `حباب طلای ۱۸ عیار ${pctRatio(p)} · بالاتر از محدودهٔ معمول`,
     border: 'border-warn/45',
-    bar: 'from-warn via-amber-400 to-transparent',
+    bar: 'from-warn via-warn/50 to-transparent',
     badge: 'warn'
   },
   fair: {
     title: (p) => `حباب طلای ۱۸ عیار ${pctRatio(p)} · در محدودهٔ متعادل بازار`,
     border: 'border-divider',
-    bar: 'from-amber-400 via-yellow-500/70 to-transparent',
+    bar: 'from-accent via-accent/60 to-transparent',
     badge: 'neutral'
   },
   unknown: {
@@ -2158,7 +2157,7 @@ function ValueCard({ d }: { d: GoldPayload }) {
         <dl className="mt-3.5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
             <dt className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
-              <Scale aria-hidden className="h-3.5 w-3.5 text-amber-500" />
+              <Scale aria-hidden className="h-3.5 w-3.5 text-accent" />
               ارزش ذاتی هر گرم ۱۸ عیار
             </dt>
             <dd className="mt-1.5 text-base font-extrabold text-ink sm:text-lg">{d.intrinsic ? million(d.intrinsic) : '—'}</dd>
@@ -2166,7 +2165,7 @@ function ValueCard({ d }: { d: GoldPayload }) {
           </div>
           <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
             <dt className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
-              <Globe aria-hidden className="h-3.5 w-3.5 text-amber-500" />
+              <Globe aria-hidden className="h-3.5 w-3.5 text-accent" />
               انس جهانی طلا
             </dt>
             <dd className="mt-1.5 text-base font-extrabold text-ink sm:text-lg">
@@ -2220,13 +2219,13 @@ function PremiumBar({
       )}
       <div dir="ltr" className="relative mt-2.5 h-2.5 rounded-full bg-surface-2" role="img" aria-label={`حباب ${pctRatio(now)}`}>
         <span
-          className="absolute inset-y-0 rounded-full bg-gradient-to-r from-gain/45 via-amber-400/55 to-warn/50"
+          className="absolute inset-y-0 rounded-full bg-gradient-to-r from-gain/45 via-accent/45 to-warn/50"
           style={{ left: x(low), right: `calc(100% - ${x(high)})` }}
           aria-hidden
         />
         <span className="absolute -inset-y-1 w-0.5 rounded-full bg-ink/40" style={{ left: x(stats?.p50 ?? 0) }} aria-hidden />
         <span
-          className="absolute -top-1 h-4.5 w-4.5 -translate-x-1/2 rounded-full border-2 border-card bg-amber-500 shadow-sm ring-2 ring-amber-400/35"
+          className="absolute -top-1 h-4.5 w-4.5 -translate-x-1/2 rounded-full border-2 border-card bg-accent shadow-sm ring-2 ring-accent/30"
           style={{ left: x(now) }}
           aria-hidden
         />
@@ -2298,7 +2297,7 @@ function Platforms({ d }: { d: GoldPayload }) {
                 href={meta.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-divider bg-card text-subtle transition-colors hover:border-amber-500/45 hover:text-amber-600"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-divider bg-card text-subtle transition-colors hover:border-accent/45 hover:text-accent"
                 aria-label={`باز کردن ${meta.name}`}
               >
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden />
@@ -2328,7 +2327,7 @@ function Coins({ coins }: { coins: CoinRow[] }) {
           return (
             <li
               key={c.coin}
-              className="rounded-2xl border border-amber-500/20 bg-gradient-to-bl from-amber-500/[0.06] via-surface-2/40 to-card p-3.5"
+              className="rounded-2xl border border-divider bg-surface-2/45 p-3.5"
             >
               <div className="flex items-center gap-3">
                 <IranCoinLogo coin={String(c.coin)} />
@@ -2362,7 +2361,7 @@ function Growth({ rows }: { rows: Decomposition[] }) {
   return (
     <Surface className="p-4 sm:p-5">
       <div className="flex items-center gap-2">
-        <BarChart3 aria-hidden className="h-4 w-4 text-amber-500" />
+        <BarChart3 aria-hidden className="h-4 w-4 text-accent" />
         <h3 className="text-sm font-extrabold text-ink">تفکیک عوامل تغییر قیمت طلای ۱۸ عیار</h3>
       </div>
       <div className="mt-3 overflow-x-auto">
