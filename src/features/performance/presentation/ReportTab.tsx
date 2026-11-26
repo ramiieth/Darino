@@ -1,21 +1,18 @@
 /**
- * تحلیل هوشمند عملکرد سرمایه — طراحی مدرن و کامل
+ * تحلیل هوشمند عملکرد سرمایه — طراحی مدرن و هماهنگ با سیستم دیزاین دارینو
  *
  *   ۱. تمرکز بر دارایی‌های موجود فعلی در کیف پول، جزئیات بهای تمام‌شده (FIFO داشبورد)، میانگین خرید و سود/زیان باز
  *      (بدون نمایش چرخه‌های خرید و فروش گذشته یا رمزارزهای فروخته‌شده)
  *   ۲. کاتالوگ کامل و دقیق قیمت‌های مستند ۱۱ دی ۱۴۰۳ (۳۱ دسامبر ۲۰۲۴):
- *      • مسکن اهواز: کیانپارس (۶۰ تا ۶۵ میلیون)، پادادشهر (۴۵ میلیون)، گلستان (۴۵ میلیون)، کیان‌آباد (۴۵ میلیون)، شهرک دانشگاه (۳۰ تا ۳۲ میلیون)
- *      • خودروهای منتخب بازار آزاد (صرفاً قیمت بازار آزاد؛ قیمت کارخانه به طور کامل حذف شده است):
- *        تارا (V1، V2، V4)، پژو ۲۰۷ (TU3، دنده‌ای هیدرولیک، دنده‌ای پانوراما، اتوماتیک سقف فلزی، اتوماتیک پانوراما)،
- *        ری‌را، هایما (S5، S7، 8S، 7X)، دنا پلاس (۵ دنده، ۶ سرعته، توربو اتوماتیک)، سورن پلاس (XU7P، بنزینی فول، دوگانه‌سوز)،
- *        شاهین (GL، G، اتوماتیک CVT، پلاس)، اطلس G، سهند S، ساینا (S بنزینی، دوگانه‌سوز)، کوییک (S/GX، GXR، اتوماتیک)،
- *        چانگان (CS35 تیپ ۲ و ۳، CS55 پلاس)، هیوندای النترا و ام‌جی ۵ (MG5)
- *   ۳. استخراج زندهٔ قیمت‌های فعلی خودروهای منتخب و مسکن اهواز از استورهای اپ دارینو + پشتیبانی از سایر بازارهای جهانی (سهام آمریکا، نفت، طلا، شاخص‌ها و رمزارزها)
+ *      • مسکن اهواز: کیانپارس، کیان‌آباد، گلستان، پادادشهر، شهرک دانشگاه
+ *      • خودروهای منتخب بازار آزاد (صرفاً قیمت بازار آزاد؛ بدون قیمت کارخانه)
+ *   ۳. استخراج زندهٔ قیمت‌های فعلی خودروهای منتخب و مسکن اهواز از استورهای اپ دارینو + بازارهای جهانی
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowUpDown,
   Building2,
   Car,
   Check,
@@ -25,7 +22,6 @@ import {
   Flame,
   Globe,
   Layers,
-  Search,
   Sparkles,
   Trash2,
   TrendingDown,
@@ -97,6 +93,35 @@ const CATEGORY_NAMES = {
   crypto: 'رمزارزها'
 } as const;
 
+type SortMode = 'default' | 'best_market' | 'best_portfolio';
+
+function CategoryIcon({ category, className = 'h-3.5 w-3.5' }: { category: keyof typeof CATEGORY_NAMES; className?: string }) {
+  switch (category) {
+    case 'property':
+      return <Building2 className={className} aria-hidden />;
+    case 'car':
+      return <Car className={className} aria-hidden />;
+    case 'us_stock':
+      return <Globe className={className} aria-hidden />;
+    case 'commodity':
+      return <Flame className={className} aria-hidden />;
+    case 'gold_fx':
+      return <Coins className={className} aria-hidden />;
+    case 'crypto':
+      return <TrendingUp className={className} aria-hidden />;
+    default:
+      return <Layers className={className} aria-hidden />;
+  }
+}
+
+/** کوتاه‌سازی برچسب فرعی برای جلوگیری از تکرار تاریخ داخل کارت */
+function cleanRangeNote(raw: string): string {
+  return raw
+    .replace(/\s*\(بازار آزاد ۱۱ دی ۱۴۰۳\)/g, '')
+    .replace(/\s*\(۱۱ دی ۱۴۰۳\)/g, '')
+    .trim();
+}
+
 /** تشخیص دسته‌بندی برای ردیف‌های عمومی بازار */
 function categorizeMarket(id: string, name: string): { category: SimulatorItem['category']; categoryLabel: string; unitLabel: string } {
   if (/^car[:_]/.test(id) || id === 'car') return { category: 'car', categoryLabel: 'خودرو (بازار آزاد)', unitLabel: 'دستگاه' };
@@ -121,7 +146,6 @@ export function ReportTab({
   endId,
   onPeriod,
   analysis,
-  market,
   walletBridge,
   reports,
   buildPayload,
@@ -146,6 +170,7 @@ export function ReportTab({
   const [copied, setCopied] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<keyof typeof CATEGORY_NAMES>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('default');
   const [activeLens, setActiveLens] = useState<'both' | 'holdings' | 'buyhold'>('both');
 
   // اتصال مستقیم به استورهای بازار خودرو و املاک اهواز در اپ دارینو برای استخراج قیمت‌های روز
@@ -163,7 +188,7 @@ export function ReportTab({
   const rateStart = analysis?.start.rateToman ?? 80_000;
   const rateEnd = analysis?.end.rateToman ?? 120_000;
 
-  // مبنای واقعی سبد: در صورت اتصال کیف‌پول‌ها، ارزش زندهٔ فعلی (مثلاً ۲۹,۹۹۲ دلار) جایگزین آخرین سابقهٔ قدیمی می‌شود
+  // مبنای واقعی سبد: در صورت اتصال کیف‌پول‌ها، ارزش زندهٔ فعلی جایگزین آخرین سابقهٔ قدیمی می‌شود
   const portfolioBasis = useMemo(() => {
     if (!analysis) return null;
     const startUsd = analysis.portfolio.startUsd;
@@ -187,7 +212,7 @@ export function ReportTab({
     };
   }, [analysis, walletBridge?.totalLiveUsd, rateStart, rateEnd]);
 
-  // ساخت فهرست کامل و یکپارچهٔ بازارهای منتخب (مسکن اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا، نفت، طلا و رمزارزها)
+  // ساخت فهرست کامل و یکپارچهٔ بازارهای منتخب
   const simulatorItems = useMemo((): SimulatorItem[] => {
     if (!analysis || !portfolioBasis) return [];
     const { startToman, startUsd, pnlToman: portPnlToman, pnlUsd: portPnlUsd } = portfolioBasis;
@@ -208,7 +233,7 @@ export function ReportTab({
       items.push({
         id: `prop:${nh.key}`,
         name: nh.name,
-        subLabel: `۱۱ دی ۱۴۰۳: ${nh.rangeNoteDec1403}`,
+        subLabel: `بازهٔ ۱۱ دی ۱۴۰۳: ${cleanRangeNote(nh.rangeNoteDec1403)}`,
         category: 'property',
         categoryLabel: 'مسکن اهواز',
         unitLabel: 'مترمربع',
@@ -246,7 +271,7 @@ export function ReportTab({
       items.push({
         id: car.id,
         name: car.name,
-        subLabel: `${car.brandFa} · ۱۱ دی ۱۴۰۳: ${car.rangeNoteDec1403}`,
+        subLabel: `${car.brandFa} · بازهٔ ۱۱ دی ۱۴۰۳: ${cleanRangeNote(car.rangeNoteDec1403)}`,
         category: 'car',
         categoryLabel: `خودرو (${car.brandFa})`,
         unitLabel: 'دستگاه',
@@ -270,7 +295,7 @@ export function ReportTab({
       });
     }
 
-    // ۴. بازارهای جهانی، طلا، سکه، دلار، سهام آمریکا، نفت و کریپتو از موتور تحلیل
+    // ۳. بازارهای جهانی، طلا، سکه، دلار، سهام آمریکا، نفت و کریپتو از موتور تحلیل
     for (const r of analysis.rows) {
       if (r.kind === 'inflation' || /^prop[:_]/.test(r.id) || /^car[:_]/.test(r.id)) continue;
       const cat = categorizeMarket(r.id, r.name);
@@ -316,7 +341,16 @@ export function ReportTab({
     return items;
   }, [analysis, portfolioBasis, rateStart, rateEnd, propSnapshots, propListings, carSnapshots]);
 
-  // شبیه‌ساز تعاملی «تعداد دلخواه واحد» (مثلاً ۳ یا ۴ دستگاه خودرو یا ۱۰۰ متر ملک)
+  // خلاصهٔ آماری مقایسه برای نوار بالای گرید
+  const marketOverviewStats = useMemo(() => {
+    if (!simulatorItems.length) return null;
+    const beatenCount = simulatorItems.filter((i) => i.vsPortfolioUsd <= 0).length;
+    const laggedCount = simulatorItems.length - beatenCount;
+    const topMarket = [...simulatorItems].sort((a, b) => b.returnPct - a.returnPct)[0];
+    return { beatenCount, laggedCount, topMarket };
+  }, [simulatorItems]);
+
+  // شبیه‌ساز تعاملی «تعداد دلخواه واحد»
   const [activeSimId, setActiveSimId] = useState<string>('car:tara-v1-manual');
   const activeSimItem = simulatorItems.find((i) => i.id === activeSimId) ?? simulatorItems[0];
   const [customUnits, setCustomUnits] = useState<number>(3);
@@ -371,7 +405,6 @@ export function ReportTab({
     setBusy(true);
     setError(null);
     try {
-      // غنی‌سازی پیلود ارسالی با کاتالوگ کامل قیمت‌های ۱۱ دی ۱۴۰۳ و قیمت‌های روز استخراج‌شده از اپ دارینو
       const enrichedPayload = {
         ...basePayload,
         iranRealAssetsBenchmarks: simulatorItems
@@ -435,23 +468,32 @@ export function ReportTab({
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return simulatorItems.filter((i) => {
+    const list = simulatorItems.filter((i) => {
       if (selectedCategory !== 'all' && i.category !== selectedCategory) return false;
       if (!q) return true;
       return i.name.toLowerCase().includes(q) || (i.subLabel ?? '').toLowerCase().includes(q) || i.categoryLabel.toLowerCase().includes(q);
     });
-  }, [simulatorItems, selectedCategory, searchQuery]);
+    if (sortMode === 'best_market') {
+      return [...list].sort((a, b) => b.returnPct - a.returnPct);
+    }
+    if (sortMode === 'best_portfolio') {
+      return [...list].sort((a, b) => a.vsPortfolioUsd - b.vsPortfolioUsd);
+    }
+    return list;
+  }, [simulatorItems, selectedCategory, searchQuery, sortMode]);
 
   const cb = walletBridge?.costBasis;
 
   return (
     <div className="space-y-6">
-      {/* ─── هدر اصلی تحلیل هوشمند ─── */}
-      <Surface variant="focal" className="relative overflow-hidden p-5 md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/15 text-accent shadow-xs">
+      {/* ─── هدر اصلی تحلیل هوشمند با هویت بصری سرمه‌ای/آبی دارینو ─── */}
+      <Surface variant="focal" className="relative overflow-hidden p-0">
+        <div className="h-1.5 w-full bg-gradient-to-l from-[#0B1B5C] via-[#2E5BFF] to-[#1F47E0]" aria-hidden />
+
+        <div className="p-5 md:p-6 space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0B1B5C] text-white shadow-xs">
                 <Sparkles className="h-5 w-5" />
               </span>
               <div>
@@ -459,63 +501,107 @@ export function ReportTab({
                   <h2 className="text-lg font-extrabold text-ink">تحلیل هوشمند عملکرد و مقایسه سرمایه</h2>
                   <Badge tone="brand">موتور تحلیلی دارینو</Badge>
                 </div>
-                <p className="mt-0.5 text-xs text-muted">
-                  بررسی تخصصی دارایی‌های فعلی کیف پول و بهای تمام‌شده در کنار مقایسهٔ کامل با املاک ۵ محلهٔ اهواز، خودروهای منتخب بازار آزاد، سهام آمریکا، نفت و طلا
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  بررسی تخصصی دارایی‌های فعلی کیف پول و بهای تمام‌شده در کنار مقایسهٔ کامل با مسکن اهواز، خودروهای بازار آزاد، سهام آمریکا، نفت و طلا
                 </p>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="primary"
               icon={<Sparkles className="h-4 w-4" />}
               loading={busy}
               disabled={!ready}
               onClick={() => void generate()}
-              className="font-bold shadow-sm"
+              className="rounded-xl bg-gradient-to-l from-[#0B1B5C] to-[#2E5BFF] font-bold shadow-sm hover:opacity-95"
             >
               {reports.length ? 'به‌روزرسانی تحلیل هوشمند' : 'تهیهٔ تحلیل هوشمند'}
             </Button>
           </div>
-        </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-4">
-          <div className="flex-1 min-w-[260px]">
-            <PeriodPicker records={records} startId={startId} endId={endId} onChange={onPeriod} />
+          {/* نوار خلاصهٔ عملکرد سبد در بازهٔ انتخابی */}
+          {portfolioBasis && (
+            <div className="grid gap-2.5 sm:grid-cols-3 rounded-2xl border border-[#0B1B5C]/12 bg-[#0B1B5C]/[0.025] p-3.5 text-xs">
+              <div className="flex items-center justify-between sm:block rounded-xl bg-card px-3 py-2.5 ring-1 ring-divider/70">
+                <span className="text-[11px] font-semibold text-muted block">سبد شما در این بازه (دلاری)</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-sm font-black text-ink">
+                    <Usd v={portfolioBasis.pnlUsd} signed />
+                  </span>
+                  <Pct v={portfolioBasis.returnUsd} className="text-xs font-bold" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between sm:block rounded-xl bg-card px-3 py-2.5 ring-1 ring-divider/70">
+                <span className="text-[11px] font-semibold text-muted block">سبد شما در این بازه (تومانی)</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-sm font-black text-ink">
+                    <Toman v={portfolioBasis.pnlToman} signed />
+                  </span>
+                  <Pct v={portfolioBasis.returnToman} className="text-xs font-bold" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between sm:block rounded-xl bg-card px-3 py-2.5 ring-1 ring-divider/70">
+                <span className="text-[11px] font-semibold text-muted block">جایگاه سبد در برابر {toFaDigits(simulatorItems.length)} بازار</span>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 font-bold">
+                  {marketOverviewStats ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 text-positive">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        برتر از {toFaDigits(marketOverviewStats.beatenCount)} بازار
+                      </span>
+                      <span className="text-subtle">·</span>
+                      <span className="inline-flex items-center gap-1 text-negative">
+                        <TrendingDown className="h-3.5 w-3.5" />
+                        عقب از {toFaDigits(marketOverviewStats.laggedCount)}
+                      </span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-4">
+            <div className="min-w-[260px] flex-1">
+              <PeriodPicker records={records} startId={startId} endId={endId} onChange={onPeriod} />
+            </div>
+
+            {/* انتخاب‌گر نمای نمایش */}
+            <div className="flex flex-wrap items-center gap-1 rounded-xl bg-surface-2 p-1 text-xs">
+              {[
+                { id: 'both' as const, label: 'نمای جامع (هر دو بخش)' },
+                { id: 'holdings' as const, label: 'دارایی‌های موجود و بهای تمام‌شده' },
+                { id: 'buyhold' as const, label: 'مقایسه خودرو، ملک اهواز و بازارها' }
+              ].map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setActiveLens(l.id)}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 font-bold transition-all',
+                    activeLens === l.id ? 'bg-[#0B1B5C] text-white shadow-xs' : 'text-muted hover:text-ink'
+                  )}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* انتخاب‌گر نمای نمایش */}
-          <div className="flex items-center gap-1 rounded-control bg-surface-2 p-1 text-xs">
-            {[
-              { id: 'both' as const, label: 'نمای جامع (هر دو بخش)' },
-              { id: 'holdings' as const, label: 'دارایی‌های موجود و بهای تمام‌شده' },
-              { id: 'buyhold' as const, label: 'مقایسه خودرو، ملک اهواز و بازارها' }
-            ].map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => setActiveLens(l.id)}
-                className={cn(
-                  'rounded-control px-3 py-1.5 font-bold transition-all',
-                  activeLens === l.id ? 'bg-card text-ink shadow-xs' : 'text-muted hover:text-ink'
-                )}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
+          {!ready && (
+            <p className="text-2xs text-subtle animate-pulse">در حال دریافت و همگام‌سازی آخرین قیمت‌های بازار از اپ دارینو…</p>
+          )}
+          {error && <Notice tone="warn">{error}</Notice>}
         </div>
-
-        {!ready && (
-          <p className="mt-2 text-2xs text-subtle animate-pulse">در حال دریافت و همگام‌سازی آخرین قیمت‌های بازار از اپ دارینو…</p>
-        )}
-        {error && <Notice tone="warn" className="mt-4">{error}</Notice>}
       </Surface>
 
       {/* ─── بخش اول: دارایی‌های موجود فعلی در کیف پول، جزئیات بهای تمام‌شده، میانگین خرید و سود/زیان باز ─── */}
       {(activeLens === 'both' || activeLens === 'holdings') && walletBridge && cb && (
-        <Surface className="space-y-5 p-5 md:p-6 border border-divider">
+        <Surface className="space-y-5 border border-divider p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider pb-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gain/15 text-positive">
@@ -553,7 +639,13 @@ export function ReportTab({
               size="sm"
               label="ارزش روز دارایی‌های دارای بها"
               value={<Usd v={cb.totalCurrentValueUsd} />}
-              sub={walletBridge.totalLiveUsd !== null ? `کل کیف پول‌ها: ${faNumber(Math.round(walletBridge.totalLiveUsd))} دلار` : undefined}
+              sub={
+                walletBridge.totalLiveUsd !== null ? (
+                  <>
+                    کل کیف پول‌ها: <Usd v={walletBridge.totalLiveUsd} />
+                  </>
+                ) : undefined
+              }
             />
             <Metric
               size="sm"
@@ -565,7 +657,15 @@ export function ReportTab({
               size="sm"
               label="حساب‌های پرپچوال فعال"
               value={cb.perpEquityUsd !== null ? <Usd v={cb.perpEquityUsd} /> : '—'}
-              sub={cb.perpAllTimePnlUsd !== null ? `سود/زیان کل پرپ: ${faNumber(Math.round(cb.perpAllTimePnlUsd))} دلار` : 'بدون پوزیشن'}
+              sub={
+                cb.perpAllTimePnlUsd !== null ? (
+                  <>
+                    سود/زیان کل پرپ: <Usd v={cb.perpAllTimePnlUsd} signed />
+                  </>
+                ) : (
+                  'بدون پوزیشن'
+                )
+              }
             />
           </MetricGrid>
 
@@ -573,7 +673,7 @@ export function ReportTab({
           {cb.rows.length > 0 ? (
             <div className="overflow-x-auto rounded-2xl border border-divider">
               <table className="w-full text-xs">
-                <thead className="bg-surface-2 text-subtle">
+                <thead className="bg-[#0B1B5C]/[0.04] text-subtle">
                   <tr>
                     <th className="p-3.5 text-start font-semibold">دارایی موجود</th>
                     <th className="p-3.5 text-start font-semibold">موجودی فعلی</th>
@@ -598,7 +698,7 @@ export function ReportTab({
                         </div>
                       </td>
                       <td className="p-3.5 font-medium">
-                        {faNumber(r.currentQuantity, { maximumFractionDigits: 4 })} <span className="text-2xs text-muted">{r.symbol}</span>
+                        <bdi dir="ltr" className="num-ltr">{faNumber(r.currentQuantity, { maximumFractionDigits: 4 })}</bdi>
                       </td>
                       <td className="p-3.5 font-medium">
                         {r.avgCostUsd !== null ? <Usd v={r.avgCostUsd} /> : <span className="text-subtle">—</span>}
@@ -627,7 +727,11 @@ export function ReportTab({
                         )}
                       </td>
                       <td className="p-3.5 text-end font-semibold text-muted">
-                        {r.sharePct !== null ? `${toFaDigits(r.sharePct.toFixed(1))}٪` : '—'}
+                        {r.sharePct !== null ? (
+                          <bdi dir="ltr" className="num-ltr">{toFaDigits(r.sharePct.toFixed(1))}٪</bdi>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -646,10 +750,10 @@ export function ReportTab({
       {(activeLens === 'both' || activeLens === 'buyhold') && (
         <>
           {/* شبیه‌ساز تعاملی «اگر ۳ یا ۴ دستگاه خودرو یا چند متر ملک در ۱۱ دی ۱۴۰۳ خریده بودم» */}
-          <Surface className="space-y-5 p-5 md:p-6 border border-accent/25 bg-gradient-to-br from-card via-card to-accent/5">
+          <Surface className="space-y-5 border border-[#0B1B5C]/15 bg-gradient-to-br from-card via-card to-[#2E5BFF]/[0.04] p-5 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider pb-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0B1B5C]/10 text-[#0B1B5C] dark:bg-accent/15 dark:text-accent">
                   <Car className="h-5 w-5" />
                 </span>
                 <div>
@@ -666,13 +770,13 @@ export function ReportTab({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-12 items-end">
+            <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
               <div className="lg:col-span-5">
                 <Field label="انتخاب خودرو (بازار آزاد)، محلهٔ مسکن اهواز یا سهام جهانی">
                   <Select
                     value={activeSimId}
                     onChange={(e) => setActiveSimId(e.target.value)}
-                    className="font-bold text-xs"
+                    className="text-xs font-bold"
                   >
                     <optgroup label="مسکن اهواز (۵ محلهٔ منتخب — ۱۱ دی ۱۴۰۳ تا امروز)">
                       {simulatorItems.filter((i) => i.category === 'property').map((i) => (
@@ -715,13 +819,13 @@ export function ReportTab({
                     step={activeSimItem?.unitLabel === 'دستگاه' ? 1 : activeSimItem?.unitLabel === 'مترمربع' ? 10 : 1}
                     value={customUnits}
                     onChange={(e) => setCustomUnits(Math.max(0.1, Number(e.target.value) || 1))}
-                    className="font-bold text-sm text-center"
+                    className="text-center text-sm font-bold"
                   />
                 </Field>
               </div>
 
-              <div className="lg:col-span-5 flex flex-col gap-1.5">
-                <span className="text-2xs text-muted font-semibold">انتخاب سریع تعداد واحد:</span>
+              <div className="flex flex-col gap-1.5 lg:col-span-5">
+                <span className="text-2xs font-semibold text-muted">انتخاب سریع تعداد واحد:</span>
                 <div className="flex flex-wrap gap-1.5">
                   {(activeSimItem?.unitLabel === 'مترمربع' ? [50, 75, 100, 120, 150, 200] : [1, 2, 3, 4, 5, 10]).map((num) => (
                     <button
@@ -731,7 +835,7 @@ export function ReportTab({
                       className={cn(
                         'rounded-control border px-2.5 py-1.5 text-2xs font-bold transition-all',
                         customUnits === num
-                          ? 'border-accent bg-accent text-white shadow-xs'
+                          ? 'border-[#0B1B5C] bg-[#0B1B5C] text-white shadow-xs'
                           : 'border-divider bg-surface-2 text-ink hover:border-accent/40'
                       )}
                     >
@@ -745,7 +849,7 @@ export function ReportTab({
                       className={cn(
                         'rounded-control border px-2.5 py-1.5 text-2xs font-bold transition-all',
                         Math.abs(customUnits - activeSimItem.unitsCount) < 0.05
-                          ? 'border-accent bg-accent text-white shadow-xs'
+                          ? 'border-[#0B1B5C] bg-[#0B1B5C] text-white shadow-xs'
                           : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
                       )}
                     >
@@ -758,7 +862,7 @@ export function ReportTab({
 
             {/* نتیجهٔ شبیه‌سازی سناریوی انتخاب‌شده */}
             {customSimResult && activeSimItem && (
-              <div className="rounded-2xl border border-divider bg-card p-4 md:p-5 shadow-sm space-y-4">
+              <div className="space-y-4 rounded-2xl border border-divider bg-card p-4 shadow-sm md:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider pb-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -774,57 +878,70 @@ export function ReportTab({
                     )}
                   </div>
                   <div className="text-end">
-                    <span className="text-2xs text-muted block">رشد قیمت بازار آزاد:</span>
+                    <span className="block text-2xs text-muted">رشد قیمت بازار آزاد:</span>
                     <span className="text-base font-black"><Pct v={customSimResult.returnPct} /></span>
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
-                  <div className="rounded-xl bg-surface-2 p-3.5 space-y-1">
+                <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-1 rounded-xl bg-surface-2/80 p-3.5">
                     <span className="text-2xs text-muted">پول لازم در تاریخ شروع (۱۱ دی ۱۴۰۳):</span>
                     <p className="text-sm font-extrabold text-ink"><Toman v={customSimResult.startCostToman} /></p>
                     <p className="text-2xs text-subtle">معادل دلاری شروع: <Usd v={customSimResult.startCostUsd} compact /></p>
-                    <span className="text-2xs text-subtle block pt-1 border-t border-divider/60">
+                    <span className="block border-t border-divider/60 pt-1 text-2xs text-subtle">
                       فی هر {activeSimItem.unitLabel} در شروع: {activeSimItem.currency === 'usd' ? <Usd v={customSimResult.unitPriceStart} /> : <Toman v={customSimResult.unitPriceStart} />}
                     </span>
                   </div>
 
-                  <div className="rounded-xl bg-surface-2 p-3.5 space-y-1">
+                  <div className="space-y-1 rounded-xl bg-surface-2/80 p-3.5">
                     <span className="text-2xs text-muted">ارزش فروش امروز به قیمت بازار آزاد:</span>
                     <p className="text-sm font-extrabold text-ink"><Toman v={customSimResult.endValueToman} /></p>
                     <p className="text-2xs text-subtle">معادل دلاری امروز: <Usd v={customSimResult.endValueUsd} compact /></p>
-                    <span className="text-2xs text-subtle block pt-1 border-t border-divider/60">
+                    <span className="block border-t border-divider/60 pt-1 text-2xs text-subtle">
                       فی هر {activeSimItem.unitLabel} امروز: {activeSimItem.currency === 'usd' ? <Usd v={customSimResult.unitPriceEnd} /> : <Toman v={customSimResult.unitPriceEnd} />}
                     </span>
                   </div>
 
-                  <div className="rounded-xl bg-surface-2 p-3.5 space-y-1">
+                  <div
+                    className={cn(
+                      'space-y-1 rounded-xl border p-3.5',
+                      customSimResult.pnlToman >= 0
+                        ? 'border-emerald-500/20 bg-emerald-500/[0.04]'
+                        : 'border-rose-500/20 bg-rose-500/[0.04]'
+                    )}
+                  >
                     <span className="text-2xs text-muted">سود خالص فروش در بازار آزاد:</span>
                     <p className="text-sm font-extrabold"><Toman v={customSimResult.pnlToman} signed /></p>
                     <p className="text-2xs"><Usd v={customSimResult.pnlUsd} signed compact /></p>
-                    <span className="text-2xs text-subtle block pt-1 border-t border-divider/60">
+                    <span className="block border-t border-divider/60 pt-1 text-2xs text-subtle">
                       درصد سود تومانی: <Pct v={customSimResult.returnPct} />
                     </span>
                   </div>
 
-                  <div className="rounded-xl border border-divider bg-surface-2/40 p-3.5 space-y-2 flex flex-col justify-between">
+                  <div className="flex flex-col justify-between space-y-2 rounded-xl border border-divider bg-surface-2/40 p-3.5">
                     <div className="space-y-1">
-                      <span className="text-2xs text-muted block">
+                      <span className="block text-2xs text-muted">
                         مقایسهٔ هم‌سرمایه با بازده سبد شما ({portfolioBasis?.usingLiveWallet ? 'موجودی زندهٔ کیف‌پول‌ها' : 'سابقهٔ پایان'}):
                       </span>
                       <p className={cn('font-bold leading-5', customSimResult.vsPortfolioUsd <= 0 ? 'text-positive' : 'text-negative')}>
-                        {customSimResult.vsPortfolioUsd <= 0
-                          ? `در مقیاس دلاری، بازده سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) از این دارایی (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) بهتر بوده است`
-                          : `این دارایی در مقیاس دلاری (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) از سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) جلوتر بوده است`}
+                        {customSimResult.vsPortfolioUsd <= 0 ? (
+                          <>در مقیاس دلاری، بازده سبد شما (<Pct v={customSimResult.portReturnUsd} />) از این دارایی (<Pct v={customSimResult.returnUsdPct} />) بهتر بوده است</>
+                        ) : (
+                          <>این دارایی در مقیاس دلاری (<Pct v={customSimResult.returnUsdPct} />) از سبد شما (<Pct v={customSimResult.portReturnUsd} />) جلوتر بوده است</>
+                        )}
                       </p>
                       <p className="text-2xs text-subtle">
-                        تفاوت هم‌سرمایه روی {fmtCompactFa(customSimResult.startCostToman)} تومان:{' '}
-                        <b className="text-ink">{fmtCompactFa(Math.abs(customSimResult.vsPortfolioToman))} تومان</b>
-                        {' '}({customSimResult.vsPortfolioUsd <= 0 ? '+' : '-'}${faNumber(Math.round(Math.abs(customSimResult.vsPortfolioUsd)))})
+                        تفاوت هم‌سرمایه روی <Toman v={customSimResult.startCostToman} />:{' '}
+                        <Toman
+                          v={customSimResult.vsPortfolioUsd <= 0 ? Math.abs(customSimResult.vsPortfolioToman) : -Math.abs(customSimResult.vsPortfolioToman)}
+                          signed
+                          className="font-bold"
+                        />{' '}
+                        (<Usd v={customSimResult.vsPortfolioUsd <= 0 ? Math.abs(customSimResult.vsPortfolioUsd) : -Math.abs(customSimResult.vsPortfolioUsd)} signed />)
                       </p>
                       {portfolioBasis && (
-                        <p className="text-2xs text-muted pt-1 border-t border-divider/60">
-                          سبد شما: ${faNumber(Math.round(portfolioBasis.startUsd))} ← ${faNumber(Math.round(portfolioBasis.endUsd))}
+                        <p className="border-t border-divider/60 pt-1 text-2xs text-muted">
+                          سبد شما: <Usd v={portfolioBasis.startUsd} /> ← <Usd v={portfolioBasis.endUsd} />
                         </p>
                       )}
                     </div>
@@ -839,7 +956,7 @@ export function ReportTab({
             )}
           </Surface>
 
-          {/* ─── ماتریس و جدول جامع همهٔ دارایی‌ها (مسکن اهواز، ۳۳+ مدل خودروی بازار آزاد، سهام آمریکا و نفت) ─── */}
+          {/* ─── ماتریس و جدول جامع همهٔ دارایی‌ها ─── */}
           <Surface className="space-y-4 p-5 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -851,33 +968,66 @@ export function ReportTab({
                 </p>
               </div>
 
-              <div className="w-full sm:w-64">
-                <Input
-                  withSearchIcon
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="جست‌وجوی خودرو، محله اهواز، سهام…"
-                  aria-label="جست‌وجوی دارایی"
-                />
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <div className="min-w-[200px] flex-1 sm:w-56">
+                  <Input
+                    withSearchIcon
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="جست‌وجوی خودرو، محله اهواز، سهام…"
+                    aria-label="جست‌وجوی دارایی"
+                  />
+                </div>
+                <div className="flex items-center gap-1 rounded-control border border-divider bg-surface-2 p-1 text-[11px]">
+                  <ArrowUpDown className="ms-1 h-3.5 w-3.5 text-muted" aria-hidden />
+                  {(
+                    [
+                      { id: 'default' as const, label: 'پیش‌فرض' },
+                      { id: 'best_market' as const, label: 'بیشترین رشد' },
+                      { id: 'best_portfolio' as const, label: 'برتری سبد' }
+                    ]
+                  ).map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSortMode(s.id)}
+                      className={cn(
+                        'rounded-md px-2 py-1 font-bold transition',
+                        sortMode === s.id ? 'bg-card text-[#0B1B5C] shadow-2xs dark:text-ink' : 'text-muted hover:text-ink'
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* تب‌های دسته‌بندی بازارها */}
+            {/* تب‌های دسته‌بندی بازارها با آیکون */}
             <div className="no-scrollbar flex gap-1.5 overflow-x-auto rounded-xl bg-surface-2 p-1.5 text-xs">
               {(Object.keys(CATEGORY_NAMES) as (keyof typeof CATEGORY_NAMES)[]).map((cat) => {
                 const count = cat === 'all' ? simulatorItems.length : simulatorItems.filter((i) => i.category === cat).length;
+                const selected = selectedCategory === cat;
                 return (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
                     className={cn(
-                      'whitespace-nowrap rounded-lg px-3 py-1.5 font-bold transition-all flex items-center gap-1.5',
-                      selectedCategory === cat ? 'bg-card text-ink shadow-xs' : 'text-muted hover:text-ink'
+                      'flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 font-bold transition-all',
+                      selected ? 'bg-[#0B1B5C] text-white shadow-xs' : 'text-muted hover:text-ink'
                     )}
                   >
+                    <CategoryIcon category={cat} className="h-3.5 w-3.5" />
                     <span>{CATEGORY_NAMES[cat]}</span>
-                    <span className="rounded-full bg-surface-2 px-1.5 py-0.2 text-2xs text-subtle">{toFaDigits(count)}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.2 text-2xs',
+                        selected ? 'bg-white/20 text-white' : 'bg-card text-subtle'
+                      )}
+                    >
+                      {toFaDigits(count)}
+                    </span>
                   </button>
                 );
               })}
@@ -889,6 +1039,7 @@ export function ReportTab({
               <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredItems.map((item) => {
                   const portfolioAhead = item.vsPortfolioUsd <= 0;
+                  const isIranAsset = item.category === 'car' || item.category === 'property';
                   return (
                     <div
                       key={item.id}
@@ -897,37 +1048,42 @@ export function ReportTab({
                         setCustomUnits(item.unitLabel === 'مترمربع' ? 100 : 3);
                       }}
                       className={cn(
-                        'cursor-pointer rounded-2xl border p-4 transition-all hover:shadow-md flex flex-col justify-between gap-3',
-                        activeSimId === item.id ? 'border-accent bg-accent/5 ring-1 ring-accent/30' : 'border-divider bg-card'
+                        'flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-4 transition-all hover:shadow-md',
+                        activeSimId === item.id
+                          ? 'border-[#2E5BFF] bg-[#2E5BFF]/[0.04] ring-1 ring-[#2E5BFF]/30'
+                          : 'border-divider bg-card'
                       )}
                     >
                       <div className="space-y-2.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <span className="text-2xs font-semibold text-accent block">{item.categoryLabel}</span>
-                            <h4 className="font-extrabold text-sm text-ink mt-0.5">{item.name}</h4>
-                            {item.subLabel && <p className="text-2xs text-muted mt-0.5">{item.subLabel}</p>}
+                            <span className="inline-flex items-center gap-1 text-2xs font-bold text-accent">
+                              <CategoryIcon category={item.category} className="h-3 w-3" />
+                              {item.categoryLabel}
+                            </span>
+                            <h4 className="mt-0.5 text-sm font-extrabold text-ink">{item.name}</h4>
+                            {item.subLabel && <p className="mt-0.5 text-2xs text-muted">{item.subLabel}</p>}
                           </div>
                           <Badge tone={item.returnPct >= 0 ? 'gain' : 'loss'}>
                             <Pct v={item.returnPct} />
                           </Badge>
                         </div>
 
-                        <div className="rounded-xl bg-surface-2 p-3 space-y-1.5 text-xs">
-                          <div className="flex justify-between items-center">
+                        <div className="space-y-1.5 rounded-xl bg-surface-2/80 p-3 text-xs">
+                          <div className="flex items-center justify-between">
                             <span className="text-subtle">قابل خرید با سرمایهٔ شروع:</span>
                             <b className="font-extrabold text-ink">
                               {toFaDigits(item.unitsCount < 10 ? item.unitsCount.toFixed(2) : Math.round(item.unitsCount).toLocaleString('en-US'))} {item.unitLabel}
                             </b>
                           </div>
-                          <div className="flex justify-between items-center text-2xs text-subtle">
-                            <span>قیمت بازار در ۱۱ دی ۱۴۰۳:</span>
+                          <div className="flex items-center justify-between text-2xs text-subtle">
+                            <span>{isIranAsset ? 'قیمت بازار در ۱۱ دی ۱۴۰۳:' : 'قیمت تاریخ شروع:'}</span>
                             <span className="font-semibold text-ink">
                               {item.currency === 'usd' ? <Usd v={item.priceStart} /> : <Toman v={item.priceStart} />}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-2xs text-subtle">
-                            <span>قیمت بازار آزاد امروز (اپ):</span>
+                          <div className="flex items-center justify-between text-2xs text-subtle">
+                            <span>{isIranAsset ? 'قیمت بازار آزاد امروز:' : 'قیمت روز:'}</span>
                             <span className="font-semibold text-ink">
                               {item.currency === 'usd' ? <Usd v={item.priceEnd} /> : <Toman v={item.priceEnd} />}
                             </span>
@@ -936,24 +1092,30 @@ export function ReportTab({
                       </div>
 
                       <div className="space-y-2 border-t border-divider pt-2.5">
-                        <div className="flex justify-between items-baseline">
+                        <div className="flex items-baseline justify-between">
                           <span className="text-2xs text-muted">ارزش فروش امروز:</span>
-                          <b className="font-extrabold text-sm text-ink"><Toman v={item.endValueToman} /></b>
+                          <b className="text-sm font-extrabold text-ink"><Toman v={item.endValueToman} /></b>
                         </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-2xs text-muted">سود خالص بازار آزاد:</span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-2xs text-muted">{isIranAsset ? 'سود خالص بازار آزاد:' : 'سود خالص:'}</span>
                           <span className="font-bold"><Toman v={item.pnlToman} signed /></span>
                         </div>
 
                         <div
                           className={cn(
-                            'rounded-lg px-2.5 py-1.5 text-2xs flex items-center justify-between font-bold',
+                            'flex flex-wrap items-center justify-between gap-1 rounded-lg px-2.5 py-1.5 text-2xs font-bold',
                             portfolioAhead ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'
                           )}
                         >
                           <span>{portfolioAhead ? 'برتری سبد شما:' : 'برتری این بازار:'}</span>
-                          <span>
-                            {portfolioAhead ? '+' : '-'}{fmtCompactFa(Math.abs(item.vsPortfolioToman))} تومان ({portfolioAhead ? '+' : '-'}${faNumber(Math.round(Math.abs(item.vsPortfolioUsd)))})
+                          <span className="inline-flex flex-wrap items-baseline gap-1">
+                            <Toman
+                              v={portfolioAhead ? Math.abs(item.vsPortfolioToman) : -Math.abs(item.vsPortfolioToman)}
+                              signed
+                            />
+                            <span className="opacity-80">
+                              (<Usd v={portfolioAhead ? Math.abs(item.vsPortfolioUsd) : -Math.abs(item.vsPortfolioUsd)} signed />)
+                            </span>
                           </span>
                         </div>
                       </div>
@@ -970,9 +1132,11 @@ export function ReportTab({
       <Surface className="space-y-4 p-5 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider pb-4">
           <div className="flex items-center gap-2.5">
-            <FileText className="h-5 w-5 text-accent" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0B1B5C]/10 text-[#0B1B5C] dark:bg-accent/15 dark:text-accent">
+              <FileText className="h-4.5 w-4.5" />
+            </span>
             <div>
-              <h3 className="font-bold text-base text-ink">گزارش جامع تحلیل هوشمند سرمایه</h3>
+              <h3 className="text-base font-bold text-ink">گزارش جامع تحلیل هوشمند سرمایه</h3>
               <p className="text-2xs text-muted">تفسیر یکپارچهٔ دارایی‌های موجود و بهای تمام‌شده در کنار مقایسه با ملک اهواز، خودروهای بازار آزاد، سهام آمریکا و نفت</p>
             </div>
           </div>
@@ -1014,7 +1178,7 @@ export function ReportTab({
                 className={cn(
                   'min-h-9 shrink-0 rounded-control border px-3 text-xs font-semibold transition-all',
                   current?.id === r.id
-                    ? 'border-accent bg-accent/15 text-accent font-bold'
+                    ? 'border-[#0B1B5C] bg-[#0B1B5C] font-bold text-white'
                     : 'border-divider bg-surface-2 text-muted hover:border-accent/40'
                 )}
               >
@@ -1026,19 +1190,19 @@ export function ReportTab({
 
         {current ? (
           <div className="space-y-4 pt-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-muted border-b border-divider pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider pb-3 text-2xs text-muted">
               <span>تاریخ تهیهٔ تحلیل: {fmtDateTime(current.createdAt)}</span>
               <span>بازهٔ بررسی: {formatJalali(current.periodStart)} تا {formatJalali(current.periodEnd)}</span>
             </div>
 
-            <div className="prose prose-sm dark:prose-invert max-w-none leading-7">
+            <div className="prose prose-sm max-w-none leading-7 dark:prose-invert">
               <AssistantResponse text={current.text} />
             </div>
 
             {current.sources.length > 0 && (
-              <div className="mt-6 border-t border-divider pt-4 space-y-1.5">
+              <div className="mt-6 space-y-1.5 border-t border-divider pt-4">
                 <p className="text-xs font-bold text-ink">منابع داده‌های تحلیل‌شده</p>
-                <ul className="list-disc space-y-0.5 ps-5 text-2xs text-subtle leading-5">
+                <ul className="list-disc space-y-0.5 ps-5 text-2xs leading-5 text-subtle">
                   {current.sources.map((s) => (
                     <li key={s}>{s}</li>
                   ))}
@@ -1047,10 +1211,10 @@ export function ReportTab({
             )}
           </div>
         ) : (
-          <div className="py-12 text-center space-y-3">
-            <Sparkles className="h-10 w-10 text-muted mx-auto opacity-40" />
+          <div className="space-y-3 py-12 text-center">
+            <Sparkles className="mx-auto h-10 w-10 text-muted opacity-40" />
             <h4 className="text-sm font-semibold text-ink">هنوز گزارش تحلیلی برای این بازه ثبت نشده است</h4>
-            <p className="text-xs text-muted max-w-md mx-auto">
+            <p className="mx-auto max-w-md text-xs text-muted">
               با کلیک بر روی دکمهٔ «تهیهٔ تحلیل هوشمند»، گزارش تحلیلی کامل بر اساس دارایی‌های موجود فعلی، بهای تمام‌شده، مسکن اهواز و قیمت بازار آزاد خودروهای منتخب تولید می‌شود.
             </p>
             <Button
@@ -1059,7 +1223,7 @@ export function ReportTab({
               loading={busy}
               disabled={!ready}
               onClick={() => void generate()}
-              className="mt-2 font-bold"
+              className="mt-2 bg-gradient-to-l from-[#0B1B5C] to-[#2E5BFF] font-bold"
             >
               تهیهٔ گزارش تحلیلی هوشمند
             </Button>
