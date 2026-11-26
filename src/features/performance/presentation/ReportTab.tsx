@@ -69,6 +69,8 @@ export interface SimulatorItem {
   priceStartRangeNote?: string;
   priceEnd: number;
   unitsCount: number;
+  /** باقیماندهٔ نقدی خرید خودرو پس از خرید تعداد صحیح دستگاه */
+  leftoverCashToman?: number;
   startCostToman: number;
   startCostUsd: number;
   endValueToman: number;
@@ -257,13 +259,15 @@ export function ReportTab({
       });
     }
 
-    // ۲. خودروهای منتخب بازار آزاد در ۱۱ دی ۱۴۰۳ (بدون قیمت کارخانه) + قیمت روز از استور بازار خودروی دارینو
+    // ۲. خودروهای منتخب بازار آزاد در ۱۱ دی ۱۴۰۳ (فقط تعداد صحیح دستگاه + قیمت کارکردهٔ مدل ۱۴۰۳ در سال ۱۴۰۵)
     for (const car of HISTORICAL_CAR_BENCHMARKS) {
-      const liveCar = resolveLiveCarMarketPrice(car, carSnapshots);
+      const liveCar = resolveLiveCarMarketPrice(car, carSnapshots, 1403);
       const pStart = car.marketPriceDec1403;
       const pEnd = liveCar.price;
-      const count = startToman > 0 ? startToman / pStart : 0;
-      const valEndToman = count * pEnd;
+      // خودرو را نمی‌توان کسری خرید (مثلاً ۲.۱ دستگاه)؛ فقط تعداد صحیح + باقیماندهٔ نقدی
+      const wholeCount = startToman > 0 ? Math.floor(startToman / pStart) : 0;
+      const leftoverToman = Math.max(0, startToman - wholeCount * pStart);
+      const valEndToman = wholeCount * pEnd + leftoverToman;
       const valEndUsd = rateEnd > 0 ? valEndToman / rateEnd : 0;
       const pnlT = valEndToman - startToman;
       const pnlU = valEndUsd - startUsd;
@@ -271,7 +275,7 @@ export function ReportTab({
       items.push({
         id: car.id,
         name: car.name,
-        subLabel: `${car.brandFa} · بازهٔ ۱۱ دی ۱۴۰۳: ${cleanRangeNote(car.rangeNoteDec1403)}`,
+        subLabel: `${car.brandFa} · مدل ۱۴۰۳ (امروز کارکرده) · ${cleanRangeNote(car.rangeNoteDec1403)}`,
         category: 'car',
         categoryLabel: `خودرو (${car.brandFa})`,
         unitLabel: 'دستگاه',
@@ -279,7 +283,8 @@ export function ReportTab({
         priceStart: pStart,
         priceStartRangeNote: car.rangeNoteDec1403,
         priceEnd: pEnd,
-        unitsCount: count,
+        unitsCount: wholeCount,
+        leftoverCashToman: leftoverToman,
         startCostToman: startToman,
         startCostUsd: startUsd,
         endValueToman: valEndToman,
@@ -357,7 +362,8 @@ export function ReportTab({
 
   const customSimResult = useMemo(() => {
     if (!activeSimItem) return null;
-    const count = Number.isFinite(customUnits) && customUnits > 0 ? customUnits : 1;
+    const rawCount = Number.isFinite(customUnits) && customUnits > 0 ? customUnits : 1;
+    const count = activeSimItem.unitLabel === 'دستگاه' ? Math.max(1, Math.round(rawCount)) : rawCount;
     const isUsd = activeSimItem.currency === 'usd';
     const unitPriceStart = activeSimItem.priceStart;
     const unitPriceEnd = activeSimItem.priceEnd;
@@ -815,10 +821,13 @@ export function ReportTab({
                 <Field label={`تعداد (${activeSimItem?.unitLabel ?? 'واحد'})`}>
                   <Input
                     type="number"
-                    min={0.1}
+                    min={activeSimItem?.unitLabel === 'دستگاه' ? 1 : 0.1}
                     step={activeSimItem?.unitLabel === 'دستگاه' ? 1 : activeSimItem?.unitLabel === 'مترمربع' ? 10 : 1}
-                    value={customUnits}
-                    onChange={(e) => setCustomUnits(Math.max(0.1, Number(e.target.value) || 1))}
+                    value={activeSimItem?.unitLabel === 'دستگاه' ? Math.max(1, Math.round(customUnits)) : customUnits}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 1;
+                      setCustomUnits(activeSimItem?.unitLabel === 'دستگاه' ? Math.max(1, Math.round(val)) : Math.max(0.1, val));
+                    }}
                     className="text-center text-sm font-bold"
                   />
                 </Field>
@@ -842,10 +851,16 @@ export function ReportTab({
                       {toFaDigits(num)} {activeSimItem?.unitLabel}
                     </button>
                   ))}
-                  {activeSimItem && (
+                  {activeSimItem && activeSimItem.unitsCount >= 1 && (
                     <button
                       type="button"
-                      onClick={() => setCustomUnits(Math.round(activeSimItem.unitsCount * 100) / 100)}
+                      onClick={() =>
+                        setCustomUnits(
+                          activeSimItem.unitLabel === 'دستگاه'
+                            ? Math.floor(activeSimItem.unitsCount)
+                            : Math.round(activeSimItem.unitsCount * 100) / 100
+                        )
+                      }
                       className={cn(
                         'rounded-control border px-2.5 py-1.5 text-2xs font-bold transition-all',
                         Math.abs(customUnits - activeSimItem.unitsCount) < 0.05
@@ -853,7 +868,11 @@ export function ReportTab({
                           : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
                       )}
                     >
-                      معادل کل سرمایهٔ شروع شما ({toFaDigits(activeSimItem.unitsCount.toFixed(1))} {activeSimItem.unitLabel})
+                      حداکثر خرید با سرمایهٔ شروع شما (
+                      {activeSimItem.unitLabel === 'دستگاه'
+                        ? toFaDigits(Math.floor(activeSimItem.unitsCount))
+                        : toFaDigits(activeSimItem.unitsCount.toFixed(1))}{' '}
+                      {activeSimItem.unitLabel})
                     </button>
                   )}
                 </div>
@@ -1070,20 +1089,34 @@ export function ReportTab({
                         </div>
 
                         <div className="space-y-1.5 rounded-xl bg-surface-2/80 p-3 text-xs">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <span className="text-subtle">قابل خرید با سرمایهٔ شروع:</span>
-                            <b className="font-extrabold text-ink">
-                              {toFaDigits(item.unitsCount < 10 ? item.unitsCount.toFixed(2) : Math.round(item.unitsCount).toLocaleString('en-US'))} {item.unitLabel}
-                            </b>
+                            {item.category === 'car' ? (
+                              item.unitsCount >= 1 ? (
+                                <b className="font-extrabold text-ink">{toFaDigits(Math.floor(item.unitsCount))} دستگاه</b>
+                              ) : (
+                                <span className="text-2xs font-bold text-warn">کمتر از ۱ دستگاه (ناکافی)</span>
+                              )
+                            ) : (
+                              <b className="font-extrabold text-ink">
+                                {toFaDigits(item.unitsCount < 10 ? item.unitsCount.toFixed(2) : Math.round(item.unitsCount).toLocaleString('en-US'))} {item.unitLabel}
+                              </b>
+                            )}
                           </div>
+                          {item.category === 'car' && item.unitsCount >= 1 && (item.leftoverCashToman ?? 0) >= 1_000_000 && (
+                            <div className="flex items-center justify-between text-2xs text-subtle">
+                              <span>باقیماندهٔ نقدی پس از خرید:</span>
+                              <span className="font-semibold text-ink"><Toman v={item.leftoverCashToman} /></span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between text-2xs text-subtle">
-                            <span>{isIranAsset ? 'قیمت بازار در ۱۱ دی ۱۴۰۳:' : 'قیمت تاریخ شروع:'}</span>
+                            <span>{item.category === 'car' ? 'قیمت صفر در ۱۱ دی ۱۴۰۳:' : isIranAsset ? 'قیمت بازار در ۱۱ دی ۱۴۰۳:' : 'قیمت تاریخ شروع:'}</span>
                             <span className="font-semibold text-ink">
                               {item.currency === 'usd' ? <Usd v={item.priceStart} /> : <Toman v={item.priceStart} />}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-2xs text-subtle">
-                            <span>{isIranAsset ? 'قیمت بازار آزاد امروز:' : 'قیمت روز:'}</span>
+                            <span>{item.category === 'car' ? 'قیمت کارکردهٔ مدل ۱۴۰۳ امروز:' : isIranAsset ? 'قیمت بازار آزاد امروز:' : 'قیمت روز:'}</span>
                             <span className="font-semibold text-ink">
                               {item.currency === 'usd' ? <Usd v={item.priceEnd} /> : <Toman v={item.priceEnd} />}
                             </span>

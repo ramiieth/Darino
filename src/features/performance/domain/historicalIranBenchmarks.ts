@@ -515,17 +515,22 @@ export function resolveLiveAhvazPropertyPrice(
   };
 }
 
+/** ضریب افت سالانهٔ مدل خودرو در بازار ایران (حدود ۹٪ به ازای هر سال اختلاف مدل بین خودروی کارکردهٔ ۱۴۰۳ و صفر ۱۴۰۵) */
+export const CAR_MODEL_YEAR_DEPRECIATION_RATE = 0.09;
+
 /**
- * استخراج قیمت فعلی بازار آزاد یک خودرو از آخرین Snapshot بخش «بازار خودرو»ی اپ دارینو
- * ⚠️ فقط قیمت بازار آزاد (`row.market`) خوانده می‌شود؛ قیمت کارخانه (`row.dealer`) کاملاً نادیده گرفته می‌شود.
+ * استخراج قیمت فعلی بازار آزاد یک خودروی خریداری‌شده در سال ۱۴۰۳ (مدل ۱۴۰۳) از آخرین Snapshot بخش «بازار خودرو»ی اپ دارینو:
+ *   ۱. اولویت اول: قیمت واقعی مدل ۱۴۰۳ (دیوار یا car.ir) در آخرین Snapshot (چون خودروی خریداری‌شده در دی ۱۴۰۳، امروز خودروی کارکردهٔ مدل ۱۴۰۳ است نه صفر ۱۴۰۵).
+ *   ۲. اولویت دوم: اگر در Snapshot فقط مدل جدیدتر (مثلاً ۱۴۰۴ یا ۱۴۰۵) موجود باشد، قیمت بازار آزاد آن با افت سالانهٔ مدل (۹٪ در سال) برای مدل ۱۴۰۳ تعدیل می‌شود.
+ * ⚠️ قیمت کارخانه (`row.dealer`) کاملاً نادیده گرفته می‌شود.
  */
 export function resolveLiveCarMarketPrice(
   def: HistoricalCarDef,
-  snapshots: CarSnapshot[]
-): { price: number; year: string | null; source: string; isLive: boolean } {
+  snapshots: CarSnapshot[],
+  purchaseYear = 1403
+): { price: number; year: string | null; source: string; isLive: boolean; depreciatedFromYear?: number } {
   const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
   if (latest && latest.rows.length > 0) {
-    // فقط ردیف‌هایی که قیمت بازار آزاد (market !== null) دارند
     const candidates: CarPriceRow[] = [];
     for (const r of latest.rows) {
       if (!r.market || r.market <= 0) continue;
@@ -536,22 +541,51 @@ export function resolveLiveCarMarketPrice(
     }
 
     if (candidates.length > 0) {
-      // انتخاب جدیدترین سال ساخت که قیمت بازار آزاد دارد
-      candidates.sort((a, b) => Number(b.year) - Number(a.year) || (b.marketUpdatedAt ?? 0) - (a.marketUpdatedAt ?? 0));
+      // ۱. جستجوی مستقیم مدل دقیق سال خرید (مثلاً ۱۴۰۳) — اولویت با قیمت واقعی دیوار (کارکرده/بازار)
+      const exactYearRows = candidates.filter((r) => Number(r.year) === purchaseYear);
+      if (exactYearRows.length > 0) {
+        exactYearRows.sort(
+          (a, b) => Number(b.source === 'divar') - Number(a.source === 'divar') || (b.marketUpdatedAt ?? 0) - (a.marketUpdatedAt ?? 0)
+        );
+        const best = exactYearRows[0];
+        return {
+          price: Math.round(best.market as number),
+          year: best.year,
+          source: `بازار خودروی اپ دارینو (قیمت واقعی مدل ${best.year} کارکرده — ${best.source === 'divar' ? 'دیوار' : 'بازار آزاد'})`,
+          isLive: true
+        };
+      }
+
+      // ۲. اگر مدل ۱۴۰۳ موجود نبود، نزدیک‌ترین مدل جدیدتر را می‌گیریم و افت مدل را اعمال می‌کنیم
+      candidates.sort(
+        (a, b) => Math.abs(Number(a.year) - purchaseYear) - Math.abs(Number(b.year) - purchaseYear) || (b.marketUpdatedAt ?? 0) - (a.marketUpdatedAt ?? 0)
+      );
       const best = candidates[0];
+      const bestYear = Number(best.year);
+      const yearDiff = Number.isFinite(bestYear) && bestYear > purchaseYear ? bestYear - purchaseYear : 0;
+      const factor = yearDiff > 0 ? Math.pow(1 - CAR_MODEL_YEAR_DEPRECIATION_RATE, yearDiff) : 1;
+      const adjustedPrice = Math.round((best.market as number) * factor);
+      const dropPct = Math.round((1 - factor) * 100);
       return {
-        price: best.market as number,
-        year: best.year,
-        source: `بازار خودروی اپ دارینو (قیمت بازار آزاد مدل ${best.year} — بدون قیمت کارخانه)`,
-        isLive: true
+        price: adjustedPrice,
+        year: String(purchaseYear),
+        source:
+          yearDiff > 0
+            ? `بازار خودروی دارینو (قیمت مدل ${best.year} تعدیل‌شده برای کارکردهٔ مدل ${purchaseYear} با ~${dropPct}٪ افت مدل)`
+            : `بازار خودروی اپ دارینو (قیمت بازار آزاد مدل ${best.year})`,
+        isLive: true,
+        depreciatedFromYear: yearDiff > 0 ? bestYear : undefined
       };
     }
   }
 
+  // پشتیبان زمانی که کش بازار خودرو هنوز بارگذاری نشده: اعمال افت ۲ ساله (۱۴۰۳ در سال ۱۴۰۵) روی قیمت صفر روز
+  const fallbackFactor = Math.pow(1 - CAR_MODEL_YEAR_DEPRECIATION_RATE, 2);
   return {
-    price: def.fallbackCurrentMarket,
-    year: null,
-    source: 'قیمت بازار آزاد در اپ دارینو (بدون قیمت کارخانه)',
-    isLive: false
+    price: Math.round(def.fallbackCurrentMarket * fallbackFactor),
+    year: String(purchaseYear),
+    source: `قیمت برآوردی کارکردهٔ مدل ${purchaseYear} در بازار آزاد (تعدیل افت مدل ~۱۷٪ نسبت به صفر روز)`,
+    isLive: false,
+    depreciatedFromYear: 1405
   };
 }

@@ -15,7 +15,7 @@ import type { CarSnapshot } from '@/features/carMarket/domain/types';
 import type { PropertyMarketSnapshot } from '@/features/propertyMarket/domain/types';
 import { normalizePoints, valueAt } from '../domain/engine';
 import { CAR_AVG_ID, PROP_AVG_ID, SOURCE_FA, carMarketId, propertyMarketId } from '../domain/markets';
-import { HISTORICAL_CAR_BENCHMARKS, HISTORICAL_DEC_31_2024_TS } from '../domain/historicalIranBenchmarks';
+import { CAR_MODEL_YEAR_DEPRECIATION_RATE, HISTORICAL_CAR_BENCHMARKS, HISTORICAL_DEC_31_2024_TS } from '../domain/historicalIranBenchmarks';
 import type { BenchmarksPayload, CpiPoint, ManualPricePoint, PerfSettings, Pt, Series } from '../domain/types';
 
 const MONTH = 30 * 86_400_000;
@@ -282,7 +282,7 @@ export function useMarketSeries(startTs: number | null, settings: PerfSettings):
         if (!baseCar) continue;
         let car = baseCar;
         // اگر بازهٔ بررسی از حوالی ۱۱ دی ۱۴۰۳ شروع شده و سری car.ir/دیوار از تاریخ دیرتری آغاز می‌شود،
-        // قیمت بازار آزاد ثبت‌شده در ۱۱ دی ۱۴۰۳ (بخش تحلیل هوشمند) به‌عنوان نقطهٔ شروع اضافه می‌شود تا «داده کافی موجود نیست» نزند
+        // قیمت بازار آزاد ۱۱ دی ۱۴۰۳ اضافه می‌شود و قیمت روز نیز برای خودروی کارکردهٔ مدل ۱۴۰۳ تعدیل می‌گردد (نه صفر ۱۴۰۴/۱۴۰۵)
         const firstPt = car.points[0]?.[0];
         const nearDec1403 = Math.abs(startTs - HISTORICAL_DEC_31_2024_TS) <= 35 * DAY;
         if (nearDec1403 && (!firstPt || firstPt > startTs + 15 * DAY)) {
@@ -291,10 +291,17 @@ export function useMarketSeries(startTs: number | null, settings: PerfSettings):
             (mappedId ? HISTORICAL_CAR_BENCHMARKS.find((h) => h.id === mappedId) : undefined) ??
             HISTORICAL_CAR_BENCHMARKS.find((h) => h.matchPatterns.some((re) => re.test(car.detail ?? '')));
           if (histDef) {
+            const yearMatch = /مدل\s*(\d{4})/.exec(car.detail ?? '');
+            const seriesYear = yearMatch ? Number(yearMatch[1]) : 1404;
+            const yearDiff = Number.isFinite(seriesYear) && seriesYear > 1403 ? seriesYear - 1403 : 0;
+            const ageFactor = yearDiff > 0 ? Math.pow(1 - CAR_MODEL_YEAR_DEPRECIATION_RATE, yearDiff) : 1;
+            const adjustedLaterPts: Pt[] = car.points.map(([t, v]) => [t, Math.round(v * ageFactor)]);
+            const dropPct = Math.round((1 - ageFactor) * 100);
             car = {
               ...car,
-              points: normalizePoints([[HISTORICAL_DEC_31_2024_TS, histDef.marketPriceDec1403], ...car.points]),
-              source: `قیمت بازار آزاد ۱۱ دی ۱۴۰۳ (تحلیل هوشمند دارینو) + ${car.source}`
+              points: normalizePoints([[HISTORICAL_DEC_31_2024_TS, histDef.marketPriceDec1403], ...adjustedLaterPts]),
+              detail: yearDiff > 0 ? `${(car.detail ?? histDef.name).replace(/مدل\s*\d{4}/, 'مدل ۱۴۰۳ کارکرده')} (تعدیل ~${toFa(dropPct)}٪ افت مدل)` : car.detail,
+              source: `قیمت بازار آزاد ۱۱ دی ۱۴۰۳ (مدل ۱۴۰۳) + ${car.source}${yearDiff > 0 ? ` — تعدیل‌شده با ~${toFa(dropPct)}٪ افت مدل برای کارکردهٔ ۱۴۰۳` : ''}`
             };
           }
         }
