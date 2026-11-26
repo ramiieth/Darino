@@ -43,61 +43,61 @@ export const RATING_FA: Record<
   { label: string; short: string; actionHint: string; tone: 'gain' | 'warn' | 'loss' | 'neutral'; direction: 1 | 0 | -1 }
 > = {
   Buy: {
-    label: 'ورود صعودی قوی (Buy)',
+    label: 'پیشنهاد خرید قوی',
     short: 'خرید قوی',
-    actionHint: 'کفهٔ شواهد صعودی با اختلاف معنادار سنگین‌تر است؛ ورود یا افزایش پوزیشن با رعایت حد ضرر.',
+    actionHint: 'بیشتر نشانه‌ها به نفع رشد قیمت است؛ می‌توان با رعایت حد ضرر وارد شد.',
     tone: 'gain',
     direction: 1
   },
   Overweight: {
-    label: 'افزایش تدریجی وزن (Overweight)',
-    short: 'افزایش وزن',
-    actionHint: 'چشم‌انداز مثبت است اما ریسک‌هایی وجود دارد؛ ورود پله‌ای یا با حجم محتاطانه‌تر.',
+    label: 'خرید پله‌ای و تدریجی',
+    short: 'خرید پله‌ای',
+    actionHint: 'چشم‌انداز کلی مثبت است اما کمی ریسک وجود دارد؛ بهتر است کم‌کم و پله‌ای وارد شوید.',
     tone: 'gain',
     direction: 1
   },
   Hold: {
-    label: 'نگه‌داری / صبر (Hold)',
-    short: 'نگه‌داری / صبر',
-    actionHint: 'شواهد صعودی و نزولی متوازن است یا داده برای ورود جهت‌دار کافی نیست؛ فعلاً بدون اقدام جدید.',
+    label: 'صبر و نگه‌داری',
+    short: 'صبر و نگه‌داری',
+    actionHint: 'نشانه‌های مثبت و منفی تقریباً برابرند؛ فعلاً بهتر است دست نگه دارید و عجله نکنید.',
     tone: 'neutral',
     direction: 0
   },
   Underweight: {
-    label: 'کاهش وزن و سیو سود (Underweight)',
-    short: 'کاهش وزن',
-    actionHint: 'ریسک‌های نزولی در حال غلبه هستند؛ کاهش حجم پوزیشن یا تنگ کردن حد ضرر.',
+    label: 'کاهش حجم و سیو سود',
+    short: 'کاهش حجم',
+    actionHint: 'ریسک افت قیمت بیشتر شده است؛ بهتر است بخشی از سود را ذخیره کنید یا حد ضرر را نزدیک‌تر بگذارید.',
     tone: 'warn',
     direction: -1
   },
   Sell: {
-    label: 'خروج / پرهیز از خرید (Sell)',
-    short: 'خروج / شورت',
-    actionHint: 'کفهٔ استدلال‌های نزولی و ریسک غالب است؛ خروج از پوزیشن لانگ یا بررسی سناریوی نزولی.',
+    label: 'پرهیز از خرید / خروج',
+    short: 'خروج / فروش',
+    actionHint: 'نشانه‌های ریزش و ریسک غالب است؛ بهتر است وارد خرید نشوید یا از معامله خارج شوید.',
     tone: 'loss',
     direction: -1
   }
 };
 
 export const TRADER_ACTION_FA: Record<TraderAction, { label: string; short: string; tone: 'gain' | 'neutral' | 'loss' }> = {
-  Buy: { label: 'پیشنهاد خرید / لانگ (Buy)', short: 'خرید / لانگ', tone: 'gain' },
-  Hold: { label: 'پیشنهاد صبر و نگه‌داری (Hold)', short: 'صبر / بدون ورود', tone: 'neutral' },
-  Sell: { label: 'پیشنهاد فروش / شورت (Sell)', short: 'فروش / شورت', tone: 'loss' }
+  Buy: { label: 'پیشنهاد خرید', short: 'خرید', tone: 'gain' },
+  Hold: { label: 'پیشنهاد صبر و دست‌نگه‌داشتن', short: 'صبر', tone: 'neutral' },
+  Sell: { label: 'پیشنهاد فروش یا پرهیز از خرید', short: 'فروش / خروج', tone: 'loss' }
 };
 
 export const SENTIMENT_BAND_FA: Record<SentimentBand, { label: string; tone: 'gain' | 'warn' | 'loss' | 'neutral' }> = {
-  Bullish: { label: 'کاملاً صعودی', tone: 'gain' },
-  'Mildly Bullish': { label: 'ملایم صعودی', tone: 'gain' },
-  Neutral: { label: 'خنثی', tone: 'neutral' },
-  Mixed: { label: 'متناقض (دوگانه)', tone: 'warn' },
-  'Mildly Bearish': { label: 'ملایم نزولی', tone: 'warn' },
-  Bearish: { label: 'کاملاً نزولی', tone: 'loss' }
+  Bullish: { label: 'بسیار مثبت و صعودی', tone: 'gain' },
+  'Mildly Bullish': { label: 'متمایل به رشد', tone: 'gain' },
+  Neutral: { label: 'خنثی و متعادل', tone: 'neutral' },
+  Mixed: { label: 'دوپهلو و نامطمئن', tone: 'warn' },
+  'Mildly Bearish': { label: 'متمایل به افت', tone: 'warn' },
+  Bearish: { label: 'منفی و نزولی', tone: 'loss' }
 };
 
 export const CONFIDENCE_FA: Record<ConfidenceLevel, string> = {
-  high: 'بالا (داده کامل)',
-  medium: 'متوسط',
-  low: 'پایین (داده محدود)'
+  high: 'دادهٔ کامل',
+  medium: 'دادهٔ متوسط',
+  low: 'دادهٔ محدود'
 };
 
 const NULLISH_FLOAT = new Set(['', 'none', 'n/a', 'na', 'null', 'nil', '-', 'tbd', 'unknown', 'نامشخص']);
@@ -416,67 +416,67 @@ export function buildIndicatorDiagnostics(t: TechnicalSnapshot): IndicatorDiagno
   return [
     {
       key: 'close_10_ema',
-      nameFa: 'میانگین متحرک نمایی ۱۰',
+      nameFa: 'میانگین قیمت کوتاه‌مدت (۱۰ دوره)',
       code: '10 EMA',
       category: 'روند',
       value: t.close10Ema,
       signal: ema10Sig,
-      signalFa: ema10Sig === 'bullish' ? 'بالای میانگین' : ema10Sig === 'bearish' ? 'زیر میانگین' : 'خنثی',
-      noteFa: 'شتاب کوتاه‌مدت قیمت و نقطه ورود سریع'
+      signalFa: ema10Sig === 'bullish' ? 'بالای میانگین' : ema10Sig === 'bearish' ? 'زیر میانگین' : 'متعادل',
+      noteFa: 'جهت حرکت قیمت در چند روز اخیر'
     },
     {
       key: 'close_50_sma',
-      nameFa: 'میانگین متحرک ساده ۵۰',
+      nameFa: 'میانگین قیمت میان‌مدت (۵۰ دوره)',
       code: '50 SMA',
       category: 'روند',
       value: t.close50Sma,
       signal: sma50Sig,
-      signalFa: sma50Sig === 'bullish' ? 'روند میان‌مدت صعودی' : sma50Sig === 'bearish' ? 'روند میان‌مدت نزولی' : 'خنثی',
-      noteFa: 'حمایت یا مقاومت دینامیک میان‌مدت'
+      signalFa: sma50Sig === 'bullish' ? 'روند میان‌مدت مثبت' : sma50Sig === 'bearish' ? 'روند میان‌مدت منفی' : 'متعادل',
+      noteFa: 'نشان می‌دهد روند چند هفتهٔ اخیر صعودی است یا نزولی'
     },
     {
       key: 'close_200_sma',
-      nameFa: 'میانگین متحرک ساده ۲۰۰',
+      nameFa: 'میانگین قیمت بلندمدت (۲۰۰ دوره)',
       code: '200 SMA',
       category: 'روند',
       value: t.close200Sma,
       signal: sma200Sig,
-      signalFa: sma200Sig === 'bullish' ? 'بالای خط روند کلان' : sma200Sig === 'bearish' ? 'زیر خط روند کلان' : 'داده ناکافی',
-      noteFa: 'معیار کلان جهت بازار و تقاطع طلایی/مرگ'
+      signalFa: sma200Sig === 'bullish' ? 'بالای روند بلندمدت' : sma200Sig === 'bearish' ? 'زیر روند بلندمدت' : 'داده ناکافی',
+      noteFa: 'معیار اصلی برای تشخیص بازار صعودی یا نزولی در بلندمدت'
     },
     {
       key: 'macd',
-      nameFa: 'خط مکدی (۱۲، ۲۶)',
+      nameFa: 'شاخص شتاب حرکت',
       code: 'MACD',
       category: 'مومنتوم',
       value: t.macd,
       signal: macdSig,
-      signalFa: macdSig === 'bullish' ? 'بالای خط سیگنال' : macdSig === 'bearish' ? 'زیر خط سیگنال' : 'خنثی',
-      noteFa: 'تفاضل میانگین‌های نمایی ۱۲ و ۲۶ دوره‌ای'
+      signalFa: macdSig === 'bullish' ? 'شتاب صعودی' : macdSig === 'bearish' ? 'شتاب نزولی' : 'متعادل',
+      noteFa: 'سنجش سرعت و جهت تغییر قیمت در کوتاه‌مدت نسبت به میان‌مدت'
     },
     {
       key: 'macds',
-      nameFa: 'خط سیگنال مکدی (۹)',
+      nameFa: 'خط تعادل شتاب',
       code: 'MACD Signal',
       category: 'مومنتوم',
       value: t.macds,
       signal: macdSig,
-      signalFa: macdSig === 'bullish' ? 'تقاطع صعودی' : macdSig === 'bearish' ? 'تقاطع نزولی' : 'خنثی',
-      noteFa: 'میانگین ۹ دوره‌ای خط مکدی برای تشخیص چرخش'
+      signalFa: macdSig === 'bullish' ? 'چرخش رو به بالا' : macdSig === 'bearish' ? 'چرخش رو به پایین' : 'متعادل',
+      noteFa: 'به تشخیص زودهنگام تغییر مسیر قیمت کمک می‌کند'
     },
     {
       key: 'macdh',
-      nameFa: 'هیستوگرام مکدی',
+      nameFa: 'قدرت شتاب فعلی',
       code: 'MACD Hist',
       category: 'مومنتوم',
       value: t.macdh,
       signal: macdhSig,
-      signalFa: macdhSig === 'bullish' ? 'مومنتوم مثبت' : macdhSig === 'bearish' ? 'مومنتوم منفی' : 'خنثی',
-      noteFa: 'فاصله خط مکدی و سیگنال (قدرت شتاب)'
+      signalFa: macdhSig === 'bullish' ? 'شتاب مثبت' : macdhSig === 'bearish' ? 'شتاب منفی' : 'متعادل',
+      noteFa: 'نشان می‌دهد شتاب خرید یا فروش در حال قوی‌تر شدن است یا ضعیف‌تر'
     },
     {
       key: 'rsi',
-      nameFa: 'شاخص قدرت نسبی (۱۴)',
+      nameFa: 'قدرت خریداران در برابر فروشندگان',
       code: 'RSI 14',
       category: 'مومنتوم',
       value: t.rsi14,
@@ -485,65 +485,65 @@ export function buildIndicatorDiagnostics(t: TechnicalSnapshot): IndicatorDiagno
         t.rsi14 === null
           ? '—'
           : t.rsi14 >= 70
-            ? 'اشباع خرید (>۷۰)'
+            ? 'داغ و پرخرید (احتمال اصلاح)'
             : t.rsi14 <= 30
-              ? 'اشباع فروش (<۳۰)'
+              ? 'ارزان و پرفروش (احتمال بازگشت)'
               : t.rsi14 >= 53
-                ? 'متمایل به صعود'
+                ? 'برتری خریداران'
                 : t.rsi14 <= 47
-                  ? 'متمایل به نزول'
-                  : 'تعادل (۴۷ تا ۵۳)',
-      noteFa: 'سنجش اشباع خرید/فروش با فرمول Wilder'
+                  ? 'برتری فروشندگان'
+                  : 'تعادل کامل',
+      noteFa: 'عدد بالای ۷۰ یعنی بازار داغ شده و زیر ۳۰ یعنی بیش‌ازحد افت کرده است'
     },
     {
       key: 'boll',
-      nameFa: 'میانه باند بولینگر (۲۰)',
+      nameFa: 'محدودهٔ تعادل قیمت',
       code: 'Boll Mid',
       category: 'نوسان',
       value: t.bollMid,
       signal: t.bollMid === null ? 'neutral' : c >= t.bollMid ? 'bullish' : 'bearish',
       signalFa: bollPos,
-      noteFa: 'محور تعادل ۲۰ کندل اخیر'
+      noteFa: 'قیمت میانی در نوسان‌های اخیر بازار'
     },
     {
       key: 'boll_ub',
-      nameFa: 'سقف باند بولینگر (+۲σ)',
+      nameFa: 'سقف محدودهٔ نوسان',
       code: 'Boll Upper',
       category: 'نوسان',
       value: t.bollUpper,
       signal: t.bollUpper !== null && c >= t.bollUpper ? 'bearish' : 'neutral',
-      signalFa: t.bollUpper !== null && c >= t.bollUpper ? 'برخورد به سقف' : 'مرز بالایی نوسان',
-      noteFa: 'ناحیه مقاومت دینامیک و شکست نوسانی'
+      signalFa: t.bollUpper !== null && c >= t.bollUpper ? 'نزدیک سقف نوسان' : 'مرز بالایی قیمت',
+      noteFa: 'محدوده‌ای که معمولاً فروشندگان در آن فعال‌تر می‌شوند'
     },
     {
       key: 'boll_lb',
-      nameFa: 'کف باند بولینگر (−۲σ)',
+      nameFa: 'کف محدودهٔ نوسان',
       code: 'Boll Lower',
       category: 'نوسان',
       value: t.bollLower,
       signal: t.bollLower !== null && c <= t.bollLower ? 'bullish' : 'neutral',
-      signalFa: t.bollLower !== null && c <= t.bollLower ? 'برخورد به کف' : 'مرز پایینی نوسان',
-      noteFa: 'ناحیه حمایت دینامیک و بازگشت به میانگین'
+      signalFa: t.bollLower !== null && c <= t.bollLower ? 'نزدیک کف نوسان' : 'مرز پایینی قیمت',
+      noteFa: 'محدوده‌ای که معمولاً خریداران در آن وارد می‌شوند'
     },
     {
       key: 'atr',
-      nameFa: 'میانگین دامنه واقعی (۱۴)',
+      nameFa: 'میزان نوسان معمول قیمت',
       code: 'ATR 14',
       category: 'نوسان',
       value: t.atr14,
       signal: 'neutral',
       signalFa: t.atrPct !== null ? `${t.atrPct.toFixed(2)}% قیمت` : '—',
-      noteFa: 'مبنای تعیین فاصله حد ضرر (۲×ATR) و اندازه پوزیشن'
+      noteFa: 'برای محاسبهٔ فاصلهٔ امن حد ضرر و مبلغ مناسب ورود به کار می‌رود'
     },
     {
       key: 'vwma',
-      nameFa: 'میانگین وزنی فعالیت (۲۰)',
+      nameFa: 'میانگین قیمت بر اساس حجم معاملات',
       code: 'VWMA 20',
       category: 'حجم و ساختار',
       value: t.vwma20,
       signal: vwmaSig,
-      signalFa: vwmaSig === 'bullish' ? 'تأیید روند با حجم' : vwmaSig === 'bearish' ? 'فشار فروش وزنی' : 'خنثی',
-      noteFa: 'میانگین قیمت وزن‌دهی‌شده با فعالیت هر کندل'
+      signalFa: vwmaSig === 'bullish' ? 'پشتیبانی خریداران' : vwmaSig === 'bearish' ? 'فشار فروشندگان' : 'متعادل',
+      noteFa: 'بررسی می‌کند آیا حرکت قیمت با حجم معاملات واقعی همراه بوده یا نه'
     }
   ];
 }
@@ -767,54 +767,51 @@ export function buildDeterministicTradingAgentsReport(input: CommitteeMarketInpu
       ? 'نامشخص'
       : n.toLocaleString('en-US', { maximumFractionDigits: digits });
 
+  const assetName = getMarketVisualMeta(input.coin).nameFa;
   const trendText =
     t.trendRegime === 'bullish'
-      ? 'صعودی (بالای میانگین‌های ۵۰ و ۲۰۰ دوره‌ای)'
+      ? 'صعودی (بالای میانگین‌های میان‌مدت و بلندمدت)'
       : t.trendRegime === 'bearish'
-        ? 'نزولی (زیر میانگین‌های ۵۰ و ۲۰۰ دوره‌ای)'
-        : 'نوسانی و خنثی';
+        ? 'نزولی (پایین‌تر از میانگین‌های میان‌مدت و بلندمدت)'
+        : 'درجا و بدون جهت مشخص';
 
   const marketReport = [
-    `بررسی ${t.barsCount} کندل ۴ ساعته نشان می‌دهد قیمت فعلی ${input.coin} در سطح ${fmt(t.close, 4)} دلار در رژیم ${trendText} قرار دارد و از میان ۱۱ شاخص تکنیکال، ${bullRows.length} شاخص صعودی و ${bearRows.length} شاخص نزولی هستند.`,
-    `میانگین نمایی کوتاه‌مدت (EMA10: ${fmt(t.close10Ema, 4)})، میانگین ۵۰ دوره‌ای (SMA50: ${fmt(t.close50Sma, 4)}) و میانگین ۲۰۰ دوره‌ای (SMA200: ${fmt(t.close200Sma, 4)}) در کنار شاخص قدرت نسبی (RSI14: ${fmt(t.rsi14, 1)}) و هیستوگرام مکدی (${fmt(t.macdh, 4)}) مومنتوم فعلی را تعریف می‌کنند.`,
-    `دامنه نوسان واقعی (ATR14: ${fmt(t.atr14, 4)} معادل ${fmt(t.atrPct, 2)}٪ قیمت) مرزهای باند بولینگر (${fmt(t.bollLower, 4)} تا ${fmt(t.bollUpper, 4)}) و سطوح حمایت/مقاومت ۲۰ کندل (${fmt(t.support20, 4)} / ${fmt(t.resistance20, 4)}) را به عنوان سطوح کلیدی تصمیم‌گیری تثبیت کرده است.`
+    `بررسی تاریخچهٔ اخیر نشان می‌دهد ${assetName} در قیمت ${fmt(t.close, 4)} دلار در روند ${trendText} قرار دارد و از میان ۱۱ شاخص بازار، ${bullRows.length} نشانه مثبت و ${bearRows.length} نشانه منفی دیده می‌شود.`,
+    `میانگین قیمت میان‌مدت حدود ${fmt(t.close50Sma, 4)} دلار و شاخص قدرت خریداران روی عدد ${fmt(t.rsi14, 1)} از ۱۰۰ قرار دارد.`,
+    `نوسان معمول قیمت حدود ${fmt(t.atrPct, 2)}٪ است و محدودهٔ کف و سقف اخیر بین ${fmt(t.support20, 4)} تا ${fmt(t.resistance20, 4)} دلار قرار گرفته است.`
   ].join(' ');
 
   const fundingText =
     d.fundingAprNow !== null
-      ? `نرخ فاندینگ سالانه فعلی ${fmt(d.fundingAprNow, 1)}٪ (میانگین ۷ روزه: ${fmt(d.fundingAvg7dApr, 1)}٪، صدک ۳۰ روزه: ${fmt(d.fundingPercentile30d, 0)}) است`
-      : 'داده نرخ فاندینگ لحظه‌ای محدود است';
+      ? `هزینهٔ نگه‌داری معاملات در بازار حدود ${fmt(d.fundingAprNow, 1)}٪ سالانه است که نشان می‌دهد هیجان خریداران در چه سطحی قرار دارد`
+      : 'اطلاعات لحظه‌ای هیجان معاملات محدود است';
   const tradersText =
     topTradersConsensus && topTradersConsensus.longUsd + topTradersConsensus.shortUsd > 0
-      ? ` و در میان ${topTradersConsensus.tradersCount} تریدر برتر باثبات، حجم لانگ ${fmt(topTradersConsensus.longUsd, 0)} دلار در برابر شورت ${fmt(topTradersConsensus.shortUsd, 0)} دلار ثبت شده است.`
+      ? ` و در میان ${topTradersConsensus.tradersCount} معامله‌گر برتر، حجم معاملات خرید ${fmt(topTradersConsensus.longUsd, 0)} دلار در برابر فروش ${fmt(topTradersConsensus.shortUsd, 0)} دلار بوده است.`
       : '.';
 
-  const sentimentNarrative = `${fundingText}${tradersText} برآیند تراز اندیکاتورها و ازدحام مشتقات، امتیاز احساسات را روی ${base.sentimentScore} از ۱۰ (${SENTIMENT_BAND_FA[base.sentimentBand].label}) قرار می‌دهد.`;
+  const sentimentNarrative = `${fundingText}${tradersText} در مجموع امتیاز وضعیت فعلی ${base.sentimentScore} از ۱۰ (${SENTIMENT_BAND_FA[base.sentimentBand].label}) ارزیابی می‌شود.`;
 
   const macroStateFa =
     macroRegime?.state === 'on'
-      ? 'ریسک‌پذیر (Risk-On)'
+      ? 'مثبت و پرانرژی'
       : macroRegime?.state === 'off'
-        ? 'محتاط و تدافعی (Risk-Off)'
+        ? 'محتاطانه و کم‌ریسک'
         : 'متعادل';
-  const newsMacroReport = `رژیم کلان بازار در وضعیت ${macroStateFa} قرار دارد${macroRegime?.btcAbove200 !== null && macroRegime?.btcAbove200 !== undefined ? ` (بیت‌کوین ${macroRegime.btcAbove200 ? 'بالای' : 'زیر'} میانگین ۲۰۰ روزه)` : ''}${macroRegime?.breadthPct !== null && macroRegime?.breadthPct !== undefined ? ` و پهنای صعودی بازار ${fmt(macroRegime.breadthPct, 0)}٪ است` : ''}. این آرایش کلان وزن سناریوی ${base.suggestedAction === 'Buy' ? 'ورود پله‌ای در اصلاح‌ها' : base.suggestedAction === 'Sell' ? 'کاهش ریسک و پرهیز از لانگ اهرمی' : 'صبر تا شکست معتبر سطوح'} را تقویت می‌کند.`;
+  const newsMacroReport = `فضای کلی بازارها در وضعیت ${macroStateFa} قرار دارد${macroRegime?.btcAbove200 !== null && macroRegime?.btcAbove200 !== undefined ? ` (بیت‌کوین ${macroRegime.btcAbove200 ? 'بالای' : 'پایین‌تر از'} میانگین بلندمدت خود است)` : ''}${macroRegime?.breadthPct !== null && macroRegime?.breadthPct !== undefined ? ` و حدود ${fmt(macroRegime.breadthPct, 0)}٪ از بازار در وضعیت مثبت هستند` : ''}. در چنین فضایی ${base.suggestedAction === 'Buy' ? 'ورود پله‌ای در افت‌های کوتاه‌مدت منطقی‌تر است' : base.suggestedAction === 'Sell' ? 'حفظ احتیاط و پرهیز از ریسک بالا اولویت دارد' : 'صبر کردن تا مشخص شدن جهت اصلی بازار تصمیم عاقلانه‌تری است'}.`;
 
-  const volOiRatio =
-    d.volume24hUsd && d.openInterestUsd && d.openInterestUsd > 0
-      ? (d.volume24hUsd / d.openInterestUsd).toFixed(2)
-      : null;
-  const fundamentalsReport = `حجم معاملات ۲۴ ساعته ${fmt(d.volume24hUsd, 0)} دلار و قراردادهای باز (Open Interest) معادل ${fmt(d.openInterestUsd, 0)} دلار است${volOiRatio ? ` (نسبت گردش حجم به OI: ${volOiRatio}x)` : ''}. حداکثر اهرم صرافی ${fmt(d.maxLeverage, 0)}x و اهرم امن ۷ روزه بر اساس مدل بقای دارینو ${d.safeLeverage7d ? `${d.safeLeverage7d}x` : 'بدون اهرم'} برآورد می‌شود.`;
+  const fundamentalsReport = `حجم معاملات ۲۴ ساعته حدود ${fmt(d.volume24hUsd, 0)} دلار و مجموع معاملات باز در بازار ${fmt(d.openInterestUsd, 0)} دلار است که نشان‌دهندهٔ نقدشوندگی این بازار است. سقف اهرم امن برای حفظ سرمایه در نوسان‌های یک هفتهٔ اخیر ${d.safeLeverage7d ? `حداکثر ${d.safeLeverage7d} برابر` : 'بدون اهرم'} برآورد می‌شود.`;
 
   const bullHistory = [
-    `پژوهشگر صعودی (Bull): ساختار حمایت در سطح ${fmt(t.support20, 4)} دلار (۲۰ کندل) و ${fmt(t.support50, 4)} دلار (۵۰ کندل) به همراه ${bullRows.length} سیگنال مثبت تکنیکال (${bullRows.slice(0, 4).map((r) => r.code).join('، ') || 'حفظ کف نوسانی'}) نشان‌دهنده پتانسیل حرکت به سمت هدف ${fmt(base.atrTargetLong, 4)} دلار است.`,
+    `کف‌های قیمتی اخیر در محدودهٔ ${fmt(t.support20, 4)} و ${fmt(t.support50, 4)} دلار همراه با ${bullRows.length} نشانهٔ مثبت در نمودار، نشان می‌دهد بازار توان حرکت به سمت محدودهٔ ${fmt(base.atrTargetLong, 4)} دلار را دارد.`,
     t.change24hPct !== null && t.change24hPct < 0
-      ? `اصلاح اخیر (${fmt(t.change24hPct, 2)}٪ در ۲۴ ساعت) نسبت ریسک به ریوارد ورود نزدیک حمایت و کف بولینگر (${fmt(t.bollLower, 4)}) را بهبود داده است.`
-      : `حفظ قیمت نسبت به میانگین وزنی حجم (VWMA20: ${fmt(t.vwma20, 4)}) از تداوم تقاضای فعال در بازار پشتیبانی می‌کند.`
+      ? `افت کوتاه‌مدت اخیر (${fmt(t.change24hPct, 2)}٪ در شبانه‌روز گذشته) قیمت را به محدودهٔ جذاب‌تری برای خرید نزدیک کرده است.`
+      : `ماندن قیمت بالاتر از میانگین معاملات اخیر (${fmt(t.vwma20, 4)} دلار) نشان می‌دهد تقاضای خریداران همچنان فعال است.`
   ].join(' ');
 
   const bearHistory = [
-    `پژوهشگر نزولی (Bear): مقاومت سنگین در تراز ${fmt(t.resistance20, 4)} و ${fmt(t.resistance50, 4)} دلار در کنار ${bearRows.length} سیگنال هشدار تکنیکال (${bearRows.slice(0, 4).map((r) => r.code).join('، ') || 'محدودیت شتاب'}) ریسک برگشت قیمت را بالا نگه می‌دارد.`,
-    `با توجه به سابقه بدترین ریزش ۲۴ ساعته (${fmt(d.worstCrash24hPct, 1)}٪) و نوسان ATR (${fmt(t.atrPct, 2)}٪)، هرگونه ورود بدون حد ضرر سخت‌گیرانه در سطح ۲×ATR در معرض تله نقدینگی قرار می‌گیرد.`
+    `در محدودهٔ ${fmt(t.resistance20, 4)} تا ${fmt(t.resistance50, 4)} دلار فروشندگان حضور جدی دارند و وجود ${bearRows.length} نشانهٔ هشدار در نمودار، احتمال برگشت قیمت را بالا نگه می‌دارد.`,
+    `با توجه به سابقهٔ شدیدترین افت یک‌روزه (${fmt(d.worstCrash24hPct, 1)}٪) و نوسان معمول ${fmt(t.atrPct, 2)}٪، هرگونه خرید بدون تعیین حد ضرر مشخص می‌تواند به زیان غیرمنتظره منجر شود.`
   ].join(' ');
 
   const traderAction = base.suggestedAction;
@@ -825,12 +822,12 @@ export function buildDeterministicTradingAgentsReport(input: CommitteeMarketInpu
     traderAction === 'Buy' ? base.atrTargetLong : traderAction === 'Sell' ? base.atrTargetShort : null;
 
   const sizingText = base.recommendedSizeUsd
-    ? `حداکثر ${base.recommendedSizeUsd.toLocaleString('en-US')} دلار (بر مبنای ریسک ${portfolio?.maxRiskPct ?? 1}٪ سرمایه و فاصله استاپ ۲×ATR)${d.safeLeverage7d ? ` با اهرم حداکثر ${Math.min(d.safeLeverage7d, 3)}x` : ''}`
-    : `حداکثر ۱٪ کل سرمایه در معرض ریسک فاصله استاپ ۲×ATR (${fmt(stopLoss, 4)} دلار)`;
+    ? `حداکثر ${base.recommendedSizeUsd.toLocaleString('en-US')} دلار (متناسب با سقف ضرر ${portfolio?.maxRiskPct ?? 1}٪ از سرمایه)${d.safeLeverage7d ? ` با اهرم حداکثر ${Math.min(d.safeLeverage7d, 3)} برابر` : ''}`
+    : `حداکثر ۱٪ از کل سرمایه در معرض ریسک تا حد ضرر (${fmt(stopLoss, 4)} دلار)`;
 
   const lessonsNote =
     pastLessons && pastLessons.length > 0
-      ? ` با لحاظ کردن سابقه تصمیم‌های قبلی در حافظه کمیته (${pastLessons[0]})، انضباط حد ضرر اولویت اول است.`
+      ? ` با توجه به تجربهٔ تصمیم‌های قبلی در سابقهٔ کمیته، پایبندی به حد ضرر اولویت اول است.`
       : '';
 
   return {
@@ -850,34 +847,34 @@ export function buildDeterministicTradingAgentsReport(input: CommitteeMarketInpu
       bearHistory,
       researchPlan: {
         recommendation: base.suggestedRating,
-        rationale: `با داوری میان ${bullRows.length} شاخص صعودی و ${bearRows.length} شاخص نزولی، امتیاز ترکیبی ${base.sentimentScore}/10 و وضعیت فاندینگ، کفه شواهد به نفع حکم «${RATING_FA[base.suggestedRating].label}» است.`,
+        rationale: `پس از مقایسهٔ ${bullRows.length} نشانهٔ مثبت در برابر ${bearRows.length} نشانهٔ منفی و امتیاز کلی ${base.sentimentScore} از ۱۰، جمع‌بندی به نفع «${RATING_FA[base.suggestedRating].label}» است.`,
         strategicActions:
           traderAction === 'Hold'
-            ? `خودداری از ورود عجولانه در میانه رنج و انتظار برای شکست معتبر سطح ${fmt(t.resistance20, 4)} دلار یا واکنش به حمایت ${fmt(t.support20, 4)} دلار.`
-            : `اجرای پله‌ای در حوالی ${fmt(entryPrice, 4)} دلار با ثبت هم‌زمان حد ضرر ۲×ATR در ${fmt(stopLoss, 4)} دلار و هدف ${fmt(takeProfit, 4)} دلار.`
+            ? `فعلاً از خرید عجولانه خودداری کنید و منتظر عبور قیمت از سقف ${fmt(t.resistance20, 4)} دلار یا رسیدن به کف ${fmt(t.support20, 4)} دلار بمانید.`
+            : `ورود پله‌ای نزدیک قیمت ${fmt(entryPrice, 4)} دلار همراه با ثبت هم‌زمان حد ضرر در ${fmt(stopLoss, 4)} دلار و هدف سود در ${fmt(takeProfit, 4)} دلار.`
       }
     },
     traderProposal: {
       action: traderAction,
       reasoning:
         traderAction === 'Hold'
-          ? `به دلیل توازن نسبی نیروهای صعودی و نزولی (امتیاز ${base.sentimentScore} از ۱۰)، نسبت ریسک به ریوارد ورود فوری در قیمت ${fmt(t.close, 4)} دلار بهینه نیست و حفظ نقدینگی اولویت دارد.`
-          : `پیشنهاد ${TRADER_ACTION_FA[traderAction].label} در قیمت مرجع ${fmt(entryPrice, 4)} دلار با حد ضرر مبتنی بر ۲ برابر ATR14 (${fmt(stopLoss, 4)} دلار) و حد سود ۳.۵ برابر ATR14 (${fmt(takeProfit, 4)} دلار) با نسبت ریسک به ریوارد ۱ به ۱.۷۵ تنظیم شد.`,
+          ? `چون نیروهای موافق و مخالف خرید تقریباً برابرند (امتیاز ${base.sentimentScore} از ۱۰)، ورود در قیمت فعلی (${fmt(t.close, 4)} دلار) نسبت سود به زیان جذابی ندارد و صبر کردن بهتر است.`
+          : `${TRADER_ACTION_FA[traderAction].label} در حوالی ${fmt(entryPrice, 4)} دلار با حد ضرر امن در ${fmt(stopLoss, 4)} دلار و هدف سود در ${fmt(takeProfit, 4)} دلار تنظیم شده است (نسبت سود به زیان حدود ۱ به ۱.۷۵).`,
       entryPrice,
       stopLoss,
       takeProfit,
       positionSizing: sizingText
     },
     riskDebate: {
-      aggressiveArgument: `تحلیلگر ریسک تهاجمی: نوسان ATR (${fmt(t.atrPct, 2)}٪) و نقدشوندگی ${fmt(d.volume24hUsd, 0)} دلاری فرصت مناسبی برای شکار حرکت تا تراز ${fmt(takeProfit ?? base.atrTargetLong, 4)} دلار فراهم می‌کند و تأخیر بیش‌ازحد باعث از دست رفتن نقطه بهینه ورود می‌شود.`,
-      conservativeArgument: `تحلیلگر ریسک محافظه‌کار: بدترین ریزش ۲۴ ساعته تاریخی (${fmt(d.worstCrash24hPct, 1)}٪) و موقعیت شاخص‌ها ایجاب می‌کند هیچ پوزیشنی بدون حد ضرر قطعی در ${fmt(stopLoss ?? base.atrStopLong, 4)} دلار و رعایت سقف اهرم امن باز نشود.`,
-      neutralArgument: `تحلیلگر ریسک متوازن: بهترین رویکرد، پیروی از حکم ${RATING_FA[base.suggestedRating].short} با حجم کنترل‌شده (${sizingText}) و انتقال حد ضرر به نقطه سربه‌سر پس از طی شدن ۱×ATR در جهت معامله است.`,
+      aggressiveArgument: `با توجه به نوسان ${fmt(t.atrPct, 2)}٪ و نقدشوندگی مناسب بازار، فرصت خوبی برای حرکت قیمت تا محدودهٔ ${fmt(takeProfit ?? base.atrTargetLong, 4)} دلار وجود دارد و صبر بیش‌ازحد ممکن است باعث از دست رفتن نقطهٔ ورود مناسب شود.`,
+      conservativeArgument: `سابقهٔ افت شدید یک‌روزه (${fmt(d.worstCrash24hPct, 1)}٪) یادآوری می‌کند که هیچ معامله‌ای نباید بدون حد ضرر قطعی در ${fmt(stopLoss ?? base.atrStopLong, 4)} دلار و رعایت سقف اهرم امن انجام شود.`,
+      neutralArgument: `بهترین کار، پیروی از جمع‌بندی «${RATING_FA[base.suggestedRating].short}» با مبلغ کنترل‌شده (${sizingText}) است؛ اگر قیمت به سود نشست، حد ضرر را به قیمت ورود منتقل کنید تا ریسک اصل سرمایه صفر شود.`,
       portfolioDecision: {
         rating: base.suggestedRating,
-        executiveSummary: `حکم نهایی کمیته روی ${input.coin} در قیمت ${fmt(t.close, 4)} دلار، «${RATING_FA[base.suggestedRating].label}» با امتیاز کمی ${base.sentimentScore} از ۱۰ است. ${traderAction === 'Hold' ? `تا روشن شدن تکلیف مرزهای ${fmt(t.support20, 4)} و ${fmt(t.resistance20, 4)} دلار صبر پیشنهاد می‌شود.` : `نقطه ورود مرجع ${fmt(entryPrice, 4)} دلار، حد ضرر الزامی ${fmt(stopLoss, 4)} دلار و هدف قیمتی ${fmt(takeProfit, 4)} دلار تعیین گردید.`} این خروجی شبیه‌سازی پژوهشی کمیته ایجنت‌هاست و توصیه مالی قطعی نیست.`,
-        investmentThesis: `تز سرمایه‌گذاری بر پایه تراز ${bullRows.length} به ${bearRows.length} در ۱۱ اندیکاتور تکنیکال، رژیم روند ${trendText}، امتیاز احساسات ${base.sentimentScore}/10 و کنترل ریسک ۲×ATR شکل گرفته است.${lessonsNote} شرط ابطال این سناریو، تثبیت کندل ۴ ساعته در خلاف جهت سطح ${fmt(stopLoss ?? t.support20, 4)} دلار است.`,
+        executiveSummary: `نتیجهٔ نهایی بررسی روی ${assetName} در قیمت ${fmt(t.close, 4)} دلار، «${RATING_FA[base.suggestedRating].label}» با امتیاز ${base.sentimentScore} از ۱۰ است. ${traderAction === 'Hold' ? `پیشنهاد می‌شود تا روشن شدن تکلیف محدودهٔ ${fmt(t.support20, 4)} تا ${fmt(t.resistance20, 4)} دلار صبر کنید.` : `قیمت ورود ${fmt(entryPrice, 4)} دلار، حد ضرر امن ${fmt(stopLoss, 4)} دلار و هدف سود ${fmt(takeProfit, 4)} دلار پیشنهاد شده است.`} این گزارش صرفاً تحلیل آموزشی است و توصیهٔ مالی قطعی نیست.`,
+        investmentThesis: `این تصمیم بر پایهٔ ${bullRows.length} نشانهٔ مثبت در برابر ${bearRows.length} نشانهٔ منفی، روند ${trendText} و امتیاز کلی ${base.sentimentScore} از ۱۰ گرفته شده است.${lessonsNote} اگر قیمت به صورت قطعی از سطح ${fmt(stopLoss ?? t.support20, 4)} دلار عبور کند، این تحلیل دیگر معتبر نیست و باید بازبینی شود.`,
         priceTarget: takeProfit,
-        timeHorizon: '۵ تا ۱۴ روز (سوینگ ۴ ساعته)'
+        timeHorizon: '۵ تا ۱۴ روز آینده'
       }
     }
   };
@@ -1329,65 +1326,65 @@ export function renderCompleteReportHtml(
 <div class="container">
   <header>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-      <h1>گزارش کمیته ایجنت‌ها (TradingAgents) — <span dir="ltr">${escapeHtml(input.coin)}</span></h1>
+      <h1>گزارش کمیتهٔ مناظرهٔ دارینو — <span dir="ltr">${escapeHtml(input.coin)}</span></h1>
       <span class="badge">${escapeHtml(ratingMeta.label)}</span>
     </div>
-    <p style="color:var(--muted);font-size:13px;">تاریخ تحلیل: ${escapeHtml(input.analysisDate)} · قیمت مرجع: <span dir="ltr">${input.technical.close}</span> دلار · عمق مناظره: ${input.researchDepth} دور</p>
+    <p style="color:var(--muted);font-size:13px;">تاریخ تحلیل: ${escapeHtml(input.analysisDate)} · قیمت فعلی: <span dir="ltr">${input.technical.close}</span> دلار</p>
     <div class="grid">
-      <div class="stat"><div class="stat-label">حکم نهایی مدیر پرتفولیو</div><div class="stat-value">${escapeHtml(ratingMeta.short)} (${escapeHtml(pm.rating)})</div></div>
-      <div class="stat"><div class="stat-label">پیشنهاد ایجنت معامله‌گر</div><div class="stat-value">${escapeHtml(TRADER_ACTION_FA[tp.action].label)}</div></div>
-      <div class="stat"><div class="stat-label">نقطه ورود / حد ضرر</div><div class="stat-value" dir="ltr">${tp.entryPrice ?? '—'} / ${tp.stopLoss ?? '—'}</div></div>
-      <div class="stat"><div class="stat-label">هدف قیمتی / افق زمانی</div><div class="stat-value">${pm.priceTarget ?? '—'} · ${escapeHtml(pm.timeHorizon)}</div></div>
+      <div class="stat"><div class="stat-label">نتیجهٔ نهایی کمیته</div><div class="stat-value">${escapeHtml(ratingMeta.short)}</div></div>
+      <div class="stat"><div class="stat-label">اقدام پیشنهادی</div><div class="stat-value">${escapeHtml(TRADER_ACTION_FA[tp.action].label)}</div></div>
+      <div class="stat"><div class="stat-label">قیمت ورود / حد ضرر</div><div class="stat-value" dir="ltr">${tp.entryPrice ?? '—'} / ${tp.stopLoss ?? '—'}</div></div>
+      <div class="stat"><div class="stat-label">هدف سود / بازهٔ زمانی</div><div class="stat-value">${pm.priceTarget ?? '—'} · ${escapeHtml(pm.timeHorizon)}</div></div>
     </div>
   </header>
 
   <section>
-    <h2>۱. حکم نهایی مدیر پرتفولیو (Portfolio Manager)</h2>
-    <p><strong>خلاصه مدیریتی:</strong> ${escapeHtml(pm.executiveSummary)}</p>
-    <p><strong>تز سرمایه‌گذاری:</strong> ${escapeHtml(pm.investmentThesis)}</p>
+    <h2>۱. نتیجهٔ نهایی کمیته</h2>
+    <p><strong>خلاصه:</strong> ${escapeHtml(pm.executiveSummary)}</p>
+    <p><strong>دلیل اصلی و زمان تغییر نظر:</strong> ${escapeHtml(pm.investmentThesis)}</p>
   </section>
 
   <section>
-    <h2>۲. پیشنهاد ایجنت معامله‌گر (Trader Agent)</h2>
-    <p><strong>استدلال معامله‌گر:</strong> ${escapeHtml(tp.reasoning)}</p>
-    <p><strong>اندازه پوزیشن پیشنهادی:</strong> ${escapeHtml(tp.positionSizing)}</p>
+    <h2>۲. برنامهٔ عملیاتی ورود و خروج</h2>
+    <p><strong>توضیح:</strong> ${escapeHtml(tp.reasoning)}</p>
+    <p><strong>مبلغ و سقف ریسک پیشنهادی:</strong> ${escapeHtml(tp.positionSizing)}</p>
   </section>
 
   <section>
-    <h2>۳. مناظره تیم پژوهشگران (Bull vs. Bear) و حکم مدیر پژوهش</h2>
-    <h3>پژوهشگر صعودی (Bull Researcher)</h3>
+    <h2>۳. مناظره موافق و مخالف خرید</h2>
+    <h3>دیدگاه موافق خرید</h3>
     <p>${escapeHtml(report.researchDebate.bullHistory)}</p>
-    <h3>پژوهشگر نزولی (Bear Researcher)</h3>
+    <h3>دیدگاه مخالف و هشدارها</h3>
     <p>${escapeHtml(report.researchDebate.bearHistory)}</p>
-    <h3>جمع‌بندی مدیر پژوهش (${escapeHtml(rp.recommendation)})</h3>
+    <h3>جمع‌بندی داور مناظره (${escapeHtml(RATING_FA[rp.recommendation].short)})</h3>
     <p>${escapeHtml(rp.rationale)}</p>
-    <p><strong>گام‌های راهبردی:</strong> ${escapeHtml(rp.strategicActions)}</p>
+    <p><strong>قدم پیشنهادی:</strong> ${escapeHtml(rp.strategicActions)}</p>
   </section>
 
   <section>
-    <h2>۴. مناظره کمیته مدیریت ریسک (۳ دیدگاه)</h2>
-    <h3>تحلیلگر ریسک تهاجمی (Aggressive)</h3>
+    <h2>۴. بررسی ریسک از ۳ دیدگاه</h2>
+    <h3>دیدگاه جسورانه</h3>
     <p>${escapeHtml(report.riskDebate.aggressiveArgument)}</p>
-    <h3>تحلیلگر ریسک محافظه‌کار (Conservative)</h3>
+    <h3>دیدگاه محتاطانه</h3>
     <p>${escapeHtml(report.riskDebate.conservativeArgument)}</p>
-    <h3>تحلیلگر ریسک خنثی و متوازن (Neutral)</h3>
+    <h3>دیدگاه میانه و متعادل</h3>
     <p>${escapeHtml(report.riskDebate.neutralArgument)}</p>
   </section>
 
   <section>
-    <h2>۵. گزارش‌های ۴ تحلیلگر تخصصی (Analyst Team)</h2>
-    <h3>تحلیلگر تکنیکال بازار (۱۱ اندیکاتور)</h3>
+    <h2>۵. گزارش ۴ بخش بازار</h2>
+    <h3>وضعیت نمودار و قیمت</h3>
     <p>${escapeHtml(report.analysts.marketReport)}</p>
-    <h3>تحلیلگر احساسات و ازدحام (${escapeHtml(SENTIMENT_BAND_FA[sr.overallBand].label)} — نمره ${sr.overallScore}/10)</h3>
+    <h3>جوّ بازار و رفتار معامله‌گران (${escapeHtml(SENTIMENT_BAND_FA[sr.overallBand].label)} — امتیاز ${sr.overallScore} از ۱۰)</h3>
     <p>${escapeHtml(sr.narrative)}</p>
-    <h3>تحلیلگر رژیم بازار و اقتصاد کلان</h3>
+    <h3>فضای کلی بازارها</h3>
     <p>${escapeHtml(report.analysts.newsMacroReport)}</p>
-    <h3>تحلیلگر بنیادی و ساختار نقدشوندگی</h3>
+    <h3>حجم معاملات و نقدشوندگی</h3>
     <p>${escapeHtml(report.analysts.fundamentalsReport)}</p>
   </section>
 
   <footer>
-    این گزارش پژوهشی و آموزشی توسط معماری چندایجنتی TradingAgents در وب‌اپلیکیشن دارینو تولید شده است و توصیه مالی یا سیگنال قطعی خرید و فروش نیست.
+    این گزارش صرفاً تحلیل آموزشی در دارینو است و توصیهٔ قطعی خرید یا فروش نیست.
   </footer>
 </div>
 </body>
