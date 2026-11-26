@@ -423,7 +423,7 @@ export function ReportTab({
             priceDec1403Toman: Math.round(i.priceStart),
             priceCurrentAppToman: Math.round(i.priceEnd),
             returnTomanPct: Math.round(i.returnPct * 10000) / 100,
-            unitsBuyableWithStartCapital: Math.round(i.unitsCount * 100) / 100,
+            unitsBuyableWithStartCapital: i.category === 'car' ? Math.floor(i.unitsCount) : Math.round(i.unitsCount * 100) / 100,
             sellValueTodayToman: Math.round(i.endValueToman),
             profitToman: Math.round(i.pnlToman),
             vsUserPortfolioToman: Math.round(i.vsPortfolioToman),
@@ -1055,100 +1055,137 @@ export function ReportTab({
             {filteredItems.length === 0 ? (
               <Notice tone="info">موردی مطابق با جست‌وجوی شما پیدا نشد.</Notice>
             ) : (
-              <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 {filteredItems.map((item) => {
                   const portfolioAhead = item.vsPortfolioUsd <= 0;
-                  const isIranAsset = item.category === 'car' || item.category === 'property';
+                  const isCar = item.category === 'car';
+                  const wholeCars = Math.floor(item.unitsCount);
+                  const hasLeftover = isCar && wholeCars >= 1 && (item.leftoverCashToman ?? 0) >= 1_000_000;
+                  const selected = activeSimId === item.id;
+
                   return (
                     <div
                       key={item.id}
                       onClick={() => {
                         setActiveSimId(item.id);
-                        setCustomUnits(item.unitLabel === 'مترمربع' ? 100 : 3);
+                        setCustomUnits(
+                          item.unitLabel === 'مترمربع'
+                            ? 100
+                            : isCar
+                              ? Math.max(1, wholeCars)
+                              : 3
+                        );
                       }}
                       className={cn(
-                        'flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-4 transition-all hover:shadow-md',
-                        activeSimId === item.id
-                          ? 'border-[#2E5BFF] bg-[#2E5BFF]/[0.04] ring-1 ring-[#2E5BFF]/30'
-                          : 'border-divider bg-card'
+                        'group flex cursor-pointer flex-col justify-between gap-3.5 rounded-2xl border p-4 sm:p-5 transition-all hover:shadow-md',
+                        selected
+                          ? 'border-[#2E5BFF] bg-[#2E5BFF]/[0.03] ring-1 ring-[#2E5BFF]/30'
+                          : 'border-divider bg-card hover:border-accent/40'
                       )}
                     >
-                      <div className="space-y-2.5">
-                        <div className="flex items-start justify-between gap-2">
+                      {/* ۱) ردیف عنوان + آیکون اختصاصی + بج درصد رشد */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span
+                            className={cn(
+                              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-divider/60',
+                              selected
+                                ? 'bg-[#0B1B5C] text-white'
+                                : 'bg-[#0B1B5C]/[0.06] text-[#0B1B5C] dark:bg-accent/15 dark:text-accent'
+                            )}
+                          >
+                            <CategoryIcon category={item.category} className="h-4 w-4" />
+                          </span>
                           <div className="min-w-0">
-                            <span className="inline-flex items-center gap-1 text-2xs font-bold text-accent">
-                              <CategoryIcon category={item.category} className="h-3 w-3" />
+                            <h4 className="truncate text-sm font-extrabold text-ink sm:text-base">{item.name}</h4>
+                            <p className="truncate text-2xs text-muted">
                               {item.categoryLabel}
-                            </span>
-                            <h4 className="mt-0.5 text-sm font-extrabold text-ink">{item.name}</h4>
-                            {item.subLabel && <p className="mt-0.5 text-2xs text-muted">{item.subLabel}</p>}
+                              {item.subLabel ? ` · ${item.subLabel}` : ''}
+                            </p>
                           </div>
-                          <Badge tone={item.returnPct >= 0 ? 'gain' : 'loss'}>
-                            <Pct v={item.returnPct} />
-                          </Badge>
                         </div>
 
-                        <div className="space-y-1.5 rounded-xl bg-surface-2/80 p-3 text-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-subtle">قابل خرید با سرمایهٔ شروع:</span>
-                            {item.category === 'car' ? (
-                              item.unitsCount >= 1 ? (
-                                <b className="font-extrabold text-ink">{toFaDigits(Math.floor(item.unitsCount))} دستگاه</b>
-                              ) : (
-                                <span className="text-2xs font-bold text-warn">کمتر از ۱ دستگاه (ناکافی)</span>
-                              )
-                            ) : (
-                              <b className="font-extrabold text-ink">
-                                {toFaDigits(item.unitsCount < 10 ? item.unitsCount.toFixed(2) : Math.round(item.unitsCount).toLocaleString('en-US'))} {item.unitLabel}
-                              </b>
-                            )}
-                          </div>
-                          {item.category === 'car' && item.unitsCount >= 1 && (item.leftoverCashToman ?? 0) >= 1_000_000 && (
-                            <div className="flex items-center justify-between text-2xs text-subtle">
-                              <span>باقیماندهٔ نقدی پس از خرید:</span>
-                              <span className="font-semibold text-ink"><Toman v={item.leftoverCashToman} /></span>
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between text-2xs text-subtle">
-                            <span>{item.category === 'car' ? 'قیمت صفر در ۱۱ دی ۱۴۰۳:' : isIranAsset ? 'قیمت بازار در ۱۱ دی ۱۴۰۳:' : 'قیمت تاریخ شروع:'}</span>
-                            <span className="font-semibold text-ink">
-                              {item.currency === 'usd' ? <Usd v={item.priceStart} /> : <Toman v={item.priceStart} />}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-2xs text-subtle">
-                            <span>{item.category === 'car' ? 'قیمت کارکردهٔ مدل ۱۴۰۳ امروز:' : isIranAsset ? 'قیمت بازار آزاد امروز:' : 'قیمت روز:'}</span>
-                            <span className="font-semibold text-ink">
-                              {item.currency === 'usd' ? <Usd v={item.priceEnd} /> : <Toman v={item.priceEnd} />}
-                            </span>
-                          </div>
+                        <Badge tone={item.returnPct >= 0 ? 'gain' : 'loss'} className="shrink-0 px-2.5 py-1 text-xs font-extrabold">
+                          <Pct v={item.returnPct} />
+                        </Badge>
+                      </div>
+
+                      {/* ۲) عدد کانونی (ارزش امروز + سود خالص زیر آن) */}
+                      <div className="space-y-0.5 py-1">
+                        <span className="block text-[11px] font-semibold text-muted">
+                          {isCar && wholeCars < 1 ? 'ارزش امروز (سرمایهٔ نقدی حفظ‌شده)' : 'ارزش امروز'}
+                        </span>
+                        <p className="text-xl font-black tracking-tight text-[#0B1B5C] dark:text-ink sm:text-2xl">
+                          <Toman v={item.endValueToman} />
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="text-muted">سود خالص:</span>
+                          <span className="font-bold">
+                            <Toman v={item.pnlToman} signed />
+                          </span>
                         </div>
                       </div>
 
-                      <div className="space-y-2 border-t border-divider pt-2.5">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-2xs text-muted">ارزش فروش امروز:</span>
-                          <b className="text-sm font-extrabold text-ink"><Toman v={item.endValueToman} /></b>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-2xs text-muted">{isIranAsset ? 'سود خالص بازار آزاد:' : 'سود خالص:'}</span>
-                          <span className="font-bold"><Toman v={item.pnlToman} signed /></span>
+                      {/* ۳) نوار فشردهٔ ۲ ستونه: مقدار خرید (فقط عدد صحیح برای خودرو) + مسیر قیمت */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2/80 px-3.5 py-2.5 text-xs">
+                        <div className="flex flex-wrap items-baseline gap-1.5">
+                          <span className="text-2xs text-subtle">مقدار خرید:</span>
+                          {isCar ? (
+                            wholeCars >= 1 ? (
+                              <span className="font-extrabold text-ink">
+                                {toFaDigits(wholeCars)} دستگاه
+                                {hasLeftover && (
+                                  <span className="ms-1 text-2xs font-medium text-muted">
+                                    (+ <Toman v={item.leftoverCashToman} /> نقد)
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-2xs font-bold text-warn">کمتر از ۱ دستگاه (ناکافی)</span>
+                            )
+                          ) : (
+                            <b className="font-extrabold text-ink">
+                              {toFaDigits(item.unitsCount < 10 ? item.unitsCount.toFixed(2) : Math.round(item.unitsCount).toLocaleString('en-US'))}{' '}
+                              {item.unitLabel}
+                            </b>
+                          )}
                         </div>
 
-                        <div
-                          className={cn(
-                            'flex flex-wrap items-center justify-between gap-1 rounded-lg px-2.5 py-1.5 text-2xs font-bold',
-                            portfolioAhead ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'
-                          )}
-                        >
-                          <span>{portfolioAhead ? 'برتری سبد شما:' : 'برتری این بازار:'}</span>
-                          <span className="inline-flex flex-wrap items-baseline gap-1">
-                            <Toman
-                              v={portfolioAhead ? Math.abs(item.vsPortfolioToman) : -Math.abs(item.vsPortfolioToman)}
-                              signed
-                            />
-                            <span className="opacity-80">
-                              (<Usd v={portfolioAhead ? Math.abs(item.vsPortfolioUsd) : -Math.abs(item.vsPortfolioUsd)} signed />)
-                            </span>
+                        <div className="flex flex-wrap items-baseline gap-1 text-2xs text-subtle">
+                          <span>{isCar ? 'صفر ۱۴۰۳ ← کارکرده:' : 'مسیر قیمت:'}</span>
+                          <span className="inline-flex items-baseline gap-1 font-bold text-ink">
+                            {item.currency === 'usd' ? <Usd v={item.priceStart} /> : <Toman v={item.priceStart} />}
+                            <span className="text-subtle">←</span>
+                            {item.currency === 'usd' ? <Usd v={item.priceEnd} /> : <Toman v={item.priceEnd} />}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ۴) نوار نتیجهٔ شفاف (بدون دوگانگی منفی و بدون پرانتز فشرده) */}
+                      <div
+                        className={cn(
+                          'flex flex-wrap items-center justify-between gap-2 rounded-xl px-3.5 py-2 text-xs font-bold',
+                          portfolioAhead
+                            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'
+                        )}
+                      >
+                        <span>{portfolioAhead ? 'جلوتر از این بازار' : 'عقب‌تر از این بازار'}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Toman
+                            v={portfolioAhead ? Math.abs(item.vsPortfolioToman) : -Math.abs(item.vsPortfolioToman)}
+                            signed
+                            className="font-extrabold"
+                          />
+                          <span
+                            className={cn(
+                              'rounded-lg px-2 py-0.5 text-[11px] font-bold',
+                              portfolioAhead
+                                ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                                : 'bg-rose-500/15 text-rose-800 dark:text-rose-200'
+                            )}
+                          >
+                            <Usd v={portfolioAhead ? Math.abs(item.vsPortfolioUsd) : -Math.abs(item.vsPortfolioUsd)} signed />
                           </span>
                         </div>
                       </div>
