@@ -15,7 +15,7 @@ import type { CarSnapshot } from '@/features/carMarket/domain/types';
 import type { PropertyMarketSnapshot } from '@/features/propertyMarket/domain/types';
 import { normalizePoints, valueAt } from '../domain/engine';
 import { CAR_AVG_ID, PROP_AVG_ID, SOURCE_FA, carMarketId, propertyMarketId } from '../domain/markets';
-import { CAR_MODEL_YEAR_DEPRECIATION_RATE, HISTORICAL_CAR_BENCHMARKS, HISTORICAL_DEC_31_2024_TS } from '../domain/historicalIranBenchmarks';
+import { AHVAZ_PROPERTY_BENCHMARKS, CAR_MODEL_YEAR_DEPRECIATION_RATE, HISTORICAL_CAR_BENCHMARKS, HISTORICAL_DEC_31_2024_TS } from '../domain/historicalIranBenchmarks';
 import type { BenchmarksPayload, CpiPoint, ManualPricePoint, PerfSettings, Pt, Series } from '../domain/types';
 
 const MONTH = 30 * 86_400_000;
@@ -312,11 +312,39 @@ export function useMarketSeries(startTs: number | null, settings: PerfSettings):
     const avgCar = averageSeries(CAR_AVG_ID, carComps, 'میانگین هم‌وزن قیمت بازار آزاد مدل‌های منتخب (دی ۱۴۰۳ تا امروز)', `${toFa(carComps.length)} مدل`);
     if (avgCar) out[CAR_AVG_ID] = avgCar;
     const propComps: Series[] = [];
+    let anyPropAnchored = false;
     for (const k of settings.neighborhoods) {
-      const p = propertySeries(props, k, manual);
-      if (p) { out[p.id] = p; propComps.push(p); }
+      const baseProp = propertySeries(props, k, manual);
+      if (!baseProp) continue;
+      let p = baseProp;
+      // اگر بازهٔ بررسی از حوالی ۱۱ دی ۱۴۰۳ شروع شده و تاریخچهٔ Snapshot دیوار از بعد از آن آغاز می‌شود،
+      // قیمت مستند هر مترمربع ۱۱ دی ۱۴۰۳ همان محله از کاتالوگ اپ به ابتدای سری اضافه می‌شود
+      if (startTs !== null) {
+        const firstPt = p.points[0]?.[0];
+        const nearDec1403 = Math.abs(startTs - HISTORICAL_DEC_31_2024_TS) <= 35 * DAY;
+        if (nearDec1403 && (!firstPt || firstPt > startTs + 15 * DAY)) {
+          const histProp = AHVAZ_PROPERTY_BENCHMARKS.find((h) => h.key === k);
+          if (histProp) {
+            anyPropAnchored = true;
+            p = {
+              ...p,
+              points: normalizePoints([[HISTORICAL_DEC_31_2024_TS, histProp.priceDec1403], ...p.points]),
+              source: `قیمت هر مترمربع ۱۱ دی ۱۴۰۳ (${histProp.rangeNoteDec1403}) + ${p.source}`
+            };
+          }
+        }
+      }
+      out[p.id] = p;
+      propComps.push(p);
     }
-    const avgProp = averageSeries(PROP_AVG_ID, propComps, 'میانگین هم‌وزن چارک بالای قیمت هر مترمربع محله‌های منتخب (دیوار + قیمت‌های دستی)', `${toFa(propComps.length)} محله`);
+    const avgProp = averageSeries(
+      PROP_AVG_ID,
+      propComps,
+      anyPropAnchored
+        ? 'میانگین هم‌وزن چارک بالای قیمت هر مترمربع محله‌های منتخب (دی ۱۴۰۳ تا امروز — دیوار + قیمت‌های دستی)'
+        : 'میانگین هم‌وزن چارک بالای قیمت هر مترمربع محله‌های منتخب (دیوار + قیمت‌های دستی)',
+      `${toFa(propComps.length)} محله`
+    );
     if (avgProp) out[PROP_AVG_ID] = avgProp;
     return out;
   }, [bench.data, usdtS, settings.iranCpi, settings.carModelIds, settings.manualPrices, settings.neighborhoods, cars, props, startTs]);
