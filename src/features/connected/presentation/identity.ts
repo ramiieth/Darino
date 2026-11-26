@@ -16,8 +16,32 @@ export function tokenName(symbol: string, fallback: string = symbol) { const rec
 export const positionNames: Record<string,string> = { wallet:'موجودی کیف پول', deposit:'سپرده', loan:'بدهی', locked:'قفل‌شده', staked:'استیک‌شده', reward:'پاداش', investment:'سرمایه‌گذاری' };
 export const operationNames: Record<string,string> = { approve:'مجوز قرارداد', revoke:'لغو مجوز', receive:'دریافت', send:'ارسال', trade:'مبادله', deposit:'سپرده', withdraw:'برداشت', claim:'دریافت پاداش', mint:'ایجاد توکن', burn:'سوزاندن', execute:'اجرای قرارداد', deploy:'استقرار قرارداد', delegate:'واگذاری', revoke_delegation:'لغو واگذاری', bid:'پیشنهاد خرید' };
 
-export function tokenQuantity(value:string|null|undefined):string {
- try { if(value==null)return '—';const n=new Decimal(value);if(!n.isFinite())return '—';return toFaDigits(n.toSignificantDigits(8).toFixed()); } catch{return '—';}
+/** تشخیص مقادیر نجومی (مثل MAX_UINT256 یا MAX_UINT160 در مجوزهای نامحدود قرارداد) */
+export function isUnlimitedQuantity(value: string | null | undefined): boolean {
+  if (value == null) return false;
+  try {
+    const n = new Decimal(value);
+    return n.isFinite() && n.abs().gte('1e15');
+  } catch {
+    return false;
+  }
+}
+
+export function tokenQuantity(value: string | null | undefined): string {
+  try {
+    if (value == null) return '—';
+    const n = new Decimal(value);
+    if (!n.isFinite()) return '—';
+    const abs = n.abs();
+    if (abs.gte('1e15')) return 'نامحدود';
+    if (abs.gte('1e12')) return `${toFaDigits(n.div('1e12').toSignificantDigits(4).toFixed())} تریلیون`;
+    if (abs.gte('1e9')) return `${toFaDigits(n.div('1e9').toSignificantDigits(4).toFixed())} میلیارد`;
+    if (abs.gte('1e6')) return `${toFaDigits(n.div('1e6').toSignificantDigits(4).toFixed())} میلیون`;
+    if (abs.isZero()) return '۰';
+    return toFaDigits(n.toSignificantDigits(6).toFixed());
+  } catch {
+    return '—';
+  }
 }
 
 export function platformName(value:string):string {

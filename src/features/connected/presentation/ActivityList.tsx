@@ -8,7 +8,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { TokenLogo, LogoImage } from '@/shared/components/ui/EntityLogo';
 import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { AssetValue } from './AssetValue';
-import { chainIdentity, tokenName, operationNames, tokenQuantity } from './identity';
+import { chainIdentity, tokenName, operationNames, tokenQuantity, isUnlimitedQuantity } from './identity';
 import { dateTime } from './ConnectedPage';
 import { activityDay } from '../domain/activityView';
 import { isInternal, type Activity, type ActivityLink } from '../domain/activity';
@@ -65,8 +65,10 @@ export function ActivityList({
     const main = assets.find((t) => t.direction === 'in') ?? assets[0];
     const confirmed = ['confirmed', 'APPLIED'].includes(row.status);
 
-    const isIn = main ? main.direction === 'in' : receiving;
-    const isOut = main ? main.direction === 'out' : sending;
+    const isIn = !isApprove && (main ? main.direction === 'in' : receiving);
+    const isOut = !isApprove && (main ? main.direction === 'out' : sending);
+    const unlimited = main ? isUnlimitedQuantity(main.quantity) : false;
+    const isRevokeZero = row.kind === 'revoke' || (isApprove && main != null && Number(main.quantity) === 0);
     const sign = isIn ? '+' : isOut ? '-' : '';
     const amountTone = isIn ? 'text-positive' : isOut ? 'text-negative' : 'text-ink';
     const badgeTone = receiving || isIn ? 'gain' : sending || isOut ? 'loss' : isApprove ? 'warn' : 'info';
@@ -83,7 +85,7 @@ export function ActivityList({
         onClick={() => setSelected(row)}
         aria-label={`جزئیات ${name(row)} · ${row.label}`}
         className={cn(
-          'activity-native-row group flex min-h-20 w-full items-center gap-3 rounded-xl px-3 py-3 text-start transition-all duration-150 hover:bg-surface-2/75 active:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          'activity-native-row group flex min-h-20 w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-start transition-all duration-150 hover:bg-surface-2/75 active:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
           nested && 'mt-1 border-s-2 border-accent/35 bg-surface-2/30'
         )}
       >
@@ -160,9 +162,9 @@ export function ActivityList({
           </span>
         </span>
 
-        {/* ستون میانی روی دسکتاپ (پر کردن فضای خالی وسط در نمای کامل) */}
+        {/* ستون میانی روی دسکتاپ با عرض ثابت برای هم‌ترازی منظم همه ردیف‌ها */}
         {!preview && (
-          <span className="hidden min-w-[11rem] flex-col items-start gap-1 text-xs text-muted md:flex">
+          <span className="hidden w-48 shrink-0 flex-col items-start gap-1 text-xs text-muted md:flex">
             <span className="flex flex-wrap items-center gap-1.5">
               {chain && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-divider/80 bg-card px-2 py-0.5 text-[11px] font-medium text-ink">
@@ -184,19 +186,33 @@ export function ActivityList({
           </span>
         )}
 
-        {/* ستون مقدار و ارزش — علامت + و - همیشه سمت چپ عدد (قبل از ارقام) با <bdi dir="ltr"> */}
-        <span className="min-w-0 max-w-[49%] shrink-0 text-end">
+        {/* ستون مقدار و ارزش با عرض منظم و بدون سرریز برای مجوزهای نامحدود */}
+        <span className={cn('min-w-0 shrink-0 text-end', preview ? 'max-w-[49%]' : 'max-w-[46%] md:w-52')}>
           {main ? (
-            <>
-              <span className={cn('inline-flex flex-wrap items-baseline justify-end gap-1 text-xs font-extrabold sm:text-sm', amountTone)}>
-                <bdi dir="ltr" className="num-ltr">
-                  {sign}
-                  {tokenQuantity(main.quantity)}
-                </bdi>
-                <span className="font-semibold">{tokenName(main.symbol)}</span>
-              </span>
-              <AssetValue value={main.value} className="mt-0.5 text-end" primaryClassName="text-xs font-semibold text-ink/85" />
-            </>
+            unlimited ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <Badge tone="warn">مجوز نامحدود</Badge>
+                <span className="text-2xs font-medium text-muted">{tokenName(main.symbol)}</span>
+              </div>
+            ) : isRevokeZero ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <Badge tone="neutral">لغو دسترسی</Badge>
+                <span className="text-2xs font-medium text-muted">{tokenName(main.symbol)}</span>
+              </div>
+            ) : (
+              <>
+                <span className={cn('inline-flex flex-wrap items-baseline justify-end gap-1 text-xs font-extrabold sm:text-sm', amountTone)}>
+                  <bdi dir="ltr" className="num-ltr">
+                    {sign}
+                    {tokenQuantity(main.quantity)}
+                  </bdi>
+                  <span className="font-semibold">{tokenName(main.symbol)}</span>
+                </span>
+                {main.value != null && (
+                  <AssetValue value={main.value} className="mt-0.5 text-end" primaryClassName="text-xs font-semibold text-ink/85" />
+                )}
+              </>
+            )
           ) : (
             <AssetValue value={row.amount ? Number(row.amount) : null} className="text-end" primaryClassName="text-sm font-bold" />
           )}
