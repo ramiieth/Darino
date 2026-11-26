@@ -386,7 +386,7 @@ export function ReviewTab({
           <div className="grid gap-4 md:grid-cols-2">
             <Surface className="space-y-2.5 border-gain/30 bg-gain/[0.025] p-4 md:p-5">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4.5 w-4.5 text-gain-text" aria-hidden />
+                <CheckCircle2 className="h-4.5 w-4.5 text-positive" aria-hidden />
                 <h3 className="text-sm font-bold text-ink">چه کارهایی خوب پیش رفت؟</h3>
               </div>
               {autoGoodTags.length > 0 && (
@@ -576,7 +576,7 @@ function StatTile({ label, value, tone = 'neutral' }: { label: string; value: st
           ? 'border-warn/25 bg-warn/[0.04]'
           : 'border-divider/80 bg-card';
   const text =
-    tone === 'gain' ? 'text-gain-text' : tone === 'loss' ? 'text-negative' : tone === 'warn' ? 'text-warn' : 'text-ink';
+    tone === 'gain' ? 'text-positive' : tone === 'loss' ? 'text-negative' : tone === 'warn' ? 'text-warn' : 'text-ink';
   return (
     <div className={cn('rounded-xl border p-3.5', bg)}>
       <p className="text-[11px] font-medium text-muted">{label}</p>

@@ -144,7 +144,7 @@ export function SettingsTab({
 
       <Surface className="space-y-4 p-4 md:p-5">
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gain/10 text-gain-text">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gain/10 text-positive">
             <Shield className="h-4.5 w-4.5" aria-hidden />
           </span>
           <div>

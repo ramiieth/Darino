@@ -1,14 +1,29 @@
 /**
  * داشبورد یکپارچه «طلای ایران»
  *
- * شامل ۴ بخش تمیز و مرتبط به هم (با استفاده از نرخ زنده و ذخیره‌شده مشترک):
- * ۱. بازار و روند (قیمت روز طلای ۱۸ عیار، پلتفرم‌ها، سکه‌ها، تحلیل تاریخی ۷/۳۰/۶۰ روزه + نمودار تعاملی، اسنپ‌شات مستقل)
- * ۲. طلای آنلاین (ملی‌گلد و پلتفرم‌ها + افزودن پلتفرم سفارشی، محاسبه خرید، فروش، هزینه نگهداری و سربه‌سر)
+ * شامل ۴ بخش تمیز، لوگودار و مرتبط به هم (با استفاده از نرخ زنده و ذخیره‌شده مشترک):
+ * ۱. بازار و روند (قیمت روز طلای ۱۸ عیار، پلتفرم‌ها، سکه‌ها، تحلیل تاریخی ۷/۳۰/۶۰ روزه + نمودار مساحتی تعاملی، اسنپ‌شات مستقل)
+ * ۲. طلای آنلاین (ملی‌گلد، میلی، وال‌گلد، دریک + افزودن پلتفرم سفارشی، محاسبه خرید، فروش، هزینه نگهداری و سربه‌سر)
  * ۳. طلای زینتی و مقایسه (محاسبه فاکتور خرید مصنوعات، فروش مجدد بدون اجرت/مالیات/سنگ، مقایسه با طلای آنلاین و سناریوی آینده)
- * ۴. صندوق‌های طلای بورسی (۶ صندوق با مرجع ثابت ۱۰ مرداد ۱۴۰۵ + ماشین‌حساب سرمایه‌گذاری با کارمزد ۰.۱۲٪)
+ * ۴. صندوق‌های طلای بورسی (۶ صندوق لوگودار با مرجع ثابت ۱۰ مرداد ۱۴۰۵ + ماشین‌حساب سرمایه‌گذاری با کارمزد ۰.۱۲٪)
  */
-import { useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import {
+  Banknote,
+  BarChart3,
+  Check,
+  ExternalLink,
+  Gem,
+  Globe,
+  Landmark,
+  Plus,
+  RefreshCw,
+  Scale,
+  Smartphone,
+  Sparkles,
+  Trash2,
+  TrendingUp
+} from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
@@ -57,12 +72,48 @@ import {
   type StorageFeeMode
 } from '../domain/goldInvestment';
 import { useGold } from '../data/intelApi';
+import {
+  GoldBullionEmblem,
+  GoldEtfLogo,
+  GoldPlatformLogo,
+  GoldSparkIcon,
+  IranCoinLogo,
+  JewelryEmblem
+} from './GoldLogos';
 
 const STORE_KEY = 'darino:iran-gold-suite:v1';
 const LAST_PAYLOAD_KEY = 'darino:iran-gold-last-payload:v1';
 const HISTORY_CACHE_KEY = 'darino:iran-gold-history18k:v1';
 
 type SectionTab = 'market' | 'online' | 'jewelry' | 'etf';
+
+const GOLD_TABS: readonly {
+  id: SectionTab;
+  label: string;
+  sub: string;
+  icon: ReactNode;
+}[] = [
+  { id: 'market', label: 'بازار، تاریخچه و اسنپ‌شات', sub: 'نرخ زنده، حباب و روند', icon: <TrendingUp aria-hidden className="h-4 w-4" /> },
+  { id: 'online', label: 'خرید طلای آنلاین', sub: 'ملی‌گلد، میلی، وال‌گلد، دریک', icon: <Smartphone aria-hidden className="h-4 w-4" /> },
+  { id: 'jewelry', label: 'طلای زینتی و مقایسه', sub: 'فاکتور، بازخرید و مقایسه', icon: <Gem aria-hidden className="h-4 w-4" /> },
+  { id: 'etf', label: 'صندوق‌های طلا', sub: 'عیار، مثقال، لوتوس و…', icon: <Landmark aria-hidden className="h-4 w-4" /> }
+];
+
+const QUICK_WEIGHTS = [0.5, 1, 3, 5, 10] as const;
+
+const JEWELRY_PRESETS = [
+  { label: 'حلقه ۳ گرم · اجرت ۱۲٪', name: 'حلقه طلا', weight: '3', making: '12', profit: '7' },
+  { label: 'دستبند ۱۰ گرم · اجرت ۱۵٪', name: 'دستبند طلا', weight: '10', making: '15', profit: '7' },
+  { label: 'گردنبند ۱۵ گرم · اجرت ۱۸٪', name: 'گردنبند طلا', weight: '15', making: '18', profit: '7' },
+  { label: 'طلای کم‌اجرت · اجرت ۳٪', name: 'طلای کم‌اجرت', weight: '5', making: '3', profit: '5' }
+] as const;
+
+const QUICK_ETF_AMOUNTS = [
+  { value: 10_000_000, label: '۱۰ میلیون' },
+  { value: 50_000_000, label: '۵۰ میلیون' },
+  { value: 100_000_000, label: '۱۰۰ میلیون' },
+  { value: 500_000_000, label: '۵۰۰ میلیون' }
+] as const;
 
 interface EtfUserEntry {
   currentPrice: string;
@@ -327,109 +378,154 @@ export function GoldTab() {
 
   return (
     <div className="space-y-5">
-      {/* نوار بالا: قیمت روز طلای ۱۸ عیار + شاخص‌های ۷/۳۰/۶۰ روزه + اسنپ‌شات انتخابی */}
-      <Surface variant="focal" className="p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-muted">قیمت روز هر گرم طلای ۱۸ عیار</span>
-              <Badge tone={!d ? 'neutral' : isOfflineCached ? 'warn' : isStale ? 'neutral' : 'gain'}>
-                {!d && q.isLoading
-                  ? 'در حال دریافت...'
-                  : !d
-                    ? 'آفلاین'
-                    : isOfflineCached
-                      ? 'آخرین قیمت ذخیره‌شده'
-                      : isStale
-                        ? 'کمی قدیمی'
-                        : 'زنده · متصل'}
-              </Badge>
-              {d && (
-                <span className="text-2xs text-subtle">
-                  منبع: {d.bazaar ? 'بازار (TGJU) و ۴ پلتفرم' : 'میانه پلتفرم‌های آنلاین'} · {fmtRelativeAge(d.fetchedAt)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1.5 text-2xl font-extrabold text-ink sm:text-3xl">
-              {live18kToman ? fmtToman(live18kToman) : q.isLoading ? 'در حال بارگذاری نرخ روز...' : '—'}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<RefreshCw className="h-3.5 w-3.5" />}
-            loading={q.isFetching}
-            onClick={() => void q.refetch()}
-          >
-            به‌روزرسانی
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 border-t border-divider pt-3.5 sm:grid-cols-4">
-          {horizons.map((h) => (
-            <button
-              key={h.days}
-              type="button"
-              onClick={() => {
-                set('horizonDays', h.days);
-                set('tab', 'market');
-              }}
-              className={cn(
-                'rounded-field border p-2.5 text-start transition-colors',
-                s.horizonDays === h.days && s.tab === 'market'
-                  ? 'border-accent bg-accent-soft/40'
-                  : 'border-divider bg-card hover:border-divider-strong'
-              )}
-            >
-              <p className="text-2xs font-semibold text-muted">تغییر {toFaDigits(h.days)} روز گذشته</p>
-              {h.available ? (
-                <>
-                  <p className={cn('mt-1 text-sm font-extrabold', (h.changePct ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-                    {fmtPct(h.changePct)}
+      {/* کارت کانونی طلایی: قیمت روز طلای ۱۸ عیار + شمش طلا + شاخص‌های ۷/۳۰/۶۰ روزه و اسنپ‌شات */}
+      <Surface variant="focal" className="relative overflow-hidden border-amber-500/30">
+        <div className="h-[3.5px] w-full bg-gradient-to-l from-amber-400 via-yellow-500 to-amber-600" aria-hidden />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-16 start-8 h-44 w-72 rounded-full bg-amber-400/12 blur-3xl"
+        />
+        <div className="relative space-y-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3.5">
+              <GoldBullionEmblem size="lg" />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
+                    قیمت روز هر گرم طلای ۱۸ عیار
+                  </span>
+                  <Badge tone={!d ? 'neutral' : isOfflineCached ? 'warn' : isStale ? 'neutral' : 'gain'}>
+                    {!d && q.isLoading
+                      ? 'در حال دریافت...'
+                      : !d
+                        ? 'آفلاین'
+                        : isOfflineCached
+                          ? 'آخرین قیمت ذخیره‌شده'
+                          : isStale
+                            ? 'کمی قدیمی'
+                            : 'زنده · متصل'}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-2xl font-black tracking-tight text-ink sm:text-3xl">
+                  {live18kToman ? fmtToman(live18kToman) : q.isLoading ? 'در حال بارگذاری نرخ روز...' : '—'}
+                </p>
+                {d && (
+                  <p className="mt-0.5 text-2xs text-subtle">
+                    منبع: {d.bazaar ? 'بازار (TGJU) و ۴ پلتفرم' : 'میانه پلتفرم‌های آنلاین'} · {fmtRelativeAge(d.fetchedAt)}
                   </p>
-                  <p className="text-2xs text-subtle">{fmtToman(h.changeToman, true)}</p>
-                </>
-              ) : (
-                <p className="mt-1 text-2xs text-subtle">داده تاریخی ناکافی</p>
-              )}
-            </button>
-          ))}
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<RefreshCw className="h-3.5 w-3.5" />}
+              loading={q.isFetching}
+              onClick={() => void q.refetch()}
+              className="border-amber-500/35 hover:border-amber-500/60"
+            >
+              به‌روزرسانی
+            </Button>
+          </div>
 
-          <div className="rounded-field border border-accent/30 bg-accent-soft/20 p-2.5">
-            <p className="truncate text-2xs font-semibold text-accent">
-              نسبت به اسنپ‌شات ({activeSnapshot?.title ?? 'مرجع'})
-            </p>
-            {snapshotComparison ? (
-              <>
-                <p
+          <div className="grid grid-cols-2 gap-2.5 border-t border-divider/80 pt-3.5 sm:grid-cols-4">
+            {horizons.map((h) => {
+              const isSelected = s.horizonDays === h.days && s.tab === 'market';
+              const up = (h.changePct ?? 0) >= 0;
+              return (
+                <button
+                  key={h.days}
+                  type="button"
+                  onClick={() => {
+                    set('horizonDays', h.days);
+                    set('tab', 'market');
+                  }}
                   className={cn(
-                    'mt-1 text-sm font-extrabold',
-                    snapshotComparison.changePct >= 0 ? 'text-positive' : 'text-negative'
+                    'rounded-xl border p-3 text-start transition-all',
+                    isSelected
+                      ? 'border-amber-500/65 bg-amber-500/[0.08] shadow-xs ring-1 ring-amber-400/25'
+                      : 'border-divider bg-card/85 hover:border-amber-500/35 hover:bg-card'
                   )}
                 >
-                  {fmtPct(snapshotComparison.changePct)}
-                </p>
-                <p className="text-2xs text-subtle">{fmtToman(snapshotComparison.diffToman, true)}</p>
-              </>
-            ) : (
-              <p className="mt-1 text-2xs text-subtle">—</p>
-            )}
+                  <p className="text-2xs font-semibold text-muted">تغییر {toFaDigits(h.days)} روز گذشته</p>
+                  {h.available ? (
+                    <>
+                      <p className={cn('mt-1 text-sm font-extrabold', up ? 'text-positive' : 'text-negative')}>
+                        {fmtPct(h.changePct)}
+                      </p>
+                      <p className="text-2xs text-subtle">{fmtToman(h.changeToman, true)}</p>
+                    </>
+                  ) : (
+                    <p className="mt-1 text-2xs text-subtle">داده تاریخی ناکافی</p>
+                  )}
+                </button>
+              );
+            })}
+
+            <div className="rounded-xl border border-amber-500/35 bg-gradient-to-bl from-amber-500/[0.10] via-card to-card p-3">
+              <p className="truncate text-2xs font-bold text-amber-700 dark:text-amber-300">
+                نسبت به اسنپ‌شات ({activeSnapshot?.title ?? 'مرجع'})
+              </p>
+              {snapshotComparison ? (
+                <>
+                  <p
+                    className={cn(
+                      'mt-1 text-sm font-extrabold',
+                      snapshotComparison.changePct >= 0 ? 'text-positive' : 'text-negative'
+                    )}
+                  >
+                    {fmtPct(snapshotComparison.changePct)}
+                  </p>
+                  <p className="text-2xs text-subtle">{fmtToman(snapshotComparison.diffToman, true)}</p>
+                </>
+              ) : (
+                <p className="mt-1 text-2xs text-subtle">—</p>
+              )}
+            </div>
           </div>
         </div>
       </Surface>
 
-      {/* ناوبری بخش‌های ۴گانه ماژول طلای ایران */}
-      <SegmentedControl<SectionTab>
-        label="بخش‌های طلای ایران"
-        value={s.tab}
-        onChange={(t) => set('tab', t)}
-        options={[
-          { value: 'market', label: 'بازار، تاریخچه و اسنپ‌شات' },
-          { value: 'online', label: 'خرید طلای آنلاین' },
-          { value: 'jewelry', label: 'طلای زینتی و مقایسه' },
-          { value: 'etf', label: 'صندوق‌های طلا' }
-        ]}
-      />
+      {/* ناوبری کارتی ۴گانه ماژول طلای ایران با آیکون و رنگ‌بندی طلایی */}
+      <nav
+        aria-label="بخش‌های طلای ایران"
+        className="grid grid-cols-2 gap-2.5 lg:grid-cols-4"
+      >
+        {GOLD_TABS.map((t) => {
+          const active = s.tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => set('tab', t.id)}
+              aria-pressed={active}
+              className={cn(
+                'flex items-center gap-2.5 rounded-2xl border p-3 text-start transition-all duration-150',
+                active
+                  ? 'border-amber-500/65 bg-gradient-to-bl from-amber-500/14 via-amber-500/[0.05] to-card shadow-sm ring-1 ring-amber-400/30'
+                  : 'border-divider bg-card hover:border-amber-500/30 hover:bg-surface-2/50'
+              )}
+            >
+              <span
+                className={cn(
+                  'grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors',
+                  active
+                    ? 'bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-amber-950 shadow-xs'
+                    : 'bg-surface-2 text-muted'
+                )}
+              >
+                {t.icon}
+              </span>
+              <span className="min-w-0">
+                <span className={cn('block truncate text-xs font-extrabold', active ? 'text-ink' : 'text-ink/85')}>
+                  {t.label}
+                </span>
+                <span className="block truncate text-2xs text-muted">{t.sub}</span>
+              </span>
+            </button>
+          );
+        })}
+      </nav>
 
       {s.tab === 'market' && (
         <MarketAndHistorySection
@@ -564,10 +660,23 @@ function MarketAndHistorySection({
 
   return (
     <div className="space-y-5">
-      {/* جدول و نمودار تغییرات ۷، ۳۰ و ۶۰ روزه */}
-      <Surface className="p-4 sm:p-5 space-y-4">
+      {/* کارت ارزش‌گذاری ذاتی، پلتفرم‌ها و سکه‌ها (در دسترس فوری) */}
+      {!d && isLoading && <ListSkeleton rows={3} />}
+      {!d && !isLoading && (
+        <ErrorState
+          message="نرخ زنده پلتفرم‌ها و حباب سکه در حال حاضر دریافت نشد؛ محاسبه‌گرها و صندوق‌های طلا در تب‌های بالا فعال هستند."
+          onRetry={onRetry}
+        />
+      )}
+      {d && <ValueCard d={d} />}
+
+      {/* جدول و نمودار مساحتی تغییرات ۷، ۳۰ و ۶۰ روزه */}
+      <Surface className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">تحلیل تاریخی قیمت طلای ۱۸ عیار (۷، ۳۰ و ۶۰ روز گذشته)</h3>
+          <div className="flex items-center gap-2">
+            <GoldSparkIcon />
+            <h3 className="text-sm font-extrabold text-ink">تحلیل تاریخی قیمت طلای ۱۸ عیار (۷، ۳۰ و ۶۰ روز گذشته)</h3>
+          </div>
           <SegmentedControl<'7' | '30' | '60'>
             label="بازه نمودار"
             size="sm"
@@ -584,6 +693,18 @@ function MarketAndHistorySection({
           />
         </div>
 
+        {/* نمودار مساحتی تعاملی SVG */}
+        {selectedHorizon.series.length >= 2 ? (
+          <InteractiveGoldChart
+            series={selectedHorizon.series}
+            isUp={(selectedHorizon.changePct ?? 0) >= 0}
+            hoverIdx={hoverIdx}
+            onHover={setHoverIdx}
+          />
+        ) : (
+          <p className="py-4 text-center text-xs text-subtle">اطلاعات تاریخی کافی برای رسم نمودار در دسترس نیست.</p>
+        )}
+
         <div className="overflow-x-auto">
           <table className="data-table w-full text-xs">
             <thead>
@@ -596,56 +717,78 @@ function MarketAndHistorySection({
               </tr>
             </thead>
             <tbody>
-              {horizons.map((h) => (
-                <tr key={h.days} className={cn(h.days === selectedHorizon.days && 'bg-accent-soft/20')}>
-                  <td className="font-bold text-ink">
-                    {toFaDigits(h.days)} روز گذشته
-                    {h.referenceTimestamp && (
-                      <span className="block text-2xs font-normal text-subtle">
-                        از {fmtFaDate(h.referenceTimestamp)}
-                      </span>
+              {horizons.map((h) => {
+                const up = (h.changePct ?? 0) >= 0;
+                return (
+                  <tr
+                    key={h.days}
+                    onClick={() => {
+                      setHoverIdx(null);
+                      onSelectHorizon(h.days);
+                    }}
+                    className={cn(
+                      'cursor-pointer transition-colors',
+                      h.days === selectedHorizon.days && 'bg-amber-500/[0.07]'
                     )}
-                  </td>
-                  {h.available ? (
-                    <>
-                      <td className="col-num whitespace-nowrap">{fmtToman(h.startPriceToman)}</td>
-                      <td className="col-num whitespace-nowrap font-semibold">{fmtToman(h.currentPriceToman)}</td>
-                      <td className={cn('col-num whitespace-nowrap font-bold', (h.changeToman ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-                        {fmtToman(h.changeToman, true)}
-                      </td>
-                      <td className={cn('col-num whitespace-nowrap font-bold', (h.changePct ?? 0) >= 0 ? 'text-positive' : 'text-negative')}>
-                        {fmtPct(h.changePct)}
-                      </td>
-                    </>
-                  ) : (
-                    <td colSpan={4} className="text-center text-subtle">
-                      اطلاعات تاریخی کافی در دسترس نیست
+                  >
+                    <td className="font-bold text-ink">
+                      {toFaDigits(h.days)} روز گذشته
+                      {h.referenceTimestamp && (
+                        <span className="block text-2xs font-normal text-subtle">
+                          از {fmtFaDate(h.referenceTimestamp)}
+                        </span>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    {h.available ? (
+                      <>
+                        <td className="col-num whitespace-nowrap text-muted">{fmtToman(h.startPriceToman)}</td>
+                        <td className="col-num whitespace-nowrap font-semibold text-ink">{fmtToman(h.currentPriceToman)}</td>
+                        <td className={cn('col-num whitespace-nowrap font-bold', up ? 'text-positive' : 'text-negative')}>
+                          {fmtToman(h.changeToman, true)}
+                        </td>
+                        <td className="col-num whitespace-nowrap">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 font-extrabold',
+                              up ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative'
+                            )}
+                          >
+                            {fmtPct(h.changePct)}
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <td colSpan={4} className="text-center text-subtle">
+                        اطلاعات تاریخی کافی در دسترس نیست
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-
-        {/* نمودار تعاملی SVG بر اساس داده‌های تاریخی واقعی */}
-        {selectedHorizon.series.length >= 2 ? (
-          <InteractiveGoldChart
-            series={selectedHorizon.series}
-            isUp={(selectedHorizon.changePct ?? 0) >= 0}
-            hoverIdx={hoverIdx}
-            onHover={setHoverIdx}
-          />
-        ) : (
-          <p className="py-4 text-center text-xs text-subtle">اطلاعات تاریخی کافی برای رسم نمودار در دسترس نیست.</p>
-        )}
       </Surface>
 
+      {/* پلتفرم‌های آنلاین لوگودار، سکه‌های مدالیون‌دار و تفکیک عوامل رشد */}
+      {d && (
+        <>
+          <Platforms d={d} />
+          {coins.length > 0 && <Coins coins={coins} />}
+          {decomposition.length > 0 && <Growth rows={decomposition} />}
+        </>
+      )}
+
       {/* بخش مستقل قیمت مرجع (Snapshot) */}
-      <Surface className="p-4 sm:p-5 space-y-4">
+      <Surface className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">قیمت مرجع (Snapshot)</h3>
-          <span className="text-2xs text-subtle">ثابت و مستقل از تاریخچه خودکار بازار</span>
+          <div className="flex items-center gap-2">
+            <GoldSparkIcon />
+            <h3 className="text-sm font-extrabold text-ink">قیمت مرجع (Snapshot)</h3>
+          </div>
+          <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-2xs font-semibold text-subtle">
+            ثابت و مستقل از تاریخچه خودکار بازار
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -657,8 +800,10 @@ function MarketAndHistorySection({
                 type="button"
                 onClick={() => onSelectSnapshot(sn.id)}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors',
-                  active ? 'border-accent bg-accent-soft text-accent' : 'border-divider bg-card text-muted hover:text-ink'
+                  'inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold transition-all',
+                  active
+                    ? 'border-amber-500/65 bg-amber-500/12 text-amber-800 dark:text-amber-200'
+                    : 'border-divider bg-card text-muted hover:border-amber-500/35 hover:text-ink'
                 )}
               >
                 <span>{sn.title}</span>
@@ -669,7 +814,7 @@ function MarketAndHistorySection({
         </div>
 
         {snapshotComparison && (
-          <div className="grid grid-cols-2 gap-3 rounded-field border border-divider bg-surface-2/40 p-3.5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3.5 sm:grid-cols-4">
             <div>
               <p className="text-2xs text-muted">قیمت مرجع ({snapshotComparison.snapshot.dateLabelFa})</p>
               <p className="mt-1 text-sm font-bold text-ink">{fmtToman(snapshotComparison.snapshot.price18kToman)}</p>
@@ -758,23 +903,6 @@ function MarketAndHistorySection({
           </div>
         </Disclosure>
       </Surface>
-
-      {/* کارت‌های ارزش‌گذاری ذاتی، پلتفرم‌ها، سکه‌ها و تجزیه رشد */}
-      {!d && isLoading && <ListSkeleton rows={3} />}
-      {!d && !isLoading && (
-        <ErrorState
-          message="نرخ زنده پلتفرم‌ها و حباب سکه در حال حاضر دریافت نشد؛ محاسبه‌گرها و صندوق‌های طلا در تب‌های بالا فعال هستند."
-          onRetry={onRetry}
-        />
-      )}
-      {d && (
-        <>
-          <ValueCard d={d} />
-          <Platforms d={d} />
-          {coins.length > 0 && <Coins coins={coins} />}
-          {decomposition.length > 0 && <Growth rows={decomposition} />}
-        </>
-      )}
     </div>
   );
 }
@@ -790,13 +918,14 @@ function InteractiveGoldChart({
   hoverIdx: number | null;
   onHover: (idx: number | null) => void;
 }) {
+  const gradId = useId();
   const prices = series.map((x) => x.close);
   const minP = Math.min(...prices);
   const maxP = Math.max(...prices);
   const range = Math.max(1, maxP - minP);
   const w = 640;
-  const h = 150;
-  const padY = 14;
+  const h = 160;
+  const padY = 16;
 
   const points = series.map((pt, i) => {
     const x = (i / Math.max(1, series.length - 1)) * w;
@@ -804,31 +933,66 @@ function InteractiveGoldChart({
     return { x, y, pt };
   });
 
-  const polyline = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const linePath = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(' ');
+  const areaPath = `${linePath} L ${w} ${h - 4} L 0 ${h - 4} Z`;
   const activePoint = hoverIdx != null && points[hoverIdx] ? points[hoverIdx] : points[points.length - 1];
-  const strokeClass = isUp ? 'stroke-positive' : 'stroke-negative';
+  const strokeHex = isUp ? '#10b981' : '#ef4444';
 
   return (
-    <div className="space-y-2 rounded-field border border-divider bg-surface-2/30 p-3">
+    <div className="space-y-2.5 rounded-xl border border-divider/80 bg-surface-2/35 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="text-muted">
           تاریخ: <b className="text-ink">{fmtFaDate(activePoint.pt.t)}</b>
         </span>
-        <span className="font-extrabold text-ink">{fmtToman(activePoint.pt.close)}</span>
+        <span className="rounded-full bg-card px-2.5 py-0.5 font-extrabold text-ink shadow-2xs ring-1 ring-divider/70">
+          {fmtToman(activePoint.pt.close)}
+        </span>
       </div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
-        className="h-36 w-full overflow-visible"
+        className="h-40 w-full overflow-visible"
         onMouseLeave={() => onHover(null)}
       >
-        <polyline
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeHex} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={strokeHex} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map((ratio) => (
+          <line
+            key={ratio}
+            x1={0}
+            x2={w}
+            y1={padY + ratio * (h - 2 * padY)}
+            y2={padY + ratio * (h - 2 * padY)}
+            stroke="currentColor"
+            strokeOpacity="0.1"
+            strokeDasharray="3 4"
+          />
+        ))}
+        <path d={areaPath} fill={`url(#${gradId})`} />
+        <path
+          d={linePath}
           fill="none"
-          strokeWidth="2.5"
+          stroke={strokeHex}
+          strokeWidth="2.6"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={strokeClass}
-          points={polyline}
         />
+        {activePoint && (
+          <line
+            x1={activePoint.x}
+            x2={activePoint.x}
+            y1={padY / 2}
+            y2={h - 4}
+            stroke={strokeHex}
+            strokeOpacity="0.35"
+            strokeDasharray="3 3"
+          />
+        )}
         {points.map((p, idx) => (
           <rect
             key={p.pt.t}
@@ -843,17 +1007,25 @@ function InteractiveGoldChart({
           />
         ))}
         {activePoint && (
-          <circle
-            cx={activePoint.x}
-            cy={activePoint.y}
-            r={4.5}
-            className="fill-ink stroke-surface stroke-2"
-          />
+          <>
+            <circle cx={activePoint.x} cy={activePoint.y} r={8} fill={strokeHex} opacity="0.2" />
+            <circle
+              cx={activePoint.x}
+              cy={activePoint.y}
+              r={4.5}
+              fill={strokeHex}
+              className="stroke-card stroke-2"
+            />
+          </>
         )}
       </svg>
-      <div className="flex justify-between text-2xs text-subtle">
-        <span>کف بازه: {fmtToman(minP)}</span>
-        <span>سقف بازه: {fmtToman(maxP)}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-2xs">
+        <span className="rounded-full bg-negative/10 px-2.5 py-0.5 font-semibold text-negative">
+          کف بازه: {fmtToman(minP)}
+        </span>
+        <span className="rounded-full bg-gain/10 px-2.5 py-0.5 font-semibold text-positive">
+          سقف بازه: {fmtToman(maxP)}
+        </span>
       </div>
     </div>
   );
@@ -934,193 +1106,243 @@ function OnlineGoldSection({
 
   return (
     <div className="space-y-5">
-      <Surface className="p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">خرید و فروش طلای آنلاین</h3>
-          <Badge tone={calc.isEstimatedQuote ? 'warn' : 'gain'}>
-            {calc.isEstimatedQuote ? 'نرخ تخمینی / دستی' : 'نرخ زنده API پلتفرم'}
-          </Badge>
-        </div>
-
-        {/* انتخاب پلتفرم */}
-        <div className="flex flex-wrap gap-2">
-          {s.onlinePlatforms.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => set('selectedPlatformId', p.id)}
-              className={cn(
-                'rounded-control border px-3 py-1.5 text-xs font-bold transition-colors',
-                p.id === activeProfile.id
-                  ? 'border-accent bg-accent-soft text-accent'
-                  : 'border-divider bg-card text-muted hover:text-ink'
-              )}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-
-        {/* ورودی‌های اصلی ساده */}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="وزن طلا (گرم)">
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              value={s.onlineWeightGrams}
-              onChange={(e) => set('onlineWeightGrams', e.target.value)}
-              suffix="گرم"
-            />
-          </Field>
-          <Field label="مدت نگهداری (ماه)">
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              value={s.holdingMonths}
-              onChange={(e) => set('holdingMonths', e.target.value)}
-              suffix="ماه"
-            />
-          </Field>
-          <Field label="نوع تسویه در پایان">
-            <select
-              value={s.physicalDelivery ? 'physical' : 'cash'}
-              onChange={(e) => set('physicalDelivery', e.target.value === 'physical')}
-              className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
-            >
-              <option value="cash">فروش ریالی در پلتفرم</option>
-              <option value="physical">تحویل فیزیکی طلا</option>
-            </select>
-          </Field>
-        </div>
-
-        {/* کارت‌های خلاصه نتیجه */}
-        {calc.valid && (
-          <div className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-4">
-            <div className="rounded-field border border-divider bg-card p-3">
-              <p className="text-2xs text-muted">مبلغ کل پرداختی خرید</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.totalBuyCostToman)}</p>
-              <p className="text-2xs text-subtle">کارمزد خرید: {fmtToman(calc.buyFeeToman)}</p>
+      <Surface className="overflow-hidden">
+        <div className="h-[3px] w-full bg-gradient-to-l from-amber-400 via-emerald-500/70 to-transparent" aria-hidden />
+        <div className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <GoldPlatformLogo platformId={activeProfile.id} name={activeProfile.name} size="md" />
+              <div>
+                <h3 className="text-sm font-extrabold text-ink">خرید و فروش طلای آنلاین</h3>
+                <p className="text-2xs text-muted">محاسبهٔ دقیق خرید، کارمزد رفت‌وبرگشت و قیمت سربه‌سر در {activeProfile.name}</p>
+              </div>
             </div>
-            <div className="rounded-field border border-divider bg-card p-3">
-              <p className="text-2xs text-muted">مبلغ خالص دریافتی فروش</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netSellProceedsToman)}</p>
-              <p className="text-2xs text-subtle">کارمزد فروش: {fmtToman(calc.sellFeeToman)}</p>
-            </div>
-            <div className="rounded-field border border-divider bg-card p-3">
-              <p className="text-2xs text-muted">سود یا زیان خالص لحظه‌ای</p>
-              <p className={cn('mt-1 text-sm font-extrabold', calc.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
-                {fmtToman(calc.netProfitToman, true)} ({fmtPct(calc.roiPct)})
-              </p>
-              <p className="text-2xs text-subtle">هزینه رفت‌وبرگشت و اسپرد</p>
-            </div>
-            <div className="rounded-field border border-accent/30 bg-accent-soft/20 p-3">
-              <p className="text-2xs font-semibold text-accent">قیمت سربه‌سر هر گرم</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenSellPricePerGramToman)}</p>
-              <p className="text-2xs text-subtle">وزن خالص: {toFaDigits(calc.netReceivedWeightGrams)} گرم</p>
-            </div>
+            <Badge tone={calc.isEstimatedQuote ? 'warn' : 'gain'}>
+              {calc.isEstimatedQuote ? 'نرخ تخمینی / دستی' : 'نرخ زنده API پلتفرم'}
+            </Badge>
           </div>
-        )}
 
-        {/* جزئیات فاکتور و تنظیمات تعرفه پلتفرم (بازشونده) */}
-        <Disclosure summary="جزئیات محاسبه و تنظیمات تعرفه پلتفرم">
-          <div className="space-y-4 pt-2">
-            {calc.valid && (
-              <KeyValueList
-                dense
-                rows={[
-                  { label: 'قیمت خرید هر گرم در پلتفرم', value: fmtToman(calc.buyPricePerGramToman) },
-                  { label: 'قیمت فروش هر گرم در پلتفرم', value: fmtToman(calc.sellPricePerGramToman) },
-                  { label: 'ارزش پایه طلای خام', value: fmtToman(calc.baseGoldValueToman) },
-                  { label: `کارمزد خرید (${toFaDigits(activeProfile.buyFeePct)}٪)`, value: fmtToman(calc.buyFeeToman) },
-                  { label: 'هزینه نگهداری دوره', value: fmtToman(calc.storageCostToman) },
-                  { label: `کارمزد فروش (${toFaDigits(activeProfile.sellFeePct)}٪)`, value: fmtToman(calc.sellFeeToman) },
-                  { label: 'سایر هزینه‌های برداشت / تحویل فیزیکی', value: fmtToman(calc.extraSellCostsToman) }
-                ]}
-              />
-            )}
-
-            <div className="grid gap-3 border-t border-divider pt-3 sm:grid-cols-3">
-              <Field label="کارمزد خرید (٪)">
-                <Input
-                  dir="ltr"
-                  inputMode="decimal"
-                  value={String(activeProfile.buyFeePct)}
-                  onChange={(e) => updateProfile({ buyFeePct: parseCleanNum(e.target.value) })}
-                />
-              </Field>
-              <Field label="کارمزد فروش (٪)">
-                <Input
-                  dir="ltr"
-                  inputMode="decimal"
-                  value={String(activeProfile.sellFeePct)}
-                  onChange={(e) => updateProfile({ sellFeePct: parseCleanNum(e.target.value) })}
-                />
-              </Field>
-              <Field label="مدل هزینه نگهداری">
-                <select
-                  value={activeProfile.storageFeeMode}
-                  onChange={(e) => updateProfile({ storageFeeMode: e.target.value as StorageFeeMode })}
-                  className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
+          {/* انتخاب پلتفرم با لوگو و پیش‌نمایش نرخ */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {s.onlinePlatforms.map((p) => {
+              const active = p.id === activeProfile.id;
+              const live = liveRows.find((r) => r.platform === p.linkedPlatform);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => set('selectedPlatformId', p.id)}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-xl border p-2.5 text-start transition-all',
+                    active
+                      ? 'border-amber-500/65 bg-amber-500/[0.08] shadow-xs ring-1 ring-amber-400/25'
+                      : 'border-divider bg-card hover:border-amber-500/35'
+                  )}
                 >
-                  <option value="none">بدون هزینه نگهداری</option>
-                  <option value="monthly_fixed">مبلغ ثابت ماهانه (تومان)</option>
-                  <option value="per_gram_monthly">به‌ازای هر گرم در ماه (تومان)</option>
-                  <option value="annual_pct">درصد سالانه از ارزش دارایی</option>
-                </select>
-              </Field>
-            </div>
+                  <GoldPlatformLogo platformId={p.id} name={p.name} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-extrabold text-ink">{p.name}</span>
+                    <span className="block truncate text-2xs text-subtle">
+                      {live ? fmtToman(live.buy) : `کارمزد ${toFaDigits(p.buyFeePct)}٪`}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {activeProfile.storageFeeMode !== 'none' && (
-                <Field label="مقدار هزینه نگهداری">
+          {/* انتخاب سریع وزن */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
+              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              وزن سریع:
+            </span>
+            {QUICK_WEIGHTS.map((w) => {
+              const active = parseCleanNum(s.onlineWeightGrams) === w;
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => set('onlineWeightGrams', String(w))}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
+                    active
+                      ? 'border-amber-500 bg-amber-500 text-amber-950'
+                      : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
+                  )}
+                >
+                  {toFaDigits(w)} گرم
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ورودی‌های اصلی ساده */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="وزن طلا (گرم)">
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                value={s.onlineWeightGrams}
+                onChange={(e) => set('onlineWeightGrams', e.target.value)}
+                suffix="گرم"
+              />
+            </Field>
+            <Field label="مدت نگهداری (ماه)">
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                value={s.holdingMonths}
+                onChange={(e) => set('holdingMonths', e.target.value)}
+                suffix="ماه"
+              />
+            </Field>
+            <Field label="نوع تسویه در پایان">
+              <select
+                value={s.physicalDelivery ? 'physical' : 'cash'}
+                onChange={(e) => set('physicalDelivery', e.target.value === 'physical')}
+                className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
+              >
+                <option value="cash">فروش ریالی در پلتفرم</option>
+                <option value="physical">تحویل فیزیکی طلا</option>
+              </select>
+            </Field>
+          </div>
+
+          {/* کارت‌های خلاصه نتیجه */}
+          {calc.valid && (
+            <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+              <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+                <p className="text-2xs font-semibold text-muted">مبلغ کل پرداختی خرید</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.totalBuyCostToman)}</p>
+                <p className="text-2xs text-subtle">کارمزد خرید: {fmtToman(calc.buyFeeToman)}</p>
+              </div>
+              <div className="rounded-xl border border-divider border-s-4 border-s-gain bg-card p-3">
+                <p className="text-2xs font-semibold text-muted">مبلغ خالص دریافتی فروش</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netSellProceedsToman)}</p>
+                <p className="text-2xs text-subtle">کارمزد فروش: {fmtToman(calc.sellFeeToman)}</p>
+              </div>
+              <div
+                className={cn(
+                  'rounded-xl border border-divider border-s-4 bg-card p-3',
+                  calc.netProfitToman >= 0 ? 'border-s-gain' : 'border-s-loss'
+                )}
+              >
+                <p className="text-2xs font-semibold text-muted">سود یا زیان خالص لحظه‌ای</p>
+                <p className={cn('mt-1 text-sm font-extrabold', calc.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
+                  {fmtToman(calc.netProfitToman, true)} ({fmtPct(calc.roiPct)})
+                </p>
+                <p className="text-2xs text-subtle">هزینه رفت‌وبرگشت و اسپرد</p>
+              </div>
+              <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
+                <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر گرم</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenSellPricePerGramToman)}</p>
+                <p className="text-2xs text-subtle">وزن خالص: {toFaDigits(calc.netReceivedWeightGrams)} گرم</p>
+              </div>
+            </div>
+          )}
+
+          {/* جزئیات فاکتور و تنظیمات تعرفه پلتفرم (بازشونده) */}
+          <Disclosure summary="جزئیات محاسبه و تنظیمات تعرفه پلتفرم">
+            <div className="space-y-4 pt-2">
+              {calc.valid && (
+                <KeyValueList
+                  dense
+                  rows={[
+                    { label: 'قیمت خرید هر گرم در پلتفرم', value: fmtToman(calc.buyPricePerGramToman) },
+                    { label: 'قیمت فروش هر گرم در پلتفرم', value: fmtToman(calc.sellPricePerGramToman) },
+                    { label: 'ارزش پایه طلای خام', value: fmtToman(calc.baseGoldValueToman) },
+                    { label: `کارمزد خرید (${toFaDigits(activeProfile.buyFeePct)}٪)`, value: fmtToman(calc.buyFeeToman) },
+                    { label: 'هزینه نگهداری دوره', value: fmtToman(calc.storageCostToman) },
+                    { label: `کارمزد فروش (${toFaDigits(activeProfile.sellFeePct)}٪)`, value: fmtToman(calc.sellFeeToman) },
+                    { label: 'سایر هزینه‌های برداشت / تحویل فیزیکی', value: fmtToman(calc.extraSellCostsToman) }
+                  ]}
+                />
+              )}
+
+              <div className="grid gap-3 border-t border-divider pt-3 sm:grid-cols-3">
+                <Field label="کارمزد خرید (٪)">
                   <Input
                     dir="ltr"
                     inputMode="decimal"
-                    value={String(activeProfile.storageFeeValue)}
-                    onChange={(e) => updateProfile({ storageFeeValue: parseCleanNum(e.target.value) })}
+                    value={String(activeProfile.buyFeePct)}
+                    onChange={(e) => updateProfile({ buyFeePct: parseCleanNum(e.target.value) })}
                   />
                 </Field>
-              )}
-              <Field label="هزینه تحویل فیزیکی (تومان)">
-                <Input
-                  dir="ltr"
-                  inputMode="numeric"
-                  value={String(activeProfile.physicalDeliveryFeeToman)}
-                  onChange={(e) => updateProfile({ physicalDeliveryFeeToman: parseCleanNum(e.target.value) })}
-                />
-              </Field>
-              <Field label="نرخ خرید دستی هر گرم (۰ = خودکار API)">
-                <Input
-                  dir="ltr"
-                  inputMode="numeric"
-                  value={String(activeProfile.buyPricePerGramToman || '')}
-                  onChange={(e) => {
-                    const v = parseCleanNum(e.target.value);
-                    updateProfile({
-                      useLiveQuote: v <= 0,
-                      buyPricePerGramToman: v,
-                      sellPricePerGramToman: activeProfile.sellPricePerGramToman || v
-                    });
-                  }}
-                  placeholder="خودکار از API"
-                />
-              </Field>
-            </div>
+                <Field label="کارمزد فروش (٪)">
+                  <Input
+                    dir="ltr"
+                    inputMode="decimal"
+                    value={String(activeProfile.sellFeePct)}
+                    onChange={(e) => updateProfile({ sellFeePct: parseCleanNum(e.target.value) })}
+                  />
+                </Field>
+                <Field label="مدل هزینه نگهداری">
+                  <select
+                    value={activeProfile.storageFeeMode}
+                    onChange={(e) => updateProfile({ storageFeeMode: e.target.value as StorageFeeMode })}
+                    className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
+                  >
+                    <option value="none">بدون هزینه نگهداری</option>
+                    <option value="monthly_fixed">مبلغ ثابت ماهانه (تومان)</option>
+                    <option value="per_gram_monthly">به‌ازای هر گرم در ماه (تومان)</option>
+                    <option value="annual_pct">درصد سالانه از ارزش دارایی</option>
+                  </select>
+                </Field>
+              </div>
 
-            <div className="flex flex-wrap items-end gap-2 border-t border-divider pt-3">
-              <Field label="افزودن پلتفرم جدید" className="w-56">
-                <Input
-                  value={newPlatformName}
-                  onChange={(e) => setNewPlatformName(e.target.value)}
-                  placeholder="نام پلتفرم..."
-                />
-              </Field>
-              <Button size="sm" variant="outline" icon={<Plus />} onClick={addCustomPlatform}>
-                افزودن پلتفرم
-              </Button>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {activeProfile.storageFeeMode !== 'none' && (
+                  <Field label="مقدار هزینه نگهداری">
+                    <Input
+                      dir="ltr"
+                      inputMode="decimal"
+                      value={String(activeProfile.storageFeeValue)}
+                      onChange={(e) => updateProfile({ storageFeeValue: parseCleanNum(e.target.value) })}
+                    />
+                  </Field>
+                )}
+                <Field label="هزینه تحویل فیزیکی (تومان)">
+                  <Input
+                    dir="ltr"
+                    inputMode="numeric"
+                    value={String(activeProfile.physicalDeliveryFeeToman)}
+                    onChange={(e) => updateProfile({ physicalDeliveryFeeToman: parseCleanNum(e.target.value) })}
+                  />
+                </Field>
+                <Field label="نرخ خرید دستی هر گرم (۰ = خودکار API)">
+                  <Input
+                    dir="ltr"
+                    inputMode="numeric"
+                    value={String(activeProfile.buyPricePerGramToman || '')}
+                    onChange={(e) => {
+                      const v = parseCleanNum(e.target.value);
+                      updateProfile({
+                        useLiveQuote: v <= 0,
+                        buyPricePerGramToman: v,
+                        sellPricePerGramToman: activeProfile.sellPricePerGramToman || v
+                      });
+                    }}
+                    placeholder="خودکار از API"
+                  />
+                </Field>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2 border-t border-divider pt-3">
+                <Field label="افزودن پلتفرم جدید" className="w-56">
+                  <Input
+                    value={newPlatformName}
+                    onChange={(e) => setNewPlatformName(e.target.value)}
+                    placeholder="نام پلتفرم..."
+                  />
+                </Field>
+                <Button size="sm" variant="outline" icon={<Plus />} onClick={addCustomPlatform}>
+                  افزودن پلتفرم
+                </Button>
+              </div>
             </div>
-          </div>
-        </Disclosure>
+          </Disclosure>
+        </div>
       </Surface>
     </div>
   );
@@ -1209,155 +1431,201 @@ function JewelryAndComparisonSection({
   return (
     <div className="space-y-5">
       {/* محاسبه‌گر خرید و فروش مجدد طلای زینتی */}
-      <Surface className="p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">محاسبه خرید و فروش مجدد طلای زینتی</h3>
-          <span className="text-2xs text-subtle">نرخ پایه ۱۸ عیار: {fmtToman(marketPx)}</span>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-4">
-          <Field label="نوع مصنوع (حلقه، دستبند...)">
-            <Input
-              value={s.jewelryProductName}
-              onChange={(e) => set('jewelryProductName', e.target.value)}
-            />
-          </Field>
-          <Field label="وزن کل محصول (گرم)">
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              value={s.jewelryWeightGrams}
-              onChange={(e) => set('jewelryWeightGrams', e.target.value)}
-              suffix="گرم"
-            />
-          </Field>
-          <Field label="اجرت ساخت">
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              value={s.makingChargeValue}
-              onChange={(e) => set('makingChargeValue', e.target.value)}
-              suffix={s.makingChargeMode === 'percent' ? '٪' : 'تومان'}
-            />
-          </Field>
-          <Field label="سود فروشنده (٪)">
-            <Input
-              dir="ltr"
-              inputMode="decimal"
-              value={s.sellerProfitPct}
-              onChange={(e) => set('sellerProfitPct', e.target.value)}
-              suffix="٪"
-            />
-          </Field>
-        </div>
-
-        {j.valid && (
-          <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-            <div className="rounded-field border border-divider bg-card p-3">
-              <p className="text-2xs text-muted">ارزش طلای خام داخل محصول</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.rawGoldValueToman)}</p>
-              <p className="text-2xs text-subtle">وزن خالص طلا: {toFaDigits(j.netGoldWeightGrams)} گرم</p>
-            </div>
-            <div className="rounded-field border border-warn/40 bg-warn/5 p-3">
-              <p className="text-2xs font-semibold text-warn">مبلغ کل فاکتور خرید</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.totalBuyInvoiceToman)}</p>
-              <p className="text-2xs text-subtle">
-                اجرت+سود+مالیات: {fmtToman(j.totalOverheadToman)} ({fmtPct(j.overheadPctOfRaw, 1, false)})
-              </p>
-            </div>
-            <div className="rounded-field border border-divider bg-card p-3">
-              <p className="text-2xs text-muted">مبلغ دریافتی فروش مجدد امروز</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.resaleNetProceedsToman)}</p>
-              <p className="text-2xs text-negative">
-                اختلاف با خرید: {fmtToman(j.netProfitOrLossToman, true)} ({fmtPct(j.roiPct, 1)})
-              </p>
-            </div>
-            <div className="rounded-field border border-accent/30 bg-accent-soft/20 p-3">
-              <p className="text-2xs font-semibold text-accent">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.breakEven18kPriceToman)}</p>
-              <p className="text-2xs text-subtle">رشد لازم بازار: {fmtPct(j.requiredMarketGrowthPctToBreakEven, 1)}</p>
+      <Surface className="overflow-hidden">
+        <div className="h-[3px] w-full bg-gradient-to-l from-rose-400 via-amber-400 to-yellow-500" aria-hidden />
+        <div className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <JewelryEmblem />
+              <div>
+                <h3 className="text-sm font-extrabold text-ink">محاسبه خرید و فروش مجدد طلای زینتی</h3>
+                <p className="text-2xs text-muted">نرخ پایهٔ هر گرم ۱۸ عیار: {fmtToman(marketPx)}</p>
+              </div>
             </div>
           </div>
-        )}
 
-        <Disclosure summary="جزئیات کامل فاکتور طلافروشی و تنظیمات عیار، مالیات و بازخرید">
-          <div className="space-y-4 pt-2">
-            {j.valid && (
-              <KeyValueList
-                dense
-                rows={[
-                  { label: 'ارزش طلای خام', value: fmtToman(j.rawGoldValueToman) },
-                  { label: 'اجرت ساخت', value: fmtToman(j.makingChargeToman) },
-                  { label: `سود فروشنده (${toFaDigits(s.sellerProfitPct)}٪)`, value: fmtToman(j.sellerProfitToman) },
-                  { label: 'مبلغ مشمول مالیات (اجرت + سود)', value: fmtToman(j.taxableAmountToman) },
-                  { label: `مالیات بر ارزش افزوده (${toFaDigits(s.taxPct)}٪)`, value: fmtToman(j.taxToman) },
-                  { label: 'کسورات فروش مجدد و سنگ', value: fmtToman(j.resaleDeductionsToman) }
-                ]}
+          {/* سناریوهای سریع طلای زینتی */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
+              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              نمونهٔ سریع:
+            </span>
+            {JEWELRY_PRESETS.map((pr) => (
+              <button
+                key={pr.label}
+                type="button"
+                onClick={() =>
+                  setS((prev) => ({
+                    ...prev,
+                    jewelryProductName: pr.name,
+                    jewelryWeightGrams: pr.weight,
+                    makingChargeMode: 'percent',
+                    makingChargeValue: pr.making,
+                    sellerProfitPct: pr.profit
+                  }))
+                }
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
+                  s.jewelryProductName === pr.name && s.jewelryWeightGrams === pr.weight
+                    ? 'border-amber-500 bg-amber-500/15 text-amber-800 dark:text-amber-200'
+                    : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
+                )}
+              >
+                {pr.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="نوع مصنوع (حلقه، دستبند...)">
+              <Input
+                value={s.jewelryProductName}
+                onChange={(e) => set('jewelryProductName', e.target.value)}
               />
-            )}
-
-            <div className="grid gap-3 border-t border-divider pt-3 sm:grid-cols-4">
-              <Field label="روش محاسبه اجرت">
-                <select
-                  value={s.makingChargeMode}
-                  onChange={(e) => set('makingChargeMode', e.target.value as MakingChargeMode)}
-                  className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
-                >
-                  <option value="percent">درصدی از طلای خام</option>
-                  <option value="per_gram">مبلغ ثابت هر گرم (تومان)</option>
-                  <option value="fixed_total">مبلغ ثابت کل محصول (تومان)</option>
-                </select>
-              </Field>
-              <Field label="عیار طلا (۷۵۰ = ۱۸ عیار)">
-                <Input dir="ltr" inputMode="decimal" value={s.karat} onChange={(e) => set('karat', e.target.value)} />
-              </Field>
-              <Field label="وزن نگین / غیرطلا (گرم)">
-                <Input
-                  dir="ltr"
-                  inputMode="decimal"
-                  value={s.stoneWeightGrams}
-                  onChange={(e) => set('stoneWeightGrams', e.target.value)}
-                />
-              </Field>
-              <Field label="نرخ مالیات (٪)">
-                <Input dir="ltr" inputMode="decimal" value={s.taxPct} onChange={(e) => set('taxPct', e.target.value)} />
-              </Field>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="مبنای محاسبه مالیات">
-                <select
-                  value={s.taxBase}
-                  onChange={(e) => set('taxBase', e.target.value as JewelryTaxBase)}
-                  className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
-                >
-                  <option value="making_plus_profit">فقط اجرت + سود فروشنده (قانونی)</option>
-                  <option value="total_invoice">کل مبلغ فاکتور</option>
-                </select>
-              </Field>
-              <Field label="کسورات بازخرید طلافروش (٪)">
-                <Input
-                  dir="ltr"
-                  inputMode="decimal"
-                  value={s.resaleDeductionPct}
-                  onChange={(e) => set('resaleDeductionPct', e.target.value)}
-                />
-              </Field>
-              <Field label="تخفیف خرید (تومان)">
-                <Input dir="ltr" inputMode="numeric" value={s.discountToman} onChange={(e) => set('discountToman', e.target.value)} />
-              </Field>
-            </div>
+            </Field>
+            <Field label="وزن کل محصول (گرم)">
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                value={s.jewelryWeightGrams}
+                onChange={(e) => set('jewelryWeightGrams', e.target.value)}
+                suffix="گرم"
+              />
+            </Field>
+            <Field label="اجرت ساخت">
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                value={s.makingChargeValue}
+                onChange={(e) => set('makingChargeValue', e.target.value)}
+                suffix={s.makingChargeMode === 'percent' ? '٪' : 'تومان'}
+              />
+            </Field>
+            <Field label="سود فروشنده (٪)">
+              <Input
+                dir="ltr"
+                inputMode="decimal"
+                value={s.sellerProfitPct}
+                onChange={(e) => set('sellerProfitPct', e.target.value)}
+                suffix="٪"
+              />
+            </Field>
           </div>
-        </Disclosure>
+
+          {j.valid && (
+            <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+              <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+                <p className="text-2xs font-semibold text-muted">ارزش طلای خام داخل محصول</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.rawGoldValueToman)}</p>
+                <p className="text-2xs text-subtle">وزن خالص طلا: {toFaDigits(j.netGoldWeightGrams)} گرم</p>
+              </div>
+              <div className="rounded-xl border border-warn/40 border-s-4 border-s-warn bg-warn/[0.05] p-3">
+                <p className="text-2xs font-bold text-warn">مبلغ کل فاکتور خرید</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.totalBuyInvoiceToman)}</p>
+                <p className="text-2xs text-subtle">
+                  اجرت+سود+مالیات: {fmtToman(j.totalOverheadToman)} ({fmtPct(j.overheadPctOfRaw, 1, false)})
+                </p>
+              </div>
+              <div className="rounded-xl border border-divider border-s-4 border-s-loss bg-card p-3">
+                <p className="text-2xs font-semibold text-muted">مبلغ دریافتی فروش مجدد امروز</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.resaleNetProceedsToman)}</p>
+                <p className="text-2xs font-semibold text-negative">
+                  اختلاف با خرید: {fmtToman(j.netProfitOrLossToman, true)} ({fmtPct(j.roiPct, 1)})
+                </p>
+              </div>
+              <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
+                <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
+                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.breakEven18kPriceToman)}</p>
+                <p className="text-2xs text-subtle">رشد لازم بازار: {fmtPct(j.requiredMarketGrowthPctToBreakEven, 1)}</p>
+              </div>
+            </div>
+          )}
+
+          <Disclosure summary="جزئیات کامل فاکتور طلافروشی و تنظیمات عیار، مالیات و بازخرید">
+            <div className="space-y-4 pt-2">
+              {j.valid && (
+                <KeyValueList
+                  dense
+                  rows={[
+                    { label: 'ارزش طلای خام', value: fmtToman(j.rawGoldValueToman) },
+                    { label: 'اجرت ساخت', value: fmtToman(j.makingChargeToman) },
+                    { label: `سود فروشنده (${toFaDigits(s.sellerProfitPct)}٪)`, value: fmtToman(j.sellerProfitToman) },
+                    { label: 'مبلغ مشمول مالیات (اجرت + سود)', value: fmtToman(j.taxableAmountToman) },
+                    { label: `مالیات بر ارزش افزوده (${toFaDigits(s.taxPct)}٪)`, value: fmtToman(j.taxToman) },
+                    { label: 'کسورات فروش مجدد و سنگ', value: fmtToman(j.resaleDeductionsToman) }
+                  ]}
+                />
+              )}
+
+              <div className="grid gap-3 border-t border-divider pt-3 sm:grid-cols-4">
+                <Field label="روش محاسبه اجرت">
+                  <select
+                    value={s.makingChargeMode}
+                    onChange={(e) => set('makingChargeMode', e.target.value as MakingChargeMode)}
+                    className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
+                  >
+                    <option value="percent">درصدی از طلای خام</option>
+                    <option value="per_gram">مبلغ ثابت هر گرم (تومان)</option>
+                    <option value="fixed_total">مبلغ ثابت کل محصول (تومان)</option>
+                  </select>
+                </Field>
+                <Field label="عیار طلا (۷۵۰ = ۱۸ عیار)">
+                  <Input dir="ltr" inputMode="decimal" value={s.karat} onChange={(e) => set('karat', e.target.value)} />
+                </Field>
+                <Field label="وزن نگین / غیرطلا (گرم)">
+                  <Input
+                    dir="ltr"
+                    inputMode="decimal"
+                    value={s.stoneWeightGrams}
+                    onChange={(e) => set('stoneWeightGrams', e.target.value)}
+                  />
+                </Field>
+                <Field label="نرخ مالیات (٪)">
+                  <Input dir="ltr" inputMode="decimal" value={s.taxPct} onChange={(e) => set('taxPct', e.target.value)} />
+                </Field>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="مبنای محاسبه مالیات">
+                  <select
+                    value={s.taxBase}
+                    onChange={(e) => set('taxBase', e.target.value as JewelryTaxBase)}
+                    className="h-10 w-full rounded-control border border-divider bg-card px-3 text-xs font-semibold text-ink"
+                  >
+                    <option value="making_plus_profit">فقط اجرت + سود فروشنده (قانونی)</option>
+                    <option value="total_invoice">کل مبلغ فاکتور</option>
+                  </select>
+                </Field>
+                <Field label="کسورات بازخرید طلافروش (٪)">
+                  <Input
+                    dir="ltr"
+                    inputMode="decimal"
+                    value={s.resaleDeductionPct}
+                    onChange={(e) => set('resaleDeductionPct', e.target.value)}
+                  />
+                </Field>
+                <Field label="تخفیف خرید (تومان)">
+                  <Input dir="ltr" inputMode="numeric" value={s.discountToman} onChange={(e) => set('discountToman', e.target.value)} />
+                </Field>
+              </div>
+            </div>
+          </Disclosure>
+        </div>
       </Surface>
 
-      {/* داشبورد مقایسه طلای آنلاین با طلای زینتی */}
+      {/* داشبورد مقایسه طلای آنلاین با طلای زینتی با لوگوهای طرفین */}
       {cmp.online.valid && cmp.jewelry.valid && (
-        <Surface className="p-4 sm:p-5 space-y-4">
+        <Surface className="space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-ink">
-              مقایسه سرمایه‌گذاری در طلا ({toFaDigits(cmp.weightGrams)} گرم · عیار ۷۵۰)
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center -space-x-2 space-x-reverse">
+                <GoldPlatformLogo platformId={activeProfile.id} name={activeProfile.name} size="sm" className="ring-2 ring-card" />
+                <JewelryEmblem size="sm" className="ring-2 ring-card" />
+              </div>
+              <h3 className="text-sm font-extrabold text-ink">
+                مقایسه سرمایه‌گذاری در طلا ({toFaDigits(cmp.weightGrams)} گرم · عیار ۷۵۰)
+              </h3>
+            </div>
             <Badge tone="gain">
               برتر از نظر بازده مالی: {cmp.betterRoiMethod === 'online' ? `طلای آنلاین (${activeProfile.name})` : 'طلای زینتی'}
             </Badge>
@@ -1380,8 +1648,8 @@ function JewelryAndComparisonSection({
                 </tr>
                 <tr>
                   <td>مجموع اجرت، سود، مالیات و کارمزد خرید</td>
-                  <td className="col-num whitespace-nowrap">{fmtToman(cmp.online.buyFeeToman + cmp.online.extraBuyCostsToman)}</td>
-                  <td className="col-num whitespace-nowrap text-warn font-semibold">{fmtToman(cmp.jewelry.totalOverheadToman)}</td>
+                  <td className="col-num whitespace-nowrap font-semibold text-positive">{fmtToman(cmp.online.buyFeeToman + cmp.online.extraBuyCostsToman)}</td>
+                  <td className="col-num whitespace-nowrap font-semibold text-warn">{fmtToman(cmp.jewelry.totalOverheadToman)}</td>
                 </tr>
                 <tr>
                   <td className="font-bold text-ink">مبلغ کل پرداختی در زمان خرید</td>
@@ -1404,13 +1672,13 @@ function JewelryAndComparisonSection({
                 </tr>
                 <tr>
                   <td>رشد لازم قیمت طلا برای رسیدن به سربه‌سر</td>
-                  <td className="col-num whitespace-nowrap">{fmtPct(cmp.onlineRequiredGrowthPctToBreakEven, 1)}</td>
+                  <td className="col-num whitespace-nowrap font-semibold text-positive">{fmtPct(cmp.onlineRequiredGrowthPctToBreakEven, 1)}</td>
                   <td className="col-num whitespace-nowrap font-semibold text-warn">{fmtPct(cmp.jewelryRequiredGrowthPctToBreakEven, 1)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p className="text-2xs text-subtle">
+          <p className="rounded-xl bg-surface-2/60 px-3 py-2 text-2xs leading-5 text-muted">
             اختلاف هزینهٔ خرید اولیه: <b className="text-ink">{fmtToman(cmp.initialCostDiffToman)}</b> به نفع{' '}
             {cmp.lowerInitialCostMethod === 'online' ? 'طلای آنلاین' : 'طلای زینتی'} · این مقایسه صرفاً مالی است و ارزش مصرفی و زینتی مصنوعات طلا جداگانه است.
           </p>
@@ -1418,10 +1686,10 @@ function JewelryAndComparisonSection({
       )}
 
       {/* سناریوسازی قیمت آینده طلا */}
-      <Surface className="p-4 sm:p-5 space-y-4">
+      <Surface className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h3 className="text-sm font-bold text-ink">سناریوی قیمت آینده طلا (هر گرم ۱۸ عیار)</h3>
+            <h3 className="text-sm font-extrabold text-ink">سناریوی قیمت آینده طلا (هر گرم ۱۸ عیار)</h3>
             <p className="text-2xs text-subtle">بررسی ارزش فروش و سود خالص هر دو روش در قیمت‌های فرضی آینده کاربر</p>
           </div>
           <div className="flex items-center gap-2">
@@ -1435,7 +1703,7 @@ function JewelryAndComparisonSection({
             />
             <Button
               size="sm"
-              variant="ghost"
+              variant="outline"
               icon={<Plus />}
               onClick={() => {
                 const v = parseCleanNum(scenarioInput);
@@ -1472,14 +1740,28 @@ function JewelryAndComparisonSection({
                   <td className={cn('col-num whitespace-nowrap font-bold', r.onlineNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(r.onlineNetProfitToman, true)}
                   </td>
-                  <td className={cn('col-num whitespace-nowrap font-bold', r.onlineRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
-                    {fmtPct(r.onlineRoiPct, 1)}
+                  <td className="col-num whitespace-nowrap">
+                    <span
+                      className={cn(
+                        'inline-flex rounded-full px-2 py-0.5 font-extrabold',
+                        r.onlineRoiPct >= 0 ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative'
+                      )}
+                    >
+                      {fmtPct(r.onlineRoiPct, 1)}
+                    </span>
                   </td>
                   <td className={cn('col-num whitespace-nowrap font-bold', r.jewelryNetProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                     {fmtToman(r.jewelryNetProfitToman, true)}
                   </td>
-                  <td className={cn('col-num whitespace-nowrap font-bold', r.jewelryRoiPct >= 0 ? 'text-positive' : 'text-negative')}>
-                    {fmtPct(r.jewelryRoiPct, 1)}
+                  <td className="col-num whitespace-nowrap">
+                    <span
+                      className={cn(
+                        'inline-flex rounded-full px-2 py-0.5 font-extrabold',
+                        r.jewelryRoiPct >= 0 ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative'
+                      )}
+                    >
+                      {fmtPct(r.jewelryRoiPct, 1)}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -1551,100 +1833,127 @@ function GoldEtfSection({
     ]
   );
 
+  const selectedEtf = GOLD_ETF_PRESETS.find((e) => e.id === s.selectedEtfId) ?? GOLD_ETF_PRESETS[0];
+
   return (
     <div className="space-y-5">
-      {/* داشبورد ۶ صندوق طلای بورسی با قیمت مرجع ثابت ۱۰ مرداد ۱۴۰۵ */}
-      <Surface className="p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">صندوق‌های طلای بورسی</h3>
-          <Badge tone="info">مرجع ثابت اسنپ‌شات: {GOLD_ETF_SNAPSHOT_DATE_FA}</Badge>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((c) => (
-            <div
-              key={c.etf.id}
-              className={cn(
-                'rounded-card border p-3.5 space-y-3 transition-colors',
-                s.selectedEtfId === c.etf.id ? 'border-accent bg-accent-soft/20' : 'border-divider bg-card'
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-extrabold text-ink">{c.etf.nameFa}</p>
-                  <p className="text-2xs text-muted">نماد بورسی: {c.etf.tickerFa}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    set('selectedEtfId', c.etf.id);
-                    set('etfBuyPrice', String(c.currentPriceToman ?? c.etf.snapshotPriceToman));
-                    if (c.currentPriceToman) set('etfCurrentPrice', String(c.currentPriceToman));
-                    if (c.futurePriceToman) set('etfFuturePrice', String(c.futurePriceToman));
-                  }}
-                  className="text-2xs font-bold text-accent underline"
-                >
-                  انتخاب در ماشین‌حساب
-                </button>
-              </div>
-
-              <div className="rounded-field bg-surface-2/60 px-2.5 py-2 text-xs">
-                <span className="text-muted">قیمت مرجع ({GOLD_ETF_SNAPSHOT_DATE_FA}): </span>
-                <b className="text-ink">{fmtToman(c.etf.snapshotPriceToman)}</b>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="قیمت فعلی (تومان)">
-                  <Input
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={s.etfEntries[c.etf.id]?.currentPrice ?? ''}
-                    onChange={(e) => updateEtfEntry(c.etf.id, { currentPrice: e.target.value })}
-                    placeholder="ورود دستی"
-                  />
-                </Field>
-                <Field label="قیمت آینده فرضی">
-                  <Input
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={s.etfEntries[c.etf.id]?.futurePrice ?? ''}
-                    onChange={(e) => updateEtfEntry(c.etf.id, { futurePrice: e.target.value })}
-                    placeholder="سناریو"
-                  />
-                </Field>
-              </div>
-
-              <div className="space-y-1 border-t border-divider pt-2 text-2xs">
-                <div className="flex justify-between">
-                  <span className="text-muted">تغییر فعلی نسبت به مرجع:</span>
-                  {c.changeCurrentVsSnapshotPct !== null ? (
-                    <b className={c.changeCurrentVsSnapshotPct >= 0 ? 'text-positive' : 'text-negative'}>
-                      {fmtPct(c.changeCurrentVsSnapshotPct)} ({fmtToman(c.diffCurrentVsSnapshotToman, true)})
-                    </b>
-                  ) : (
-                    <span className="text-subtle">—</span>
-                  )}
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">تغییر سناریوی آینده نسبت به مرجع:</span>
-                  {c.changeFutureVsSnapshotPct !== null ? (
-                    <b className={c.changeFutureVsSnapshotPct >= 0 ? 'text-positive' : 'text-negative'}>
-                      {fmtPct(c.changeFutureVsSnapshotPct)} ({fmtToman(c.diffFutureVsSnapshotToman, true)})
-                    </b>
-                  ) : (
-                    <span className="text-subtle">—</span>
-                  )}
-                </div>
-              </div>
+      {/* داشبورد ۶ صندوق طلای بورسی لوگودار با قیمت مرجع ثابت ۱۰ مرداد ۱۴۰۵ */}
+      <Surface className="overflow-hidden">
+        <div className="h-[3px] w-full bg-gradient-to-l from-amber-400 via-yellow-500 to-indigo-500/70" aria-hidden />
+        <div className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <GoldSparkIcon />
+              <h3 className="text-sm font-extrabold text-ink">صندوق‌های طلای بورسی</h3>
             </div>
-          ))}
+            <Badge tone="info">مرجع ثابت اسنپ‌شات: {GOLD_ETF_SNAPSHOT_DATE_FA}</Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((c) => {
+              const selected = s.selectedEtfId === c.etf.id;
+              return (
+                <div
+                  key={c.etf.id}
+                  className={cn(
+                    'space-y-3 rounded-2xl border p-3.5 transition-all',
+                    selected
+                      ? 'border-amber-500/65 bg-amber-500/[0.06] shadow-xs ring-1 ring-amber-400/25'
+                      : 'border-divider bg-card hover:border-amber-500/35'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <GoldEtfLogo etfId={c.etf.id} tickerFa={c.etf.tickerFa} size="md" />
+                      <div>
+                        <p className="text-sm font-extrabold text-ink">{c.etf.nameFa}</p>
+                        <p className="text-2xs text-muted">نماد بورسی: {c.etf.tickerFa}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set('selectedEtfId', c.etf.id);
+                        set('etfBuyPrice', String(c.currentPriceToman ?? c.etf.snapshotPriceToman));
+                        if (c.currentPriceToman) set('etfCurrentPrice', String(c.currentPriceToman));
+                        if (c.futurePriceToman) set('etfFuturePrice', String(c.futurePriceToman));
+                      }}
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-2xs font-bold transition-colors',
+                        selected
+                          ? 'bg-amber-500 text-amber-950'
+                          : 'bg-surface-2 text-accent hover:bg-accent/15'
+                      )}
+                    >
+                      {selected ? 'انتخاب‌شده' : 'انتخاب در ماشین‌حساب'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl bg-surface-2/65 px-3 py-2 text-xs">
+                    <span className="text-muted">مرجع ({GOLD_ETF_SNAPSHOT_DATE_FA}):</span>
+                    <b className="text-ink">{fmtToman(c.etf.snapshotPriceToman)}</b>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="قیمت فعلی (تومان)">
+                      <Input
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={s.etfEntries[c.etf.id]?.currentPrice ?? ''}
+                        onChange={(e) => updateEtfEntry(c.etf.id, { currentPrice: e.target.value })}
+                        placeholder="ورود دستی"
+                      />
+                    </Field>
+                    <Field label="قیمت آینده فرضی">
+                      <Input
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={s.etfEntries[c.etf.id]?.futurePrice ?? ''}
+                        onChange={(e) => updateEtfEntry(c.etf.id, { futurePrice: e.target.value })}
+                        placeholder="سناریو"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="space-y-1 border-t border-divider pt-2 text-2xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted">تغییر فعلی نسبت به مرجع:</span>
+                      {c.changeCurrentVsSnapshotPct !== null ? (
+                        <b className={c.changeCurrentVsSnapshotPct >= 0 ? 'text-positive' : 'text-negative'}>
+                          {fmtPct(c.changeCurrentVsSnapshotPct)} ({fmtToman(c.diffCurrentVsSnapshotToman, true)})
+                        </b>
+                      ) : (
+                        <span className="text-subtle">—</span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted">تغییر سناریوی آینده نسبت به مرجع:</span>
+                      {c.changeFutureVsSnapshotPct !== null ? (
+                        <b className={c.changeFutureVsSnapshotPct >= 0 ? 'text-positive' : 'text-negative'}>
+                          {fmtPct(c.changeFutureVsSnapshotPct)} ({fmtToman(c.diffFutureVsSnapshotToman, true)})
+                        </b>
+                      ) : (
+                        <span className="text-subtle">—</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </Surface>
 
       {/* ماشین‌حساب سرمایه‌گذاری صندوق طلا */}
-      <Surface className="p-4 sm:p-5 space-y-4">
+      <Surface className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-ink">ماشین‌حساب سرمایه‌گذاری صندوق طلا</h3>
+          <div className="flex items-center gap-2.5">
+            <GoldEtfLogo etfId={selectedEtf.id} tickerFa={selectedEtf.tickerFa} size="sm" />
+            <div>
+              <h3 className="text-sm font-extrabold text-ink">ماشین‌حساب سرمایه‌گذاری صندوق طلا</h3>
+              <p className="text-2xs text-muted">با احتساب کارمزد خرید و فروش بورسی (۰.۱۲٪ هر طرف)</p>
+            </div>
+          </div>
           <SegmentedControl<'by_amount' | 'by_units'>
             label="روش محاسبه"
             size="sm"
@@ -1656,6 +1965,33 @@ function GoldEtfSection({
             ]}
           />
         </div>
+
+        {s.etfCalcMode === 'by_amount' && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-2xs font-semibold text-subtle">
+              <Sparkles aria-hidden className="h-3 w-3 text-amber-500" />
+              مبلغ سریع:
+            </span>
+            {QUICK_ETF_AMOUNTS.map((item) => {
+              const active = parseCleanNum(s.etfAmountToman) === item.value;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => set('etfAmountToman', String(item.value))}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-2xs font-bold transition-all',
+                    active
+                      ? 'border-amber-500 bg-amber-500 text-amber-950'
+                      : 'border-divider bg-surface-2/70 text-muted hover:text-ink'
+                  )}
+                >
+                  {item.label} تومان
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="انتخاب صندوق طلا">
@@ -1727,41 +2063,44 @@ function GoldEtfSection({
         </div>
 
         {calc.valid && (
-          <div className="space-y-3 pt-1">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-field border border-divider bg-card p-3">
-                <p className="text-2xs text-muted">تعداد واحد و هزینه واقعی ورود</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">
-                  {toFaDigits(calc.unitsPurchased.toLocaleString('en-US'))} واحد
-                </p>
-                <p className="text-2xs text-subtle">ورود: {fmtToman(calc.totalEntryCostToman)}</p>
-              </div>
-              <div className="rounded-field border border-divider bg-card p-3">
-                <p className="text-2xs text-muted">مبلغ نهایی دریافتی پس از فروش</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netFinalProceedsToman)}</p>
-                <p className="text-2xs text-subtle">هزینه کارمزد معاملات: {fmtToman(calc.totalTradingFeesToman)}</p>
-              </div>
-              <div className="rounded-field border border-divider bg-card p-3">
-                <p className="text-2xs text-muted">سود یا زیان خالص و بازدهی</p>
-                <p
-                  className={cn(
-                    'mt-1 text-sm font-extrabold',
-                    calc.netProfitOrLossToman >= 0 ? 'text-positive' : 'text-negative'
-                  )}
-                >
-                  {fmtToman(calc.netProfitOrLossToman, true)} ({fmtPct(calc.roiPct)})
-                </p>
-                {calc.leftoverCashToman > 0 && (
-                  <p className="text-2xs text-subtle">باقیمانده نقدی: {fmtToman(calc.leftoverCashToman)}</p>
+          <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+            <div className="rounded-xl border border-divider border-s-4 border-s-amber-500 bg-card p-3">
+              <p className="text-2xs font-semibold text-muted">تعداد واحد و هزینه واقعی ورود</p>
+              <p className="mt-1 text-sm font-extrabold text-ink">
+                {toFaDigits(calc.unitsPurchased.toLocaleString('en-US'))} واحد
+              </p>
+              <p className="text-2xs text-subtle">ورود: {fmtToman(calc.totalEntryCostToman)}</p>
+            </div>
+            <div className="rounded-xl border border-divider border-s-4 border-s-gain bg-card p-3">
+              <p className="text-2xs font-semibold text-muted">مبلغ نهایی دریافتی پس از فروش</p>
+              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netFinalProceedsToman)}</p>
+              <p className="text-2xs text-subtle">هزینه کارمزد معاملات: {fmtToman(calc.totalTradingFeesToman)}</p>
+            </div>
+            <div
+              className={cn(
+                'rounded-xl border border-divider border-s-4 bg-card p-3',
+                calc.netProfitOrLossToman >= 0 ? 'border-s-gain' : 'border-s-loss'
+              )}
+            >
+              <p className="text-2xs font-semibold text-muted">سود یا زیان خالص و بازدهی</p>
+              <p
+                className={cn(
+                  'mt-1 text-sm font-extrabold',
+                  calc.netProfitOrLossToman >= 0 ? 'text-positive' : 'text-negative'
                 )}
-              </div>
-              <div className="rounded-field border border-accent/30 bg-accent-soft/20 p-3">
-                <p className="text-2xs font-semibold text-accent">قیمت سربه‌سر هر واحد</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenUnitPriceToman)}</p>
-                <p className="text-2xs text-subtle">
-                  نسبت به مرجع {GOLD_ETF_SNAPSHOT_DATE_FA}: {fmtPct(calc.futureChangeVsSnapshotPct, 1)}
-                </p>
-              </div>
+              >
+                {fmtToman(calc.netProfitOrLossToman, true)} ({fmtPct(calc.roiPct)})
+              </p>
+              {calc.leftoverCashToman > 0 && (
+                <p className="text-2xs text-subtle">باقیمانده نقدی: {fmtToman(calc.leftoverCashToman)}</p>
+              )}
+            </div>
+            <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] p-3">
+              <p className="text-2xs font-bold text-amber-700 dark:text-amber-300">قیمت سربه‌سر هر واحد</p>
+              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenUnitPriceToman)}</p>
+              <p className="text-2xs text-subtle">
+                نسبت به مرجع {GOLD_ETF_SNAPSHOT_DATE_FA}: {fmtPct(calc.futureChangeVsSnapshotPct, 1)}
+              </p>
             </div>
           </div>
         )}
@@ -1771,25 +2110,33 @@ function GoldEtfSection({
 }
 
 /* ============================================================
-   کامپوننت‌های موجود ارزش‌گذاری، پلتفرم‌ها، سکه‌ها و تجزیه رشد
+   کامپوننت‌های ارزش‌گذاری، پلتفرم‌ها، سکه‌ها و تجزیه رشد
    ============================================================ */
 
-const VALUE_FA: Record<Valuation, { title: (p: number) => string; border: string }> = {
+const VALUE_FA: Record<Valuation, { title: (p: number) => string; border: string; bar: string; badge: 'gain' | 'warn' | 'neutral' }> = {
   cheap: {
     title: (p) => `حباب طلای ۱۸ عیار ${pctRatio(p)} · پایین‌تر از محدودهٔ معمول`,
-    border: 'border-gain/50'
+    border: 'border-gain/45',
+    bar: 'from-gain via-emerald-400 to-transparent',
+    badge: 'gain'
   },
   rich: {
     title: (p) => `حباب طلای ۱۸ عیار ${pctRatio(p)} · بالاتر از محدودهٔ معمول`,
-    border: 'border-warn/50'
+    border: 'border-warn/45',
+    bar: 'from-warn via-amber-400 to-transparent',
+    badge: 'warn'
   },
   fair: {
     title: (p) => `حباب طلای ۱۸ عیار ${pctRatio(p)} · در محدودهٔ متعادل بازار`,
-    border: 'border-divider'
+    border: 'border-divider',
+    bar: 'from-amber-400 via-yellow-500/70 to-transparent',
+    badge: 'neutral'
   },
   unknown: {
     title: () => 'حباب در انتظار دریافت نرخ انس و دلار',
-    border: 'border-divider'
+    border: 'border-divider',
+    bar: 'from-divider to-transparent',
+    badge: 'neutral'
   }
 };
 
@@ -1798,37 +2145,51 @@ function ValueCard({ d }: { d: GoldPayload }) {
   const v = valuation(d.premium, rows, d.stats, d.dollarSource);
   const t = VALUE_FA[v.state];
   return (
-    <Surface className={cn('border p-4 sm:p-5', t.border)}>
-      <h3 className="text-sm font-extrabold text-ink">{t.title(d.premium ?? 0)}</h3>
-      {d.dollarSource === 'usdt' && (
-        <p className="mt-1 text-2xs text-warn">مبنای محاسبه: نرخ تتر (در غیاب نرخ دلار آزاد).</p>
-      )}
+    <Surface className={cn('overflow-hidden border', t.border)}>
+      <div className={cn('h-[3px] w-full bg-gradient-to-l', t.bar)} aria-hidden />
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-extrabold text-ink">{t.title(d.premium ?? 0)}</h3>
+          {d.dollarSource === 'usdt' && (
+            <Badge tone="warn">مبنای محاسبه: تتر</Badge>
+          )}
+        </div>
 
-      <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-divider pt-3">
-        <div>
-          <dt className="text-2xs font-semibold text-muted">ارزش ذاتی هر گرم ۱۸ عیار</dt>
-          <dd className="mt-1 text-base font-extrabold text-ink sm:text-lg">{d.intrinsic ? million(d.intrinsic) : '—'}</dd>
-          <dd className="text-2xs text-subtle">تومان (انس × دلار)</dd>
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold text-muted">انس جهانی طلا</dt>
-          <dd className="mt-1 text-base font-extrabold text-ink sm:text-lg">
-            {d.ounceUsd ? `${toFaDigits(d.ounceUsd.toLocaleString('en-US', { maximumFractionDigits: 0 }))} دلار` : '—'}
-          </dd>
-          <dd className="text-2xs text-subtle">هر انس</dd>
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold text-muted">{d.dollarSource === 'free' ? 'دلار آزاد' : 'دلار تتر'}</dt>
-          <dd className="mt-1 text-base font-extrabold text-ink sm:text-lg">
-            {d.dollarToman ? fmtToman(d.dollarToman) : '—'}
-          </dd>
-          <dd className="text-2xs text-subtle">نرخ لحظه‌ای</dd>
-        </div>
-      </dl>
+        <dl className="mt-3.5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+            <dt className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
+              <Scale aria-hidden className="h-3.5 w-3.5 text-amber-500" />
+              ارزش ذاتی هر گرم ۱۸ عیار
+            </dt>
+            <dd className="mt-1.5 text-base font-extrabold text-ink sm:text-lg">{d.intrinsic ? million(d.intrinsic) : '—'}</dd>
+            <dd className="text-2xs text-subtle">تومان (انس × دلار)</dd>
+          </div>
+          <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+            <dt className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
+              <Globe aria-hidden className="h-3.5 w-3.5 text-amber-500" />
+              انس جهانی طلا
+            </dt>
+            <dd className="mt-1.5 text-base font-extrabold text-ink sm:text-lg">
+              {d.ounceUsd ? `${toFaDigits(d.ounceUsd.toLocaleString('en-US', { maximumFractionDigits: 0 }))} دلار` : '—'}
+            </dd>
+            <dd className="text-2xs text-subtle">هر انس جهانی</dd>
+          </div>
+          <div className="rounded-xl border border-divider/70 bg-surface-2/40 p-3">
+            <dt className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
+              <Banknote aria-hidden className="h-3.5 w-3.5 text-positive" />
+              {d.dollarSource === 'free' ? 'دلار آزاد' : 'دلار تتر'}
+            </dt>
+            <dd className="mt-1.5 text-base font-extrabold text-ink sm:text-lg">
+              {d.dollarToman ? fmtToman(d.dollarToman) : '—'}
+            </dd>
+            <dd className="text-2xs text-subtle">نرخ لحظه‌ای</dd>
+          </div>
+        </dl>
 
-      {d.premium !== null && (
-        <PremiumBar now={d.premium} stats={d.dollarSource === 'free' ? d.stats : null} low={v.low} high={v.high} />
-      )}
+        {d.premium !== null && (
+          <PremiumBar now={d.premium} stats={d.dollarSource === 'free' ? d.stats : null} low={v.low} high={v.high} />
+        )}
+      </div>
     </Surface>
   );
 }
@@ -1849,7 +2210,7 @@ function PremiumBar({
   const span = Math.max(0.05, Math.abs(now), Math.abs(low), Math.abs(high)) * 1.15;
   const x = (v: number) => `${((v + span) / (2 * span)) * 100}%`;
   return (
-    <div className={compact ? 'mt-2' : 'mt-3 border-t border-divider pt-3'}>
+    <div className={compact ? 'mt-2.5' : 'mt-3.5 border-t border-divider pt-3'}>
       {!compact && (
         <p className="text-2xs font-semibold text-muted">
           {stats
@@ -1857,15 +2218,15 @@ function PremiumBar({
             : `محدودهٔ هزینهٔ رفت‌وبرگشت: ${LRI}±${pctRatio(high, 1, false)}${PDI}`}
         </p>
       )}
-      <div dir="ltr" className="relative mt-2.5 h-2 rounded-full bg-surface-2" role="img" aria-label={`حباب ${pctRatio(now)}`}>
+      <div dir="ltr" className="relative mt-2.5 h-2.5 rounded-full bg-surface-2" role="img" aria-label={`حباب ${pctRatio(now)}`}>
         <span
-          className="absolute inset-y-0 rounded-full bg-brand/25"
+          className="absolute inset-y-0 rounded-full bg-gradient-to-r from-gain/45 via-amber-400/55 to-warn/50"
           style={{ left: x(low), right: `calc(100% - ${x(high)})` }}
           aria-hidden
         />
-        <span className="absolute -inset-y-1 w-px bg-ink/40" style={{ left: x(stats?.p50 ?? 0) }} aria-hidden />
+        <span className="absolute -inset-y-1 w-0.5 rounded-full bg-ink/40" style={{ left: x(stats?.p50 ?? 0) }} aria-hidden />
         <span
-          className="absolute -top-1 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-surface bg-ink"
+          className="absolute -top-1 h-4.5 w-4.5 -translate-x-1/2 rounded-full border-2 border-card bg-amber-500 shadow-sm ring-2 ring-amber-400/35"
           style={{ left: x(now) }}
           aria-hidden
         />
@@ -1879,43 +2240,68 @@ function Platforms({ d }: { d: GoldPayload }) {
   const bestSell = rows.reduce<PlatformRow | null>((b, r) => (!b || r.sell > b.sell ? r : b), null);
   const vsBazaar = platformsVsBazaar(rows, d.bazaar);
   return (
-    <Surface className="p-4">
+    <Surface className="p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-ink">نرخ زنده پلتفرم‌های آنلاین طلای ۱۸ عیار</h3>
+        <div className="flex items-center gap-2">
+          <GoldSparkIcon />
+          <h3 className="text-sm font-extrabold text-ink">نرخ زنده پلتفرم‌های آنلاین طلای ۱۸ عیار</h3>
+        </div>
         {d.bazaar && vsBazaar !== null && (
-          <span className="text-2xs text-muted">
+          <Badge tone={vsBazaar < 0 ? 'gain' : 'neutral'}>
             پلتفرم‌ها {pctRatio(Math.abs(vsBazaar), 1, false)} {vsBazaar < 0 ? 'ارزان‌تر' : 'گران‌تر'} از بازار
-          </span>
+          </Badge>
         )}
       </div>
-      <ul className="mt-2 divide-y divide-divider">
+      <ul className="mt-3 divide-y divide-divider">
         {rows.map((r, i) => {
           const meta = PLATFORM_FA[r.platform] ?? { name: String(r.platform), url: '#' };
+          const isBestBuy = i === 0;
+          const isBestSell = bestSell?.platform === r.platform && rows.length > 1;
           return (
-            <li key={r.platform} className="flex items-center gap-3 py-2.5">
+            <li
+              key={r.platform}
+              className={cn(
+                'flex items-center gap-3 py-3 transition-colors',
+                isBestBuy && 'rounded-xl bg-gain/[0.04] px-2.5 -mx-2.5'
+              )}
+            >
+              <GoldPlatformLogo platformId={String(r.platform)} name={meta.name} size="md" />
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-1.5 font-bold text-ink">
+                <p className="flex flex-wrap items-center gap-1.5 font-extrabold text-ink">
                   {meta.name}
-                  {i === 0 && <Badge tone="gain">ارزان‌ترین خرید</Badge>}
-                  {bestSell?.platform === r.platform && rows.length > 1 && <Badge tone="info">بهترین فروش</Badge>}
+                  {isBestBuy && <Badge tone="gain">ارزان‌ترین خرید</Badge>}
+                  {isBestSell && <Badge tone="info">بهترین فروش</Badge>}
                 </p>
-                <p className="text-2xs text-muted">
-                  خرید {fmtToman(r.buy)} · فروش {fmtToman(r.sell)}
+                <p className="mt-0.5 text-2xs text-muted">
+                  خرید <b className="text-ink">{fmtToman(r.buy)}</b> · فروش <b className="text-ink">{fmtToman(r.sell)}</b>
                   {r.buy !== r.sell && ` · اسپرد ${pctRatio(r.spread, 1, false)}`}
                 </p>
               </div>
               <div className="shrink-0 text-end">
-                <p className="text-sm font-bold text-ink">{Number.isFinite(r.premium) ? pctRatio(r.premium) : '—'}</p>
+                <p
+                  className={cn(
+                    'text-sm font-extrabold',
+                    Number.isFinite(r.premium)
+                      ? r.premium <= 0.01
+                        ? 'text-positive'
+                        : r.premium >= 0.03
+                          ? 'text-warn'
+                          : 'text-ink'
+                      : 'text-subtle'
+                  )}
+                >
+                  {Number.isFinite(r.premium) ? pctRatio(r.premium) : '—'}
+                </p>
                 <p className="text-2xs text-subtle">حباب</p>
               </div>
               <a
                 href={meta.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="shrink-0 text-subtle hover:text-brand"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-divider bg-card text-subtle transition-colors hover:border-amber-500/45 hover:text-amber-600"
                 aria-label={`باز کردن ${meta.name}`}
               >
-                <ExternalLink className="h-4 w-4" aria-hidden />
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </a>
             </li>
           );
@@ -1929,23 +2315,35 @@ const POSITION_FA = { low: 'پایین‌تر از معمول', mid: 'متعاد
 
 function Coins({ coins }: { coins: CoinRow[] }) {
   return (
-    <Surface className="p-4">
-      <h3 className="text-sm font-bold text-ink">قیمت و حباب سکه</h3>
-      <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+    <Surface className="p-4 sm:p-5">
+      <div className="flex items-center gap-2">
+        <GoldSparkIcon />
+        <h3 className="text-sm font-extrabold text-ink">قیمت و حباب سکه</h3>
+      </div>
+      <ul className="mt-3.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {coins.map((c) => {
           const pos = c.stats ? percentileOf(c.premium, c.stats) : null;
           const label = COIN_FA[c.coin] ?? String(c.coin);
+          const bubbleTone = c.premium >= 0.2 ? 'warn' : c.premium <= 0.08 ? 'gain' : 'neutral';
           return (
-            <li key={c.coin} className="rounded-field bg-surface-2/60 p-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="font-bold text-ink">{label}</p>
-                <p className="text-sm font-extrabold text-ink">{pctRatio(c.premium)}</p>
+            <li
+              key={c.coin}
+              className="rounded-2xl border border-amber-500/20 bg-gradient-to-bl from-amber-500/[0.06] via-surface-2/40 to-card p-3.5"
+            >
+              <div className="flex items-center gap-3">
+                <IranCoinLogo coin={String(c.coin)} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-extrabold text-ink">{label}</p>
+                    <Badge tone={bubbleTone}>حباب {pctRatio(c.premium)}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs font-bold text-ink/90">{fmtToman(c.price)}</p>
+                </div>
               </div>
-              <p className="text-2xs text-muted">{fmtToman(c.price)}</p>
               {c.stats && <PremiumBar now={c.premium} stats={c.stats} low={c.stats.p10} high={c.stats.p90} compact />}
               {c.stats && pos && (
-                <p className="mt-1.5 text-2xs text-subtle">
-                  {POSITION_FA[pos]} · میانه تاریخی: {pctRatio(c.stats.p50)}
+                <p className="mt-2 text-2xs text-subtle">
+                  وضعیت: <b className="text-ink/80">{POSITION_FA[pos]}</b> · میانه تاریخی: {pctRatio(c.stats.p50)}
                 </p>
               )}
             </li>
@@ -1957,9 +2355,16 @@ function Coins({ coins }: { coins: CoinRow[] }) {
 }
 
 function Growth({ rows }: { rows: Decomposition[] }) {
+  const maxAbs = Math.max(
+    0.01,
+    ...rows.flatMap((r) => [Math.abs(r.iran), Math.abs(r.ounce), Math.abs(r.dollar), Math.abs(r.premium)])
+  );
   return (
-    <Surface className="p-4">
-      <h3 className="text-sm font-bold text-ink">تفکیک عوامل تغییر قیمت طلای ۱۸ عیار</h3>
+    <Surface className="p-4 sm:p-5">
+      <div className="flex items-center gap-2">
+        <BarChart3 aria-hidden className="h-4 w-4 text-amber-500" />
+        <h3 className="text-sm font-extrabold text-ink">تفکیک عوامل تغییر قیمت طلای ۱۸ عیار</h3>
+      </div>
       <div className="mt-3 overflow-x-auto">
         <table className="data-table">
           <thead>
@@ -1975,14 +2380,30 @@ function Growth({ rows }: { rows: Decomposition[] }) {
             {rows.map((r) => (
               <tr key={r.days}>
                 <td className="font-bold text-ink">{toFaDigits(r.days)} روز</td>
-                {[r.iran, r.ounce, r.dollar, r.premium].map((v, i) => (
-                  <td
-                    key={i}
-                    className={cn('col-num whitespace-nowrap', i === 0 && 'font-bold', v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '')}
-                  >
-                    {Number.isFinite(v) ? pctRatio(v) : '—'}
-                  </td>
-                ))}
+                {[r.iran, r.ounce, r.dollar, r.premium].map((v, i) => {
+                  const pctWidth = Math.min(100, Math.round((Math.abs(v) / maxAbs) * 100));
+                  return (
+                    <td key={i} className="col-num whitespace-nowrap">
+                      <span
+                        className={cn(
+                          'block',
+                          i === 0 && 'font-extrabold',
+                          v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : 'text-muted'
+                        )}
+                      >
+                        {Number.isFinite(v) ? pctRatio(v) : '—'}
+                      </span>
+                      {Number.isFinite(v) && (
+                        <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-surface-2">
+                          <span
+                            className={cn('block h-full rounded-full', v >= 0 ? 'bg-gain' : 'bg-loss')}
+                            style={{ width: `${Math.max(6, pctWidth)}%` }}
+                          />
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

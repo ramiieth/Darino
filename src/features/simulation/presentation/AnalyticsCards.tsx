@@ -2,7 +2,6 @@
  * Timeline insights — four narrative findings:
  *  largest gain / largest loss / smallest gain / smallest loss
  *
- * «If you had bought [asset] on [date], it would be worth [+$value] today — [+$profit] profit.»
  * Hypothetical and backward-looking; not a forecast.
  */
 import { TrendingUp, TrendingDown, ChevronsUp, ChevronsDown } from 'lucide-react';
@@ -13,6 +12,7 @@ import { EmptyState } from '@/shared/components/ui/StateViews';
 import { MoneyValue, PercentValue } from '@/shared/components/ui/FinancialValue';
 import type { SimAssetRow, TimelineResult } from '@/shared/types';
 import { t, type TKey } from '@/shared/i18n/fa';
+import { cn } from '@/shared/lib/cn';
 
 type CardKind = 'maxGain' | 'maxLoss' | 'minGain' | 'minLoss';
 
@@ -42,11 +42,11 @@ export function pickAnalytics(result: TimelineResult): AnalyticsItem[] {
   return items;
 }
 
-const CARD: Record<CardKind, { label: TKey; rank: TKey; icon: typeof TrendingUp; tone: Tone }> = {
-  maxGain: { label: 'analyticsMaxGain', rank: 'rankMaxGain', icon: TrendingUp, tone: 'gain' },
-  maxLoss: { label: 'analyticsMaxLoss', rank: 'rankMaxLoss', icon: TrendingDown, tone: 'loss' },
-  minGain: { label: 'analyticsMinGain', rank: 'rankMinGain', icon: ChevronsUp, tone: 'neutral' },
-  minLoss: { label: 'analyticsMinLoss', rank: 'rankMinLoss', icon: ChevronsDown, tone: 'neutral' }
+const CARD: Record<CardKind, { label: TKey; rank: TKey; icon: typeof TrendingUp; tone: Tone; accentBorder: string }> = {
+  maxGain: { label: 'analyticsMaxGain', rank: 'rankMaxGain', icon: TrendingUp, tone: 'gain', accentBorder: 'border-s-4 border-s-gain' },
+  maxLoss: { label: 'analyticsMaxLoss', rank: 'rankMaxLoss', icon: TrendingDown, tone: 'loss', accentBorder: 'border-s-4 border-s-loss' },
+  minGain: { label: 'analyticsMinGain', rank: 'rankMinGain', icon: ChevronsUp, tone: 'neutral', accentBorder: 'border-s-4 border-s-gain/40' },
+  minLoss: { label: 'analyticsMinLoss', rank: 'rankMinLoss', icon: ChevronsDown, tone: 'neutral', accentBorder: 'border-s-4 border-s-loss/40' }
 };
 
 export function AnalyticsCards({ result, timeline }: { result: TimelineResult; timeline: 1 | 2 }) {
@@ -62,22 +62,48 @@ export function AnalyticsCards({ result, timeline }: { result: TimelineResult; t
         const Icon = c.icon;
         const isGain = kind === 'maxGain' || kind === 'minGain';
         return (
-          <Surface key={kind} className="p-4 md:p-5">
+          <Surface key={kind} className={cn('space-y-3 p-4 md:p-5', c.accentBorder)}>
             <div className="flex items-center gap-3">
-              <AssetLogo symbol={row.symbol} kind={row.kind} size={36} />
+              <AssetLogo symbol={row.symbol} kind={row.kind} size={38} />
               <div className="min-w-0 flex-1">
                 <Badge tone={c.tone} icon={<Icon aria-hidden />}>
                   {t(c.label)}
                 </Badge>
-                <p className="mt-1 truncate text-sm font-semibold text-ink">
-                  {row.nameFa}
-                </p>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <p className="truncate text-sm font-extrabold text-ink">{row.nameFa}</p>
+                  <bdi dir="ltr" className="font-mono text-2xs uppercase text-subtle">
+                    {row.symbol}
+                  </bdi>
+                </div>
               </div>
-              <div className="text-end">
-                <p className="text-lg font-bold"><PercentValue value={row.changePct} /></p>
+              <div className="shrink-0 text-end">
+                <span
+                  className={cn(
+                    'inline-flex rounded-xl px-2.5 py-1 text-base font-extrabold',
+                    isGain ? 'bg-gain/10 text-positive' : 'bg-negative/10 text-negative'
+                  )}
+                >
+                  <PercentValue value={row.changePct} />
+                </span>
               </div>
             </div>
-            <p className="mt-3 text-sm leading-7 text-muted">
+
+            <div className="grid grid-cols-2 gap-2.5 rounded-xl bg-surface-2/55 p-2.5 text-xs">
+              <div>
+                <span className="block text-2xs text-muted">ارزش امروز سرمایه</span>
+                <span className="mt-0.5 block font-bold text-ink">
+                  <MoneyValue value={row.valueUsd} />
+                </span>
+              </div>
+              <div>
+                <span className="block text-2xs text-muted">{isGain ? 'سود خالص' : 'زیان خالص'}</span>
+                <span className="mt-0.5 block font-bold">
+                  <MoneyValue value={row.profitLoss} signed tone="auto" />
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs leading-6 text-muted">
               {t('analyticsIntro').replace('{date}', dateLabel)}
               <span className="font-semibold text-ink"> {row.nameFa} </span>
               {t('analyticsMiddle').replace('{rank}', t(c.rank))}{' '}

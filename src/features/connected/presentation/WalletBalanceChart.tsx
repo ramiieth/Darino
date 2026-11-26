@@ -97,6 +97,8 @@ export function WalletBalanceChart({ portfolio, network }: { portfolio: Connecte
   const delta = points.length > 1 ? points[points.length - 1][1] - points[0][1] : null;
   const percent = delta !== null && points[0][1] > 0 ? (delta / points[0][1]) * 100 : null;
   const isLoss = delta !== null && delta < 0;
+  const high = points.length > 1 ? Math.max(...points.map((p) => p[1])) : null;
+  const low = points.length > 1 ? Math.min(...points.map((p) => p[1])) : null;
   const color = cssColor(isLoss ? 'loss' : 'gain');
   const labels = points.map(([at]) =>
     new Date(at).toLocaleString(
@@ -112,7 +114,7 @@ export function WalletBalanceChart({ portfolio, network }: { portfolio: Connecte
     if (!chartArea) return 'transparent';
     const gradient = canvasCtx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
     const rgb = isLoss ? '200, 41, 63' : '15, 157, 107';
-    gradient.addColorStop(0, `rgba(${rgb}, 0.20)`);
+    gradient.addColorStop(0, `rgba(${rgb}, 0.22)`);
     gradient.addColorStop(0.7, `rgba(${rgb}, 0.04)`);
     gradient.addColorStop(1, `rgba(${rgb}, 0.0)`);
     return gradient;
@@ -122,10 +124,10 @@ export function WalletBalanceChart({ portfolio, network }: { portfolio: Connecte
     <div className="mb-5 space-y-3.5 border-b border-divider/80 pb-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <p className="text-sm font-semibold text-ink">روند کیف پول</p>
+          <p className="text-sm font-bold text-ink">روند کیف پول</p>
           {(percent !== null || delta !== null) && (
             <div
-              className={`inline-flex flex-wrap items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              className={`inline-flex flex-wrap items-center gap-2 rounded-full px-2.5 py-1 text-xs font-bold ${
                 isLoss ? 'bg-loss/10' : 'bg-gain/10'
               }`}
             >
@@ -160,7 +162,7 @@ export function WalletBalanceChart({ portfolio, network }: { portfolio: Connecte
       {!busy && data && points.length < 2 && <p className="py-6 text-xs text-muted">دادهٔ کافی برای نمودار دریافت نشد.</p>}
       {!busy && points.length > 1 && (
         <div
-          className="relative h-48 min-w-0 w-full overflow-hidden rounded-2xl bg-gradient-to-b from-surface-2/30 to-transparent px-1 pt-2 md:h-60"
+          className="relative h-48 min-w-0 w-full overflow-hidden rounded-2xl border border-divider/50 bg-gradient-to-b from-surface-2/35 to-transparent px-1 pt-2 md:h-60"
           role="img"
           aria-label={`نمودار ارزش کیف پول ${wallet.holding.label}؛ ${periods.find((p) => p[0] === period)?.[1]}`}
         >
@@ -203,29 +205,44 @@ export function WalletBalanceChart({ portfolio, network }: { portfolio: Connecte
         </div>
       )}
 
-      <div
-        className="inline-flex flex-wrap gap-1 rounded-xl bg-surface-2/75 p-1"
-        role="group"
-        aria-label="بازهٔ نمودار"
-      >
-        {periods.map(([id, label]) => {
-          const active = period === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setPeriod(id)}
-              className={`min-h-8 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 ${
-                active
-                  ? 'bg-card text-accent shadow-sm ring-1 ring-divider/80'
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          className="inline-flex flex-wrap gap-1 rounded-xl bg-surface-2/75 p-1"
+          role="group"
+          aria-label="بازهٔ نمودار"
+        >
+          {periods.map(([id, label]) => {
+            const active = period === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setPeriod(id)}
+                className={`min-h-8 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all duration-150 ${
+                  active
+                    ? 'bg-card text-accent shadow-sm ring-1 ring-divider/80'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {high !== null && low !== null && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+            <span className="inline-flex items-center gap-1 rounded-full bg-surface-2/70 px-2.5 py-1">
+              <span>بیشینه:</span>
+              <MoneyValue value={high} className="font-semibold text-ink" />
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-surface-2/70 px-2.5 py-1">
+              <span>کمینه:</span>
+              <MoneyValue value={low} className="font-semibold text-ink" />
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

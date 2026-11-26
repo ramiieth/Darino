@@ -95,6 +95,27 @@ function fmtPctFa(val: number | null | undefined, digits = 1, signed = true): st
   return `${sign}${toFaDigits(abs.toFixed(digits))}٪`;
 }
 
+/** نمایش عدد دلاری با علامت ایزوله‌شده در جهت LTR تا در RTL هرگز علامت پس از عدد نیفتد */
+function UsdBdi({ val, signed = false }: { val: number | null | undefined; signed?: boolean }) {
+  if (val === null || val === undefined || !Number.isFinite(val)) return <span className="num-ltr text-subtle">—</span>;
+  const abs = Math.abs(val);
+  const numStr = abs >= 1000 ? Math.round(abs).toLocaleString('en-US') : abs >= 1 ? abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : abs.toPrecision(4);
+  const sign = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
+  return (
+    <span dir="rtl" className="inline-flex items-baseline gap-1 whitespace-nowrap">
+      <bdi dir="ltr" className="num-ltr">{sign}{toFaDigits(numStr)}</bdi>
+      <span className="text-[0.72em] font-medium opacity-75">دلار</span>
+    </span>
+  );
+}
+
+function PctBdi({ val, digits = 1, signed = true }: { val: number | null | undefined; digits?: number; signed?: boolean }) {
+  if (val === null || val === undefined || !Number.isFinite(val)) return <span className="num-ltr text-subtle">—</span>;
+  const abs = Math.abs(val);
+  const sign = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
+  return <bdi dir="ltr" className="num-ltr">{sign}{toFaDigits(abs.toFixed(digits))}٪</bdi>;
+}
+
 export function CompareCalculator() {
   const { prices: livePrices } = useCalculatorPrices();
 
@@ -368,17 +389,19 @@ export function CompareCalculator() {
   return (
     <div className="space-y-5">
       {/* ۱) هدر، کنترل سرمایه اولیه و انتخابگر دقیق بازه زمانی */}
-      <Surface className="border border-accent/30 bg-gradient-to-bl from-accent/10 via-surface-2/30 to-transparent p-4 sm:p-5 space-y-4">
+      <Surface variant="focal" className="relative overflow-hidden">
+        <div className="h-[3px] w-full bg-gradient-to-l from-accent via-gain/65 to-transparent" aria-hidden />
+        <div className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-extrabold text-ink sm:text-lg">
-                مقایسه عملکرد دارایی‌ها (Asset Performance Comparison)
+                مقایسهٔ عملکرد دارایی‌ها
               </h2>
               <Badge tone="info">{toFaDigits(selectedSymbols.length)} دارایی فعال</Badge>
             </div>
             <p className="mt-1 text-xs leading-6 text-muted">
-              بررسی دقیق بازده قیمتی، سود و زیان دلاری، نرخ رشد سالانه (CAGR) و بیشترین افت سرمایه (Max Drawdown) در بازه زمانی کاملاً یکسان
+              بررسی سود و زیان دلاری، نرخ رشد سالانه و بیشترین افت سرمایه از سقف تا کف در یک بازهٔ زمانی کاملاً یکسان
             </p>
           </div>
 
@@ -656,6 +679,7 @@ export function CompareCalculator() {
             </div>
           </Disclosure>
         </div>
+        </div>
       </Surface>
 
       {/* هشدار شفاف در صورتی که یکی از دارایی‌های انتخاب‌شده در تاریخ شروع هنوز وجود نداشته است */}
@@ -677,23 +701,23 @@ export function CompareCalculator() {
       {summaryStats && (
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Surface className="border-s-4 border-s-emerald-500 p-4 space-y-1">
+            <Surface className="space-y-1 border-s-4 border-s-gain p-4">
               <span className="text-xs font-bold text-muted">بیشترین بازده در این بازه</span>
               <p className="text-base font-extrabold text-ink">
-                {summaryStats.best.nameFa} ({summaryStats.best.symbol})
+                {summaryStats.best.nameFa} <bdi dir="ltr" className="font-mono text-xs text-muted">({summaryStats.best.symbol})</bdi>
               </p>
               <p className="text-xl font-extrabold text-positive">
-                {fmtPctFa(summaryStats.best.totalReturnPct, 1)}
+                <PctBdi val={summaryStats.best.totalReturnPct} digits={1} />
               </p>
               <p className="text-xs text-muted">
-                ارزش {fmtUsdFa(initialCapitalUsd)}: <strong>{fmtUsdFa(summaryStats.best.currentValueUsd)}</strong>
+                ارزش <UsdBdi val={initialCapitalUsd} />: <strong className="text-ink"><UsdBdi val={summaryStats.best.currentValueUsd} /></strong>
               </p>
             </Surface>
 
-            <Surface className="border-s-4 border-s-rose-500 p-4 space-y-1">
+            <Surface className="space-y-1 border-s-4 border-s-loss p-4">
               <span className="text-xs font-bold text-muted">ضعیف‌ترین عملکرد در این بازه</span>
               <p className="text-base font-extrabold text-ink">
-                {summaryStats.worst.nameFa} ({summaryStats.worst.symbol})
+                {summaryStats.worst.nameFa} <bdi dir="ltr" className="font-mono text-xs text-muted">({summaryStats.worst.symbol})</bdi>
               </p>
               <p
                 className={cn(
@@ -701,50 +725,50 @@ export function CompareCalculator() {
                   (summaryStats.worst.totalReturnPct ?? 0) >= 0 ? 'text-positive' : 'text-negative'
                 )}
               >
-                {fmtPctFa(summaryStats.worst.totalReturnPct, 1)}
+                <PctBdi val={summaryStats.worst.totalReturnPct} digits={1} />
               </p>
               <p className="text-xs text-muted">
-                ارزش {fmtUsdFa(initialCapitalUsd)}: <strong>{fmtUsdFa(summaryStats.worst.currentValueUsd)}</strong>
+                ارزش <UsdBdi val={initialCapitalUsd} />: <strong className="text-ink"><UsdBdi val={summaryStats.worst.currentValueUsd} /></strong>
               </p>
             </Surface>
 
-            <Surface className="border-s-4 border-s-sky-500 p-4 space-y-1">
+            <Surface className="space-y-1 border-s-4 border-s-accent p-4">
               <span className="text-xs font-bold text-muted">کمترین افت مسیر (پایدارترین)</span>
               <p className="text-base font-extrabold text-ink">
-                {summaryStats.lowestDrawdown.nameFa} ({summaryStats.lowestDrawdown.symbol})
+                {summaryStats.lowestDrawdown.nameFa} <bdi dir="ltr" className="font-mono text-xs text-muted">({summaryStats.lowestDrawdown.symbol})</bdi>
               </p>
-              <p className="text-xl font-extrabold text-sky-600 dark:text-sky-300">
-                حداکثر افت: {fmtPctFa(summaryStats.lowestDrawdown.maxDrawdownPct, 1)}
+              <p className="text-xl font-extrabold text-accent">
+                <PctBdi val={summaryStats.lowestDrawdown.maxDrawdownPct} digits={1} />
               </p>
               <p className="text-xs text-muted">
-                نوسان سالانه: {fmtPctFa(summaryStats.lowestDrawdown.annualizedVolatilityPct, 1, false)}
+                نوسان سالانه: <PctBdi val={summaryStats.lowestDrawdown.annualizedVolatilityPct} digits={1} signed={false} />
               </p>
             </Surface>
 
-            <Surface className="border-s-4 border-s-amber-500 p-4 space-y-1">
-              <span className="text-xs font-bold text-muted">سنگین‌ترین افت میانی (Max Drawdown)</span>
+            <Surface className="space-y-1 border-s-4 border-s-warn p-4">
+              <span className="text-xs font-bold text-muted">سنگین‌ترین افت از سقف تا کف</span>
               <p className="text-base font-extrabold text-ink">
-                {summaryStats.deepestDrawdown.nameFa} ({summaryStats.deepestDrawdown.symbol})
+                {summaryStats.deepestDrawdown.nameFa} <bdi dir="ltr" className="font-mono text-xs text-muted">({summaryStats.deepestDrawdown.symbol})</bdi>
               </p>
               <p className="text-xl font-extrabold text-negative">
-                حداکثر افت: {fmtPctFa(summaryStats.deepestDrawdown.maxDrawdownPct, 1)}
+                <PctBdi val={summaryStats.deepestDrawdown.maxDrawdownPct} digits={1} />
               </p>
               <p className="text-xs text-muted">
-                نوسان سالانه: {fmtPctFa(summaryStats.deepestDrawdown.annualizedVolatilityPct, 1, false)}
+                نوسان سالانه: <PctBdi val={summaryStats.deepestDrawdown.annualizedVolatilityPct} digits={1} signed={false} />
               </p>
             </Surface>
           </div>
 
           {/* کارت‌های ماشین‌حساب سرمایه‌گذاری فرضی برای هر دارایی */}
-          <Surface className="p-4 sm:p-5 space-y-3">
+          <Surface className="space-y-3 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-extrabold text-ink sm:text-base">
-                  ماشین‌حساب سرمایه‌گذاری فرضی: اگر در <span dir="ltr">{startIso}</span> مبلغ{' '}
-                  {fmtUsdFa(initialCapitalUsd)} می‌خریدید، در <span dir="ltr">{endIso}</span> چقدر داشتید؟
+                  اگر در <bdi dir="ltr" className="font-mono">{startIso}</bdi> مبلغ{' '}
+                  <UsdBdi val={initialCapitalUsd} /> می‌خریدید، در <bdi dir="ltr" className="font-mono">{endIso}</bdi> چقدر داشتید؟
                 </h3>
                 <p className="text-xs text-muted">
-                  مقایسه مستقیم قیمت خرید، قیمت پایان، ارزش فعلی سرمایه و سود یا زیان خالص دلاری
+                  مقایسهٔ مستقیم قیمت خرید، قیمت پایان، ارزش فعلی سرمایه و سود یا زیان خالص دلاری
                 </p>
               </div>
             </div>
@@ -756,11 +780,16 @@ export function CompareCalculator() {
                   <div
                     key={m.symbol}
                     onClick={() => setInspectedAssetSymbol(m.symbol)}
-                    className="cursor-pointer rounded-card border border-divider bg-surface-2/40 p-3.5 transition-all hover:border-accent hover:bg-card space-y-2"
+                    className="cursor-pointer space-y-2 rounded-card border border-divider bg-surface-2/40 p-3.5 transition-all hover:border-accent hover:bg-card"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-2 text-xs font-extrabold text-muted">
+                        <span
+                          className={cn(
+                            'flex h-6 w-6 items-center justify-center rounded-full text-xs font-extrabold',
+                            idx === 0 ? 'bg-gain/15 text-positive' : 'bg-surface-2 text-muted'
+                          )}
+                        >
                           {toFaDigits(idx + 1)}
                         </span>
                         <MarketAssetLogo symbol={m.symbol === 'GOLD' ? 'PAXG' : m.symbol === 'SILVER' ? 'SLV' : m.symbol} size={26} />
@@ -772,15 +801,15 @@ export function CompareCalculator() {
                         </div>
                       </div>
                       <Badge tone={isGain ? 'gain' : 'loss'}>
-                        {fmtPctFa(m.totalReturnPct, 1)}
+                        <PctBdi val={m.totalReturnPct} digits={1} />
                       </Badge>
                     </div>
 
-                    <div className="rounded-field bg-card p-2.5 space-y-1">
+                    <div className="space-y-1 rounded-field bg-card p-2.5">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] text-muted">ارزش امروز {fmtUsdFa(initialCapitalUsd)}:</span>
+                        <span className="text-[11px] text-muted">ارزش امروز:</span>
                         <span className="text-base font-extrabold text-ink">
-                          {fmtUsdFa(m.currentValueUsd)}
+                          <UsdBdi val={m.currentValueUsd} />
                         </span>
                       </div>
                       <div className="flex items-baseline justify-between">
@@ -791,27 +820,27 @@ export function CompareCalculator() {
                             isGain ? 'text-positive' : 'text-negative'
                           )}
                         >
-                          {fmtUsdFa(m.netProfitLossUsd, true)}
+                          <UsdBdi val={m.netProfitLossUsd} signed />
                         </span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] text-muted">
                       <div>
-                        <span>قیمت شروع: </span>
-                        <strong className="text-ink">{fmtUsdFa(m.startPrice)}</strong>
+                        <span>شروع: </span>
+                        <strong className="text-ink"><UsdBdi val={m.startPrice} /></strong>
                       </div>
                       <div>
-                        <span>قیمت پایان: </span>
-                        <strong className="text-ink">{fmtUsdFa(m.endPrice)}</strong>
+                        <span>پایان: </span>
+                        <strong className="text-ink"><UsdBdi val={m.endPrice} /></strong>
                       </div>
                       <div>
-                        <span>رشد سالانه (CAGR): </span>
-                        <strong className="text-ink">{fmtPctFa(m.cagrPct, 1)}</strong>
+                        <span>رشد سالانه: </span>
+                        <strong className="text-ink"><PctBdi val={m.cagrPct} digits={1} /></strong>
                       </div>
                       <div>
-                        <span>بیشترین افت (MDD): </span>
-                        <strong className="text-negative">{fmtPctFa(m.maxDrawdownPct, 1)}</strong>
+                        <span>بیشترین افت: </span>
+                        <strong className="text-negative"><PctBdi val={m.maxDrawdownPct} digits={1} /></strong>
                       </div>
                     </div>
                   </div>
@@ -969,30 +998,30 @@ export function CompareCalculator() {
                         </div>
                       </div>
                     </td>
-                    <td className="col-num text-xs text-muted">{fmtUsdFa(m.startPrice)}</td>
-                    <td className="col-num text-xs font-bold text-ink">{fmtUsdFa(m.endPrice)}</td>
+                    <td className="col-num text-xs text-muted"><UsdBdi val={m.startPrice} /></td>
+                    <td className="col-num text-xs font-bold text-ink"><UsdBdi val={m.endPrice} /></td>
                     <td
                       className={cn(
                         'col-num text-xs font-semibold',
                         (m.priceChangeUsd ?? 0) >= 0 ? 'text-positive' : 'text-negative'
                       )}
                     >
-                      {fmtUsdFa(m.priceChangeUsd, true)}
+                      <UsdBdi val={m.priceChangeUsd} signed />
                     </td>
                     <td className="col-num">
                       <span
                         className={cn(
                           'inline-flex rounded-full px-2 py-0.5 text-xs font-extrabold',
                           isGain
-                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-rose-500/15 text-rose-600 dark:text-rose-300'
+                            ? 'bg-gain/12 text-positive'
+                            : 'bg-negative/12 text-negative'
                         )}
                       >
-                        {fmtPctFa(m.totalReturnPct, 1)}
+                        <PctBdi val={m.totalReturnPct} digits={1} />
                       </span>
                     </td>
                     <td className="col-num text-xs font-extrabold text-ink">
-                      {fmtUsdFa(m.currentValueUsd)}
+                      <UsdBdi val={m.currentValueUsd} />
                     </td>
                     <td
                       className={cn(
@@ -1000,16 +1029,16 @@ export function CompareCalculator() {
                         (m.netProfitLossUsd ?? 0) >= 0 ? 'text-positive' : 'text-negative'
                       )}
                     >
-                      {fmtUsdFa(m.netProfitLossUsd, true)}
+                      <UsdBdi val={m.netProfitLossUsd} signed />
                     </td>
                     <td className="col-num text-xs font-semibold text-ink">
-                      {fmtPctFa(m.cagrPct, 1)}
+                      <PctBdi val={m.cagrPct} digits={1} />
                     </td>
                     <td className="col-num text-xs font-bold text-negative">
-                      {fmtPctFa(m.maxDrawdownPct, 1)}
+                      <PctBdi val={m.maxDrawdownPct} digits={1} />
                     </td>
                     <td className="col-num !pe-4 text-xs text-muted">
-                      {fmtPctFa(m.annualizedVolatilityPct, 1, false)}
+                      <PctBdi val={m.annualizedVolatilityPct} digits={1} signed={false} />
                     </td>
                   </tr>
                 );
@@ -1058,23 +1087,21 @@ export function CompareCalculator() {
             <div className="rounded-field bg-surface-2/60 p-3">
               <span className="text-muted">بهترین سال تقویمی در بازه</span>
               <p className="mt-1 font-extrabold text-positive">
-                {inspectedMetric.bestYearReturn
-                  ? `سال ${toFaDigits(inspectedMetric.bestYearReturn.year)} (${fmtPctFa(
-                      inspectedMetric.bestYearReturn.returnPct,
-                      1
-                    )})`
-                  : '—'}
+                {inspectedMetric.bestYearReturn ? (
+                  <>سال {toFaDigits(inspectedMetric.bestYearReturn.year)} (<PctBdi val={inspectedMetric.bestYearReturn.returnPct} digits={1} />)</>
+                ) : (
+                  '—'
+                )}
               </p>
             </div>
             <div className="rounded-field bg-surface-2/60 p-3">
               <span className="text-muted">بدترین سال تقویمی در بازه</span>
               <p className="mt-1 font-extrabold text-negative">
-                {inspectedMetric.worstYearReturn
-                  ? `سال ${toFaDigits(inspectedMetric.worstYearReturn.year)} (${fmtPctFa(
-                      inspectedMetric.worstYearReturn.returnPct,
-                      1
-                    )})`
-                  : '—'}
+                {inspectedMetric.worstYearReturn ? (
+                  <>سال {toFaDigits(inspectedMetric.worstYearReturn.year)} (<PctBdi val={inspectedMetric.worstYearReturn.returnPct} digits={1} />)</>
+                ) : (
+                  '—'
+                )}
               </p>
             </div>
             <div className="rounded-field bg-surface-2/60 p-3">
@@ -1121,32 +1148,32 @@ export function CompareCalculator() {
                   <div className="flex justify-between">
                     <span className="text-muted">بازده کل در برابر بیشترین افت:</span>
                     <span>
-                      <strong className="text-positive">{fmtPctFa(m.totalReturnPct, 1)}</strong>
+                      <strong className="text-positive"><PctBdi val={m.totalReturnPct} digits={1} /></strong>
                       {' / '}
-                      <strong className="text-negative">{fmtPctFa(m.maxDrawdownPct, 1)}</strong>
+                      <strong className="text-negative"><PctBdi val={m.maxDrawdownPct} digits={1} /></strong>
                     </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
                     <div
-                      className="h-full rounded-full bg-rose-500"
+                      className="h-full rounded-full bg-loss"
                       style={{ width: `${Math.min(100, Math.max(5, ddAbs))}%` }}
                     />
                   </div>
                 </div>
-                <div className="flex flex-wrap justify-between gap-2 text-[11px] text-muted pt-1">
+                <div className="flex flex-wrap justify-between gap-2 pt-1 text-[11px] text-muted">
                   <span>
-                    نوسان سالانه: <strong className="text-ink">{fmtPctFa(m.annualizedVolatilityPct, 1, false)}</strong>
+                    نوسان سالانه: <strong className="text-ink"><PctBdi val={m.annualizedVolatilityPct} digits={1} signed={false} /></strong>
                   </span>
                   <span>
                     بهترین سال:{' '}
                     <strong className="text-positive">
-                      {m.bestYearReturn ? `${toFaDigits(m.bestYearReturn.year)} (${fmtPctFa(m.bestYearReturn.returnPct, 0)})` : '—'}
+                      {m.bestYearReturn ? <>{toFaDigits(m.bestYearReturn.year)} (<PctBdi val={m.bestYearReturn.returnPct} digits={0} />)</> : '—'}
                     </strong>
                   </span>
                   <span>
                     بدترین سال:{' '}
                     <strong className="text-negative">
-                      {m.worstYearReturn ? `${toFaDigits(m.worstYearReturn.year)} (${fmtPctFa(m.worstYearReturn.returnPct, 0)})` : '—'}
+                      {m.worstYearReturn ? <>{toFaDigits(m.worstYearReturn.year)} (<PctBdi val={m.worstYearReturn.returnPct} digits={0} />)</> : '—'}
                     </strong>
                   </span>
                 </div>
@@ -1156,68 +1183,70 @@ export function CompareCalculator() {
         </div>
       </Surface>
 
-      {/* ۶) بخش ویژه راستی‌آزمایی ادعاهای منتشرشده در بازار (بخش ۹ پرامپت) */}
-      <Surface className="border border-amber-500/35 bg-amber-500/5 p-4 sm:p-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5 text-amber-500" aria-hidden />
-            <h3 className="text-sm font-extrabold text-ink sm:text-base">
-              راستی‌آزمایی علمی ادعاهای منتشرشده در بازار: چرا «از سال ۲۰۲۱» می‌تواند گمراه‌کننده باشد؟
-            </h3>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <Button size="sm" variant="outline" onClick={() => handlePresetChange('since-2021')}>
-              تست روی نمودار: از ۱ ژانویه ۲۰۲۱
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handlePresetChange('nov-2021-peak')}>
-              تست روی نمودار: از سقف ۱۰ نوامبر ۲۰۲۱
-            </Button>
-          </div>
-        </div>
-
-        <p className="text-xs leading-6 text-muted">
-          در شبکه‌های اجتماعی ادعایی منتشر می‌شود: <strong>«از سال ۲۰۲۱: شاخص S&P 500 رشد ۶۲٪، طلا ۱۱۰٪، انویدیا ۲۰۴۵٪ و بیت‌کوین بازده ۰٪ داشته است!»</strong> بررسی داده‌های تاریخی نشان می‌دهد که این ادعا نتیجهٔ <strong>انتخاب گزینشی تاریخ شروع روی سقف قیمتی نوامبر ۲۰۲۱ (۱۰ نوامبر ۲۰۲۱)</strong> به جای ابتدای سال ۲۰۲۱ (۱ ژانویه ۲۰۲۱) است:
-        </p>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {claimAuditRows.map((row) => (
-            <div key={row.symbol} className="rounded-card border border-divider bg-card p-3.5 space-y-2 text-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-extrabold text-ink">{row.nameFa}</span>
-                <Badge tone={row.verdictTone}>{row.verdictBadgeFa}</Badge>
-              </div>
-              <p className="text-[11px] font-semibold text-muted">{row.viralClaimTextFa}</p>
-              <div className="grid grid-cols-2 gap-2 rounded-field bg-surface-2/60 p-2.5">
-                <div>
-                  <span className="block text-[10px] text-muted">از ابتدای ۲۰۲۱ (2021-01-01):</span>
-                  <span
-                    className={cn(
-                      'text-sm font-extrabold',
-                      row.returnFromJan2021Pct >= 0 ? 'text-positive' : 'text-negative'
-                    )}
-                  >
-                    {fmtPctFa(row.returnFromJan2021Pct, 1)}
-                  </span>
-                  <span className="block text-[10px] text-muted">شروع: {fmtUsdFa(row.priceJan2021)}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-muted">از سقف نوامبر ۲۰۲۱ (2021-11-10):</span>
-                  <span
-                    className={cn(
-                      'text-sm font-extrabold',
-                      row.returnFromNov2021PeakPct >= 0 ? 'text-positive' : 'text-negative'
-                    )}
-                  >
-                    {fmtPctFa(row.returnFromNov2021PeakPct, 1)}
-                  </span>
-                  <span className="block text-[10px] text-muted">شروع: {fmtUsdFa(row.priceNov2021Peak)}</span>
-                </div>
-              </div>
-              <p className="text-[11px] leading-5 text-muted">{row.explanationFa}</p>
+      {/* ۶) بخش ویژه راستی‌آزمایی ادعاهای منتشرشده در بازار (جمع‌شونده برای خلوت ماندن صفحه) */}
+      <Disclosure summary="راستی‌آزمایی ادعای معروف ۲۰۲۱ (بیت‌کوین ۰٪ در برابر طلا، S&P 500 و انویدیا)">
+        <Surface className="mt-2 space-y-3 border border-warn/35 bg-warn/[0.04] p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-warn" aria-hidden />
+              <h3 className="text-sm font-extrabold text-ink sm:text-base">
+                چرا مقایسهٔ «از سال ۲۰۲۱» می‌تواند گمراه‌کننده باشد؟
+              </h3>
             </div>
-          ))}
-        </div>
-      </Surface>
+            <div className="flex flex-wrap gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => handlePresetChange('since-2021')}>
+                تست روی نمودار: از ۱ ژانویه ۲۰۲۱
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handlePresetChange('nov-2021-peak')}>
+                تست روی نمودار: از سقف ۱۰ نوامبر ۲۰۲۱
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-xs leading-6 text-muted">
+            ادعای معروف <strong>«از ۲۰۲۱: S&P 500 رشد ۶۲٪، طلا ۱۱۰٪، انویدیا ۲۰۴۵٪ و بیت‌کوین ۰٪»</strong> نتیجهٔ انتخاب تاریخ شروع دقیقاً روی <strong>سقف قیمتی ۱۰ نوامبر ۲۰۲۱</strong> به‌جای ابتدای سال ۲۰۲۱ است:
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {claimAuditRows.map((row) => (
+              <div key={row.symbol} className="space-y-2 rounded-card border border-divider bg-card p-3.5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-extrabold text-ink">{row.nameFa}</span>
+                  <Badge tone={row.verdictTone}>{row.verdictBadgeFa}</Badge>
+                </div>
+                <p className="text-[11px] font-semibold text-muted">{row.viralClaimTextFa}</p>
+                <div className="grid grid-cols-2 gap-2 rounded-field bg-surface-2/60 p-2.5">
+                  <div>
+                    <span className="block text-[10px] text-muted">از ۱ ژانویه ۲۰۲۱:</span>
+                    <span
+                      className={cn(
+                        'text-sm font-extrabold',
+                        row.returnFromJan2021Pct >= 0 ? 'text-positive' : 'text-negative'
+                      )}
+                    >
+                      <PctBdi val={row.returnFromJan2021Pct} digits={1} />
+                    </span>
+                    <span className="block text-[10px] text-muted">شروع: <UsdBdi val={row.priceJan2021} /></span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted">از سقف ۱۰ نوامبر ۲۰۲۱:</span>
+                    <span
+                      className={cn(
+                        'text-sm font-extrabold',
+                        row.returnFromNov2021PeakPct >= 0 ? 'text-positive' : 'text-negative'
+                      )}
+                    >
+                      <PctBdi val={row.returnFromNov2021PeakPct} digits={1} />
+                    </span>
+                    <span className="block text-[10px] text-muted">شروع: <UsdBdi val={row.priceNov2021Peak} /></span>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-5 text-muted">{row.explanationFa}</p>
+              </div>
+            ))}
+          </div>
+        </Surface>
+      </Disclosure>
 
       {/* ۷) بخش «جمع‌بندی عملکرد» خودکار و آموزشی (بخش ۱۱ پرامپت) */}
       <Surface className="border-s-4 border-s-accent p-4 sm:p-5 space-y-3">

@@ -186,24 +186,26 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
 
       <ScenarioCashCard />
 
-      <div className="space-y-4">
-        <Tabs<TimelineTab>
-          label="بازه زمانی"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 't1', label: t('timeline1') },
-            { value: 't2', label: t('timeline2') }
-          ]}
-        />
-        <p className="text-sm text-muted">
-          {tab === 't1' ? t('timeline1Desc') : t('timeline2DescTpl').replace('{n}', String(COVERAGE.tokenizedCount))}
-        </p>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs<TimelineTab>
+            label="بازه زمانی"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 't1', label: t('timeline1') },
+              { value: 't2', label: t('timeline2') }
+            ]}
+          />
+          <p className="text-xs text-muted">
+            {tab === 't1' ? t('timeline1Desc') : t('timeline2DescTpl').replace('{n}', String(COVERAGE.tokenizedCount))}
+          </p>
+        </div>
         <StockProgress result={result} onRefresh={() => startStockCycle()} />
         <TokenSyncBar result={result} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-5 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-5">
           <SimContextChips result={result} />
         </div>
@@ -211,8 +213,6 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
           <CategoryReturnChart result={result} />
         </div>
       </div>
-
-      <SimulatedInvestmentCard period={perfPeriod} onPeriodChange={setPerfPeriod} />
 
       <Section id="insights" title="یافته‌های کلیدی" description="فرضی و گذشته‌نگر — پیش‌بینی آینده نیست">
         <AnalyticsCards result={result} timeline={timeline} />
@@ -240,6 +240,8 @@ export function SimulationPage({ onOpenScenario }: { onOpenScenario: () => void 
           />
         </div>
       </Section>
+
+      <SimulatedInvestmentCard period={perfPeriod} onPeriodChange={setPerfPeriod} />
 
       <AssetDetailSheet row={selectedRow} onClose={() => setSelectedRow(null)} />
     </Page>

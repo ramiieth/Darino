@@ -278,7 +278,7 @@ export function AuditTab({
           <span
             className={cn(
               'hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:flex',
-              m.netPnl >= 0 ? 'bg-gain/12 text-gain-text' : 'bg-negative/12 text-negative'
+              m.netPnl >= 0 ? 'bg-gain/12 text-positive' : 'bg-negative/12 text-negative'
             )}
           >
             {m.netPnl >= 0 ? <TrendingUp className="h-6 w-6" aria-hidden /> : <TrendingDown className="h-6 w-6" aria-hidden />}

@@ -10,8 +10,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowLeft,
   Bot,
   CheckCircle2,
   ChevronDown,
@@ -23,8 +25,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Trash2,
-  TrendingDown,
-  TrendingUp,
   Wallet
 } from 'lucide-react';
 import { Surface } from '@/shared/components/ui/GlassCard';
@@ -37,13 +37,8 @@ import { MoneyValue } from '@/shared/components/ui/FinancialValue';
 import { MarketAssetLogo } from '@/features/perps/presentation/MarketAssetIdentity';
 import { useCalculatorPrices } from '@/features/calculators/data/useCalculatorPrices';
 import { useWalletAndCostBridge } from '@/features/performance/data/useWalletAndCostBridge';
-import {
-  RATING_FA,
-  SENTIMENT_BAND_FA,
-  TRADER_ACTION_FA,
-  type TradingAgentsReport
-} from '@/features/intel/domain/tradingAgents';
-import { fetchJson } from '@/repositories/remoteClient';
+import { RATING_FA } from '@/features/intel/domain/tradingAgents';
+import { buttonClass } from '@/shared/components/ui/Button';
 import { cn } from '@/shared/lib/cn';
 import { toEnDigits, toFaDigits } from '@/shared/utils/formatters';
 import {
@@ -180,10 +175,8 @@ export function PortfolioBasketDcaCommitteePanel() {
   const [customNameFa, setCustomNameFa] = useState<string>('');
   const [customPriceStr, setCustomPriceStr] = useState<string>('');
 
-  // ۵) باز و بسته بودن جزئیات هر دارایی و کمیته زنده
-  const [expandedSymbol, setExpandedSymbol] = useState<string | null>('ETH');
-  const [liveCommitteeReports, setLiveCommitteeReports] = useState<Record<string, TradingAgentsReport>>({});
-  const [runningCommitteeSymbol, setRunningCommitteeSymbol] = useState<string | null>(null);
+  // ۵) باز و بسته بودن جزئیات هر دارایی
+  const [expandedSymbol, setExpandedSymbol] = useState<string | null>('BTC');
 
   const usdcBalance = parseNum(usdcStr, 0);
   const usdtBalance = parseNum(usdtStr, 0);
@@ -330,25 +323,6 @@ export function PortfolioBasketDcaCommitteePanel() {
     }
   };
 
-  const handleRunLiveCommitteeForAsset = async (row: ComputedBasketAssetRow) => {
-    const sym = row.item.symbol;
-    if (runningCommitteeSymbol) return;
-    setRunningCommitteeSymbol(sym);
-    try {
-      const res = await fetchJson<{ report: TradingAgentsReport }>(
-        '/api/integrations?op=analyze-trading-agents',
-        { method: 'POST', body: row.committee.committeeInput, timeoutMs: 65_000 }
-      );
-      if (res?.report) {
-        setLiveCommitteeReports((prev) => ({ ...prev, [sym]: res.report }));
-      }
-    } catch {
-      setLiveCommitteeReports((prev) => ({ ...prev, [sym]: row.committee.report }));
-    } finally {
-      setRunningCommitteeSymbol(null);
-      setExpandedSymbol(sym);
-    }
-  };
 
   return (
     <div className="space-y-5">
@@ -685,15 +659,13 @@ export function PortfolioBasketDcaCommitteePanel() {
         {summary.rows.map((row) => {
           const { item, committee } = row;
           const isExpanded = expandedSymbol === item.symbol;
-          const activeReport = liveCommitteeReports[item.symbol] ?? committee.report;
-          const ratingMeta = RATING_FA[activeReport.riskDebate.portfolioDecision.rating];
-          const traderMeta = TRADER_ACTION_FA[activeReport.traderProposal.action];
+          const ratingMeta = RATING_FA[committee.report.riskDebate.portfolioDecision.rating];
 
           return (
             <Surface
               key={item.id}
               className={cn(
-                'border p-4 space-y-3 transition-all',
+                'border p-4 space-y-3 transition-all hover:border-accent/35',
                 !item.enabled && 'opacity-55',
                 isExpanded ? 'border-accent shadow-xs' : 'border-divider'
               )}
@@ -715,7 +687,6 @@ export function PortfolioBasketDcaCommitteePanel() {
                         {item.symbol}
                       </span>
                       <Badge tone={ratingMeta.tone}>{ratingMeta.short}</Badge>
-                      <Badge tone="neutral">امتیاز {toFaDigits(committee.sentimentScore)}/۱۰</Badge>
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted">
                       قیمت روز: <strong className="text-ink"><MoneyValue value={item.currentPriceUsd} /></strong>
@@ -732,22 +703,21 @@ export function PortfolioBasketDcaCommitteePanel() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={runningCommitteeSymbol === item.symbol}
-                    icon={<Bot className="h-3.5 w-3.5" />}
-                    onClick={() => void handleRunLiveCommitteeForAsset(row)}
+                  <Link
+                    to={`/desk?tab=agents&m=${encodeURIComponent(item.symbol)}`}
+                    className={cn(buttonClass('outline', 'sm'), 'border-accent/30 text-accent hover:bg-accent/10')}
                   >
-                    کمیته زنده
-                  </Button>
+                    <Bot className="h-3.5 w-3.5" aria-hidden />
+                    <span>مناظره در میز معامله</span>
+                    <ArrowLeft className="h-3 w-3" aria-hidden />
+                  </Link>
                   <Button
                     size="sm"
                     variant="secondary"
                     icon={isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     onClick={() => setExpandedSymbol(isExpanded ? null : item.symbol)}
                   >
-                    {isExpanded ? 'بستن پله‌ها' : 'پله‌های DCA و کمیته'}
+                    {isExpanded ? 'بستن پله‌ها' : 'ویرایش پله‌های DCA'}
                   </Button>
                   <IconButton
                     size="sm"
@@ -967,36 +937,7 @@ export function PortfolioBasketDcaCommitteePanel() {
                     </div>
                   </div>
 
-                  {/* خروجی کمیته ۴ مرحله‌ای ایجنت‌ها */}
-                  <div className="space-y-2.5 rounded-card border border-accent/25 bg-surface-2/40 p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-extrabold text-ink">
-                        <Bot className="h-4 w-4 text-accent" aria-hidden />
-                        جمع‌بندی کمیته ایجنت‌ها (TradingAgents)
-                      </span>
-                      <div className="flex gap-1.5">
-                        <Badge tone={ratingMeta.tone}>{ratingMeta.label}</Badge>
-                        <Badge tone={traderMeta.tone}>{traderMeta.label}</Badge>
-                      </div>
-                    </div>
-                    <p className="text-xs leading-6 text-ink">{activeReport.riskDebate.portfolioDecision.executiveSummary}</p>
-                    <div className="grid gap-2.5 md:grid-cols-2 text-xs">
-                      <div className="rounded-field border border-gain/25 bg-gain/5 p-2.5 leading-6">
-                        <p className="font-bold text-positive flex items-center gap-1">
-                          <TrendingUp className="h-3.5 w-3.5" aria-hidden />
-                          دیدگاه صعودی (Bull)
-                        </p>
-                        <p className="mt-1 text-muted">{activeReport.researchDebate.bullHistory}</p>
-                      </div>
-                      <div className="rounded-field border border-negative/25 bg-negative/5 p-2.5 leading-6">
-                        <p className="font-bold text-negative flex items-center gap-1">
-                          <TrendingDown className="h-3.5 w-3.5" aria-hidden />
-                          دیدگاه نزولی (Bear)
-                        </p>
-                        <p className="mt-1 text-muted">{activeReport.researchDebate.bearHistory}</p>
-                      </div>
-                    </div>
-                  </div>
+
                 </div>
               )}
             </Surface>

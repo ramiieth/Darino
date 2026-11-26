@@ -6,7 +6,7 @@
  */
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, type ReactNode } from 'react';
-import { FlaskConical, Lock, Radar, Zap } from 'lucide-react';
+import { Coins, FlaskConical, History, Lock, Radar, Scale, Zap } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 
 export interface SectionTab {
@@ -79,12 +79,12 @@ export const FUNDING_TABS: readonly SectionTab[] = [
 ];
 
 export const VENUE_TABS: readonly SectionTab[] = [
-  { to: '/lighter', label: 'لایتر' },
-  { to: '/lighter-robinhood', label: 'لایتر رابین‌هود' },
-  { to: '/arcus', label: 'آرکوس' },
-  { to: '/txflow', label: 'تی‌اکس‌فلو' },
-  { to: '/variational', label: 'وریشنال' },
-  { to: '/ondo-perps', label: 'اوندو پرپس' }
+  { to: '/lighter', label: 'لایتر', icon: <img src="/logos/platform-lighter.png" alt="" className="h-4 w-4 rounded-full object-cover" /> },
+  { to: '/lighter-robinhood', label: 'لایتر رابین‌هود', icon: <img src="/logos/platform-lighter.png" alt="" className="h-4 w-4 rounded-full object-cover" /> },
+  { to: '/arcus', label: 'آرکوس', icon: <img src="/logos/platform-arcus.png" alt="" className="h-4 w-4 rounded-full object-cover" /> },
+  { to: '/txflow', label: 'تی‌اکس‌فلو', icon: <img src="/logos/platform-txflow.png" alt="" className="h-4 w-4 rounded-full object-cover" /> },
+  { to: '/variational', label: 'وریشنال', icon: <img src="/logos/platform-variational.png" alt="" className="h-4 w-4 rounded-full object-cover" /> },
+  { to: '/ondo-perps', label: 'اوندو پرپس', icon: <img src="/logos/platform-ondo.png" alt="" className="h-4 w-4 rounded-full object-cover" /> }
 ];
 
 export const MARKET_TABS: readonly SectionTab[] = [
@@ -93,9 +93,9 @@ export const MARKET_TABS: readonly SectionTab[] = [
 ];
 
 export const SIMULATION_TABS: readonly SectionTab[] = [
-  { to: '/simulation', label: 'با تاریخچهٔ بازار' },
-  { to: '/simulation/compare', label: 'سرمایهٔ یکسان در چند دارایی' },
-  { to: '/simulation/stable', label: 'دلار بازده‌دار به‌جای تتر' }
+  { to: '/simulation', label: 'تاریخچهٔ بازار', icon: <History aria-hidden /> },
+  { to: '/simulation/compare', label: 'مقایسه چند دارایی', icon: <Scale aria-hidden /> },
+  { to: '/simulation/stable', label: 'دلار بازده‌دار به‌جای تتر', icon: <Coins aria-hidden /> }
 ];
 
 const LAST_VENUE_KEY = 'darino:last-venue';

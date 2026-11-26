@@ -283,11 +283,11 @@ function PositionsList({ res, orders, marketById }: { res: Res<ArcusPosition[]>;
         const sl = tpsl.find((o) => o.tpslType === 'STOP_LOSS');
         const markOk = p.markPx && cmp(p.markPx, '0') !== 0;
         return (
-          <Surface key={p.marketId} className="p-4">
+          <Surface key={p.marketId} className="p-4 transition-all duration-150 hover:border-accent/35 hover:shadow-sm">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="relative shrink-0"><MarketLogo m={m} name={p.marketDisplayName} size={40}/><span className="absolute -bottom-1 -left-1 rounded-full bg-card p-0.5"><LogoImage src={chainIdentity('robinhood').logo} label="رابین‌هود" size={16}/></span></span>
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p><p className="mt-1 text-xs text-muted">اندازهٔ پوزیشن <bdi dir="rtl">{tokenQuantity(p.size)} {marketNameFa(m,p.marketDisplayName)}</bdi></p>
+                <p className="font-bold text-ink">{marketNameFa(m, p.marketDisplayName)}</p><p className="mt-0.5 text-xs text-muted">اندازهٔ پوزیشن <bdi dir="rtl">{tokenQuantity(p.size)} {marketNameFa(m,p.marketDisplayName)}</bdi></p>
               </div>
               <Badge tone={p.side === 'LONG' ? 'gain' : 'loss'}>{p.side === 'LONG' ? 'لانگ (خرید)' : 'شورت (فروش)'}</Badge>
               <Badge tone="neutral">{p.marginMode === 'CROSS' ? 'مارجین متقاطع' : 'مارجین ایزوله'}</Badge>
@@ -295,7 +295,7 @@ function PositionsList({ res, orders, marketById }: { res: Res<ArcusPosition[]>;
                 اهرم <bdi dir="ltr">{p.leverage}x</bdi>
               </Badge>
             </div>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-3 rounded-xl border border-divider/70 bg-surface-2/45 p-3 text-sm sm:grid-cols-4">
               <KV k="اندازه (طبق آرکوس)" v={<Num v={p.size} />} />
               <KV k="قیمت ورود" v={<Num v={p.averageEntryPrice} />} />
               <KV k="قیمت مارک" v={markOk ? <Num v={p.markPx} /> : NA} />

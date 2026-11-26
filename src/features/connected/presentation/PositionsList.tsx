@@ -14,30 +14,33 @@ import { ChevronDown } from 'lucide-react';
 
 export function PositionsList({ data, groupByToken = false }: { data: WalletSnapshot; groupByToken?: boolean }) {
   const positions = positionRows(data.positions, groupByToken);
+  const totalValue = positions.reduce((sum, p) => sum + (p.value && p.value > 0 ? p.value : 0), 0);
+
   return (
     <div className="positions-list-container">
       {!data.complete && <Notice tone="warn">{data.detailsError || 'جزئیات دارایی‌ها کامل دریافت نشده است.'}</Notice>}
       {!positions.length && data.complete && <p className="py-6 text-sm text-muted">دارایی قابل نمایش یافت نشد.</p>}
       {!!positions.length && (
         <div
-          className="positions-table-header hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)] gap-4 border-b border-divider/80 px-2 py-2.5 text-[11px] font-semibold text-muted"
+          className="positions-table-header mb-1 hidden grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)] gap-4 rounded-xl bg-surface-2/60 px-3 py-2.5 text-[11px] font-semibold text-muted"
           aria-hidden
         >
           <span>دارایی</span>
           <span>قیمت</span>
           <span>مقدار موجودی</span>
-          <span className="text-end">ارزش</span>
+          <span className="text-end">ارزش و سهم</span>
         </div>
       )}
-      <ul className="divide-y divide-divider/70">
+      <ul className="divide-y divide-divider/65">
         {positions.map((p) => {
           const chain = chainIdentity(p.chain, data.chains);
           const multi = p.networks.length > 1;
           const receipt = yieldTokenIdentity(p.symbol, p.name);
+          const sharePct = totalValue > 0 && p.value !== null && p.value > 0 ? (p.value / totalValue) * 100 : null;
           return (
             <li
               key={p.id}
-              className="rounded-xl px-2 py-3.5 transition-colors duration-150 hover:bg-surface-2/45"
+              className="rounded-xl px-2.5 py-3.5 transition-colors duration-150 hover:bg-surface-2/50"
             >
               <div className="positions-grid grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
                 <div className={`positions-identity flex min-w-0 gap-3 ${receipt ? 'items-start' : 'items-center'}`}>
@@ -52,10 +55,10 @@ export function PositionsList({ data, groupByToken = false }: { data: WalletSnap
                     size={42}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-ink">
+                    <p className="text-sm font-bold text-ink">
                       {receipt ? <YieldTokenLabel symbol={p.symbol} name={p.name} /> : tokenName(p.symbol, p.name)}
                     </p>
-                    <div className="mt-1 space-y-1 text-xs leading-5 text-muted">
+                    <div className="mt-0.5 space-y-1 text-xs leading-5 text-muted">
                       <p className="flex min-w-0 items-center gap-1">
                         {multi ? (
                           <>
@@ -89,7 +92,7 @@ export function PositionsList({ data, groupByToken = false }: { data: WalletSnap
                     </div>
                   </div>
                 </div>
-                <div className="positions-price hidden text-sm tabular-nums">
+                <div className="positions-price hidden text-sm tabular-nums text-muted">
                   <MoneyValue value={p.price} />
                 </div>
                 <p
@@ -101,15 +104,25 @@ export function PositionsList({ data, groupByToken = false }: { data: WalletSnap
                   <span className="block truncate tabular-nums">{tokenQuantity(p.quantity)}</span>
                 </p>
                 <div className="positions-value col-start-2 row-start-1 min-w-0 text-end">
-                  <AssetValue value={p.value} primaryClassName="text-sm font-bold" className="text-end" />
+                  <AssetValue value={p.value} primaryClassName="text-sm font-extrabold" className="text-end" />
+                  {sharePct !== null && sharePct >= 0.5 && (
+                    <div className="mt-1 flex items-center justify-end gap-1.5">
+                      <span className="h-1 w-10 overflow-hidden rounded-full bg-surface-2" dir="ltr">
+                        <span className="block h-full rounded-full bg-accent/70" style={{ width: `${Math.min(100, sharePct)}%` }} />
+                      </span>
+                      <span className="text-[10px] font-semibold text-subtle tabular-nums">
+                        {toFaDigits(sharePct < 10 ? sharePct.toFixed(1) : Math.round(sharePct))}٪
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               <details className="group mt-2 text-xs text-muted">
-                <summary className="ms-auto flex w-fit cursor-pointer list-none items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">
+                <summary className="ms-auto flex w-fit cursor-pointer list-none items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">
                   <span>{multi ? 'تفکیک شبکه‌ها' : 'جزئیات'}</span>
                   <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
-                <div className="mt-2 space-y-2.5 rounded-xl border border-divider/70 bg-surface-2/65 p-3">
+                <div className="mt-2 space-y-2 rounded-xl border border-divider/70 bg-surface-2/65 p-3">
                   <p className="positions-mobile-price flex items-center justify-between border-b border-divider/60 pb-2">
                     <span>قیمت هر واحد</span>
                     <MoneyValue value={p.price} className="font-semibold text-ink" />
@@ -117,7 +130,7 @@ export function PositionsList({ data, groupByToken = false }: { data: WalletSnap
                   {p.legs.map((leg) => {
                     const n = chainIdentity(leg.chain, data.chains);
                     return (
-                      <div key={leg.id} className="rounded-lg bg-card/70 px-2.5 py-2">
+                      <div key={leg.id} className="rounded-lg bg-card/80 px-2.5 py-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="inline-flex items-center gap-2 font-medium text-ink">
                             <LogoImage src={n.logo} label={n.name} size={18} />
