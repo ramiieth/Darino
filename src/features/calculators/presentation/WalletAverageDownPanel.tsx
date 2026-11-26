@@ -54,6 +54,10 @@ const parseNum = (s: string, fallback = 0): number => {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 };
 
+const RLI = '\u2067';
+const LRI = '\u2066';
+const PDI = '\u2069';
+
 const fmtUsdFa = (val: number | null | undefined, signed = false): string => {
   if (val === null || val === undefined || !Number.isFinite(val)) return '—';
   const abs = Math.abs(val);
@@ -64,14 +68,14 @@ const fmtUsdFa = (val: number | null | undefined, signed = false): string => {
       ? abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : abs.toPrecision(4);
   const prefix = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
-  return `${prefix}${toFaDigits(str)} دلار`;
+  return `${RLI}${LRI}${prefix}${toFaDigits(str)}${PDI} دلار${PDI}`;
 };
 
 const fmtPctFa = (val: number | null | undefined, digits = 1, signed = true): string => {
   if (val === null || val === undefined || !Number.isFinite(val)) return '—';
   const abs = Math.abs(val);
   const prefix = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
-  return `${prefix}${toFaDigits(abs.toFixed(digits))}٪`;
+  return `${LRI}${prefix}${toFaDigits(abs.toFixed(digits))}٪${PDI}`;
 };
 
 export function WalletAverageDownPanel({
@@ -570,7 +574,7 @@ export function WalletAverageDownPanel({
         <div className="rounded-card border-2 border-accent bg-card p-4 space-y-2 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-extrabold text-accent">
-              وضعیت پس از خرید جدید (+{fmtUsdFa(sim.afterNewBuys.addedAmountUsd)})
+              وضعیت پس از خرید جدید ({fmtUsdFa(sim.afterNewBuys.addedAmountUsd, true)})
             </span>
             <Badge tone="gain">
               موجودی جدید: {toFaDigits(sim.afterNewBuys.totalQuantity.toFixed(4))} {sim.symbol}
@@ -630,17 +634,17 @@ export function WalletAverageDownPanel({
                   <td className="py-2 font-bold text-ink">{fmtUsdFa(st.stepAmountUsd)}</td>
                   <td className="py-2 font-bold text-accent">{fmtUsdFa(st.stepPriceUsd)}</td>
                   <td className="py-2 text-muted">
-                    +{toFaDigits(st.stepUnitsAdded.toFixed(4))} {sim.symbol}
+                    <bdi dir="ltr" className="num-ltr">+{toFaDigits(st.stepUnitsAdded.toFixed(4))}</bdi> {sim.symbol}
                   </td>
                   <td className="py-2 font-bold text-ink">
                     {toFaDigits(st.cumulativeQuantity.toFixed(4))} {sim.symbol}
                   </td>
                   <td className="py-2 font-extrabold text-positive">{fmtUsdFa(st.newAverageCostUsd)}</td>
-                  <td className="py-2 font-bold text-emerald-600 dark:text-emerald-300">
-                    {toFaDigits(st.avgCostDropUsd)} دلار کمتر (-{toFaDigits(st.avgCostDropPct.toFixed(1))}٪)
+                  <td className="py-2 font-bold text-positive">
+                    {toFaDigits(st.avgCostDropUsd)} دلار کمتر (<bdi dir="ltr" className="num-ltr">-{toFaDigits(st.avgCostDropPct.toFixed(1))}٪</bdi>)
                   </td>
                   <td className="py-2 font-semibold text-ink">
-                    +{toFaDigits(st.requiredBounceToBreakEvenPct.toFixed(1))}٪
+                    <bdi dir="ltr" className="num-ltr">+{toFaDigits(st.requiredBounceToBreakEvenPct.toFixed(1))}٪</bdi>
                   </td>
                 </tr>
               ))}
