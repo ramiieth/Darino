@@ -80,14 +80,42 @@ function RowCard({ r }: { r: CompareRow }) {
         </>
       )}
       {r.dataFrom && <p className="mt-1 text-2xs text-subtle">داده از {formatJalali(r.dataFrom)}</p>}
-      {r.units && (
-        <p className="mt-2 rounded-control bg-surface-2 px-3 py-2 text-xs leading-6 text-muted">
-          با <Toman v={r.startToman} /> در {r.priceStart ? formatJalali(r.priceStart.at) : 'تاریخ شروع'} می‌شد حدود{' '}
-          <b className="text-ink">{toFaDigits(r.units.count.toLocaleString('en-US', { maximumFractionDigits: r.units.label === 'دستگاه' ? 1 : 0 }))} {r.units.label}</b> خرید
-          (هر {r.units.label === 'دستگاه' ? 'دستگاه' : 'مترمربع'} <Toman v={r.units.priceStart} />)؛ فروش همان مقدار در {r.priceEnd ? formatJalali(r.priceEnd.at) : 'تاریخ پایان'} (هر {r.units.label === 'دستگاه' ? 'دستگاه' : 'مترمربع'} <Toman v={r.units.priceEnd} />):{' '}
-          <b className="text-ink"><Toman v={r.endToman} /></b> · سود/زیان <Toman v={r.pnlToman} signed />
-        </p>
-      )}
+      {r.units && (() => {
+        const isCar = r.units.label === 'دستگاه';
+        if (isCar) {
+          const wholeCars = Math.floor(r.units.count);
+          const startCap = r.startToman ?? 0;
+          const leftover = Math.max(0, startCap - wholeCars * r.units.priceStart);
+          const sellValue = wholeCars * r.units.priceEnd + leftover;
+          const netPnl = sellValue - startCap;
+          return (
+            <p className="mt-2 rounded-control bg-surface-2 px-3 py-2 text-xs leading-6 text-muted">
+              {wholeCars === 0 ? (
+                <>
+                  با <Toman v={r.startToman} /> در {r.priceStart ? formatJalali(r.priceStart.at) : 'تاریخ شروع'} امکان خرید حتی{' '}
+                  <b className="text-ink">۱ دستگاه</b> (با قیمت <Toman v={r.units.priceStart} />) وجود نداشت.
+                </>
+              ) : (
+                <>
+                  با <Toman v={r.startToman} /> در {r.priceStart ? formatJalali(r.priceStart.at) : 'تاریخ شروع'} می‌شد دقیقاً{' '}
+                  <b className="text-ink">{toFaDigits(wholeCars)} دستگاه</b> خرید (هر دستگاه <Toman v={r.units.priceStart} />)
+                  {leftover >= 1_000_000 && <> + <Toman v={leftover} /> نقد باقیمانده</>}؛ فروش همان خودروها به‌صورت کارکرده در{' '}
+                  {r.priceEnd ? formatJalali(r.priceEnd.at) : 'تاریخ پایان'} (هر دستگاه <Toman v={r.units.priceEnd} />):{' '}
+                  <b className="text-ink"><Toman v={sellValue} /></b> · سود/زیان <Toman v={netPnl} signed />
+                </>
+              )}
+            </p>
+          );
+        }
+        return (
+          <p className="mt-2 rounded-control bg-surface-2 px-3 py-2 text-xs leading-6 text-muted">
+            با <Toman v={r.startToman} /> در {r.priceStart ? formatJalali(r.priceStart.at) : 'تاریخ شروع'} می‌شد حدود{' '}
+            <b className="text-ink">{toFaDigits(r.units.count.toLocaleString('en-US', { maximumFractionDigits: 0 }))} {r.units.label}</b> خرید
+            (هر {r.units.label} <Toman v={r.units.priceStart} />)؛ فروش همان مقدار در {r.priceEnd ? formatJalali(r.priceEnd.at) : 'تاریخ پایان'} (هر {r.units.label} <Toman v={r.units.priceEnd} />):{' '}
+            <b className="text-ink"><Toman v={r.endToman} /></b> · سود/زیان <Toman v={r.pnlToman} signed />
+          </p>
+        );
+      })()}
       {ok && r.priceStart && r.priceEnd && (
         <p className="mt-1.5 text-2xs text-subtle">
           قیمت‌ها: {formatJalali(r.priceStart.at)}{r.priceStart.interpolated ? ' (درون‌یابی)' : ''} ← {formatJalali(r.priceEnd.at)}{r.priceEnd.interpolated ? ' (درون‌یابی)' : ''}
