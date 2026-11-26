@@ -598,7 +598,7 @@ export function ReportTab({
                         </div>
                       </td>
                       <td className="p-3.5 font-medium">
-                        {faNumber(r.currentQuantity, { maximumFractionDigits: 4 })} <span className="text-2xs text-muted">{r.symbol}</span>
+                        <bdi dir="ltr" className="num-ltr">{faNumber(r.currentQuantity, { maximumFractionDigits: 4 })}</bdi>
                       </td>
                       <td className="p-3.5 font-medium">
                         {r.avgCostUsd !== null ? <Usd v={r.avgCostUsd} /> : <span className="text-subtle">—</span>}
@@ -813,18 +813,24 @@ export function ReportTab({
                         مقایسهٔ هم‌سرمایه با بازده سبد شما ({portfolioBasis?.usingLiveWallet ? 'موجودی زندهٔ کیف‌پول‌ها' : 'سابقهٔ پایان'}):
                       </span>
                       <p className={cn('font-bold leading-5', customSimResult.vsPortfolioUsd <= 0 ? 'text-positive' : 'text-negative')}>
-                        {customSimResult.vsPortfolioUsd <= 0
-                          ? `در مقیاس دلاری، بازده سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) از این دارایی (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) بهتر بوده است`
-                          : `این دارایی در مقیاس دلاری (${toFaDigits((customSimResult.returnUsdPct * 100).toFixed(1))}٪) از سبد شما (${toFaDigits((customSimResult.portReturnUsd * 100).toFixed(1))}٪) جلوتر بوده است`}
+                        {customSimResult.vsPortfolioUsd <= 0 ? (
+                          <>در مقیاس دلاری، بازده سبد شما (<Pct v={customSimResult.portReturnUsd} />) از این دارایی (<Pct v={customSimResult.returnUsdPct} />) بهتر بوده است</>
+                        ) : (
+                          <>این دارایی در مقیاس دلاری (<Pct v={customSimResult.returnUsdPct} />) از سبد شما (<Pct v={customSimResult.portReturnUsd} />) جلوتر بوده است</>
+                        )}
                       </p>
                       <p className="text-2xs text-subtle">
-                        تفاوت هم‌سرمایه روی {fmtCompactFa(customSimResult.startCostToman)} تومان:{' '}
-                        <b className="text-ink">{fmtCompactFa(Math.abs(customSimResult.vsPortfolioToman))} تومان</b>
-                        {' '}({customSimResult.vsPortfolioUsd <= 0 ? '+' : '-'}${faNumber(Math.round(Math.abs(customSimResult.vsPortfolioUsd)))})
+                        تفاوت هم‌سرمایه روی <Toman v={customSimResult.startCostToman} />:{' '}
+                        <Toman
+                          v={customSimResult.vsPortfolioUsd <= 0 ? Math.abs(customSimResult.vsPortfolioToman) : -Math.abs(customSimResult.vsPortfolioToman)}
+                          signed
+                          className="font-bold"
+                        />{' '}
+                        (<Usd v={customSimResult.vsPortfolioUsd <= 0 ? Math.abs(customSimResult.vsPortfolioUsd) : -Math.abs(customSimResult.vsPortfolioUsd)} signed />)
                       </p>
                       {portfolioBasis && (
                         <p className="text-2xs text-muted pt-1 border-t border-divider/60">
-                          سبد شما: ${faNumber(Math.round(portfolioBasis.startUsd))} ← ${faNumber(Math.round(portfolioBasis.endUsd))}
+                          سبد شما: <Usd v={portfolioBasis.startUsd} /> ← <Usd v={portfolioBasis.endUsd} />
                         </p>
                       )}
                     </div>
@@ -947,13 +953,19 @@ export function ReportTab({
 
                         <div
                           className={cn(
-                            'rounded-lg px-2.5 py-1.5 text-2xs flex items-center justify-between font-bold',
+                            'rounded-lg px-2.5 py-1.5 text-2xs flex flex-wrap items-center justify-between gap-1 font-bold',
                             portfolioAhead ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'
                           )}
                         >
                           <span>{portfolioAhead ? 'برتری سبد شما:' : 'برتری این بازار:'}</span>
-                          <span>
-                            {portfolioAhead ? '+' : '-'}{fmtCompactFa(Math.abs(item.vsPortfolioToman))} تومان ({portfolioAhead ? '+' : '-'}${faNumber(Math.round(Math.abs(item.vsPortfolioUsd)))})
+                          <span className="inline-flex flex-wrap items-baseline gap-1">
+                            <Toman
+                              v={portfolioAhead ? Math.abs(item.vsPortfolioToman) : -Math.abs(item.vsPortfolioToman)}
+                              signed
+                            />
+                            <span className="opacity-80">
+                              (<Usd v={portfolioAhead ? Math.abs(item.vsPortfolioUsd) : -Math.abs(item.vsPortfolioUsd)} signed />)
+                            </span>
                           </span>
                         </div>
                       </div>

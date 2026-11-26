@@ -15,6 +15,7 @@ import type { CarSnapshot } from '@/features/carMarket/domain/types';
 import type { PropertyMarketSnapshot } from '@/features/propertyMarket/domain/types';
 import { normalizePoints, valueAt } from '../domain/engine';
 import { CAR_AVG_ID, PROP_AVG_ID, SOURCE_FA, carMarketId, propertyMarketId } from '../domain/markets';
+import { HISTORICAL_CAR_BENCHMARKS, HISTORICAL_DEC_31_2024_TS } from '../domain/historicalIranBenchmarks';
 import type { BenchmarksPayload, CpiPoint, ManualPricePoint, PerfSettings, Pt, Series } from '../domain/types';
 
 const MONTH = 30 * 86_400_000;
@@ -268,14 +269,40 @@ export function useMarketSeries(startTs: number | null, settings: PerfSettings):
     const cpi = iranCpiSeries(settings.iranCpi, out.ir_cpi_wb);
     if (cpi) out.ir_cpi = cpi;
     const manual = settings.manualPrices ?? [];
+    const CAR_ID_TO_HISTORICAL: Record<string, string> = {
+      '472': 'car:207-manual',
+      '473': 'car:207-auto',
+      '761': 'car:tara-v1-manual',
+      '762': 'car:tara-v2-auto'
+    };
     const carComps: Series[] = [];
     if (startTs !== null) {
       for (const id of settings.carModelIds ?? []) {
-        const car = carSeries(cars, id, startTs, manual);
-        if (car) { out[car.id] = car; carComps.push(car); }
+        const baseCar = carSeries(cars, id, startTs, manual);
+        if (!baseCar) continue;
+        let car = baseCar;
+        // اگر بازهٔ بررسی از حوالی ۱۱ دی ۱۴۰۳ شروع شده و سری car.ir/دیوار از تاریخ دیرتری آغاز می‌شود،
+        // قیمت بازار آزاد ثبت‌شده در ۱۱ دی ۱۴۰۳ (بخش تحلیل هوشمند) به‌عنوان نقطهٔ شروع اضافه می‌شود تا «داده کافی موجود نیست» نزند
+        const firstPt = car.points[0]?.[0];
+        const nearDec1403 = Math.abs(startTs - HISTORICAL_DEC_31_2024_TS) <= 35 * DAY;
+        if (nearDec1403 && (!firstPt || firstPt > startTs + 15 * DAY)) {
+          const mappedId = CAR_ID_TO_HISTORICAL[id];
+          const histDef =
+            (mappedId ? HISTORICAL_CAR_BENCHMARKS.find((h) => h.id === mappedId) : undefined) ??
+            HISTORICAL_CAR_BENCHMARKS.find((h) => h.matchPatterns.some((re) => re.test(car.detail ?? '')));
+          if (histDef) {
+            car = {
+              ...car,
+              points: normalizePoints([[HISTORICAL_DEC_31_2024_TS, histDef.marketPriceDec1403], ...car.points]),
+              source: `قیمت بازار آزاد ۱۱ دی ۱۴۰۳ (تحلیل هوشمند دارینو) + ${car.source}`
+            };
+          }
+        }
+        out[car.id] = car;
+        carComps.push(car);
       }
     }
-    const avgCar = averageSeries(CAR_AVG_ID, carComps, 'میانگین هم‌وزن قیمت بازار مدل‌های منتخب (car.ir + قیمت‌های دستی)', `${toFa(carComps.length)} مدل`);
+    const avgCar = averageSeries(CAR_AVG_ID, carComps, 'میانگین هم‌وزن قیمت بازار آزاد مدل‌های منتخب (دی ۱۴۰۳ تا امروز)', `${toFa(carComps.length)} مدل`);
     if (avgCar) out[CAR_AVG_ID] = avgCar;
     const propComps: Series[] = [];
     for (const k of settings.neighborhoods) {
