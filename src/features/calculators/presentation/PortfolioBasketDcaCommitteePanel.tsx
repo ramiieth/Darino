@@ -62,6 +62,10 @@ const parseNum = (raw: string, fallback = 0): number => {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 };
 
+const RLI = '\u2067';
+const LRI = '\u2066';
+const PDI = '\u2069';
+
 const fmtUsdFa = (val: number | null | undefined, signed = false): string => {
   if (val === null || val === undefined || !Number.isFinite(val)) return '—';
   const abs = Math.abs(val);
@@ -72,14 +76,14 @@ const fmtUsdFa = (val: number | null | undefined, signed = false): string => {
         ? abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : abs.toPrecision(4);
   const prefix = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
-  return `${prefix}${toFaDigits(str)} دلار`;
+  return `${RLI}${LRI}${prefix}${toFaDigits(str)}${PDI} دلار${PDI}`;
 };
 
 const fmtPctFa = (val: number | null | undefined, digits = 1, signed = true): string => {
   if (val === null || val === undefined || !Number.isFinite(val)) return '—';
   const abs = Math.abs(val);
   const prefix = signed ? (val > 0 ? '+' : val < 0 ? '-' : '') : val < 0 ? '-' : '';
-  return `${prefix}${toFaDigits(abs.toFixed(digits))}٪`;
+  return `${LRI}${prefix}${toFaDigits(abs.toFixed(digits))}٪${PDI}`;
 };
 
 const REGIME_LABELS: Record<DcaStressRegime, { label: string; hint: string }> = {
@@ -525,7 +529,7 @@ export function PortfolioBasketDcaCommitteePanel() {
                   <td className="py-2.5 pe-2">
                     {sc.avgCostVsLumpSumBenefitPct > 0 ? (
                       <span className="font-extrabold text-positive">
-                        +{toFaDigits(sc.avgCostVsLumpSumBenefitPct.toFixed(1))}٪ سرمایهٔ بیشتر
+                        <bdi dir="ltr" className="num-ltr">+{toFaDigits(sc.avgCostVsLumpSumBenefitPct.toFixed(1))}٪</bdi> سرمایهٔ بیشتر
                       </span>
                     ) : (
                       <span className="text-muted">میانگین پایین‌تر برای رشد</span>
@@ -750,7 +754,7 @@ export function PortfolioBasketDcaCommitteePanel() {
                     <MoneyValue value={row.dcaAverageEntryUsd} />
                   </span>
                   <span className="block text-[10px] text-subtle">
-                    +{toFaDigits(row.dcaAddedUnits.toFixed(4))} {item.symbol}
+                    <bdi dir="ltr" className="num-ltr">+{toFaDigits(row.dcaAddedUnits.toFixed(4))}</bdi> {item.symbol}
                   </span>
                 </div>
 
@@ -927,9 +931,9 @@ export function PortfolioBasketDcaCommitteePanel() {
                                 <span className="text-[10px] text-subtle">({fmtPctFa(sd.dropFromMarketPct, 1)})</span>
                               </td>
                               <td className="py-1.5 font-bold text-ink whitespace-nowrap">{fmtUsdFa(sd.allocatedUsd)}</td>
-                              <td className="py-1.5 text-muted">+{toFaDigits(sd.unitsBought.toFixed(4))}</td>
+                              <td className="py-1.5 text-muted"><bdi dir="ltr" className="num-ltr">+{toFaDigits(sd.unitsBought.toFixed(4))}</bdi></td>
                               <td className="py-1.5 font-extrabold text-positive whitespace-nowrap">{fmtUsdFa(sd.newCombinedAvgCostUsd)}</td>
-                              <td className="py-1.5 font-semibold text-ink">+{toFaDigits(sd.bounceToBreakEvenPct.toFixed(1))}٪</td>
+                              <td className="py-1.5 font-semibold text-ink"><bdi dir="ltr" className="num-ltr">+{toFaDigits(sd.bounceToBreakEvenPct.toFixed(1))}٪</bdi></td>
                             </tr>
                           ))}
                         </tbody>

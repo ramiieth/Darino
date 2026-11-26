@@ -8,7 +8,7 @@ import { formatGregorianIso, formatJalali } from '@/shared/utils/jalali';
 
 /**
  * درصد از کسر (0.12 → +۱۲.۰۰٪ · -0.0355 → -۳.۵۵٪)
- * در جهت راست‌به‌چپ فارسی، علامت + / - دقیقاً پیش از عدد (سمت راست) و ٪ پس از عدد (سمت چپ) قرار می‌گیرد.
+ * استاندارد تایپوگرافی و اپ‌های مالی فارسی: علامت + / - سمت چپ عدد و ٪ سمت راست عدد (ایزوله در LTR).
  */
 export function Pct({
   v,
@@ -32,17 +32,16 @@ export function Pct({
     abs.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
   );
   return (
-    <span dir="rtl" className={cn('inline-flex items-baseline whitespace-nowrap', toneCls, className)}>
-      {sign && <span>{sign}</span>}
-      <bdi dir="ltr" className="num-ltr">{formatted}</bdi>
-      <span>٪</span>
-    </span>
+    <bdi dir="ltr" className={cn('num-ltr inline-block whitespace-nowrap', toneCls, className)}>
+      {sign}
+      {formatted}٪
+    </bdi>
   );
 }
 
 /**
- * مبلغ دلاری با علامت پیش از عدد در جهت فارسی:
- *  -۱,۱۰۴ دلار / +۱,۱۰۴ دلار / -۱.۶ هزار دلار
+ * مبلغ دلاری طبق استاندارد اپ‌های مالی فارسی:
+ *  عدد و علامت +/- به‌صورت ایزوله LTR (-۱,۱۰۴ / +۱,۱۰۴) و واحد «دلار» با فاصله و رنگ ملایم جدا شده.
  */
 export function Usd({
   v,
@@ -67,20 +66,22 @@ export function Usd({
   const body = compact ? fmtCompactFa(abs) : toFaDigits(Math.round(abs).toLocaleString('en-US'));
   const [number, ...scale] = body.split(' ');
   return (
-    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', toneCls, className)}>
-      <span className="inline-flex items-baseline">
-        {sign && <span>{sign}</span>}
-        <bdi dir="ltr" className="num-ltr">{number}</bdi>
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1.5 whitespace-nowrap', toneCls, className)}>
+      <bdi dir="ltr" className="num-ltr">
+        {sign}
+        {number}
+      </bdi>
+      <span className="inline-flex items-baseline gap-1 font-medium text-muted">
+        {scale.length > 0 && <span className="text-[0.82em]">{scale.join(' ')}</span>}
+        <span className="text-[0.68em] opacity-85">دلار</span>
       </span>
-      {scale.length > 0 && <span className="text-[0.82em] font-medium">{scale.join(' ')}</span>}
-      <span className="text-[0.65em] font-medium opacity-70">دلار</span>
     </span>
   );
 }
 
 /**
- * مبلغ تومانی فشرده با علامت پیش از عدد در جهت فارسی:
- *  -۴۱۸ میلیون تومان / +۵.۴ میلیارد تومان
+ * مبلغ تومانی فشرده طبق استاندارد اپ‌های مالی فارسی:
+ *  عدد و علامت +/- ایزوله در LTR (-۴۱۸ / +۵.۴) و واحد «میلیون تومان / میلیارد تومان» با فاصله و رنگ ملایم جدا شده.
  */
 export function Toman({ v, signed, className }: { v: number | null | undefined; signed?: boolean; className?: string }) {
   if (v === null || v === undefined || !Number.isFinite(v)) {
@@ -92,13 +93,15 @@ export function Toman({ v, signed, className }: { v: number | null | undefined; 
   const body = fmtCompactFa(abs);
   const [number, ...scale] = body.split(' ');
   return (
-    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1 whitespace-nowrap', toneCls, className)}>
-      <span className="inline-flex items-baseline">
-        {sign && <span>{sign}</span>}
-        <bdi dir="ltr" className="num-ltr">{number}</bdi>
+    <span dir="rtl" className={cn('persian-amount inline-flex items-baseline gap-1.5 whitespace-nowrap', toneCls, className)}>
+      <bdi dir="ltr" className="num-ltr">
+        {sign}
+        {number}
+      </bdi>
+      <span className="inline-flex items-baseline gap-1 text-[0.82em] font-medium text-muted">
+        {scale.length > 0 && <span>{scale.join(' ')}</span>}
+        <span>تومان</span>
       </span>
-      {scale.length > 0 && <span>{scale.join(' ')}</span>}
-      <span>تومان</span>
     </span>
   );
 }
