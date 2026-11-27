@@ -11,7 +11,17 @@ import { cn } from '@/shared/lib/cn';
 /** نشان مینیمال شمش طلای ۱۸ عیار هم‌رنگ سیستم دیزاین دارینو */
 export function GoldBullionEmblem({ size = 'md', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
   const dims =
-    size === 'sm' ? 'h-9 w-9 rounded-xl' : size === 'lg' ? 'h-13 w-13 rounded-2xl' : 'h-11 w-11 rounded-2xl';
+    size === 'sm'
+      ? 'h-8 w-8 rounded-xl'
+      : size === 'lg'
+        ? 'h-10 w-10 rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl'
+        : 'h-9 w-9 rounded-xl sm:h-11 sm:w-11 sm:rounded-2xl';
+  const svgDims =
+    size === 'sm'
+      ? 'h-5 w-5'
+      : size === 'lg'
+        ? 'h-6 w-6 sm:h-8 sm:w-8'
+        : 'h-6 w-6 sm:h-7 sm:w-7';
   return (
     <span
       aria-hidden
@@ -22,7 +32,7 @@ export function GoldBullionEmblem({ size = 'md', className }: { size?: 'sm' | 'm
       )}
     >
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/20" />
-      <svg viewBox="0 0 40 40" className="relative z-10 h-[68%] w-[68%]">
+      <svg viewBox="0 0 40 40" width="28" height="28" className={cn('relative z-10 shrink-0', svgDims)}>
         <defs>
           <linearGradient id="darinoChampagneGold" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#F3E2B8" />

@@ -90,13 +90,13 @@ function HeroTile({
           ? 'border-negative/25 bg-negative/[0.04]'
           : 'border-divider/80 bg-surface-2/50';
   return (
-    <div className={cn('min-w-0 rounded-xl border p-3.5', bg)}>
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
-        <span className={cn('h-2 w-2 rounded-full', dot)} aria-hidden />
-        {label}
+    <div className={cn('min-w-0 overflow-hidden rounded-xl border p-3 sm:p-3.5', bg)}>
+      <p className="flex items-center gap-1.5 truncate text-[11px] font-semibold text-muted sm:text-xs">
+        <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} aria-hidden />
+        <span className="truncate">{label}</span>
       </p>
-      <p className="num-ltr mt-1.5 text-2xl font-extrabold text-ink">
-        <AmountText text={value} />
+      <p className="num-ltr mt-1.5 text-base font-extrabold leading-tight text-ink sm:text-xl md:text-2xl">
+        <AmountText text={value} className="max-w-full flex-wrap" />
       </p>
       <p className="mt-0.5 truncate text-[11px] text-muted">{sub}</p>
     </div>
@@ -685,13 +685,16 @@ function SpotAutoAuditPanel({ b, tz, reviews }: { b: SpotBook; tz: string; revie
     <Surface variant="focal" className="relative space-y-4 overflow-hidden border border-accent/30 p-5">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[2.5px] bg-gradient-to-l from-gain via-accent/60 to-transparent" />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-extrabold text-ink">حسابرسی خودکار معاملات اسپات (کیف پول‌ها)</p>
           <p className="text-xs text-muted">
             {fa(t.swaps)} تبدیل · {fa(b.open.length)} دارایی فعال
           </p>
+          <p className="mt-0.5 text-[11px] text-subtle">
+            فقط دارایی‌های موجود در کیف‌پول (۳ دلار به بالا، بدون اسپم · استثنای YT، PT و ETH رابین‌هود و هایپرلیکویید)
+          </p>
         </div>
-        <Badge tone="gain">تحلیل خودکار فعال</Badge>
+        <Badge tone="gain" className="shrink-0">تحلیل خودکار فعال</Badge>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <HeroTile label="ارزش دارایی‌های باز" value={usd(openValueUsd)} sub={`${fa(b.open.length)} دارایی`} tone="neutral" />

@@ -97,4 +97,37 @@ describe('ژورنال اسپات', () => {
     expect(sol.unrealized).toBeCloseTo(500);
     expect(sol.value).toBeCloseTo(4500);
   });
+
+  it('حسابرسی خودکار اسپات: حذف توکن‌های ناموجود و زیر ۳ دلار به جز YT، PT و ETH روی رابین‌هود و هایپرلیکویید', async () => {
+    const { isSpotAuditExemptPosition, SPOT_AUDIT_MIN_USD } = await import('./spot');
+    expect(SPOT_AUDIT_MIN_USD).toBe(3);
+    expect(isSpotAuditExemptPosition({ symbol: 'YT-USDe', chain: 'ethereum' })).toBe(true);
+    expect(isSpotAuditExemptPosition({ symbol: 'PT-sUSDe', chain: 'arbitrum' })).toBe(true);
+    expect(isSpotAuditExemptPosition({ symbol: 'ETH', chain: 'robinhood' })).toBe(true);
+    expect(isSpotAuditExemptPosition({ symbol: 'WETH', chain: 'hyperliquid' })).toBe(true);
+    expect(isSpotAuditExemptPosition({ symbol: 'ETH', chain: 'hyperevm' })).toBe(true);
+    expect(isSpotAuditExemptPosition({ symbol: 'ETH', chain: 'ethereum' })).toBe(false);
+    expect(isSpotAuditExemptPosition({ symbol: 'ARB', chain: 'arbitrum' })).toBe(false);
+
+    const swaps = toSwaps('0xw', [
+      // فروخته‌شده / دیگر در کیف نیست → باید کامل حذف شود
+      tx(1, [leg('out', 'USDC', 100, 100), leg('in', 'GONE', 10, 100)]),
+      // در کیف هست ولی کمتر از ۳ دلار ($1.5) → باید کامل حذف شود
+      tx(2, [leg('out', 'USDC', 50, 50), leg('in', 'ARB', 50, 50)]),
+      // در کیف هست و بیش از ۳ دلار ($20) → باید بماند
+      tx(3, [leg('out', 'USDC', 20, 20), leg('in', 'SOL', 0.2, 20)]),
+      // YT زیر ۳ دلار ($1) → استثنا، باید بماند
+      tx(4, [leg('out', 'USDC', 2, 2), leg('in', 'YT-USDE', 2, 2)]),
+      // ETH روی رابین‌هود/هایپرلیکویید زیر ۳ دلار ($1.2) → استثنا، باید بماند
+      tx(5, [leg('out', 'USDC', 1.2, 1.2), leg('in', 'ETH', 0.0005, 1.2)])
+    ]);
+    const price = new Map([['ARB', 0.5], ['SOL', 100], ['YT-USDE', 0.5], ['ETH', 2400]]);
+    const held = new Map([['ARB', 3], ['SOL', 0.2], ['YT-USDE', 2], ['ETH', 0.0005]]);
+    const exemptAssets = new Set(['YT-USDE', 'ETH']);
+    const b = spotBook(swaps, price, 0, held, SPOT_AUDIT_MIN_USD, { onlyHeld: true, exemptAssets });
+    expect(b.assets.map((a) => a.asset).sort()).toEqual(['ETH', 'SOL', 'YT-USDE']);
+    expect(b.open.map((a) => a.asset).sort()).toEqual(['ETH', 'SOL', 'YT-USDE']);
+    expect(b.closed).toHaveLength(0);
+    expect(b.totals.swaps).toBe(3);
+  });
 });
