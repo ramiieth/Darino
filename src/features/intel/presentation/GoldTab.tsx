@@ -387,10 +387,10 @@ export function GoldTab() {
         />
         <div className="relative space-y-4 p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-start gap-3.5">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <GoldBullionEmblem size="lg" />
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span className="text-xs font-extrabold text-muted">
                     قیمت روز هر گرم طلای ۱۸ عیار
                   </span>
@@ -406,11 +406,11 @@ export function GoldTab() {
                             : 'زنده · متصل'}
                   </Badge>
                 </div>
-                <p className="mt-1 text-2xl font-black tracking-tight text-ink sm:text-3xl">
+                <p className="mt-1 break-words text-xl font-black leading-tight tracking-tight text-ink sm:text-2xl md:text-3xl">
                   {live18kToman ? fmtToman(live18kToman) : q.isLoading ? 'در حال بارگذاری نرخ روز...' : '—'}
                 </p>
                 {d && (
-                  <p className="mt-0.5 text-2xs text-subtle">
+                  <p className="mt-0.5 break-words text-2xs text-subtle">
                     منبع: {d.bazaar ? 'بازار (TGJU) و ۴ پلتفرم' : 'میانه پلتفرم‌های آنلاین'} · {fmtRelativeAge(d.fetchedAt)}
                   </p>
                 )}
@@ -422,12 +422,13 @@ export function GoldTab() {
               icon={<RefreshCw className="h-3.5 w-3.5" />}
               loading={q.isFetching}
               onClick={() => void q.refetch()}
+              className="shrink-0"
             >
               به‌روزرسانی
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 border-t border-divider/80 pt-3.5 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 border-t border-divider/80 pt-3.5 sm:grid-cols-4 sm:gap-2.5">
             {horizons.map((h) => {
               const isSelected = s.horizonDays === h.days && s.tab === 'market';
               const up = (h.changePct ?? 0) >= 0;
@@ -440,19 +441,19 @@ export function GoldTab() {
                     set('tab', 'market');
                   }}
                   className={cn(
-                    'rounded-xl border p-3 text-start transition-all',
+                    'min-w-0 overflow-hidden rounded-xl border p-2.5 text-start transition-all sm:p-3',
                     isSelected
                       ? 'border-accent/60 bg-accent/[0.07] shadow-xs ring-1 ring-accent/20'
                       : 'border-divider bg-card/85 hover:border-divider-strong hover:bg-card'
                   )}
                 >
-                  <p className="text-2xs font-semibold text-muted">تغییر {toFaDigits(h.days)} روز گذشته</p>
+                  <p className="truncate text-2xs font-semibold text-muted">تغییر {toFaDigits(h.days)} روز گذشته</p>
                   {h.available ? (
                     <>
-                      <p className={cn('mt-1 text-sm font-extrabold', up ? 'text-positive' : 'text-negative')}>
+                      <p className={cn('mt-1 truncate text-xs font-extrabold sm:text-sm', up ? 'text-positive' : 'text-negative')}>
                         {fmtPct(h.changePct)}
                       </p>
-                      <p className="text-2xs text-subtle">{fmtToman(h.changeToman, true)}</p>
+                      <p className="mt-0.5 break-words text-[11px] leading-snug text-subtle sm:text-2xs">{fmtToman(h.changeToman, true)}</p>
                     </>
                   ) : (
                     <p className="mt-1 text-2xs text-subtle">داده تاریخی ناکافی</p>
@@ -461,7 +462,7 @@ export function GoldTab() {
               );
             })}
 
-            <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.05] p-2.5 sm:p-3">
               <p className="truncate text-2xs font-bold text-accent">
                 نسبت به اسنپ‌شات ({activeSnapshot?.title ?? 'مرجع'})
               </p>
@@ -469,13 +470,13 @@ export function GoldTab() {
                 <>
                   <p
                     className={cn(
-                      'mt-1 text-sm font-extrabold',
+                      'mt-1 truncate text-xs font-extrabold sm:text-sm',
                       snapshotComparison.changePct >= 0 ? 'text-positive' : 'text-negative'
                     )}
                   >
                     {fmtPct(snapshotComparison.changePct)}
                   </p>
-                  <p className="text-2xs text-subtle">{fmtToman(snapshotComparison.diffToman, true)}</p>
+                  <p className="mt-0.5 break-words text-[11px] leading-snug text-subtle sm:text-2xs">{fmtToman(snapshotComparison.diffToman, true)}</p>
                 </>
               ) : (
                 <p className="mt-1 text-2xs text-subtle">—</p>
@@ -813,24 +814,24 @@ function MarketAndHistorySection({
         </div>
 
         {snapshotComparison && (
-          <div className="grid grid-cols-2 gap-3 rounded-xl border border-divider bg-surface-2/45 p-3.5 sm:grid-cols-4">
-            <div>
-              <p className="text-2xs text-muted">قیمت مرجع ({snapshotComparison.snapshot.dateLabelFa})</p>
-              <p className="mt-1 text-sm font-bold text-ink">{fmtToman(snapshotComparison.snapshot.price18kToman)}</p>
+          <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-divider bg-surface-2/45 p-3 sm:grid-cols-4 sm:gap-3 sm:p-3.5">
+            <div className="min-w-0">
+              <p className="truncate text-2xs text-muted">قیمت مرجع ({snapshotComparison.snapshot.dateLabelFa})</p>
+              <p className="mt-1 break-words text-xs font-bold leading-snug text-ink sm:text-sm">{fmtToman(snapshotComparison.snapshot.price18kToman)}</p>
             </div>
-            <div>
-              <p className="text-2xs text-muted">قیمت فعلی بازار</p>
-              <p className="mt-1 text-sm font-bold text-ink">{fmtToman(snapshotComparison.currentPriceToman)}</p>
+            <div className="min-w-0">
+              <p className="truncate text-2xs text-muted">قیمت فعلی بازار</p>
+              <p className="mt-1 break-words text-xs font-bold leading-snug text-ink sm:text-sm">{fmtToman(snapshotComparison.currentPriceToman)}</p>
             </div>
-            <div>
-              <p className="text-2xs text-muted">اختلاف قیمت با مرجع</p>
-              <p className={cn('mt-1 text-sm font-bold', snapshotComparison.diffToman >= 0 ? 'text-positive' : 'text-negative')}>
+            <div className="min-w-0">
+              <p className="truncate text-2xs text-muted">اختلاف قیمت با مرجع</p>
+              <p className={cn('mt-1 break-words text-xs font-bold leading-snug sm:text-sm', snapshotComparison.diffToman >= 0 ? 'text-positive' : 'text-negative')}>
                 {fmtToman(snapshotComparison.diffToman, true)}
               </p>
             </div>
-            <div>
-              <p className="text-2xs text-muted">درصد رشد یا افت از مرجع</p>
-              <p className={cn('mt-1 text-sm font-extrabold', snapshotComparison.changePct >= 0 ? 'text-positive' : 'text-negative')}>
+            <div className="min-w-0">
+              <p className="truncate text-2xs text-muted">درصد رشد یا افت از مرجع</p>
+              <p className={cn('mt-1 break-words text-xs font-extrabold leading-snug sm:text-sm', snapshotComparison.changePct >= 0 ? 'text-positive' : 'text-negative')}>
                 {fmtPct(snapshotComparison.changePct)}
               </p>
             </div>
@@ -1210,33 +1211,33 @@ function OnlineGoldSection({
 
           {/* کارت‌های خلاصه نتیجه */}
           {calc.valid && (
-            <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-              <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
-                <p className="text-2xs font-semibold text-muted">مبلغ کل پرداختی خرید</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.totalBuyCostToman)}</p>
-                <p className="text-2xs text-subtle">کارمزد خرید: {fmtToman(calc.buyFeeToman)}</p>
+            <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-4 sm:gap-3">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-accent bg-card p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-semibold text-muted">مبلغ کل پرداختی خرید</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(calc.totalBuyCostToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">کارمزد خرید: {fmtToman(calc.buyFeeToman)}</p>
               </div>
-              <div className="rounded-xl border border-divider border-s-4 border-s-gain bg-card p-3">
-                <p className="text-2xs font-semibold text-muted">مبلغ خالص دریافتی فروش</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netSellProceedsToman)}</p>
-                <p className="text-2xs text-subtle">کارمزد فروش: {fmtToman(calc.sellFeeToman)}</p>
+              <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-gain bg-card p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-semibold text-muted">مبلغ خالص دریافتی فروش</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(calc.netSellProceedsToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">کارمزد فروش: {fmtToman(calc.sellFeeToman)}</p>
               </div>
               <div
                 className={cn(
-                  'rounded-xl border border-divider border-s-4 bg-card p-3',
+                  'min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 bg-card p-2.5 sm:p-3',
                   calc.netProfitToman >= 0 ? 'border-s-gain' : 'border-s-loss'
                 )}
               >
-                <p className="text-2xs font-semibold text-muted">سود یا زیان خالص لحظه‌ای</p>
-                <p className={cn('mt-1 text-sm font-extrabold', calc.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
+                <p className="truncate text-2xs font-semibold text-muted">سود یا زیان خالص لحظه‌ای</p>
+                <p className={cn('mt-1 break-words text-xs font-extrabold leading-snug sm:text-sm', calc.netProfitToman >= 0 ? 'text-positive' : 'text-negative')}>
                   {fmtToman(calc.netProfitToman, true)} ({fmtPct(calc.roiPct)})
                 </p>
-                <p className="text-2xs text-subtle">هزینه رفت‌وبرگشت و اسپرد</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">هزینه رفت‌وبرگشت و اسپرد</p>
               </div>
-              <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
-                <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenSellPricePerGramToman)}</p>
-                <p className="text-2xs text-subtle">وزن خالص: {toFaDigits(calc.netReceivedWeightGrams)} گرم</p>
+              <div className="min-w-0 overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.05] p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(calc.breakEvenSellPricePerGramToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">وزن خالص: {toFaDigits(calc.netReceivedWeightGrams)} گرم</p>
               </div>
             </div>
           )}
@@ -1512,30 +1513,30 @@ function JewelryAndComparisonSection({
           </div>
 
           {j.valid && (
-            <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-              <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
-                <p className="text-2xs font-semibold text-muted">ارزش طلای خام داخل محصول</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.rawGoldValueToman)}</p>
-                <p className="text-2xs text-subtle">وزن خالص طلا: {toFaDigits(j.netGoldWeightGrams)} گرم</p>
+            <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-4 sm:gap-3">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-accent bg-card p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-semibold text-muted">ارزش طلای خام داخل محصول</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(j.rawGoldValueToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">وزن خالص طلا: {toFaDigits(j.netGoldWeightGrams)} گرم</p>
               </div>
-              <div className="rounded-xl border border-warn/40 border-s-4 border-s-warn bg-warn/[0.05] p-3">
-                <p className="text-2xs font-bold text-warn">مبلغ کل فاکتور خرید</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.totalBuyInvoiceToman)}</p>
-                <p className="text-2xs text-subtle">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-warn/40 border-s-4 border-s-warn bg-warn/[0.05] p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-bold text-warn">مبلغ کل فاکتور خرید</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(j.totalBuyInvoiceToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">
                   اجرت+سود+مالیات: {fmtToman(j.totalOverheadToman)} ({fmtPct(j.overheadPctOfRaw, 1, false)})
                 </p>
               </div>
-              <div className="rounded-xl border border-divider border-s-4 border-s-loss bg-card p-3">
-                <p className="text-2xs font-semibold text-muted">مبلغ دریافتی فروش مجدد امروز</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.resaleNetProceedsToman)}</p>
-                <p className="text-2xs font-semibold text-negative">
+              <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-loss bg-card p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-semibold text-muted">مبلغ دریافتی فروش مجدد امروز</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(j.resaleNetProceedsToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] font-semibold text-negative sm:text-2xs">
                   اختلاف با خرید: {fmtToman(j.netProfitOrLossToman, true)} ({fmtPct(j.roiPct, 1)})
                 </p>
               </div>
-              <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
-                <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
-                <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(j.breakEven18kPriceToman)}</p>
-                <p className="text-2xs text-subtle">رشد لازم بازار: {fmtPct(j.requiredMarketGrowthPctToBreakEven, 1)}</p>
+              <div className="min-w-0 overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.05] p-2.5 sm:p-3">
+                <p className="truncate text-2xs font-bold text-accent">قیمت سربه‌سر هر گرم ۱۸ عیار</p>
+                <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(j.breakEven18kPriceToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">رشد لازم بازار: {fmtPct(j.requiredMarketGrowthPctToBreakEven, 1)}</p>
               </div>
             </div>
           )}
@@ -2062,42 +2063,42 @@ function GoldEtfSection({
         </div>
 
         {calc.valid && (
-          <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
-            <div className="rounded-xl border border-divider border-s-4 border-s-accent bg-card p-3">
-              <p className="text-2xs font-semibold text-muted">تعداد واحد و هزینه واقعی ورود</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">
+          <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-4 sm:gap-3">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-accent bg-card p-2.5 sm:p-3">
+              <p className="truncate text-2xs font-semibold text-muted">تعداد واحد و هزینه واقعی ورود</p>
+              <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">
                 {toFaDigits(calc.unitsPurchased.toLocaleString('en-US'))} واحد
               </p>
-              <p className="text-2xs text-subtle">ورود: {fmtToman(calc.totalEntryCostToman)}</p>
+              <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">ورود: {fmtToman(calc.totalEntryCostToman)}</p>
             </div>
-            <div className="rounded-xl border border-divider border-s-4 border-s-gain bg-card p-3">
-              <p className="text-2xs font-semibold text-muted">مبلغ نهایی دریافتی پس از فروش</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.netFinalProceedsToman)}</p>
-              <p className="text-2xs text-subtle">هزینه کارمزد معاملات: {fmtToman(calc.totalTradingFeesToman)}</p>
+            <div className="min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 border-s-gain bg-card p-2.5 sm:p-3">
+              <p className="truncate text-2xs font-semibold text-muted">مبلغ نهایی دریافتی پس از فروش</p>
+              <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(calc.netFinalProceedsToman)}</p>
+              <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">کارمزد معاملات: {fmtToman(calc.totalTradingFeesToman)}</p>
             </div>
             <div
               className={cn(
-                'rounded-xl border border-divider border-s-4 bg-card p-3',
+                'min-w-0 overflow-hidden rounded-xl border border-divider border-s-4 bg-card p-2.5 sm:p-3',
                 calc.netProfitOrLossToman >= 0 ? 'border-s-gain' : 'border-s-loss'
               )}
             >
-              <p className="text-2xs font-semibold text-muted">سود یا زیان خالص و بازدهی</p>
+              <p className="truncate text-2xs font-semibold text-muted">سود یا زیان خالص و بازدهی</p>
               <p
                 className={cn(
-                  'mt-1 text-sm font-extrabold',
+                  'mt-1 break-words text-xs font-extrabold leading-snug sm:text-sm',
                   calc.netProfitOrLossToman >= 0 ? 'text-positive' : 'text-negative'
                 )}
               >
                 {fmtToman(calc.netProfitOrLossToman, true)} ({fmtPct(calc.roiPct)})
               </p>
               {calc.leftoverCashToman > 0 && (
-                <p className="text-2xs text-subtle">باقیمانده نقدی: {fmtToman(calc.leftoverCashToman)}</p>
+                <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">باقیمانده نقدی: {fmtToman(calc.leftoverCashToman)}</p>
               )}
             </div>
-            <div className="rounded-xl border border-accent/30 bg-accent/[0.05] p-3">
-              <p className="text-2xs font-bold text-accent">قیمت سربه‌سر هر واحد</p>
-              <p className="mt-1 text-sm font-extrabold text-ink">{fmtToman(calc.breakEvenUnitPriceToman)}</p>
-              <p className="text-2xs text-subtle">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.05] p-2.5 sm:p-3">
+              <p className="truncate text-2xs font-bold text-accent">قیمت سربه‌سر هر واحد</p>
+              <p className="mt-1 break-words text-xs font-extrabold leading-snug text-ink sm:text-sm">{fmtToman(calc.breakEvenUnitPriceToman)}</p>
+              <p className="mt-0.5 break-words text-[11px] text-subtle sm:text-2xs">
                 نسبت به مرجع {GOLD_ETF_SNAPSHOT_DATE_FA}: {fmtPct(calc.futureChangeVsSnapshotPct, 1)}
               </p>
             </div>
@@ -2225,7 +2226,7 @@ function PremiumBar({
         />
         <span className="absolute -inset-y-1 w-0.5 rounded-full bg-ink/40" style={{ left: x(stats?.p50 ?? 0) }} aria-hidden />
         <span
-          className="absolute -top-1 h-4.5 w-4.5 -translate-x-1/2 rounded-full border-2 border-card bg-accent shadow-sm ring-2 ring-accent/30"
+          className="absolute -top-1 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-card bg-accent shadow-sm ring-2 ring-accent/30"
           style={{ left: x(now) }}
           aria-hidden
         />

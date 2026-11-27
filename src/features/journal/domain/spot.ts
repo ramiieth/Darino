@@ -20,8 +20,23 @@ const WRAPPED: Record<string, string> = { WETH: 'ETH', WBTC: 'BTC', CBBTC: 'BTC'
 
 export const isStable = (symbol: string) => STABLES.has(symbol.toUpperCase());
 
-/** زیر این ارزش دلاری = خرد (Dust) → جزو پوزیشن‌های باز نیست */
+/** زیر این ارزش دلاری = خرد (Dust) → جزو پوزیشن‌های باز نیست (پیش‌فرض سازگار با تست‌های پایه) */
 export const DUST_USD = 10;
+
+/** حداقل ارزش دلاری دارایی فعلی کیف پول در حسابرسی خودکار اسپات (به جز YT، PT و ETH روی رابین‌هود و هایپرلیکویید) */
+export const SPOT_AUDIT_MIN_USD = 3;
+
+const YT_PT_RE = /^(YT|PT)(?:$|[\s\-_])/i;
+const EXEMPT_ETH_CHAINS = new Set(['robinhood', 'hyperliquid', 'hyperevm']);
+
+/** آیا این دارایی کیف پول مشمول استثنای سقف ۳ دلار است؟ (YT، PT و ETH روی شبکه‌های رابین‌هود و هایپرلیکویید) */
+export function isSpotAuditExemptPosition(p: { symbol: string; chain?: string | null; name?: string | null }): boolean {
+  const sym = p.symbol.trim().toUpperCase();
+  if (YT_PT_RE.test(sym) || (p.name && YT_PT_RE.test(p.name.trim()))) return true;
+  const base = WRAPPED[sym] ?? sym;
+  const chain = (p.chain ?? '').trim().toLowerCase();
+  return base === 'ETH' && EXEMPT_ETH_CHAINS.has(chain);
+}
 
 export interface SpotLeg {
   /** کلید دارایی (نماد تأییدشده یا شناسهٔ زریون) */
@@ -188,11 +203,25 @@ export interface SpotBook {
   };
 }
 
+export interface SpotBookOptions {
+  /** فقط دارایی‌هایی که الان در کیف پول موجودی فعال دارند محاسبه شوند (حذف توکن‌های فروخته‌شده/خالی و خرد زیر سقف) */
+  onlyHeld?: boolean;
+  /** کلید دارایی‌های مستثنی از سقف حداقل دلاری (YT، PT و ETH روی رابین‌هود و هایپرلیکویید) */
+  exemptAssets?: ReadonlySet<string>;
+}
+
 /**
  * price: کلید دارایی → قیمت لحظه‌ای دلاری (از موجودی کیف پول)
  * held:  کلید دارایی → موجودی واقعی فعلی (جمع کیف پول‌ها). بدون آن موجودی از دفتر سواپ است.
  */
-export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, number> = new Map(), from = 0, held?: ReadonlyMap<string, number>, dustUsd = DUST_USD): SpotBook {
+export function spotBook(
+  swaps: readonly SpotSwap[],
+  price: ReadonlyMap<string, number> = new Map(),
+  from = 0,
+  held?: ReadonlyMap<string, number>,
+  dustUsd = DUST_USD,
+  options?: SpotBookOptions
+): SpotBook {
   const assets = new Map<string, SpotAsset>();
   const sales: SpotSale[] = [];
   const get = (l: SpotLeg, t: number) => {
@@ -242,9 +271,18 @@ export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, 
   }
   let unrealized: number | null = price.size ? 0 : null;
   const gone = new Set<string>();
+  const onlyHeld = options?.onlyHeld === true && !!held;
+  const exempt = options?.exemptAssets;
   for (const a of [...assets.values()]) {
     const ledgerQty = a.qty;
     const actual = held ? Math.max(0, held.get(a.asset) ?? 0) : ledgerQty;
+    const isExempt = !!exempt?.has(a.asset);
+    // در حالت حسابرسی فقط دارایی‌های فعلی کیف پول: توکنی که الان در کیف نیست کنار گذاشته می‌شود
+    if (onlyHeld && actual <= 0) {
+      assets.delete(a.asset);
+      gone.add(a.asset);
+      continue;
+    }
     // بهای معلوم فقط برای min(دفتر، موجودی واقعی)؛ خروج غیر سواپی به میانگین بها کم می‌شود
     const basisQty = Math.min(ledgerQty, actual);
     a.cost = ledgerQty > 0 ? (a.cost * basisQty) / ledgerQty : 0;
@@ -254,10 +292,26 @@ export function spotBook(swaps: readonly SpotSwap[], price: ReadonlyMap<string, 
     a.avgCost = basisQty > 1e-12 ? a.cost / basisQty : null;
     const px = price.get(a.asset);
     if (a.qty > 0 && price.size) {
-      // موجودی دارد ولی زریون الان قیمتش را ندارد → کامل حذف (نه نمایش، نه محاسبه)
-      if (px === undefined) { assets.delete(a.asset); gone.add(a.asset); continue; }
+      // موجودی دارد ولی زریون الان قیمتش را ندارد → کامل حذف (مگر استثنای YT/PT/ETH رابین‌هود و هایپرلیکویید)
+      if (px === undefined) {
+        if (isExempt) {
+          a.value = null;
+          a.dust = false;
+          a.open = true;
+          a.unrealized = null;
+          continue;
+        }
+        assets.delete(a.asset);
+        gone.add(a.asset);
+        continue;
+      }
       a.value = a.qty * px;
-      a.dust = a.value < dustUsd;
+      a.dust = !isExempt && a.value < dustUsd;
+      if (onlyHeld && a.dust) {
+        assets.delete(a.asset);
+        gone.add(a.asset);
+        continue;
+      }
       a.open = !a.dust;
       // سود باز فقط بخش با بهای معلوم؛ خرد در سود باز نمی‌آید
       a.unrealized = a.open && basisQty > 0 ? basisQty * px - a.cost : a.open ? null : 0;

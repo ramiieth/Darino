@@ -12,7 +12,8 @@ import { isBitcoinAddress } from '@/features/connected/domain/bitcoinAddress';
 import { refreshWallet, useConnectedStore } from '@/features/connected/data/store';
 import { addressKey, type TransactionPage } from '@/features/connected/domain/model';
 import { fetchJson } from '@/repositories/remoteClient';
-import { assetKey, spotBook, toSwaps, type SpotBook } from '../domain/spot';
+import { assetKey, isSpotAuditExemptPosition, SPOT_AUDIT_MIN_USD, spotBook, toSwaps, type SpotBook } from '../domain/spot';
+import { trustedToken, yieldTokenPosition } from '@/features/connected/domain/visibility';
 
 const FIRST_PAGES = 3;
 
@@ -68,21 +69,39 @@ export function useSpot(fromMs: number): SpotState {
     const swaps = wallets.flatMap((w, i) => q[i].pages.flatMap((p) => toSwaps(w.address, p.rows)));
     const price = new Map<string, number>();
     // موجودی واقعی فعلی (جمع همهٔ کیف پول‌ها و شبکه‌ها) — فقط وقتی موجودی همهٔ کیف پول‌ها رسیده باشد
+    // توکن‌های اسپم و تأییدنشده حذف می‌شوند؛ YT، PT و ETH روی رابین‌هود و هایپرلیکویید از سقف ۳ دلار مستثنی هستند.
     const held = new Map<string, number>();
+    const exemptAssets = new Set<string>();
     const allLoaded = wallets.every((w) => !!snaps[addressKey(w.address)]?.data);
     for (const w of wallets) {
       for (const p of snaps[addressKey(w.address)]?.data?.positions ?? []) {
-        if (p.spam || !p.displayable || p.type !== 'wallet') continue;
-        const k = assetKey({ symbol: p.symbol, tokenId: p.tokenId, verified: p.verified });
+        if (p.spam || !p.displayable) continue;
+        const isYtPt = yieldTokenPosition(p) || /^(YT|PT)(?:$|[\s\-_])/i.test(p.symbol.trim());
+        // موقعیت‌های غیر کیف‌پول فقط اگر YT/PT پندل باشند نگه داشته می‌شوند
+        if (p.type !== 'wallet' && !isYtPt) continue;
+        // حذف کامل توکن‌های اسپم/غیرمعتبر
+        if (!isYtPt && !trustedToken(p)) continue;
         const qty = Number(p.quantity);
-        if (Number.isFinite(qty) && qty > 0) held.set(k, (held.get(k) ?? 0) + qty);
-        if (p.verified === false || p.price === null || !(p.price > 0)) continue;
+        if (!Number.isFinite(qty) || qty <= 0) continue;
+        const k = assetKey({ symbol: p.symbol, tokenId: p.tokenId, verified: isYtPt ? true : p.verified });
+        held.set(k, (held.get(k) ?? 0) + qty);
+        if (isYtPt || isSpotAuditExemptPosition({ symbol: p.symbol, chain: p.chain, name: p.name })) {
+          exemptAssets.add(k);
+        }
+        if ((p.verified === false && !isYtPt) || p.price === null || !(p.price > 0)) continue;
         price.set(k, p.price);
       }
     }
     // یک سواپ ممکن است از دو کیف پول خودی دیده شود (انتقال داخلی نیست، ولی شناسه یکی است)
     const unique = [...new Map(swaps.map((s) => [s.hash || s.id, s])).values()];
-    return spotBook(unique, price, fromMs, allLoaded ? held : undefined);
+    return spotBook(
+      unique,
+      price,
+      fromMs,
+      allLoaded ? held : undefined,
+      SPOT_AUDIT_MIN_USD,
+      allLoaded ? { onlyHeld: true, exemptAssets } : { exemptAssets }
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stamp, wallets, snaps, fromMs]);
 
