@@ -182,9 +182,20 @@ export async function getQfexDepth(market: string): Promise<{ market: string; bi
   });
 }
 /**
- * تاریخچهٔ سود/زیان معاملات یک زیرحساب لایتر (عمومی، بدون امضا)
- * trade_pnl تجمعی از ایجاد حساب است و آخرین نقطه «اکنون» است (شامل سود/زیان باز، فاندینگ و کارمزد).
- * فقط [زمان ثانیه، trade_pnl] برگردانده می‌شود: ساعتی ۷ روز + روزانه ۳۱ روز.
+ * سود/زیان کل یک نقطهٔ /api/v1/pnl لایتر مطابق نمای Total خود سایت لایتر:
+ * در API لایتر (با ignore_transfers=false)، انتقال داخلی بین پرپ و اسپات/برداشت (spot_outflow)
+ * به‌صورت منفی در trade_pnl و مثبت در trade_spot_pnl ثبت می‌شود؛ جمع اجزا اثر انتقال داخلی را خنثی می‌کند.
+ */
+function lighterTotalPnl(p: Row): number | null {
+  const trade = fin(p.trade_pnl);
+  if (trade === null) return null;
+  return trade + (fin(p.trade_spot_pnl) ?? 0) + (fin(p.pool_pnl) ?? 0) + (fin(p.staking_pnl) ?? 0);
+}
+
+/**
+ * تاریخچهٔ سود/زیان کل یک زیرحساب لایتر (عمومی، بدون امضا)
+ * تجمعی از ایجاد حساب است و آخرین نقطه «اکنون» است (شامل سود/زیان باز، فاندینگ، کارمزد و خنثی‌سازی انتقال داخلی).
+ * فقط [زمان ثانیه، total_pnl] برگردانده می‌شود: ساعتی ۷ روز + روزانه ۳۱ روز.
  */
 export async function getLighterPnl(op: string, index: string): Promise<{ hourly: [number, number][]; daily: [number, number][]; fetchedAt: number }> {
   if (!['lighter-pnl', 'lighter-mainnet-pnl'].includes(op)) throw new ProviderError(400, 'درخواست ناشناخته');
@@ -196,7 +207,7 @@ export async function getLighterPnl(op: string, index: string): Promise<{ hourly
     const data = await read(`${host}/api/v1/pnl?${query}`);
     if (!Array.isArray(data.pnl)) throw new ProviderError(502, 'پاسخ سود و زیان معتبر نیست');
     return data.pnl.map(asRow).flatMap((p): [number, number][] => {
-      const t = fin(p.timestamp), v = fin(p.trade_pnl);
+      const t = fin(p.timestamp), v = lighterTotalPnl(p);
       return t === null || v === null ? [] : [[t, v]];
     });
   };
@@ -283,7 +294,7 @@ export async function getLighterDaily(op: string, index: string, days: number): 
   const data = await read(`${host}/api/v1/pnl?${q}`);
   if (!Array.isArray(data.pnl)) throw new ProviderError(502, 'پاسخ سود و زیان معتبر نیست');
   const daily = data.pnl.map(asRow).flatMap((p): [number, number, number][] => {
-    const t = fin(p.timestamp), v = fin(p.trade_pnl), vol = fin(p.volume);
+    const t = fin(p.timestamp), v = lighterTotalPnl(p), vol = fin(p.volume);
     return t === null || v === null ? [] : [[t, v, vol ?? 0]];
   });
   return { daily, fetchedAt: Date.now() };

@@ -207,7 +207,7 @@ export function fromLighter(
     venue,
     label,
     unit: venue === 'lighter-mainnet' ? 'USDC' : 'USDG',
-    equity: equity && !equity.partial ? equity.sum : null,
+    equity: accounts ? (accounts.length === 0 ? 0 : equity && !equity.partial ? equity.sum : null) : null,
     unrealizedPnl,
     allTimePnl,
     realizedPnl: diff(allTimePnl, unrealizedPnl),
